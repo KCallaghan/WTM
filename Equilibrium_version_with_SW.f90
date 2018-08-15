@@ -99,19 +99,19 @@ subroutine dividedomain(n2,n3,numtasks,nini,filemask,ntotal) !divide among proce
   write(6,*)'reading in the mask to divide the domain'
 
   iret = nf90_open(filemask,0,ncid)  !open the mask file
-  call check_err(iret)
+  call check_err(iret, "Unable to load file '" // filemask // "'!")
   write(6,*)'first call'
 
   iret = nf90_inq_varid(ncid,'value',varid) !get the ID of the value layer
-  call check_err(iret)
+  call check_err(iret, "Problem getting ID of mask layer!")
   write(6,*) 'second call'
 
   iret = nf90_get_var(ncid,varid,varread) !read the actual values into the array called varread
-  call check_err(iret)
+  call check_err(iret, "Problem reading the values from the mask layer!")
   write(6,*) 'third call'
 
   iret = nf90_close(ncid) !close the mask file
-  call check_err(iret)
+  call check_err(iret, "Problem closing the mask file!")
   write(6,*)'fourth call'
 
   ntotal = count(varread>0.5) !count the number of land cells. I changed this slightly since I am using mask here rather than topo; all cells with a value of 1 should be included. 
@@ -146,13 +146,17 @@ end subroutine dividedomain
   
 !********************************************************************************************************
 
-subroutine check_err(statusnc)
-
+subroutine check_err(statusnc, msg)
   use netcdf
   integer statusnc
+  character(len=*) msg
 
-  if(statusnc.ne. nf90_noerr) then
-      stop 'Stopped due to a catch in the check_err subroutine'
+  if(statusnc.ne.nf90_noerr) then
+    IF (LEN(msg)>0) then
+      ERROR STOP msg
+    ELSE
+      ERROR STOP 'Stopped due to a catch in the check_err subroutine'
+    ENDIF
   endif
 
 end subroutine check_err
@@ -386,16 +390,16 @@ print *,'here',nmax,nini(n),nend(n),pid
       allocate(varread(n2,n3))
      
       iret = nf90_open(filetopo,0,ncid) !reading in the topo
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filemask // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,varread)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
 
       where(varread .le. UNDEF) varread = 0. !change undefined cells to 0
@@ -404,16 +408,16 @@ print *,'here',nmax,nini(n),nend(n),pid
       allocate(watermask(n2,n3)) 
      
       iret = nf90_open(filemask,0,ncid) !reading in the mask
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filemask // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,watermask)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
       
 
 
@@ -427,16 +431,16 @@ print *,'here',nmax,nini(n),nend(n),pid
    
      
       iret = nf90_open(fileksat,0,ncid) !reading in the ksat
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filemask // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret,"")
 
       iret = nf90_get_var(ncid,varid,ksat_read)
-      call check_err(iret)
+      call check_err(iret,"")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
 
 
@@ -444,16 +448,16 @@ print *,'here',nmax,nini(n),nend(n),pid
       allocate(rech_month_read(n2,n3))
      
       iret = nf90_open(filerech,0,ncid) !reading in the recharge file
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filemask // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,rech_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
 !####################################################################################### potentially change with lakes
       rech_read = max(rech_read,0.) !setting it so recharge can only be positive
@@ -465,32 +469,32 @@ print *,'here',nmax,nini(n),nend(n),pid
       allocate(fdepth_read(n2,n3))
     
       iret = nf90_open(filefdepth,0,ncid) !reading in the fdepth
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filemask // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,fdepth_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "")
 
 
 
 allocate(temp_read(n2,n3))
     
       iret = nf90_open(filetemp,0,ncid) !reading in the fdepth
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filemask // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,temp_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "")
 
 
 !now send everything we have opened:
