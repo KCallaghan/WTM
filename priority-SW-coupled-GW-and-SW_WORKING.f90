@@ -1312,7 +1312,7 @@ GROUNDWATER: DO while(iter<iterations)
  
             open(25,file = trim(time_end)//'_27June.dat',form='unformatted',access='stream')!access='direct',recl=n2*n3)!access='stream')!do the final write - create the file
             print *,'the file has been opened'
-            write(25,rec=1)((wtdglob(i,j),i=1,n2),j=1,n3) !and write it to file
+            write(25)((wtdglob(i,j),i=1,n2),j=1,n3) !and write it to file
             print *,'the file has been written'
             close(25)
             print *,'written to file',pid
