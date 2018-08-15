@@ -9,7 +9,7 @@
 
 subroutine Merge(A,NA,B,NB,C,NC)
  
-   integer, intent(in) :: NA,NB,NC         ! Normal usage: NA+NB = NC
+   integer, intent(in)     :: NA,NB,NC     ! Normal usage: NA+NB = NC
    integer, intent(in out) :: A(NA)        ! B overlays C(NA+1:NC)
    integer, intent(in)     :: B(NB)
    integer, intent(in out) :: C(NC)
@@ -132,16 +132,15 @@ subroutine dividedomain(n2,n3,numtasks,nini,filemask,ntotal)
   do j=1,n3
       ncount=ncount+ncells(j) !add the number of cells defined in the current column
       if (ncount .ge. ntotal/(numtasks-1)) then !>= total number of defined cells/number of threads
-          nini(n) = j-1 !Telling it which row it needs to start in, to divide up the work equally, so each task handles the same number of cells.
-         ncount = ncells(j) !reset the ncount for the next task
-          n = n+1
+        nini(n) = j-1 !Telling it which row it needs to start in, to divide up the work equally, so each task handles the same number of cells.
+        ncount  = ncells(j) !reset the ncount for the next task
+        n       = n+1
       endif
       if(n .eq. numtasks) exit
   end do
 
-print *,'down here in the subroutine',nini
+  print *,'down here in the subroutine',nini
 
- 
   deallocate(ncells)
   deallocate(varread)
 
@@ -280,13 +279,13 @@ converged = 0 !flag for the surface water loop
 
 !initialise a few values:
 
-upvalue = 0.
-downvalue = 0.
-leftvalue = 0.
+upvalue    = 0.
+downvalue  = 0.
+leftvalue  = 0.
 rightvalue = 0.
-counter = 0
+counter    = 0
 
-iter = 0
+iter       = 0
 diff_total = 0
 
 
@@ -299,9 +298,9 @@ print *,'Number of tasks = ',numtasks,'My rank = ',pid
 
 !allocate array space, the size of the number of tasks available
 
-allocate(nini(1:numtasks-1))
-allocate(nend(1:numtasks-1))
-allocate(domblock(1:numtasks-1))
+allocate(nini         (1:numtasks-1))
+allocate(nend         (1:numtasks-1))
+allocate(domblock     (1:numtasks-1))
 allocate(domblocksmall(1:numtasks-1))
                
 
@@ -379,7 +378,6 @@ if(pid .eq. 0) then
 
       iret = nf90_close(ncid)
       call check_err(iret, "Unable to close file!")
-
 
     where(topo_start_read .le. UNDEF) topo_start_read = 0. !change undefined cells to 0
 
@@ -582,8 +580,6 @@ if(pid .eq. 0) then
     call MPI_send(wtd_read (1,3),1,columntype,numtasks-1, 4,MPI_COMM_WORLD,ierr)
     call MPI_send(hold     (1,3),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
 
-
-
     deallocate(mask_read)
     deallocate(wtd_read)
     deallocate(ksat_read)
@@ -769,7 +765,7 @@ GROUNDWATER: DO while(iter<iterations)
     endif
 
 
-     if(mod(float(iter),3650.).eq.0.) then !update the changing topography and recharge, here being done every 10 years
+    if(mod(float(iter),3650.).eq.0.) then !update the changing topography and recharge, here being done every 10 years
         write(6,*)'pid',pid
         if (pid.eq.0) then !here I am going to do the adjustments to the topo,rech,fslope,temp. 
             allocate(topo_now(n2,n3))
@@ -808,10 +804,10 @@ GROUNDWATER: DO while(iter<iterations)
                 call MPI_send(fdepth_now(1,nini(n)-1),1,domblock(n),n,11,MPI_COMM_WORLD,ierr)
             end do
 
-           call MPI_send(topo_now  (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1, 9,MPI_COMM_WORLD,ierr)
-           call MPI_send(rech_now  (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,10,MPI_COMM_WORLD,ierr)
-           call MPI_send(fdepth_now(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,11,MPI_COMM_WORLD,ierr)
-           
+            call MPI_send(topo_now  (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1, 9,MPI_COMM_WORLD,ierr)
+            call MPI_send(rech_now  (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,10,MPI_COMM_WORLD,ierr)
+            call MPI_send(fdepth_now(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,11,MPI_COMM_WORLD,ierr)
+
             call MPI_send(topo_now  (1,1),1,columntype,numtasks-1, 9,MPI_COMM_WORLD,ierr)
             call MPI_send(rech_now  (1,1),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
             call MPI_send(fdepth_now(1,1),1,columntype,numtasks-1,11,MPI_COMM_WORLD,ierr)
@@ -854,9 +850,6 @@ GROUNDWATER: DO while(iter<iterations)
             call MPI_recv(topo_sent  (1,nmax+1),1,columntype,0, 9,MPI_COMM_WORLD,status,ierr) 
             call MPI_recv(rech_sent  (1,nmax+1),1,columntype,0,10,MPI_COMM_WORLD,status,ierr)
             call MPI_recv(fdepth_sent(1,nmax+1),1,columntype,0,11,MPI_COMM_WORLD,status,ierr)
-         
-         
-
         endif
     endif
 
@@ -905,36 +898,36 @@ GROUNDWATER: DO while(iter<iterations)
 !sending and receiving the lines on either side of each section to allow for flow across those lines:
 
         if(pid.eq.1)then
-            call MPI_recv(wtd(1,nmax),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(wtd(1,1),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
-            call MPI_send(wtd(1,2),1,columntype,numtasks-1,8,MPI_COMM_WORLD,ierr)
+            call MPI_recv(wtd(1,nmax),  1,columntype,pid+1,     8,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(wtd(1,1),     1,columntype,pid+1,     9,MPI_COMM_WORLD,status,ierr)
+            call MPI_send(wtd(1,2),     1,columntype,numtasks-1,8,MPI_COMM_WORLD,ierr)
             call MPI_send(wtd(1,nmax-1),1,columntype,numtasks-1,9,MPI_COMM_WORLD,ierr)
 
         elseif(pid.eq.numtasks-1)then
             if(mod(pid,2).eq.0)then
-                call MPI_recv(wtd(1,nmax),1,columntype,1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(wtd(1,1),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
-                call MPI_send(wtd(1,2),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
+                call MPI_recv(wtd(1,nmax),  1,columntype,1,    8,MPI_COMM_WORLD,status,ierr)
+                call MPI_recv(wtd(1,1),     1,columntype,1,    9,MPI_COMM_WORLD,status,ierr)
+                call MPI_send(wtd(1,2),     1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
                 call MPI_send(wtd(1,nmax-1),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
 
             else
-                call MPI_send(wtd(1,2),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
+                call MPI_send(wtd(1,2),     1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
                 call MPI_send(wtd(1,nmax-1),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
-                call MPI_recv(wtd(1,nmax),1,columntype,1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(wtd(1,1),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
+                call MPI_recv(wtd(1,nmax),  1,columntype,1,    8,MPI_COMM_WORLD,status,ierr)
+                call MPI_recv(wtd(1,1),     1,columntype,1,    9,MPI_COMM_WORLD,status,ierr)
             endif
 
         else
             if(mod(pid,2).eq.0)then
-                call MPI_recv(wtd(1,nmax),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(wtd(1,1),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
-                call MPI_send(wtd(1,2),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
+                call MPI_recv(wtd(1,nmax),  1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
+                call MPI_recv(wtd(1,1),     1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
+                call MPI_send(wtd(1,2),     1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
                 call MPI_send(wtd(1,nmax-1),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
             else
-                call MPI_send(wtd(1,2),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
+                call MPI_send(wtd(1,2),     1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
                 call MPI_send(wtd(1,nmax-1),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
-                call MPI_recv(wtd(1,nmax),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(wtd(1,1),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
+                call MPI_recv(wtd(1,nmax),  1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
+                call MPI_recv(wtd(1,1),     1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
             endif
         endif
     ENDIF 
@@ -942,13 +935,11 @@ GROUNDWATER: DO while(iter<iterations)
 
 
     if(mod((iter),365).eq.0.) then
-
-
         print *,'starting with the surface water loop!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
 
 !reset variables to 0
-        converged=0
-        counter=0
+        converged  = 0
+        counter    = 0
         diff_total = 0
       
         SURFACE: do while(converged .eq. 0) 
@@ -976,7 +967,7 @@ GROUNDWATER: DO while(iter<iterations)
             else !Any PID that is not 0
 
                 hold_read = wtd
-                nmax = nend(pid) - nini(pid) +3  
+                nmax      = nend(pid) - nini(pid) +3  
 
 
                 allocate(hz_read(n2,nmax+1))
@@ -1005,327 +996,313 @@ GROUNDWATER: DO while(iter<iterations)
 
 
                 COLS1: do i=2,nmax
-                    ROWS1:do j=2,n2
+                ROWS1: do j=2,n2
+                    row = arr(1,n2*nmax-(j-1)-(i-1)*n2) !get the next item in the sorted list to be processed, from the sorted index array
+                    col = arr(2,n2*nmax-(j-1)-(i-1)*n2)
 
-                        row = arr(1,n2*nmax-(j-1)-(i-1)*n2) !get the next item in the sorted list to be processed, from the sorted index array
-                        col = arr(2,n2*nmax-(j-1)-(i-1)*n2)
+                    if(col.ge.nmax-1)then !Doing the end two columns separately, so skip them here
+                      CYCLE
+                    endif
 
+                    if(col.le.2)then !Doing the end two columns separately, so skip them here
+                      CYCLE
+                    endif
 
-                 if(col.ge.nmax-1)then !Doing the end two columns separately, so skip them here
-                    CYCLE
-                endif
+                    if(row.eq.1 .or.row.eq.n2)then !Can't correctly process the very edge rows
+                      CYCLE
+                    endif
 
-                if(col.le.2)then !Doing the end two columns separately, so skip them here
-                    CYCLE
-                endif
+                    if(wtd(row,col).le.0)then  !there is no surface water to move
+                      CYCLE
+                    endif
 
-                if(row.eq.1 .or.row.eq.n2)then !Can't correctly process the very edge rows
-                    CYCLE
-                endif
+                    if(landmask(row,col) .eq. 0) then !we are in the ocean
+                      wtd(row,col) = 0
+                    endif
 
-
-                        if(wtd(row,col).le.0)then  !there is no surface water to move
-                            CYCLE
-                        endif
-
-                        if(landmask(row,col) .eq. 0) then !we are in the ocean
-                            wtd(row,col) = 0
-                        endif
-
-                        if(hz_read(row,col) .le. hz_read(row+1,col) .and. hz_read(row,col) &
+                    if(hz_read(row,col) .le. hz_read(row+1,col) .and. hz_read(row,col) &
                         .le. hz_read(row-1,col) .and. hz_read(row,col) .le. hz_read(row,col+1) .and. &
                         hz_read(row,col) .le. hz_read(row,col-1)) then !this is the lowest cell in the area, no water can leave
-                            CYCLE
-                        else
-                            upvalue    = hz_read(row,col) - hz_read(row-1,col) !find the steepest direction, in which water would move
-                            downvalue  = hz_read(row,col) - hz_read(row+1,col)
-                            leftvalue  = hz_read(row,col) - hz_read(row,col-1)
-                            rightvalue = hz_read(row,col) - hz_read(row,col+1)
-            
-                            if(max(upvalue,downvalue,leftvalue,rightvalue) .le. 0.) then     !should have already eliminated this option, but in case, it's the lowest local cell    
-                                CYCLE   
-                elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. upvalue) then  !choose direction which is steepest
-                    water = min(wtd(row,col)*area(row),upvalue*area(row)/2.)         !water is the minumum of the total water available, or of half the difference between 2 cells
-                    water1 = water/area(row-1)                                       !get height of water change in the giving and receiving cells
-                    water2 = water/area(row)
+                      CYCLE
+                    else
+                      upvalue    = hz_read(row,col) - hz_read(row-1,col) !find the steepest direction, in which water would move
+                      downvalue  = hz_read(row,col) - hz_read(row+1,col)
+                      leftvalue  = hz_read(row,col) - hz_read(row,col-1)
+                      rightvalue = hz_read(row,col) - hz_read(row,col+1)
+      
+                      if(max(upvalue,downvalue,leftvalue,rightvalue) .le. 0.) then     !should have already eliminated this option, but in case, it's the lowest local cell    
+                        CYCLE   
+                      elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. upvalue) then  !choose direction which is steepest
+                          water  = min(wtd(row,col)*area(row),upvalue*area(row)/2.)          !water is the minumum of the total water available, or of half the difference between 2 cells
+                          water1 = water/area(row-1)                                         !get height of water change in the giving and receiving cells
+                          water2 = water/area(row)
 
-                    wtd(row,col) = wtd(row,col) - water2                              !update water table in the cells
-                    wtd(row-1,col) = wtd(row-1,col) + water1
+                          wtd(row,col)   = wtd(row,col) - water2                             !update water table in the cells
+                          wtd(row-1,col) = wtd(row-1,col) + water1
 
-                    hz_read(row,col) = hz_read(row,col) - water2                      !update hz for the rest of the calculations
-                    hz_read(row-1,col) = hz_read(row-1,col) + water1
+                          hz_read(row,col)   = hz_read(row,col) - water2                     !update hz for the rest of the calculations
+                          hz_read(row-1,col) = hz_read(row-1,col) + water1
 
+                      elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. downvalue) then
+                          water          = min(wtd(row,col)*area(row),downvalue*area(row)/2.)    
+                          water1         = water/area(row+1)  
+                          water2         = water/area(row)
+                          wtd(row,col)   = wtd(row,col) - water2
+                          wtd(row+1,col) = wtd(row+1,col) + water1
 
+                          hz_read(row,col) = hz_read(row,col) - water2
+                          hz_read(row+1,col) = hz_read(row+1,col) + water1
 
-                elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. downvalue) then
-                    water          = min(wtd(row,col)*area(row),downvalue*area(row)/2.)    
-                    water1         = water/area(row+1)  
-                    water2         = water/area(row)
-                    wtd(row,col)   = wtd(row,col) - water2
-                    wtd(row+1,col) = wtd(row+1,col) + water1
+                      elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. rightvalue) then
+                          water          = min(wtd(row,col)*area(row),rightvalue*area(row)/2.)    
+                          water1         = water/area(row)  
+                          water2         = water/area(row)
+                          wtd(row,col)   = wtd(row,col) - water2
+                          wtd(row,col+1) = wtd(row,col+1) + water1
 
-                    hz_read(row,col) = hz_read(row,col) - water2
-                    hz_read(row+1,col) = hz_read(row+1,col) + water1
+                          hz_read(row,col) = hz_read(row,col) - water2
+                          hz_read(row,col+1) = hz_read(row,col+1) + water1
 
-                elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. rightvalue) then
-                    water          = min(wtd(row,col)*area(row),rightvalue*area(row)/2.)    
-                    water1         = water/area(row)  
-                    water2         = water/area(row)
-                    wtd(row,col)   = wtd(row,col) - water2
-                    wtd(row,col+1) = wtd(row,col+1) + water1
+                      elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. leftvalue) then
+                          water          = min(wtd(row,col)*area(row),leftvalue*area(row)/2.)    
+                          water1         = water/area(row)  
+                          water2         = water/area(row)
+                          wtd(row,col)   = wtd(row,col) - water2
+                          wtd(row,col-1) = wtd(row,col-1) + water1
 
-                    hz_read(row,col) = hz_read(row,col) - water2
-                    hz_read(row,col+1) = hz_read(row,col+1) + water1
+                          hz_read(row,col) = hz_read(row,col) - water2
+                          hz_read(row,col-1) = hz_read(row,col-1) + water1
 
-                elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. leftvalue) then
-                    water          = min(wtd(row,col)*area(row),leftvalue*area(row)/2.)    
-                    water1         = water/area(row)  
-                    water2         = water/area(row)
-                    wtd(row,col)   = wtd(row,col) - water2
-                    wtd(row,col-1) = wtd(row,col-1) + water1
-
-                    hz_read(row,col) = hz_read(row,col) - water2
-                    hz_read(row,col-1) = hz_read(row,col-1) + water1
-
-                endif
+                      endif
                          
-                        endif
+                    endif
 
-                    end do ROWS1
+                end do ROWS1
                 end do COLS1
 
 
-       if(pid.eq.1)then        !send & receive the edge columns
-            call MPI_recv(wtd(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(wtd(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
-            call MPI_send(wtd(1,3),1,columntype,numtasks-1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(wtd(1,2),1,columntype,numtasks-1,9,MPI_COMM_WORLD,ierr)
+                if(pid.eq.1)then        !send & receive the edge columns
+                    call MPI_recv(wtd(1,nmax+1),1,columntype,pid+1,     8,MPI_COMM_WORLD,status,ierr)
+                    call MPI_recv(wtd(1,nmax),  1,columntype,pid+1,     9,MPI_COMM_WORLD,status,ierr)
+                    call MPI_send(wtd(1,3),     1,columntype,numtasks-1,8,MPI_COMM_WORLD,ierr)
+                    call MPI_send(wtd(1,2),     1,columntype,numtasks-1,9,MPI_COMM_WORLD,ierr)
 
-           call MPI_recv(hz_read(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(hz_read(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
-            call MPI_send(hz_read(1,3),1,columntype,numtasks-1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(hz_read(1,2),1,columntype,numtasks-1,9,MPI_COMM_WORLD,ierr)
+                    call MPI_recv(hz_read(1,nmax+1),1,columntype,pid+1,     8,MPI_COMM_WORLD,status,ierr)
+                    call MPI_recv(hz_read(1,nmax),  1,columntype,pid+1,     9,MPI_COMM_WORLD,status,ierr)
+                    call MPI_send(hz_read(1,3),     1,columntype,numtasks-1,8,MPI_COMM_WORLD,ierr)
+                    call MPI_send(hz_read(1,2),     1,columntype,numtasks-1,9,MPI_COMM_WORLD,ierr)
 
-        elseif(pid.eq.numtasks-1)then
-            if(mod(pid,2).eq.0)then
+                elseif(pid.eq.numtasks-1)then
+                    if(mod(pid,2).eq.0)then
+                      call MPI_recv(wtd(1,nmax+1),1,columntype,1,    8,MPI_COMM_WORLD,status,ierr)
+                      call MPI_recv(wtd(1,nmax),  1,columntype,1,    9,MPI_COMM_WORLD,status,ierr)
+                      call MPI_send(wtd(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
+                      call MPI_send(wtd(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
+           
+                      call MPI_recv(hz_read(1,nmax+1),1,columntype,1,    8,MPI_COMM_WORLD,status,ierr)
+                      call MPI_recv(hz_read(1,nmax),  1,columntype,1,    9,MPI_COMM_WORLD,status,ierr)
+                      call MPI_send(hz_read(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
+                      call MPI_send(hz_read(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
+                    else
+                      call MPI_send(wtd(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
+                      call MPI_send(wtd(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
+                      call MPI_recv(wtd(1,nmax+1),1,columntype,1,    8,MPI_COMM_WORLD,status,ierr)
+                      call MPI_recv(wtd(1,nmax),  1,columntype,1,    9,MPI_COMM_WORLD,status,ierr)
+           
+                      call MPI_send(hz_read(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
+                      call MPI_send(hz_read(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
+                      call MPI_recv(hz_read(1,nmax+1),1,columntype,1,    8,MPI_COMM_WORLD,status,ierr)
+                      call MPI_recv(hz_read(1,nmax),  1,columntype,1,    9,MPI_COMM_WORLD,status,ierr)
+                    endif
+                else
+                    if(mod(pid,2).eq.0)then
+                        call MPI_recv(wtd(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
+                        call MPI_recv(wtd(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
+                        call MPI_send(wtd(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
+                        call MPI_send(wtd(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
 
-            call MPI_recv(wtd(1,nmax+1),1,columntype,1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(wtd(1,nmax),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
-            call MPI_send(wtd(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
-            call MPI_send(wtd(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
- 
-            call MPI_recv(hz_read(1,nmax+1),1,columntype,1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(hz_read(1,nmax),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
-            call MPI_send(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
-            call MPI_send(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
- 
-            else
+                        call MPI_recv(hz_read(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
+                        call MPI_recv(hz_read(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
+                        call MPI_send(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
+                        call MPI_send(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
 
-            call MPI_send(wtd(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
-            call MPI_send(wtd(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
-            call MPI_recv(wtd(1,nmax+1),1,columntype,1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(wtd(1,nmax),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
- 
-            call MPI_send(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
-            call MPI_send(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
-            call MPI_recv(hz_read(1,nmax+1),1,columntype,1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(hz_read(1,nmax),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
+                    else
+                        call MPI_send(wtd(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
+                        call MPI_send(wtd(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
+                        call MPI_recv(wtd(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
+                        call MPI_recv(wtd(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
 
-
-            endif
-
-        else
-            if(mod(pid,2).eq.0)then
-                call MPI_recv(wtd(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(wtd(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
-                call MPI_send(wtd(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(wtd(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
-
-                call MPI_recv(hz_read(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(hz_read(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
-                call MPI_send(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
-
-            else
-                call MPI_send(wtd(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(wtd(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
-                call MPI_recv(wtd(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(wtd(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
-
-                call MPI_send(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
-                call MPI_recv(hz_read(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(hz_read(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
-
-            endif
-        endif
-
-
-                    COLS3: do col=nmax-1,nmax
-                        ROWS3:do row=2,n2
-
-
-                if(row.eq.1 .or.row.eq.n2)then 
-                    CYCLE
+                        call MPI_send(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
+                        call MPI_send(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
+                        call MPI_recv(hz_read(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
+                        call MPI_recv(hz_read(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
+                    endif
                 endif
 
 
-                            if(wtd(row,col).le.0)then
-                              CYCLE
-                            endif
- 
-                            if(landmask(row,col) .eq. 0) then
-                                wtd(row,col) = 0
-                            endif
+                COLS3: do col=nmax-1,nmax
+                ROWS3: do row=2,n2
+                    if(row.eq.1 .or.row.eq.n2)then 
+                        CYCLE
+                    endif
 
-                  
-                            if(hz_read(row,col) .le. hz_read(row+1,col) .and. hz_read(row,col) &
-                            .le. hz_read(row-1,col) .and. hz_read(row,col) .le. hz_read(row,col+1) .and. &
-                            hz_read(row,col) .le. hz_read(row,col-1)) then
-                                CYCLE
-                            else
 
-                                upvalue    = hz_read(row,col) - hz_read(row-1,col)
-                                downvalue  = hz_read(row,col) - hz_read(row+1,col)
-                                leftvalue  = hz_read(row,col) - hz_read(row,col-1)
-                                rightvalue = hz_read(row,col) - hz_read(row,col+1)
+                    if(wtd(row,col).le.0)then
+                      CYCLE
+                    endif
 
-                                if(max(upvalue,downvalue,leftvalue,rightvalue) .le. 0.) then         
-                                    CYCLE   
-                         elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. upvalue) then
-                    water  = min(wtd(row,col)*area(row),upvalue*area(row)/2.)   
-                    water1 = water/area(row-1)  
-                    water2 = water/area(row)
-                           wtd(row,col) = wtd(row,col) - water2
+                    if(landmask(row,col) .eq. 0) then
+                      wtd(row,col) = 0
+                    endif
+
+                          
+                    if(hz_read(row,col) .le. hz_read(row+1,col) .and. hz_read(row,col) &
+                    .le. hz_read(row-1,col) .and. hz_read(row,col) .le. hz_read(row,col+1) .and. &
+                    hz_read(row,col) .le. hz_read(row,col-1)) then
+                        CYCLE
+                    else
+
+                        upvalue    = hz_read(row,col) - hz_read(row-1,col)
+                        downvalue  = hz_read(row,col) - hz_read(row+1,col)
+                        leftvalue  = hz_read(row,col) - hz_read(row,col-1)
+                        rightvalue = hz_read(row,col) - hz_read(row,col+1)
+
+                        if(max(upvalue,downvalue,leftvalue,rightvalue) .le. 0.) then         
+                            CYCLE   
+                        elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. upvalue) then
+                            water          = min(wtd(row,col)*area(row),upvalue*area(row)/2.)   
+                            water1         = water/area(row-1)  
+                            water2         = water/area(row)
+                            wtd(row,col)   = wtd(row,col) - water2
                             wtd(row-1,col) = wtd(row-1,col) + water1
 
-                    hz_read(row,col) = hz_read(row,col) - water2
-                    hz_read(row-1,col) = hz_read(row-1,col) + water1
+                            hz_read(row,col)   = hz_read(row,col) - water2
+                            hz_read(row-1,col) = hz_read(row-1,col) + water1
 
 
                         elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. downvalue) then
-                    water = min(wtd(row,col)*area(row),downvalue*area(row)/2.)   
-                    water1 = water/area(row+1)  
-                    water2 = water/area(row)
-                           wtd(row,col) = wtd(row,col) - water2
+                            water          = min(wtd(row,col)*area(row),downvalue*area(row)/2.)   
+                            water1         = water/area(row+1)  
+                            water2         = water/area(row)
+                            wtd(row,col)   = wtd(row,col) - water2
                             wtd(row+1,col) = wtd(row+1,col) + water1
 
-                    hz_read(row,col) = hz_read(row,col) - water2
-                    hz_read(row+1,col) = hz_read(row+1,col) + water1
+                            hz_read(row,col)   = hz_read(row,col) - water2
+                            hz_read(row+1,col) = hz_read(row+1,col) + water1
 
                         elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. rightvalue) then
-                    water = min(wtd(row,col)*area(row),rightvalue*area(row)/2.)   
-                    water1 = water/area(row)  
-                    water2 = water/area(row)
-                           wtd(row,col) = wtd(row,col) - water2
+                            water          = min(wtd(row,col)*area(row),rightvalue*area(row)/2.)   
+                            water1         = water/area(row)  
+                            water2         = water/area(row)
+                            wtd(row,col)   = wtd(row,col) - water2
                             wtd(row,col+1) = wtd(row,col+1) + water1
 
-                    hz_read(row,col) = hz_read(row,col) - water2
-                    hz_read(row,col+1) = hz_read(row,col+1) + water1
+                            hz_read(row,col)   = hz_read(row,col) - water2
+                            hz_read(row,col+1) = hz_read(row,col+1) + water1
 
                         elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. leftvalue) then
-                    water = min(wtd(row,col)*area(row),leftvalue*area(row)/2.)   
-                    water1 = water/area(row)  
-                    water2 = water/area(row)
-                           wtd(row,col) = wtd(row,col) - water2
+                            water          = min(wtd(row,col)*area(row),leftvalue*area(row)/2.)   
+                            water1         = water/area(row)  
+                            water2         = water/area(row)
+                            wtd(row,col)   = wtd(row,col) - water2
                             wtd(row,col-1) = wtd(row,col-1) + water1
 
-                    hz_read(row,col) = hz_read(row,col) - water2
-                    hz_read(row,col-1) = hz_read(row,col-1) + water1
+                            hz_read(row,col) = hz_read(row,col) - water2
+                            hz_read(row,col-1) = hz_read(row,col-1) + water1
 
                         endif
 
-                            
-                            endif
+                                    
+                    endif
 
-                        end do ROWS3
-                    end do COLS3
-             
+                end do ROWS3
+                end do COLS3
+                     
 
-       if(pid.eq.1)then  !Once again send & receive the edge columns
-            call MPI_send(wtd(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(wtd(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
-            call MPI_recv(wtd(1,3),1,columntype,numtasks-1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(wtd(1,2),1,columntype,numtasks-1,9,MPI_COMM_WORLD,status,ierr)
+               if(pid.eq.1)then  !Once again send & receive the edge columns
+                    call MPI_send(wtd(1,nmax+1),1,columntype,pid+1,     8,MPI_COMM_WORLD,ierr)
+                    call MPI_send(wtd(1,nmax),  1,columntype,pid+1,     9,MPI_COMM_WORLD,ierr)
+                    call MPI_recv(wtd(1,3),     1,columntype,numtasks-1,8,MPI_COMM_WORLD,status,ierr)
+                    call MPI_recv(wtd(1,2),     1,columntype,numtasks-1,9,MPI_COMM_WORLD,status,ierr)
 
-            call MPI_send(hz_read(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(hz_read(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
-            call MPI_recv(hz_read(1,3),1,columntype,numtasks-1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(hz_read(1,2),1,columntype,numtasks-1,9,MPI_COMM_WORLD,status,ierr)
+                    call MPI_send(hz_read(1,nmax+1),1,columntype,pid+1,     8,MPI_COMM_WORLD,ierr)
+                    call MPI_send(hz_read(1,nmax),  1,columntype,pid+1,     9,MPI_COMM_WORLD,ierr)
+                    call MPI_recv(hz_read(1,3),     1,columntype,numtasks-1,8,MPI_COMM_WORLD,status,ierr)
+                    call MPI_recv(hz_read(1,2),     1,columntype,numtasks-1,9,MPI_COMM_WORLD,status,ierr)
 
-        elseif(pid.eq.numtasks-1)then
-            if(mod(pid,2).eq.0)then
-
-
-            call MPI_send(wtd(1,nmax+1),1,columntype,1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(wtd(1,nmax),1,columntype,1,9,MPI_COMM_WORLD,ierr)
-            call MPI_recv(wtd(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
-            call MPI_recv(wtd(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
-
-            call MPI_send(hz_read(1,nmax+1),1,columntype,1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(hz_read(1,nmax),1,columntype,1,9,MPI_COMM_WORLD,ierr)
-            call MPI_recv(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
-            call MPI_recv(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
+                elseif(pid.eq.numtasks-1)then
+                    if(mod(pid,2).eq.0)then
 
 
-            else
+                    call MPI_send(wtd(1,nmax+1),1,columntype,1,    8,MPI_COMM_WORLD,ierr)
+                    call MPI_send(wtd(1,nmax),  1,columntype,1,    9,MPI_COMM_WORLD,ierr)
+                    call MPI_recv(wtd(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
+                    call MPI_recv(wtd(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
 
-            call MPI_recv(wtd(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
-            call MPI_recv(wtd(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
-            call MPI_send(wtd(1,nmax+1),1,columntype,1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(wtd(1,nmax),1,columntype,1,9,MPI_COMM_WORLD,ierr)
+                    call MPI_send(hz_read(1,nmax+1),1,columntype,1,    8,MPI_COMM_WORLD,ierr)
+                    call MPI_send(hz_read(1,nmax),  1,columntype,1,    9,MPI_COMM_WORLD,ierr)
+                    call MPI_recv(hz_read(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
+                    call MPI_recv(hz_read(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
 
-            call MPI_recv(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
-            call MPI_recv(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
-            call MPI_send(hz_read(1,nmax+1),1,columntype,1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(hz_read(1,nmax),1,columntype,1,9,MPI_COMM_WORLD,ierr)
+
+                    else
+
+                    call MPI_recv(wtd(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
+                    call MPI_recv(wtd(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
+                    call MPI_send(wtd(1,nmax+1),1,columntype,1,    8,MPI_COMM_WORLD,ierr)
+                    call MPI_send(wtd(1,nmax),  1,columntype,1,    9,MPI_COMM_WORLD,ierr)
+
+                    call MPI_recv(hz_read(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
+                    call MPI_recv(hz_read(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
+                    call MPI_send(hz_read(1,nmax+1),1,columntype,1,    8,MPI_COMM_WORLD,ierr)
+                    call MPI_send(hz_read(1,nmax),  1,columntype,1,    9,MPI_COMM_WORLD,ierr)
+
+                    endif
+
+                else
+                    if(mod(pid,2).eq.0)then
+                        call MPI_recv(wtd(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
+                        call MPI_recv(wtd(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
+                        call MPI_send(wtd(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
+                        call MPI_send(wtd(1,nmax),  1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
+
+                        call MPI_recv(hz_read(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
+                        call MPI_recv(hz_read(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
+                        call MPI_send(hz_read(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
+                        call MPI_send(hz_read(1,nmax),  1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
+
+                    else
+                        call MPI_send(wtd(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
+                        call MPI_send(wtd(1,nmax),  1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
+                        call MPI_recv(wtd(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
+                        call MPI_recv(wtd(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
+
+                        call MPI_send(hz_read(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
+                        call MPI_send(hz_read(1,nmax),  1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
+                        call MPI_recv(hz_read(1,3),     1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
+                        call MPI_recv(hz_read(1,2),     1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
+
+                    endif
+                endif
+
+                diff = abs(hold_read-wtd)
+                maxdiff = 0
+                maxdiff = maxval(diff)
+                deallocate(hz_read)
+                deallocate(diff)
+                deallocate(hz_1D)
+                deallocate(arr)
 
             endif
 
-        else
-            if(mod(pid,2).eq.0)then
-                call MPI_recv(wtd(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(wtd(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
-                call MPI_send(wtd(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(wtd(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
-
-                call MPI_recv(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
-                call MPI_send(hz_read(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(hz_read(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
-
-            else
-                call MPI_send(wtd(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(wtd(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
-                call MPI_recv(wtd(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(wtd(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
-
-                call MPI_send(hz_read(1,nmax+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(hz_read(1,nmax),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
-                call MPI_recv(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
-
-            endif
-        endif
-
-            diff = abs(hold_read-wtd)
-            maxdiff = 0
-            maxdiff = maxval(diff)
-            deallocate(hz_read)
-            deallocate(diff)
-            deallocate(hz_1D)
-            deallocate(arr)
-
-        endif
-
-        call MPI_ALLREDUCE(maxdiff,diff_total,1,MPI_REAL,mpi_max,MPI_COMM_WORLD,ierr)
+            call MPI_ALLREDUCE(maxdiff,diff_total,1,MPI_REAL,mpi_max,MPI_COMM_WORLD,ierr)
    
         end do SURFACE
 
 
 
 
-  if (pid .eq. 0) then
+        if (pid .eq. 0) then
             print *,'done yay yay yay'
  
             do n=1,numtasks-1
@@ -1345,7 +1322,6 @@ GROUNDWATER: DO while(iter<iterations)
         endif
 
     endif
- 
 
 END DO GROUNDWATER
 
@@ -1401,7 +1377,7 @@ print *,'about to try deallocating',pid
   if (error.ne.0) then
       print *, 'temp_start_read error'
   endif 
-deallocate(temp_end_read,stat=error)
+ deallocate(temp_end_read,stat=error)
   if (error.ne.0) then
       print *, 'temp_end_read error'
   endif
@@ -1417,7 +1393,7 @@ deallocate(temp_end_read,stat=error)
   if (error.ne.0) then
       print *, 'fdepth_sent error'
   endif
-deallocate(qlat_north,stat=error)
+ deallocate(qlat_north,stat=error)
   if (error.ne.0) then
       print *, 'qlat_north error'
   endif
@@ -1492,50 +1468,45 @@ deallocate(qlat_north,stat=error)
   endif
 
 
-deallocate(topo,stat=error)
-if (error.ne.0) then
-    print *, 'topo error'
-endif
+  deallocate(topo,stat=error)
+  if (error.ne.0) then
+      print *, 'topo error'
+  endif
 
-deallocate(mask,stat=error)
-if (error.ne.0) then
-    print *,'mask error'
-endif
+  deallocate(mask,stat=error)
+  if (error.ne.0) then
+      print *,'mask error'
+  endif
 
-deallocate(nini,stat=error)
-if (error.ne.0) then
-    print *,'nini error'
-endif
+  deallocate(nini,stat=error)
+  if (error.ne.0) then
+      print *,'nini error'
+  endif
 
-deallocate(nend,stat=error)
-if (error.ne.0) then
-    print *,'nend error'
-endif
+  deallocate(nend,stat=error)
+  if (error.ne.0) then
+      print *,'nend error'
+  endif
 
-deallocate(domblock,stat=error)
-if (error.ne.0) then
-    print *,'domblock error'
-endif
-
-
-deallocate(domblocksmall,stat=error)
-if (error.ne.0) then
-    print *,'domblocksmall error'
-end if
+  deallocate(domblock,stat=error)
+  if (error.ne.0) then
+      print *,'domblock error'
+  endif
 
 
+  deallocate(domblocksmall,stat=error)
+  if (error.ne.0) then
+      print *,'domblocksmall error'
+  end if
 
 
-print *,'done',pid
 
 
-call MPI_FINALIZE(ierr)
-
-print *,'finished',pid
+  print *,'done',pid
 
 
+  call MPI_FINALIZE(ierr)
+
+  print *,'finished',pid
 
 end program GWSW
-
-
-
