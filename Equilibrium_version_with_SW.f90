@@ -390,7 +390,7 @@ print *,'here',nmax,nini(n),nend(n),pid
       allocate(varread(n2,n3))
      
       iret = nf90_open(filetopo,0,ncid) !reading in the topo
-      call check_err(iret, "Unable to load file '" // filemask // "'!")
+      call check_err(iret, "Unable to load file '" // filetopo // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
       call check_err(iret, "")
@@ -431,7 +431,7 @@ print *,'here',nmax,nini(n),nend(n),pid
    
      
       iret = nf90_open(fileksat,0,ncid) !reading in the ksat
-      call check_err(iret, "Unable to load file '" // filemask // "'!")
+      call check_err(iret, "Unable to load file '" // fileksat // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
       call check_err(iret,"")
@@ -448,7 +448,7 @@ print *,'here',nmax,nini(n),nend(n),pid
       allocate(rech_month_read(n2,n3))
      
       iret = nf90_open(filerech,0,ncid) !reading in the recharge file
-      call check_err(iret, "Unable to load file '" // filemask // "'!")
+      call check_err(iret, "Unable to load file '" // filerech // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
       call check_err(iret, "")
@@ -469,7 +469,7 @@ print *,'here',nmax,nini(n),nend(n),pid
       allocate(fdepth_read(n2,n3))
     
       iret = nf90_open(filefdepth,0,ncid) !reading in the fdepth
-      call check_err(iret, "Unable to load file '" // filemask // "'!")
+      call check_err(iret, "Unable to load file '" // filefdepth // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
       call check_err(iret, "")
@@ -478,14 +478,14 @@ print *,'here',nmax,nini(n),nend(n),pid
       call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret, "")
+      call check_err(iret, "Unable to close file!")
 
 
 
 allocate(temp_read(n2,n3))
     
       iret = nf90_open(filetemp,0,ncid) !reading in the fdepth
-      call check_err(iret, "Unable to load file '" // filemask // "'!")
+      call check_err(iret, "Unable to load file '" // filetemp // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
       call check_err(iret, "")
@@ -494,7 +494,7 @@ allocate(temp_read(n2,n3))
       call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret, "")
+      call check_err(iret, "Unable to close file!")
 
 
 !now send everything we have opened:

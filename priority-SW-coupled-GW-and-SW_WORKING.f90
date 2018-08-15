@@ -100,19 +100,19 @@ subroutine dividedomain(n2,n3,numtasks,nini,filemask,ntotal)
   write(6,*)'reading in the mask to divide the domain'
   print *,filemask
   iret = nf90_open(filemask,0,ncid)  !open the mask file
-  call check_err(iret)
+  call check_err(iret, "Unable to load file '" // filemask // "'!")
   write(6,*)'first call'
 
   iret = nf90_inq_varid(ncid,'value',varid) !get the ID of the value layer
-  call check_err(iret)
+  call check_err(iret, "Problem getting ID of mask layer!")
   write(6,*) 'second call'
 
   iret = nf90_get_var(ncid,varid,varread) !read the actual values into the array called varread
-  call check_err(iret)
+  call check_err(iret, "Problem reading the values from the mask layer!")
   write(6,*) 'third call'
 
   iret = nf90_close(ncid) !close the mask file
-  call check_err(iret)
+  call check_err(iret, "Problem closing the mask file!")
   write(6,*)'fourth call'
 
   ntotal = count(varread>-100) !count the number of land cells. I changed this slightly since I am using mask here rather than topo; all cells with a value of 1 should be included. 
@@ -152,17 +152,20 @@ end subroutine dividedomain
 
 !********************************************************************************************************
 
-subroutine check_err(statusnc)
-
+subroutine check_err(statusnc, msg)
   use netcdf
   integer statusnc
+  character(len=*) msg
 
-  if(statusnc.ne. nf90_noerr) then
-      stop 'Stopped due to a catch in the check_err subroutine'
+  if(statusnc.ne.nf90_noerr) then
+    IF (LEN(msg)>0) then
+      ERROR STOP msg
+    ELSE
+      ERROR STOP 'Stopped due to a catch in the check_err subroutine'
+    ENDIF
   endif
 
 end subroutine check_err
-
 
 !********************************************************************************************************
 
@@ -236,10 +239,10 @@ end if
 !Values which may need to change from run to run:
 
 iterations = 500*365  !500 years * 12 months = 6000 iterations for 500-year runs
-n2 = 2000  !number of columns in the rotated version of madagascar. Fortran thinks these are ROWS
-n3 = 1000  !number of rows in the rotated version of madagascar. Fortran thinks these are COLUMNS.
+n2         = 2000     !number of columns in the rotated version of madagascar. Fortran thinks these are ROWS
+n3         = 1000     !number of rows in the rotated version of madagascar. Fortran thinks these are COLUMNS.
 time_start = 'Mad_021000'
-time_end = 'Mad_020500'
+time_end   = 'Mad_020500'
 
 SEDGE = -27. !latitude of the southern edge of Madagascar. 
 
@@ -253,20 +256,20 @@ surfdatadir = 'surfdata/'
 initdatadir = 'initdata/'
 
 filetopo_start = trim(surfdatadir)//trim(time_start)//'_topo_rotated.nc'
-filetopo_end = trim(surfdatadir)//trim(time_end)//'_topo_rotated.nc'
+filetopo_end   = trim(surfdatadir)//trim(time_end)//'_topo_rotated.nc'
   
 filerech_start = trim(surfdatadir)//trim(time_start)//'_rech_rotated.nc'
-filerech_end = trim(surfdatadir)//trim(time_end)//'_rech_rotated.nc'
+filerech_end   = trim(surfdatadir)//trim(time_end)//'_rech_rotated.nc'
 
 file_fslope_start = trim(surfdatadir)//trim(time_start)//'_fslope_rotated.nc'
-file_fslope_end = trim(surfdatadir)//trim(time_end)//'_fslope_rotated.nc'
+file_fslope_end   = trim(surfdatadir)//trim(time_end)//'_fslope_rotated.nc'
 
 filetemp_start = trim(surfdatadir)//trim(time_start)//'_temp_rotated.nc'
-filetemp_end = trim(surfdatadir)//trim(time_end)//'_temp_rotated.nc'
+filetemp_end   = trim(surfdatadir)//trim(time_end)//'_temp_rotated.nc'
 
 fileksat = trim(surfdatadir)//'Mad_ksat_rotated.nc' !same ksat is always used
 filemask = trim(surfdatadir)//trim(time_end)//'_mask_rotated.nc' !ask Andy if he agrees with using the end time for mask
-filewtd = trim(surfdatadir)//trim(time_start)//'_wtd_rotated.nc' !water table determined from the previous time step
+filewtd  = trim(surfdatadir)//trim(time_start)//'_wtd_rotated.nc' !water table determined from the previous time step
 
 
 !Hard-coded values:
@@ -366,16 +369,16 @@ if(pid .eq. 0) then
     allocate(topo_start_read(n2,n3)) !starting time topography
      
       iret = nf90_open(filetopo_start,0,ncid) !reading in the topo
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filetopo_start // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,topo_start_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
 
     where(topo_start_read .le. UNDEF) topo_start_read = 0. !change undefined cells to 0
@@ -383,32 +386,32 @@ if(pid .eq. 0) then
     allocate(topo_end_read(n2,n3)) !ending time topography
      
       iret = nf90_open(filetopo_end,0,ncid) !reading in the topo
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filetopo_end // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,topo_end_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
     where(topo_end_read .le. UNDEF) topo_end_read = 0. !change undefined cells to 0
 
     allocate(mask_read(n2,n3))  !mask to mask out ocean cells
      
       iret = nf90_open(filemask,0,ncid) !reading in the mask
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filemask // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,mask_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
       
   !    where(mask.eq.0) h = 0.
   
@@ -434,31 +437,31 @@ if(pid .eq. 0) then
     allocate(ksat_read(n2,n3))
         
       iret = nf90_open(fileksat,0,ncid) !reading in the ksat
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // fileksat // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret,"")
 
       iret = nf90_get_var(ncid,varid,ksat_read)
-      call check_err(iret)
+      call check_err(iret,"")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
 
     allocate(rech_start_read(n2,n3)) !recharge from the starting time
       
       iret = nf90_open(filerech_start,0,ncid) !reading in the recharge file
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filerech_start // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,rech_start_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
     rech_start_read = max(rech_start_read,0.)
     rech_start_read = (rech_start_read/365.) !converting to monthly - CHECK what units have I done for the new ones? I think it's per month already! 
@@ -468,16 +471,16 @@ if(pid .eq. 0) then
     allocate(rech_end_read(n2,n3)) !recharge from the end time
       
       iret = nf90_open(filerech_end,0,ncid) !reading in the recharge file
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filerech_end // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,rech_end_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
     rech_end_read = max(rech_end_read,0.)
     rech_end_read = (rech_end_read/365.)
@@ -486,98 +489,98 @@ if(pid .eq. 0) then
     allocate(fslope_start_read(n2,n3)) !the idea is to load in the f values for these, i.e. f = 100/(1+150*LGM_slope) so that it doesn't still have to be calculated in here. 
       
       iret = nf90_open(file_fslope_start,0,ncid) !reading in the fslope file
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // file_fslope_start // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,fslope_start_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
     print *,'347'
 
     allocate(fslope_end_read(n2,n3))
       
       iret = nf90_open(file_fslope_end,0,ncid) !reading in the fslope file
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // file_fslope_end // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,fslope_end_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
     print *,'362'
 
     allocate(temp_start_read(n2,n3)) !temp is used to calculate the final e-folding depth (along with fslope)
       
       iret = nf90_open(filetemp_start,0,ncid) !reading in the starting temperature file
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filetemp_start // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,temp_start_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
     allocate(temp_end_read(n2,n3))
       
       iret = nf90_open(filetemp_end,0,ncid) !reading in the ending temperature file
-      call check_err(iret)
+      call check_err(iret, "Unable to load file '" // filetemp_end // "'!")
 
       iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_get_var(ncid,varid,temp_end_read)
-      call check_err(iret)
+      call check_err(iret, "")
 
       iret = nf90_close(ncid)
-      call check_err(iret)
+      call check_err(iret, "Unable to close file!")
 
 
 !send and receive the data from above
 
     do n=1,numtasks-2
-        call MPI_send(mask_read(1,nini(n)-1),1,domblock(n),n,1,MPI_COMM_WORLD,ierr)
-        call MPI_send(wtd_read(1,nini(n)-1),1,domblock(n),n,2,MPI_COMM_WORLD,ierr)       
-        call MPI_send(ksat_read(1,nini(n)-1),1,domblock(n),n,3,MPI_COMM_WORLD,ierr)
-        call MPI_send(wtd_read(1,nini(n)-1),1,domblock(n),n,4,MPI_COMM_WORLD,ierr)  
-        call MPI_send(hold(1,nini(n)-1),1,domblock(n),n,10,MPI_COMM_WORLD,ierr)
+        call MPI_send(mask_read(1,nini(n)-1),1,domblock(n),n, 1,MPI_COMM_WORLD,ierr)
+        call MPI_send(wtd_read (1,nini(n)-1),1,domblock(n),n, 2,MPI_COMM_WORLD,ierr)       
+        call MPI_send(ksat_read(1,nini(n)-1),1,domblock(n),n, 3,MPI_COMM_WORLD,ierr)
+        call MPI_send(wtd_read (1,nini(n)-1),1,domblock(n),n, 4,MPI_COMM_WORLD,ierr)  
+        call MPI_send(hold     (1,nini(n)-1),1,domblock(n),n,10,MPI_COMM_WORLD,ierr)
     end do
 
-    call MPI_send(mask_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,1,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,2,MPI_COMM_WORLD,ierr)
-    call MPI_send(ksat_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,3,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,4,MPI_COMM_WORLD,ierr)
-    call MPI_send(hold(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,10,MPI_COMM_WORLD,ierr)
+    call MPI_send(mask_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1, 1,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1, 2,MPI_COMM_WORLD,ierr)
+    call MPI_send(ksat_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1, 3,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1, 4,MPI_COMM_WORLD,ierr)
+    call MPI_send(hold     (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,10,MPI_COMM_WORLD,ierr)
   
-    call MPI_send(mask_read(1,1),1,columntype,numtasks-1,1,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,1),1,columntype,numtasks-1,2,MPI_COMM_WORLD,ierr)
-    call MPI_send(ksat_read(1,1),1,columntype,numtasks-1,3,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,1),1,columntype,numtasks-1,4,MPI_COMM_WORLD,ierr)
-    call MPI_send(hold(1,1),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
+    call MPI_send(mask_read(1,1),1,columntype,numtasks-1, 1,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read (1,1),1,columntype,numtasks-1, 2,MPI_COMM_WORLD,ierr)
+    call MPI_send(ksat_read(1,1),1,columntype,numtasks-1, 3,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read (1,1),1,columntype,numtasks-1, 4,MPI_COMM_WORLD,ierr)
+    call MPI_send(hold     (1,1),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
 
-    call MPI_send(mask_read(1,2),1,columntype,numtasks-1,1,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,2),1,columntype,numtasks-1,2,MPI_COMM_WORLD,ierr)
-    call MPI_send(ksat_read(1,2),1,columntype,numtasks-1,3,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,2),1,columntype,numtasks-1,4,MPI_COMM_WORLD,ierr)
-    call MPI_send(hold(1,2),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
+    call MPI_send(mask_read(1,2),1,columntype,numtasks-1, 1,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read (1,2),1,columntype,numtasks-1, 2,MPI_COMM_WORLD,ierr)
+    call MPI_send(ksat_read(1,2),1,columntype,numtasks-1, 3,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read (1,2),1,columntype,numtasks-1, 4,MPI_COMM_WORLD,ierr)
+    call MPI_send(hold     (1,2),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
 
 
-    call MPI_send(mask_read(1,3),1,columntype,numtasks-1,1,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,3),1,columntype,numtasks-1,2,MPI_COMM_WORLD,ierr)
-    call MPI_send(ksat_read(1,3),1,columntype,numtasks-1,3,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,3),1,columntype,numtasks-1,4,MPI_COMM_WORLD,ierr)
-    call MPI_send(hold(1,3),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
+    call MPI_send(mask_read(1,3),1,columntype,numtasks-1, 1,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read (1,3),1,columntype,numtasks-1, 2,MPI_COMM_WORLD,ierr)
+    call MPI_send(ksat_read(1,3),1,columntype,numtasks-1, 3,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read (1,3),1,columntype,numtasks-1, 4,MPI_COMM_WORLD,ierr)
+    call MPI_send(hold     (1,3),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
 
 
 
@@ -588,56 +591,56 @@ if(pid .eq. 0) then
 else
   
     nmax = nend(pid) - nini(pid) +4
-    allocate(wtd(n2,nmax))
-    allocate(wtdnew(n2,nmax))
-    allocate(ksat(n2,nmax))
-    allocate(landmask(n2,nmax))
-    allocate(head(n2,nmax))
-    allocate(kcell(n2,nmax))
+    allocate(wtd       (n2,nmax))
+    allocate(wtdnew    (n2,nmax))
+    allocate(ksat      (n2,nmax))
+    allocate(landmask  (n2,nmax))
+    allocate(head      (n2,nmax))
+    allocate(kcell     (n2,nmax))
     allocate(qlat_north(n2,nmax))
     allocate(qlat_south(n2,nmax))
-    allocate(qlat_east(n2,nmax))
-    allocate(qlat_west(n2,nmax))
-    allocate(hold_read(n2,nmax))
+    allocate(qlat_east (n2,nmax))
+    allocate(qlat_west (n2,nmax))
+    allocate(hold_read (n2,nmax))
  
-    allocate(topo_sent(n2,nmax))
-    allocate(rech_sent(n2,nmax))
+    allocate(topo_sent  (n2,nmax))
+    allocate(rech_sent  (n2,nmax))
     allocate(fdepth_sent(n2,nmax))
 
     write(6,*)'allocated all'
 
       if(pid.lt.numtasks-1)then
 
-        call MPI_recv(landmask(1,1),1,domblock(pid),0,1,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtd(1,1),1,domblock(pid),0,2,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(ksat(1,1),1,domblock(pid),0,3,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtdnew(1,1),1,domblock(pid),0,4,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(landmask (1,1),1,domblock(pid),0,1,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(wtd      (1,1),1,domblock(pid),0,2,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(ksat     (1,1),1,domblock(pid),0,3,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(wtdnew   (1,1),1,domblock(pid),0,4,MPI_COMM_WORLD,status,ierr)
         call MPI_recv(hold_read(1,1),1,domblock(pid),0,10,MPI_COMM_WORLD,status,ierr)
 
    else
 
-        call MPI_recv(landmask(1,1),1,domblocksmall(pid),0,1,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtd(1,1),1,domblocksmall(pid),0,2,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(ksat(1,1),1,domblocksmall(pid),0,3,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtdnew(1,1),1,domblocksmall(pid),0,4,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(landmask (1,1),1,domblocksmall(pid),0, 1,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(wtd      (1,1),1,domblocksmall(pid),0, 2,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(ksat     (1,1),1,domblocksmall(pid),0, 3,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(wtdnew   (1,1),1,domblocksmall(pid),0, 4,MPI_COMM_WORLD,status,ierr)
         call MPI_recv(hold_read(1,1),1,domblocksmall(pid),0,10,MPI_COMM_WORLD,status,ierr)
 
-        call MPI_recv(landmask(1,nmax-2),1,columntype,0,1,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtd(1,nmax-2),1,columntype,0,2,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(ksat(1,nmax-2),1,columntype,0,3,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtdnew(1,nmax-2),1,columntype,0,4,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(landmask (1,nmax-2),1,columntype,0, 1,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(wtd      (1,nmax-2),1,columntype,0, 2,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(ksat     (1,nmax-2),1,columntype,0, 3,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(wtdnew   (1,nmax-2),1,columntype,0, 4,MPI_COMM_WORLD,status,ierr)
         call MPI_recv(hold_read(1,nmax-2),1,columntype,0,10,MPI_COMM_WORLD,status,ierr)
 
-        call MPI_recv(landmask(1,nmax-1),1,columntype,0,1,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtd(1,nmax-1),1,columntype,0,2,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(ksat(1,nmax-1),1,columntype,0,3,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtdnew(1,nmax-1),1,columntype,0,4,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(landmask (1,nmax-1),1,columntype,0, 1,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(wtd      (1,nmax-1),1,columntype,0, 2,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(ksat     (1,nmax-1),1,columntype,0, 3,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(wtdnew   (1,nmax-1),1,columntype,0, 4,MPI_COMM_WORLD,status,ierr)
         call MPI_recv(hold_read(1,nmax-1),1,columntype,0,10,MPI_COMM_WORLD,status,ierr)
 
-        call MPI_recv(landmask(1,nmax),1,columntype,0,1,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtd(1,nmax),1,columntype,0,2,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(ksat(1,nmax),1,columntype,0,3,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtdnew(1,nmax),1,columntype,0,4,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(landmask (1,nmax),1,columntype,0, 1,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(wtd      (1,nmax),1,columntype,0, 2,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(ksat     (1,nmax),1,columntype,0, 3,MPI_COMM_WORLD,status,ierr)
+        call MPI_recv(wtdnew   (1,nmax),1,columntype,0, 4,MPI_COMM_WORLD,status,ierr)
         call MPI_recv(hold_read(1,nmax),1,columntype,0,10,MPI_COMM_WORLD,status,ierr)
     endif
    
@@ -657,11 +660,11 @@ if(pid .gt. 0) then
     allocate(alpha(n2))
 
     do j=1,n2 !changing area of cell depending on its latitude
-        xlat(j) = (float(j-2)/delta_xy+SEDGE)*pi/180. !latitude in radians
-        xs = (float(2*(j-1))/(delta_xy*2.)+SEDGE)*pi/180. !Latitude on southern cell edge in radians
-        xn = (float(2*(j+1))/(delta_xy*2.)+SEDGE)*pi/180. !latitude on northern cell edge in radians
+        xlat(j)     = (float(j-2)/delta_xy+SEDGE)*pi/180. !latitude in radians
+        xs          = (float(2*(j-1))/(delta_xy*2.)+SEDGE)*pi/180. !Latitude on southern cell edge in radians
+        xn          = (float(2*(j+1))/(delta_xy*2.)+SEDGE)*pi/180. !latitude on northern cell edge in radians
         placeholder = dy*6370000.*(sin(xn)-sin(xs))/2.
-        area(j) = dy * 6370000.*(sin(xn)-sin(xs))/2. !final cell area for that latitude: trapezoid dy * dx
+        area(j)     = dy * 6370000.*(sin(xn)-sin(xs))/2. !final cell area for that latitude: trapezoid dy * dx
 
         alpha(j) = 0.5*deltat/placeholder 
     end do
@@ -689,24 +692,24 @@ if (pid.eq.0) then
     do n=1,numtasks-2
         call MPI_send(topo_start_read(1,nini(n)-1),1,domblock(n),n,5,MPI_COMM_WORLD,ierr)
         call MPI_send(rech_start_read(1,nini(n)-1),1,domblock(n),n,6,MPI_COMM_WORLD,ierr)
-        call MPI_send(fdepth_start(1,nini(n)-1),1,domblock(n),n,7,MPI_COMM_WORLD,ierr)
+        call MPI_send(fdepth_start   (1,nini(n)-1),1,domblock(n),n,7,MPI_COMM_WORLD,ierr)
     end do
 
     call MPI_send(topo_start_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,5,MPI_COMM_WORLD,ierr)
     call MPI_send(rech_start_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,6,MPI_COMM_WORLD,ierr)
-    call MPI_send(fdepth_start(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,7,MPI_COMM_WORLD,ierr)
+    call MPI_send(fdepth_start   (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,7,MPI_COMM_WORLD,ierr)
 
     call MPI_send(topo_start_read(1,1),1,columntype,numtasks-1,5,MPI_COMM_WORLD,ierr)
     call MPI_send(rech_start_read(1,1),1,columntype,numtasks-1,6,MPI_COMM_WORLD,ierr)
-    call MPI_send(fdepth_start(1,1),1,columntype,numtasks-1,7,MPI_COMM_WORLD,ierr)
+    call MPI_send(fdepth_start   (1,1),1,columntype,numtasks-1,7,MPI_COMM_WORLD,ierr)
 
     call MPI_send(topo_start_read(1,2),1,columntype,numtasks-1,5,MPI_COMM_WORLD,ierr)
     call MPI_send(rech_start_read(1,2),1,columntype,numtasks-1,6,MPI_COMM_WORLD,ierr)
-    call MPI_send(fdepth_start(1,2),1,columntype,numtasks-1,7,MPI_COMM_WORLD,ierr)
+    call MPI_send(fdepth_start   (1,2),1,columntype,numtasks-1,7,MPI_COMM_WORLD,ierr)
 
     call MPI_send(topo_start_read(1,3),1,columntype,numtasks-1,5,MPI_COMM_WORLD,ierr)
     call MPI_send(rech_start_read(1,3),1,columntype,numtasks-1,6,MPI_COMM_WORLD,ierr)
-    call MPI_send(fdepth_start(1,3),1,columntype,numtasks-1,7,MPI_COMM_WORLD,ierr)
+    call MPI_send(fdepth_start   (1,3),1,columntype,numtasks-1,7,MPI_COMM_WORLD,ierr)
 
 
  
@@ -716,26 +719,26 @@ if (pid.eq.0) then
 
 elseif(pid.lt.numtasks-1)then
   
-    call MPI_recv(topo_sent(1,1),1,domblock(pid),0,5,MPI_COMM_WORLD,status,ierr) !receiving everthing that was sent above     
-    call MPI_recv(rech_sent(1,1),1,domblock(pid),0,6,MPI_COMM_WORLD,status,ierr)
+    call MPI_recv(topo_sent  (1,1),1,domblock(pid),0,5,MPI_COMM_WORLD,status,ierr) !receiving everthing that was sent above     
+    call MPI_recv(rech_sent  (1,1),1,domblock(pid),0,6,MPI_COMM_WORLD,status,ierr)
     call MPI_recv(fdepth_sent(1,1),1,domblock(pid),0,7,MPI_COMM_WORLD,status,ierr)
 
 else
 
-    call MPI_recv(topo_sent(1,1),1,domblocksmall(pid),0,5,MPI_COMM_WORLD,status,ierr)
-    call MPI_recv(rech_sent(1,1),1,domblocksmall(pid),0,6,MPI_COMM_WORLD,status,ierr)
+    call MPI_recv(topo_sent  (1,1),1,domblocksmall(pid),0,5,MPI_COMM_WORLD,status,ierr)
+    call MPI_recv(rech_sent  (1,1),1,domblocksmall(pid),0,6,MPI_COMM_WORLD,status,ierr)
     call MPI_recv(fdepth_sent(1,1),1,domblocksmall(pid),0,7,MPI_COMM_WORLD,status,ierr)
 
-    call MPI_recv(topo_sent(1,nmax-2),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
-    call MPI_recv(rech_sent(1,nmax-2),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
+    call MPI_recv(topo_sent  (1,nmax-2),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
+    call MPI_recv(rech_sent  (1,nmax-2),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
     call MPI_recv(fdepth_sent(1,nmax-2),1,columntype,0,7,MPI_COMM_WORLD,status,ierr)
 
-    call MPI_recv(topo_sent(1,nmax-1),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
-    call MPI_recv(rech_sent(1,nmax-1),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
+    call MPI_recv(topo_sent  (1,nmax-1),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
+    call MPI_recv(rech_sent  (1,nmax-1),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
     call MPI_recv(fdepth_sent(1,nmax-1),1,columntype,0,7,MPI_COMM_WORLD,status,ierr)
 
-    call MPI_recv(topo_sent(1,nmax),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
-    call MPI_recv(rech_sent(1,nmax),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
+    call MPI_recv(topo_sent  (1,nmax),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
+    call MPI_recv(rech_sent  (1,nmax),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
     call MPI_recv(fdepth_sent(1,nmax),1,columntype,0,7,MPI_COMM_WORLD,status,ierr)
 
 
@@ -800,25 +803,25 @@ GROUNDWATER: DO while(iter<iterations)
 
 
             do n=1,numtasks-2
-                call MPI_send(topo_now(1,nini(n)-1),1,domblock(n),n,9,MPI_COMM_WORLD,ierr)
-                call MPI_send(rech_now(1,nini(n)-1),1,domblock(n),n,10,MPI_COMM_WORLD,ierr)
+                call MPI_send(topo_now  (1,nini(n)-1),1,domblock(n),n, 9,MPI_COMM_WORLD,ierr)
+                call MPI_send(rech_now  (1,nini(n)-1),1,domblock(n),n,10,MPI_COMM_WORLD,ierr)
                 call MPI_send(fdepth_now(1,nini(n)-1),1,domblock(n),n,11,MPI_COMM_WORLD,ierr)
             end do
 
-           call MPI_send(topo_now(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,9,MPI_COMM_WORLD,ierr)
-           call MPI_send(rech_now(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,10,MPI_COMM_WORLD,ierr)
+           call MPI_send(topo_now  (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1, 9,MPI_COMM_WORLD,ierr)
+           call MPI_send(rech_now  (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,10,MPI_COMM_WORLD,ierr)
            call MPI_send(fdepth_now(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,11,MPI_COMM_WORLD,ierr)
            
-            call MPI_send(topo_now(1,1),1,columntype,numtasks-1,9,MPI_COMM_WORLD,ierr)
-            call MPI_send(rech_now(1,1),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
+            call MPI_send(topo_now  (1,1),1,columntype,numtasks-1, 9,MPI_COMM_WORLD,ierr)
+            call MPI_send(rech_now  (1,1),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
             call MPI_send(fdepth_now(1,1),1,columntype,numtasks-1,11,MPI_COMM_WORLD,ierr)
  
-            call MPI_send(topo_now(1,2),1,columntype,numtasks-1,9,MPI_COMM_WORLD,ierr)
-            call MPI_send(rech_now(1,2),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
+            call MPI_send(topo_now  (1,2),1,columntype,numtasks-1, 9,MPI_COMM_WORLD,ierr)
+            call MPI_send(rech_now  (1,2),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
             call MPI_send(fdepth_now(1,2),1,columntype,numtasks-1,11,MPI_COMM_WORLD,ierr)
 
-            call MPI_send(topo_now(1,3),1,columntype,numtasks-1,9,MPI_COMM_WORLD,ierr)
-            call MPI_send(rech_now(1,3),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
+            call MPI_send(topo_now  (1,3),1,columntype,numtasks-1, 9,MPI_COMM_WORLD,ierr)
+            call MPI_send(rech_now  (1,3),1,columntype,numtasks-1,10,MPI_COMM_WORLD,ierr)
             call MPI_send(fdepth_now(1,3),1,columntype,numtasks-1,11,MPI_COMM_WORLD,ierr)
 
  
@@ -830,26 +833,26 @@ GROUNDWATER: DO while(iter<iterations)
 
 
         elseif(pid.lt.numtasks-1)then
-            call MPI_recv(topo_sent(1,1),1,domblock(pid),0,9,MPI_COMM_WORLD,status,ierr) !receiving everthing that was sent above     
-            call MPI_recv(rech_sent(1,1),1,domblock(pid),0,10,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(topo_sent  (1,1),1,domblock(pid),0, 9,MPI_COMM_WORLD,status,ierr) !receiving everthing that was sent above     
+            call MPI_recv(rech_sent  (1,1),1,domblock(pid),0,10,MPI_COMM_WORLD,status,ierr)
             call MPI_recv(fdepth_sent(1,1),1,domblock(pid),0,11,MPI_COMM_WORLD,status,ierr)
 
         else
-            call MPI_recv(topo_sent(1,1),1,domblocksmall(pid),0,9,MPI_COMM_WORLD,status,ierr) 
-            call MPI_recv(rech_sent(1,1),1,domblocksmall(pid),0,10,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(topo_sent  (1,1),1,domblocksmall(pid),0, 9,MPI_COMM_WORLD,status,ierr) 
+            call MPI_recv(rech_sent  (1,1),1,domblocksmall(pid),0,10,MPI_COMM_WORLD,status,ierr)
             call MPI_recv(fdepth_sent(1,1),1,domblocksmall(pid),0,11,MPI_COMM_WORLD,status,ierr)
  
-            call MPI_recv(topo_sent(1,nmax-1),1,columntype,0,9,MPI_COMM_WORLD,status,ierr) 
-            call MPI_recv(rech_sent(1,nmax-1),1,columntype,0,10,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(topo_sent  (1,nmax-1),1,columntype,0, 9,MPI_COMM_WORLD,status,ierr) 
+            call MPI_recv(rech_sent  (1,nmax-1),1,columntype,0,10,MPI_COMM_WORLD,status,ierr)
             call MPI_recv(fdepth_sent(1,nmax-1),1,columntype,0,11,MPI_COMM_WORLD,status,ierr)
  
      
-            call MPI_recv(topo_sent(1,nmax),1,columntype,0,9,MPI_COMM_WORLD,status,ierr) 
-            call MPI_recv(rech_sent(1,nmax),1,columntype,0,10,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(topo_sent  (1,nmax),1,columntype,0, 9,MPI_COMM_WORLD,status,ierr) 
+            call MPI_recv(rech_sent  (1,nmax),1,columntype,0,10,MPI_COMM_WORLD,status,ierr)
             call MPI_recv(fdepth_sent(1,nmax),1,columntype,0,11,MPI_COMM_WORLD,status,ierr)
  
-            call MPI_recv(topo_sent(1,nmax+1),1,columntype,0,9,MPI_COMM_WORLD,status,ierr) 
-            call MPI_recv(rech_sent(1,nmax+1),1,columntype,0,10,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(topo_sent  (1,nmax+1),1,columntype,0, 9,MPI_COMM_WORLD,status,ierr) 
+            call MPI_recv(rech_sent  (1,nmax+1),1,columntype,0,10,MPI_COMM_WORLD,status,ierr)
             call MPI_recv(fdepth_sent(1,nmax+1),1,columntype,0,11,MPI_COMM_WORLD,status,ierr)
          
          
@@ -1034,9 +1037,9 @@ GROUNDWATER: DO while(iter<iterations)
                         hz_read(row,col) .le. hz_read(row,col-1)) then !this is the lowest cell in the area, no water can leave
                             CYCLE
                         else
-                            upvalue = hz_read(row,col) - hz_read(row-1,col) !find the steepest direction, in which water would move
-                            downvalue = hz_read(row,col) - hz_read(row+1,col)
-                            leftvalue = hz_read(row,col) - hz_read(row,col-1)
+                            upvalue    = hz_read(row,col) - hz_read(row-1,col) !find the steepest direction, in which water would move
+                            downvalue  = hz_read(row,col) - hz_read(row+1,col)
+                            leftvalue  = hz_read(row,col) - hz_read(row,col-1)
                             rightvalue = hz_read(row,col) - hz_read(row,col+1)
             
                             if(max(upvalue,downvalue,leftvalue,rightvalue) .le. 0.) then     !should have already eliminated this option, but in case, it's the lowest local cell    
@@ -1055,30 +1058,30 @@ GROUNDWATER: DO while(iter<iterations)
 
 
                 elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. downvalue) then
-                    water = min(wtd(row,col)*area(row),downvalue*area(row)/2.)    
-                   water1 = water/area(row+1)  
-                    water2 = water/area(row)
-                    wtd(row,col) = wtd(row,col) - water2
+                    water          = min(wtd(row,col)*area(row),downvalue*area(row)/2.)    
+                    water1         = water/area(row+1)  
+                    water2         = water/area(row)
+                    wtd(row,col)   = wtd(row,col) - water2
                     wtd(row+1,col) = wtd(row+1,col) + water1
 
                     hz_read(row,col) = hz_read(row,col) - water2
                     hz_read(row+1,col) = hz_read(row+1,col) + water1
 
                 elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. rightvalue) then
-                    water = min(wtd(row,col)*area(row),rightvalue*area(row)/2.)    
-                    water1 = water/area(row)  
-                    water2 = water/area(row)
-                   wtd(row,col) = wtd(row,col) - water2
+                    water          = min(wtd(row,col)*area(row),rightvalue*area(row)/2.)    
+                    water1         = water/area(row)  
+                    water2         = water/area(row)
+                    wtd(row,col)   = wtd(row,col) - water2
                     wtd(row,col+1) = wtd(row,col+1) + water1
 
                     hz_read(row,col) = hz_read(row,col) - water2
                     hz_read(row,col+1) = hz_read(row,col+1) + water1
 
                 elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. leftvalue) then
-                   water = min(wtd(row,col)*area(row),leftvalue*area(row)/2.)    
-                    water1 = water/area(row)  
-                    water2 = water/area(row)
-                   wtd(row,col) = wtd(row,col) - water2
+                    water          = min(wtd(row,col)*area(row),leftvalue*area(row)/2.)    
+                    water1         = water/area(row)  
+                    water2         = water/area(row)
+                    wtd(row,col)   = wtd(row,col) - water2
                     wtd(row,col-1) = wtd(row,col-1) + water1
 
                     hz_read(row,col) = hz_read(row,col) - water2
@@ -1182,15 +1185,15 @@ GROUNDWATER: DO while(iter<iterations)
                                 CYCLE
                             else
 
-                                upvalue = hz_read(row,col) - hz_read(row-1,col)
-                                downvalue = hz_read(row,col) - hz_read(row+1,col)
-                                leftvalue = hz_read(row,col) - hz_read(row,col-1)
+                                upvalue    = hz_read(row,col) - hz_read(row-1,col)
+                                downvalue  = hz_read(row,col) - hz_read(row+1,col)
+                                leftvalue  = hz_read(row,col) - hz_read(row,col-1)
                                 rightvalue = hz_read(row,col) - hz_read(row,col+1)
 
                                 if(max(upvalue,downvalue,leftvalue,rightvalue) .le. 0.) then         
                                     CYCLE   
                          elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. upvalue) then
-                    water = min(wtd(row,col)*area(row),upvalue*area(row)/2.)   
+                    water  = min(wtd(row,col)*area(row),upvalue*area(row)/2.)   
                     water1 = water/area(row-1)  
                     water2 = water/area(row)
                            wtd(row,col) = wtd(row,col) - water2
