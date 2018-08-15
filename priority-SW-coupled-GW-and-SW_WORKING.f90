@@ -660,7 +660,7 @@ if(pid .gt. 0) then
         xs          = (float(2*(j-1))/(delta_xy*2.)+SEDGE)*pi/180. !Latitude on southern cell edge in radians
         xn          = (float(2*(j+1))/(delta_xy*2.)+SEDGE)*pi/180. !latitude on northern cell edge in radians
         placeholder = dy*6370000.*(sin(xn)-sin(xs))/2.
-        area(j)     = dy * 6370000.*(sin(xn)-sin(xs))/2. !final cell area for that latitude: trapezoid dy * dx
+        area(j)     = dy*6370000.*(sin(xn)-sin(xs))/2. !final cell area for that latitude: trapezoid dy * dx
 
         alpha(j) = 0.5*deltat/placeholder 
     end do
