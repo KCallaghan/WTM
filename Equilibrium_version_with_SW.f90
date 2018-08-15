@@ -231,9 +231,9 @@ diff_coarse
 
 !Set global parameters:
 
-  n2 = 2000 !number of cells in x and y directions
-  n3 = 1000
-  region = 'Mad_' !folder name for the 4 files. Limit 8 characters.
+  n2          = 2000 !number of cells in x and y directions
+  n3          = 1000
+  region      = 'Mad_' !folder name for the 4 files. Limit 8 characters.
   surfdatadir = 'surfdata/' !folder names for data, limit 60 characters. Topo, fdepth, and rech go here.
   initdatadir = 'initdata/' !mask and wtd go here
 !ksat is not within a folder since the same one is being used for all times.
@@ -244,13 +244,13 @@ diff_coarse
 
 !input files:
 
-  filetopo = trim(surfdatadir)//trim(region)//'021000_topo_rotated.nc'
+  filetopo   = trim(surfdatadir)//trim(region)//'021000_topo_rotated.nc'
   filefdepth = trim(surfdatadir)//trim(region)//'021000_fslope_rotated.nc'
-  fileksat = trim(surfdatadir)//'Mad_ksat_rotated.nc'
-  filerech = trim(surfdatadir)//trim(region)//'021000_rech_rotated.nc'
-  filemask = trim(surfdatadir)//trim(region)//'020500_mask_rotated.nc'
-  filewtd = trim(surfdatadir)//trim(region)//'021000_wtd_rotated.nc'
-  filetemp=trim(surfdatadir)//trim(region)//'021000_temp_rotated.nc'
+  fileksat   = trim(surfdatadir)//'Mad_ksat_rotated.nc'
+  filerech   = trim(surfdatadir)//trim(region)//'021000_rech_rotated.nc'
+  filemask   = trim(surfdatadir)//trim(region)//'020500_mask_rotated.nc'
+  filewtd    = trim(surfdatadir)//trim(region)//'021000_wtd_rotated.nc'
+  filetemp   = trim(surfdatadir)//trim(region)//'021000_temp_rotated.nc'
 
 !print *,filetopo,filefdepth,fileksat,filerech,filemask,filewtd,filetemp
 !output text file
@@ -363,11 +363,11 @@ print *,'here',nmax,nini(n),nend(n),pid
 
 
       do j=1,n2  !changing area of cell depending on its latitude. Not totally sure what each of the different variables here represents...
-          xlat(j) = (float(j)/dltxy+SEDGE)*pi/180.
-          xs = (float(2*(j)-1)/(dltxy*2.)+SEDGE)*pi/180. !Latitude number 1
-          xn = (float(2*(j)+1)/(dltxy*2.)+SEDGE)*pi/180. !latitude number 2
+          xlat(j)     = (float(j)/dltxy+SEDGE)*pi/180.
+          xs          = (float(2*(j)-1)/(dltxy*2.)+SEDGE)*pi/180. !Latitude number 1
+          xn          = (float(2*(j)+1)/(dltxy*2.)+SEDGE)*pi/180. !latitude number 2
           placeholder = dy*6370000.*(sin(xn)-sin(xs))/2.
-          area = dy*6370000.*(sin(xn)-sin(xs))/2. !final cell area for that latitude
+          area        = dy*6370000.*(sin(xn)-sin(xs))/2. !final cell area for that latitude
 
           alpha(j) = deltat/placeholder 
           alphamonth(j) = (deltat/12)/placeholder 
@@ -502,46 +502,46 @@ allocate(temp_read(n2,n3))
 print *,'line 498'
 
       do n=1,numtasks-2
-          call MPI_send(varread(1,nini(n)-1),1,domblock(n),n,1,MPI_COMM_WORLD,ierr)
+          call MPI_send(varread        (1,nini(n)-1),1,domblock(n),n,1,MPI_COMM_WORLD,ierr)
 print *,'line 502'
-          call MPI_send(watermask(1,nini(n)-1),1,domblock(n),n,2,MPI_COMM_WORLD,ierr)
-          call MPI_send(wtd_read(1,nini(n)-1),1,domblock(n),n,3,MPI_COMM_WORLD,ierr)
-          call MPI_send(ksat_read(1,nini(n)-1),1,domblock(n),n,5,MPI_COMM_WORLD,ierr)
-          call MPI_send(rech_read(1,nini(n)-1),1,domblock(n),n,6,MPI_COMM_WORLD,ierr)
+          call MPI_send(watermask      (1,nini(n)-1),1,domblock(n),n,2,MPI_COMM_WORLD,ierr)
+          call MPI_send(wtd_read       (1,nini(n)-1),1,domblock(n),n,3,MPI_COMM_WORLD,ierr)
+          call MPI_send(ksat_read      (1,nini(n)-1),1,domblock(n),n,5,MPI_COMM_WORLD,ierr)
+          call MPI_send(rech_read      (1,nini(n)-1),1,domblock(n),n,6,MPI_COMM_WORLD,ierr)
           call MPI_send(rech_month_read(1,nini(n)-1),1,domblock(n),n,7,MPI_COMM_WORLD,ierr)
   print *,'line 507'      
       end do
 
 
-    call MPI_send(varread(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,1,MPI_COMM_WORLD,ierr)
-    call MPI_send(watermask(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,2,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,3,MPI_COMM_WORLD,ierr)
-    call MPI_send(ksat_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,5,MPI_COMM_WORLD,ierr)
-    call MPI_send(rech_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,6,MPI_COMM_WORLD,ierr)
+    call MPI_send(varread        (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,1,MPI_COMM_WORLD,ierr)
+    call MPI_send(watermask      (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,2,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read       (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,3,MPI_COMM_WORLD,ierr)
+    call MPI_send(ksat_read      (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,5,MPI_COMM_WORLD,ierr)
+    call MPI_send(rech_read      (1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,6,MPI_COMM_WORLD,ierr)
     call MPI_send(rech_month_read(1,nini(numtasks-1)-1),1,domblocksmall(numtasks-1),numtasks-1,7,MPI_COMM_WORLD,ierr)
    
 
-    call MPI_send(varread(1,1),1,columntype,numtasks-1,1,MPI_COMM_WORLD,ierr)
-    call MPI_send(watermask(1,1),1,columntype,numtasks-1,2,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,1),1,columntype,numtasks-1,3,MPI_COMM_WORLD,ierr)
-    call MPI_send(ksat_read(1,1),1,columntype,numtasks-1,5,MPI_COMM_WORLD,ierr)
-    call MPI_send(rech_read(1,1),1,columntype,numtasks-1,6,MPI_COMM_WORLD,ierr)
+    call MPI_send(varread        (1,1),1,columntype,numtasks-1,1,MPI_COMM_WORLD,ierr)
+    call MPI_send(watermask      (1,1),1,columntype,numtasks-1,2,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read       (1,1),1,columntype,numtasks-1,3,MPI_COMM_WORLD,ierr)
+    call MPI_send(ksat_read      (1,1),1,columntype,numtasks-1,5,MPI_COMM_WORLD,ierr)
+    call MPI_send(rech_read      (1,1),1,columntype,numtasks-1,6,MPI_COMM_WORLD,ierr)
     call MPI_send(rech_month_read(1,1),1,columntype,numtasks-1,7,MPI_COMM_WORLD,ierr)
    
 
-    call MPI_send(varread(1,2),1,columntype,numtasks-1,1,MPI_COMM_WORLD,ierr)
-    call MPI_send(watermask(1,2),1,columntype,numtasks-1,2,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,2),1,columntype,numtasks-1,3,MPI_COMM_WORLD,ierr)
-    call MPI_send(ksat_read(1,2),1,columntype,numtasks-1,5,MPI_COMM_WORLD,ierr)
-    call MPI_send(rech_read(1,2),1,columntype,numtasks-1,6,MPI_COMM_WORLD,ierr)
+    call MPI_send(varread        (1,2),1,columntype,numtasks-1,1,MPI_COMM_WORLD,ierr)
+    call MPI_send(watermask      (1,2),1,columntype,numtasks-1,2,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read       (1,2),1,columntype,numtasks-1,3,MPI_COMM_WORLD,ierr)
+    call MPI_send(ksat_read      (1,2),1,columntype,numtasks-1,5,MPI_COMM_WORLD,ierr)
+    call MPI_send(rech_read      (1,2),1,columntype,numtasks-1,6,MPI_COMM_WORLD,ierr)
     call MPI_send(rech_month_read(1,2),1,columntype,numtasks-1,7,MPI_COMM_WORLD,ierr)
    
 
-    call MPI_send(varread(1,3),1,columntype,numtasks-1,1,MPI_COMM_WORLD,ierr)
-    call MPI_send(watermask(1,3),1,columntype,numtasks-1,2,MPI_COMM_WORLD,ierr)
-    call MPI_send(wtd_read(1,3),1,columntype,numtasks-1,3,MPI_COMM_WORLD,ierr)
-    call MPI_send(ksat_read(1,3),1,columntype,numtasks-1,5,MPI_COMM_WORLD,ierr)
-    call MPI_send(rech_read(1,3),1,columntype,numtasks-1,6,MPI_COMM_WORLD,ierr)
+    call MPI_send(varread        (1,3),1,columntype,numtasks-1,1,MPI_COMM_WORLD,ierr)
+    call MPI_send(watermask      (1,3),1,columntype,numtasks-1,2,MPI_COMM_WORLD,ierr)
+    call MPI_send(wtd_read       (1,3),1,columntype,numtasks-1,3,MPI_COMM_WORLD,ierr)
+    call MPI_send(ksat_read      (1,3),1,columntype,numtasks-1,5,MPI_COMM_WORLD,ierr)
+    call MPI_send(rech_read      (1,3),1,columntype,numtasks-1,6,MPI_COMM_WORLD,ierr)
     call MPI_send(rech_month_read(1,3),1,columntype,numtasks-1,7,MPI_COMM_WORLD,ierr)
   
 
@@ -556,63 +556,60 @@ print *,'line 502'
   else
   
       nmax = nend(pid) - nini(pid) +4
-      allocate(topo(n2,nmax))
-      allocate(landmask(n2,nmax))
-      allocate(wtd(n2,nmax))
-      allocate(ksat(n2,nmax))
-      allocate(rechmean(n2,nmax))
+      allocate(topo      (n2,nmax))
+      allocate(landmask  (n2,nmax))
+      allocate(wtd       (n2,nmax))
+      allocate(ksat      (n2,nmax))
+      allocate(rechmean  (n2,nmax))
       allocate(rech_month(n2,nmax))
-      allocate(kcell(n2,nmax))
-      allocate(head(n2,nmax))
-      allocate(qlat(n2,nmax))
-      allocate(mask(n2,nmax),maskold(n2,nmax))
+      allocate(kcell     (n2,nmax))
+      allocate(head      (n2,nmax))
+      allocate(qlat      (n2,nmax))
+      allocate(mask      (n2,nmax),maskold(n2,nmax))
       write(6,*) 'allocated all'
 
     if(pid.lt.numtasks-1)then
 
-      call MPI_recv(topo(1,1),1,domblock(pid),0,1,MPI_COMM_WORLD,status,ierr) !receiving everthing that was sent above     
-      call MPI_recv(landmask(1,1),1,domblock(pid),0,2,MPI_COMM_WORLD,status,ierr)
-      call MPI_recv(wtd(1,1),1,domblock(pid),0,3,MPI_COMM_WORLD,status,ierr)
-      call MPI_recv(ksat(1,1),1,domblock(pid),0,5,MPI_COMM_WORLD,status,ierr)
-      call MPI_recv(rechmean(1,1),1,domblock(pid),0,6,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(topo      (1,1),1,domblock(pid),0,1,MPI_COMM_WORLD,status,ierr) !receiving everthing that was sent above     
+      call MPI_recv(landmask  (1,1),1,domblock(pid),0,2,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(wtd       (1,1),1,domblock(pid),0,3,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(ksat      (1,1),1,domblock(pid),0,5,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(rechmean  (1,1),1,domblock(pid),0,6,MPI_COMM_WORLD,status,ierr)
       call MPI_recv(rech_month(1,1),1,domblock(pid),0,7,MPI_COMM_WORLD,status,ierr)
-
 
    else
 
-        call MPI_recv(topo(1,1),1,domblocksmall(pid),0,1,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(landmask(1,1),1,domblocksmall(pid),0,2,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtd(1,1),1,domblocksmall(pid),0,3,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(ksat(1,1),1,domblocksmall(pid),0,5,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(rechmean(1,1),1,domblocksmall(pid),0,6,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(rech_month(1,1),1,domblocksmall(pid),0,7,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(topo      (1,1), 1, domblocksmall(pid),0,1,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(landmask  (1,1), 1, domblocksmall(pid),0,2,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(wtd       (1,1), 1, domblocksmall(pid),0,3,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(ksat      (1,1), 1, domblocksmall(pid),0,5,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(rechmean  (1,1), 1, domblocksmall(pid),0,6,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(rech_month(1,1), 1, domblocksmall(pid),0,7,MPI_COMM_WORLD,status,ierr)
     
-       call MPI_recv(topo(1,nmax-2),1,columntype,0,1,MPI_COMM_WORLD,status,ierr)
-         call MPI_recv(landmask(1,nmax-2),1,columntype,0,2,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtd(1,nmax-2),1,columntype,0,3,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(ksat(1,nmax-2),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(rechmean(1,nmax-2),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
-       call MPI_recv(rech_month(1,nmax-2),1,columntype,0,7,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(topo      (1,nmax-2),1,columntype,0,1,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(landmask  (1,nmax-2),1,columntype,0,2,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(wtd       (1,nmax-2),1,columntype,0,3,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(ksat      (1,nmax-2),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(rechmean  (1,nmax-2),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(rech_month(1,nmax-2),1,columntype,0,7,MPI_COMM_WORLD,status,ierr)
   
-      call MPI_recv(topo(1,nmax-1),1,columntype,0,1,MPI_COMM_WORLD,status,ierr)
-         call MPI_recv(landmask(1,nmax-1),1,columntype,0,2,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtd(1,nmax-1),1,columntype,0,3,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(ksat(1,nmax-1),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(rechmean(1,nmax-1),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
-       call MPI_recv(rech_month(1,nmax-1),1,columntype,0,7,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(topo      (1,nmax-1),1,columntype,0,1,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(landmask  (1,nmax-1),1,columntype,0,2,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(wtd       (1,nmax-1),1,columntype,0,3,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(ksat      (1,nmax-1),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(rechmean  (1,nmax-1),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(rech_month(1,nmax-1),1,columntype,0,7,MPI_COMM_WORLD,status,ierr)
 
-      call MPI_recv(topo(1,nmax),1,columntype,0,1,MPI_COMM_WORLD,status,ierr)
-         call MPI_recv(landmask(1,nmax),1,columntype,0,2,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(wtd(1,nmax),1,columntype,0,3,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(ksat(1,nmax),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
-        call MPI_recv(rechmean(1,nmax),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
-       call MPI_recv(rech_month(1,nmax),1,columntype,0,7,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(topo      (1,nmax),1,columntype,0,1,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(landmask  (1,nmax),1,columntype,0,2,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(wtd       (1,nmax),1,columntype,0,3,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(ksat      (1,nmax),1,columntype,0,5,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(rechmean  (1,nmax),1,columntype,0,6,MPI_COMM_WORLD,status,ierr)
+      call MPI_recv(rech_month(1,nmax),1,columntype,0,7,MPI_COMM_WORLD,status,ierr)
    
     endif
    
-
-     
-      write(6,*) 'variables received'
+      write(6, *) 'variables received'
       write(15,*) 'variables received'
 
       maskold = 1 !This is just being done ahead of the big loop, maskold is used to show which cells still need to be processed. 
@@ -624,7 +621,7 @@ print *,'line 502'
 if (pid.eq.0) then
 
 
-          allocate(fdepth_start(n2,n3))
+    allocate(fdepth_start(n2,n3))
 
 
      write(6,*)'fdepth_Start allocated'
@@ -680,7 +677,7 @@ write (6,*) 'trying to send'
    call MPI_recv(fdepth(1,1),1,domblocksmall(pid),0,15,MPI_COMM_WORLD,status,ierr)
    call MPI_recv(fdepth(1,nmax-2),1,columntype,0,15,MPI_COMM_WORLD,status,ierr)
    call MPI_recv(fdepth(1,nmax-1),1,columntype,0,15,MPI_COMM_WORLD,status,ierr)
-   call MPI_recv(fdepth(1,nmax),1,columntype,0,15,MPI_COMM_WORLD,status,ierr)
+   call MPI_recv(fdepth(1,nmax  ),1,columntype,0,15,MPI_COMM_WORLD,status,ierr)
 
 
        endif
@@ -705,15 +702,15 @@ write (6,*) 'trying to send'
 !here we automatically switch to monthly processing, 
           write(6,*) '30000 iterations,adjusting the values for monthly processing'
           write(15,*) '30000 iterations,adjusting the values for monthly processing'
-          thres = thres/12.
-          d0 = d0/12.
-          d1 = d1/12.
-          d2 = d2/12.
-          d3 = d3/12.
-          deltat = deltat/12.
-          alpha = alphamonth
-          rechmean = rech_month
-          maskold = 1          !because we changed the threshold, so we want to recheck all the cells. 
+          thres       = thres/12.
+          d0          = d0/12.
+          d1          = d1/12.
+          d2          = d2/12.
+          d3          = d3/12.
+          deltat      = deltat/12.
+          alpha       = alphamonth
+          rechmean    = rech_month
+          maskold     = 1          !because we changed the threshold, so we want to recheck all the cells. 
           numbertotal = ntotal
       endif
 
@@ -842,11 +839,11 @@ write (6,*) 'trying to send'
 
 
                      if (numberold .ne. numbercount) then
-                         mask(i+1,j) =1 !tag cells to show they are still not in equilibrium.
+                         mask(i+1,j) = 1 !tag cells to show they are still not in equilibrium.
                          mask(i-1,j) = 1
                          mask(i,j+1) = 1
                          mask(i,j-1) = 1
-                         mask(i,j) = 1
+                         mask(i,j)   = 1
                      endif
  
 
@@ -1150,30 +1147,30 @@ print *,'starting cols1'
 
 
                 elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. downvalue) then
-                    water = min(wtd_use(row,col)*area(row),downvalue*area(row)/2.)    
-                   water1 = water/area(row+1)  
-                    water2 = water/area(row)
-                    wtd_use(row,col) = wtd_use(row,col) - water2
+                    water              = min(wtd_use(row,col)*area(row),downvalue*area(row)/2.)    
+                    water1             = water/area(row+1)  
+                    water2             = water/area(row)
+                    wtd_use(row,col)   = wtd_use(row,col) - water2
                     wtd_use(row+1,col) = wtd_use(row+1,col) + water1
 
                     hz_read(row,col) = hz_read(row,col) - water2
                     hz_read(row+1,col) = hz_read(row+1,col) + water1
 
                 elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. rightvalue) then
-                    water = min(wtd_use(row,col)*area(row),rightvalue*area(row)/2.)    
-                    water1 = water/area(row)  
-                    water2 = water/area(row)
-                   wtd_use(row,col) = wtd_use(row,col) - water2
+                    water              = min(wtd_use(row,col)*area(row),rightvalue*area(row)/2.)    
+                    water1             = water/area(row)  
+                    water2             = water/area(row)
+                    wtd_use(row,col)   = wtd_use(row,col) - water2
                     wtd_use(row,col+1) = wtd_use(row,col+1) + water1
 
                     hz_read(row,col) = hz_read(row,col) - water2
                     hz_read(row,col+1) = hz_read(row,col+1) + water1
 
                 elseif(max(upvalue,downvalue,leftvalue,rightvalue) .eq. leftvalue) then
-                   water = min(wtd_use(row,col)*area(row),leftvalue*area(row)/2.)    
-                    water1 = water/area(row)  
-                    water2 = water/area(row)
-                   wtd_use(row,col) = wtd_use(row,col) - water2
+                    water              = min(wtd_use(row,col)*area(row),leftvalue*area(row)/2.)    
+                    water1             = water/area(row)  
+                    water2             = water/area(row)
+                    wtd_use(row,col)   = wtd_use(row,col) - water2
                     wtd_use(row,col-1) = wtd_use(row,col-1) + water1
 
                     hz_read(row,col) = hz_read(row,col) - water2
@@ -1189,12 +1186,12 @@ print *,'done with cols1'
 
        if(pid.eq.1)then        !send & receive the edge columns
             call MPI_recv(wtd_use(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(wtd_use(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(wtd_use(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
             call MPI_send(wtd_use(1,3),1,columntype,numtasks-1,8,MPI_COMM_WORLD,ierr)
             call MPI_send(wtd_use(1,2),1,columntype,numtasks-1,9,MPI_COMM_WORLD,ierr)
 
-           call MPI_recv(hz_read(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(hz_read(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(hz_read(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(hz_read(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
             call MPI_send(hz_read(1,3),1,columntype,numtasks-1,8,MPI_COMM_WORLD,ierr)
             call MPI_send(hz_read(1,2),1,columntype,numtasks-1,9,MPI_COMM_WORLD,ierr)
 
@@ -1202,12 +1199,12 @@ print *,'done with cols1'
             if(mod(pid,2).eq.0)then
 
             call MPI_recv(wtd_use(1,n_use+1),1,columntype,1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(wtd_use(1,n_use),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(wtd_use(1,n_use  ),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
             call MPI_send(wtd_use(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
             call MPI_send(wtd_use(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
  
             call MPI_recv(hz_read(1,n_use+1),1,columntype,1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(hz_read(1,n_use),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(hz_read(1,n_use  ),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
             call MPI_send(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
             call MPI_send(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
  
@@ -1216,12 +1213,12 @@ print *,'done with cols1'
             call MPI_send(wtd_use(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
             call MPI_send(wtd_use(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
             call MPI_recv(wtd_use(1,n_use+1),1,columntype,1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(wtd_use(1,n_use),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(wtd_use(1,n_use  ),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
  
             call MPI_send(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)   
             call MPI_send(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
             call MPI_recv(hz_read(1,n_use+1),1,columntype,1,8,MPI_COMM_WORLD,status,ierr)
-            call MPI_recv(hz_read(1,n_use),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
+            call MPI_recv(hz_read(1,n_use  ),1,columntype,1,9,MPI_COMM_WORLD,status,ierr)
 
 
             endif
@@ -1229,12 +1226,12 @@ print *,'done with cols1'
         else
             if(mod(pid,2).eq.0)then
                 call MPI_recv(wtd_use(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(wtd_use(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
+                call MPI_recv(wtd_use(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
                 call MPI_send(wtd_use(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
                 call MPI_send(wtd_use(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
 
                 call MPI_recv(hz_read(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(hz_read(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
+                call MPI_recv(hz_read(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
                 call MPI_send(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
                 call MPI_send(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
 
@@ -1242,12 +1239,12 @@ print *,'done with cols1'
                 call MPI_send(wtd_use(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
                 call MPI_send(wtd_use(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
                 call MPI_recv(wtd_use(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(wtd_use(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
+                call MPI_recv(wtd_use(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
 
                 call MPI_send(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,ierr)
                 call MPI_send(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,ierr)
                 call MPI_recv(hz_read(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,status,ierr)
-                call MPI_recv(hz_read(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
+                call MPI_recv(hz_read(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,status,ierr)
 
             endif
         endif
@@ -1336,12 +1333,12 @@ print *,'starting cols3'
 print *,'done with cols3'
        if(pid.eq.1)then  !Once again send & receive the edge columns
             call MPI_send(wtd_use(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(wtd_use(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
+            call MPI_send(wtd_use(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
             call MPI_recv(wtd_use(1,3),1,columntype,numtasks-1,8,MPI_COMM_WORLD,status,ierr)
             call MPI_recv(wtd_use(1,2),1,columntype,numtasks-1,9,MPI_COMM_WORLD,status,ierr)
 
             call MPI_send(hz_read(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(hz_read(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
+            call MPI_send(hz_read(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
             call MPI_recv(hz_read(1,3),1,columntype,numtasks-1,8,MPI_COMM_WORLD,status,ierr)
             call MPI_recv(hz_read(1,2),1,columntype,numtasks-1,9,MPI_COMM_WORLD,status,ierr)
 
@@ -1350,12 +1347,12 @@ print *,'done with cols3'
 
 
             call MPI_send(wtd_use(1,n_use+1),1,columntype,1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(wtd_use(1,n_use),1,columntype,1,9,MPI_COMM_WORLD,ierr)
+            call MPI_send(wtd_use(1,n_use  ),1,columntype,1,9,MPI_COMM_WORLD,ierr)
             call MPI_recv(wtd_use(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
             call MPI_recv(wtd_use(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
 
             call MPI_send(hz_read(1,n_use+1),1,columntype,1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(hz_read(1,n_use),1,columntype,1,9,MPI_COMM_WORLD,ierr)
+            call MPI_send(hz_read(1,n_use  ),1,columntype,1,9,MPI_COMM_WORLD,ierr)
             call MPI_recv(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
             call MPI_recv(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
 
@@ -1365,12 +1362,12 @@ print *,'done with cols3'
             call MPI_recv(wtd_use(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
             call MPI_recv(wtd_use(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
             call MPI_send(wtd_use(1,n_use+1),1,columntype,1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(wtd_use(1,n_use),1,columntype,1,9,MPI_COMM_WORLD,ierr)
+            call MPI_send(wtd_use(1,n_use  ),1,columntype,1,9,MPI_COMM_WORLD,ierr)
 
             call MPI_recv(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)   
             call MPI_recv(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
             call MPI_send(hz_read(1,n_use+1),1,columntype,1,8,MPI_COMM_WORLD,ierr)
-            call MPI_send(hz_read(1,n_use),1,columntype,1,9,MPI_COMM_WORLD,ierr)
+            call MPI_send(hz_read(1,n_use  ),1,columntype,1,9,MPI_COMM_WORLD,ierr)
 
             endif
 
@@ -1379,21 +1376,21 @@ print *,'done with cols3'
                 call MPI_recv(wtd_use(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
                 call MPI_recv(wtd_use(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
                 call MPI_send(wtd_use(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(wtd_use(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
+                call MPI_send(wtd_use(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
 
                 call MPI_recv(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
                 call MPI_recv(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
                 call MPI_send(hz_read(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(hz_read(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
+                call MPI_send(hz_read(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
 
             else
                 call MPI_send(wtd_use(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(wtd_use(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
+                call MPI_send(wtd_use(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
                 call MPI_recv(wtd_use(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
                 call MPI_recv(wtd_use(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
 
                 call MPI_send(hz_read(1,n_use+1),1,columntype,pid+1,8,MPI_COMM_WORLD,ierr)
-                call MPI_send(hz_read(1,n_use),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
+                call MPI_send(hz_read(1,n_use  ),1,columntype,pid+1,9,MPI_COMM_WORLD,ierr)
                 call MPI_recv(hz_read(1,3),1,columntype,pid-1,8,MPI_COMM_WORLD,status,ierr)
                 call MPI_recv(hz_read(1,2),1,columntype,pid-1,9,MPI_COMM_WORLD,status,ierr)
 
