@@ -497,8 +497,8 @@ program ewtd
            end do
         end do
 
-        maskold=mask
-        numbertotal=number
+        maskold     = mask
+        numbertotal = number
        
         !1111 continue
         !gmm send each other the boundaries and add up number
