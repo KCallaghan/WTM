@@ -92,8 +92,8 @@ subroutine dividedomain(n2,n3,numtasks,nini,filemask,ntotal)
   real,allocatable,dimension(:,:) :: varread
   integer,allocatable,dimension(:) :: ncells
   integer :: iret,ncid,varid,ncount,n,j
-  integer*8 :: ntotal
-  character*100 :: filemask
+  integer(KIND=8) :: ntotal
+  character(len=100) :: filemask
 
   allocate(varread(n2,n3))
 
@@ -182,7 +182,7 @@ implicit none
 
 integer :: i,j,n2,n3,ncid,varid,error,iret,col,row,converged,counter,nmax,n,iter
 
-integer*8 :: ntotal
+integer(KIND=8) :: ntotal
 
 integer ierr, pid,numtasks,tasktype,status(MPI_STATUS_SIZE),rc,columntype,columntypeint,iterations
 
@@ -190,9 +190,9 @@ real :: upvalue,downvalue,leftvalue,rightvalue,water,water1,water2,delta_xy
 
 real diff_total,maxdiff,dx,dy,xn,xs,deltat,placeholder
 
-character*20 :: surfdatadir,time_start,initdatadir,time_end
+character(len=20) :: surfdatadir,time_start,initdatadir,time_end
 
-character*100 :: filetopo_start,filemask,filetopo_end,filerech_start,filerech_end, &
+character(len=100) :: filetopo_start,filemask,filetopo_end,filerech_start,filerech_end, &
 file_fslope_start, file_fslope_end, filetemp_start, filetemp_end, fileksat,filewtd
 
 real,allocatable,dimension(:,:) :: topo,h,hold,diff,hz_read,hold_read,mask,mask_read
