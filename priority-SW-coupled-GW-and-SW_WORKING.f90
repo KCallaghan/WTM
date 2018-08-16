@@ -170,12 +170,47 @@ end subroutine check_err
 
 
 
+subroutine ReadFile(filename, arr, width, height)
+  use netcdf
+  implicit none
+
+  character(len=*), intent(in) :: filename
+  real,allocatable,dimension(:,:),intent(out) :: arr
+  integer, intent(in) :: width,height
+  integer :: iret,ncid,varid
+
+  allocate(arr(width,height))
+     
+  iret = nf90_open(filename,0,ncid) !reading in the topo
+  call check_err(iret, "Unable to load file '" // filename // "'!")
+
+  iret = nf90_inq_varid(ncid,'value',varid)
+  call check_err(iret, "")
+
+  iret = nf90_get_var(ncid,varid,arr)
+  call check_err(iret, "")
+
+  iret = nf90_close(ncid)
+  call check_err(iret, "Unable to close file!")
+end subroutine
+
+
+
 program GWSW
 
 use netcdf
 use mpi
 
 implicit none
+
+interface 
+  subroutine ReadFile(filename, arr, width, height)
+    character(len=*), intent(in) :: filename
+    real,allocatable,dimension(:,:),intent(out) :: arr
+    integer, intent(in) :: width,height
+    integer :: iret,ncid,varid
+  end subroutine
+end interface 
 
 ! Define all variables: ***********************************************************************
 
@@ -365,57 +400,17 @@ if(pid .eq. 0) then
     allocate(wtdglob(n2,n3))
     wtdglob = 0.
 
-    allocate(topo_start_read(n2,n3)) !starting time topography
-     
-      iret = nf90_open(filetopo_start,0,ncid) !reading in the topo
-      call check_err(iret, "Unable to load file '" // filetopo_start // "'!")
-
-      iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret, "")
-
-      iret = nf90_get_var(ncid,varid,topo_start_read)
-      call check_err(iret, "")
-
-      iret = nf90_close(ncid)
-      call check_err(iret, "Unable to close file!")
-
+    call ReadFile(filetopo_start, topo_start_read, n2, n3)
     where(topo_start_read .le. UNDEF) topo_start_read = 0. !change undefined cells to 0
 
-    allocate(topo_end_read(n2,n3)) !ending time topography
-     
-      iret = nf90_open(filetopo_end,0,ncid) !reading in the topo
-      call check_err(iret, "Unable to load file '" // filetopo_end // "'!")
-
-      iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret, "")
-
-      iret = nf90_get_var(ncid,varid,topo_end_read)
-      call check_err(iret, "")
-
-      iret = nf90_close(ncid)
-      call check_err(iret, "Unable to close file!")
-
+    call ReadFile(filetopo_end, topo_end_read, n2, n3)
     where(topo_end_read .le. UNDEF) topo_end_read = 0. !change undefined cells to 0
 
-    allocate(mask_read(n2,n3))  !mask to mask out ocean cells
-     
-      iret = nf90_open(filemask,0,ncid) !reading in the mask
-      call check_err(iret, "Unable to load file '" // filemask // "'!")
-
-      iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret, "")
-
-      iret = nf90_get_var(ncid,varid,mask_read)
-      call check_err(iret, "")
-
-      iret = nf90_close(ncid)
-      call check_err(iret, "Unable to close file!")
-      
+    call ReadFile(filemask, mask_read, n2,n3)
   !    where(mask.eq.0) h = 0.
   
     allocate(wtd_read(n2,n3))
-
-      wtd_read(:,:) = -5*mask_read !for now - in the future we should read in the wtd from the previous time step
+    wtd_read(:,:) = -5*mask_read !for now - in the future we should read in the wtd from the previous time step
 
    !   iret = nf90_open(filewtd,0,ncid) !reading in the mask
     !  call check_err(iret)
@@ -432,117 +427,27 @@ if(pid .eq. 0) then
     !  wtd_read = -wtd_read !it is read as a positive value, but in the model it's negative
 !false - it is read in as a negative value from now on! 
           
-    allocate(ksat_read(n2,n3))
-        
-      iret = nf90_open(fileksat,0,ncid) !reading in the ksat
-      call check_err(iret, "Unable to load file '" // fileksat // "'!")
+    call ReadFile(fileksat,ksat_read,n2,n3)
 
-      iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret,"")
-
-      iret = nf90_get_var(ncid,varid,ksat_read)
-      call check_err(iret,"")
-
-      iret = nf90_close(ncid)
-      call check_err(iret, "Unable to close file!")
-
-
-    allocate(rech_start_read(n2,n3)) !recharge from the starting time
-      
-      iret = nf90_open(filerech_start,0,ncid) !reading in the recharge file
-      call check_err(iret, "Unable to load file '" // filerech_start // "'!")
-
-      iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret, "")
-
-      iret = nf90_get_var(ncid,varid,rech_start_read)
-      call check_err(iret, "")
-
-      iret = nf90_close(ncid)
-      call check_err(iret, "Unable to close file!")
-
+    call ReadFile(filerech_start,rech_start_read,n2,n3) !recharge from the starting tim
     rech_start_read = max(rech_start_read,0.)
     rech_start_read = (rech_start_read/365.) !converting to monthly - CHECK what units have I done for the new ones? I think it's per month already! 
-
     print *,'311'
 
-    allocate(rech_end_read(n2,n3)) !recharge from the end time
-      
-      iret = nf90_open(filerech_end,0,ncid) !reading in the recharge file
-      call check_err(iret, "Unable to load file '" // filerech_end // "'!")
-
-      iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret, "")
-
-      iret = nf90_get_var(ncid,varid,rech_end_read)
-      call check_err(iret, "")
-
-      iret = nf90_close(ncid)
-      call check_err(iret, "Unable to close file!")
-
+    call ReadFile(filerech_end,rech_end_read,n2,n3) !recharge from the end tim
     rech_end_read = max(rech_end_read,0.)
     rech_end_read = (rech_end_read/365.)
 
-
-    allocate(fslope_start_read(n2,n3)) !the idea is to load in the f values for these, i.e. f = 100/(1+150*LGM_slope) so that it doesn't still have to be calculated in here. 
-      
-      iret = nf90_open(file_fslope_start,0,ncid) !reading in the fslope file
-      call check_err(iret, "Unable to load file '" // file_fslope_start // "'!")
-
-      iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret, "")
-
-      iret = nf90_get_var(ncid,varid,fslope_start_read)
-      call check_err(iret, "")
-
-      iret = nf90_close(ncid)
-      call check_err(iret, "Unable to close file!")
-
+    call ReadFile(file_fslope_start,fslope_start_read,n2,n3) !the idea is to load in the f values for these, i.e. f = 100/(1+150*LGM_slope) so that it doesn't still have to be calculated in here.
     print *,'347'
 
-    allocate(fslope_end_read(n2,n3))
-      
-      iret = nf90_open(file_fslope_end,0,ncid) !reading in the fslope file
-      call check_err(iret, "Unable to load file '" // file_fslope_end // "'!")
-
-      iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret, "")
-
-      iret = nf90_get_var(ncid,varid,fslope_end_read)
-      call check_err(iret, "")
-
-      iret = nf90_close(ncid)
-      call check_err(iret, "Unable to close file!")
-
+    call ReadFile(file_fslope_end,fslope_end_read,n2,n3)
     print *,'362'
 
-    allocate(temp_start_read(n2,n3)) !temp is used to calculate the final e-folding depth (along with fslope)
-      
-      iret = nf90_open(filetemp_start,0,ncid) !reading in the starting temperature file
-      call check_err(iret, "Unable to load file '" // filetemp_start // "'!")
+    call ReadFile(filetemp_start,temp_start_read,n2,n3) !temp is used to calculate the final e-folding depth (along with fslope
 
-      iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret, "")
+    call ReadFile(filetemp_end,temp_end_read,n2,n3)
 
-      iret = nf90_get_var(ncid,varid,temp_start_read)
-      call check_err(iret, "")
-
-      iret = nf90_close(ncid)
-      call check_err(iret, "Unable to close file!")
-
-    allocate(temp_end_read(n2,n3))
-      
-      iret = nf90_open(filetemp_end,0,ncid) !reading in the ending temperature file
-      call check_err(iret, "Unable to load file '" // filetemp_end // "'!")
-
-      iret = nf90_inq_varid(ncid,'value',varid)
-      call check_err(iret, "")
-
-      iret = nf90_get_var(ncid,varid,temp_end_read)
-      call check_err(iret, "")
-
-      iret = nf90_close(ncid)
-      call check_err(iret, "Unable to close file!")
 
 
 !send and receive the data from above
