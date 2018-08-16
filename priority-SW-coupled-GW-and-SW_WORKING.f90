@@ -412,18 +412,6 @@ if(pid .eq. 0) then
     allocate(wtd_read(n2,n3))
     wtd_read(:,:) = -5*mask_read !for now - in the future we should read in the wtd from the previous time step
 
-   !   iret = nf90_open(filewtd,0,ncid) !reading in the mask
-    !  call check_err(iret)
-!print *,'259'
- !     iret = nf90_inq_varid(ncid,'value',varid)
-  !    call check_err(iret)
-!print *,'262'
- !     iret = nf90_get_var(ncid,varid,mask_read)
-  !    call check_err(iret)
-!print *,'265'
-  !    iret = nf90_close(ncid)
- !     call check_err(iret)
-
     !  wtd_read = -wtd_read !it is read as a positive value, but in the model it's negative
 !false - it is read in as a negative value from now on! 
           
@@ -553,7 +541,7 @@ endif
 
 
 dy = 6370000.*pi/(180.*delta_xy) !radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
-dx=dy
+dx = dy
 
 if(pid .gt. 0) then
     allocate(xlat(n2))
@@ -566,8 +554,7 @@ if(pid .gt. 0) then
         xn          = (float(2*(j+1))/(delta_xy*2.)+SEDGE)*pi/180. !latitude on northern cell edge in radians
         placeholder = dy*6370000.*(sin(xn)-sin(xs))/2.
         area(j)     = dy*6370000.*(sin(xn)-sin(xs))/2. !final cell area for that latitude: trapezoid dy * dx
-
-        alpha(j) = 0.5*deltat/placeholder 
+        alpha(j)    = 0.5*deltat/placeholder 
     end do
 end if
 
@@ -579,15 +566,15 @@ if (pid.eq.0) then
     allocate(fdepth_start(n2,n3))
      
     do j=1,n3
-        do i=1,n2
-            if (temp_start_read(i,j) .gt. -5) then
-                fdepth_start(i,j) = fslope_start_read(i,j)
-            elseif (temp_start_read(i,j) .lt. -14) then
-                fdepth_start(i,j) = fslope_start_read(i,j) * (0.17+0.005*temp_start_read(i,j))
-            else
-                fdepth_start(i,j) = fslope_start_read(i,j) * (1.5 + 0.1*temp_start_read(i,j))
-            endif
-        end do
+    do i=1,n2
+        if (temp_start_read(i,j) .gt. -5) then
+            fdepth_start(i,j) = fslope_start_read(i,j)
+        elseif (temp_start_read(i,j) .lt. -14) then
+            fdepth_start(i,j) = fslope_start_read(i,j) * (0.17+0.005*temp_start_read(i,j))
+        else
+            fdepth_start(i,j) = fslope_start_read(i,j) * (1.5 + 0.1*temp_start_read(i,j))
+        endif
+    end do
     end do
 
     do n=1,numtasks-2
@@ -691,15 +678,15 @@ GROUNDWATER: DO while(iter<iterations)
 
             allocate(fdepth_now(n2,n3))
             do j=1,n3
-                do i=1,n2
-                    if (temp_now(i,j) .gt. -5) then
-                        fdepth_now(i,j) = fslope_now(i,j)
-                    elseif (temp_now(i,j) .lt. -14) then
-                        fdepth_now(i,j) = fslope_now(i,j) * (0.17+0.005*temp_now(i,j))
-                    else
-                        fdepth_now(i,j) = fslope_now(i,j) * (1.5 + 0.1*temp_now(i,j))
-                    endif
-                end do
+            do i=1,n2
+                if (temp_now(i,j) .gt. -5) then
+                    fdepth_now(i,j) = fslope_now(i,j)
+                elseif (temp_now(i,j) .lt. -14) then
+                    fdepth_now(i,j) = fslope_now(i,j) * (0.17+0.005*temp_now(i,j))
+                else
+                    fdepth_now(i,j) = fslope_now(i,j) * (1.5 + 0.1*temp_now(i,j))
+                endif
+            end do
             end do
 
 
@@ -763,38 +750,37 @@ GROUNDWATER: DO while(iter<iterations)
     IF (pid .gt. 0) then     
         nmax = nend(pid) - nini(pid) + 3
         do j=1,nmax  +1
-            do i=1,n2
-                if(fdepth_sent(i,j) .gt. 0. ) then 
-                    wtd(i,j) = wtd(i,j) + rech_sent(i,j) !add the month's recharge to the cell
-                    head(i,j) = topo_sent(i,j) + wtd(i,j) !gives the water table height (starts off the same as land surface if a wtd isn't loaded in), which = head
+        do i=1,n2
+            if(fdepth_sent(i,j) .gt. 0. ) then 
+                wtd(i,j) = wtd(i,j) + rech_sent(i,j) !add the month's recharge to the cell
+                head(i,j) = topo_sent(i,j) + wtd(i,j) !gives the water table height (starts off the same as land surface if a wtd isn't loaded in), which = head
 
-                    if(wtd(i,j) .lt. -1.5) then !work out hydraulic conductivity for each cell
-                        kcell(i,j) = fdepth_sent(i,j) *ksat(i,j)*exp((wtd(i,j)+1.5)/fdepth_sent(i,j)) !This is equation S6 from the paper
-                    elseif(wtd(i,j) .le. 0) then
-                        kcell(i,j) = ksat(i,j)*(wtd(i,j)+1.5+fdepth_sent(i,j)) !equation S4 from the paper 
-                    else
-                        kcell(i,j) = ksat(i,j)*(0+1.5+fdepth_sent(i,j)) !maxes out when water is at the surface, to avoid instabilities in surface water movement.
-                    endif
+                if(wtd(i,j) .lt. -1.5) then !work out hydraulic conductivity for each cell
+                    kcell(i,j) = fdepth_sent(i,j) *ksat(i,j)*exp((wtd(i,j)+1.5)/fdepth_sent(i,j)) !This is equation S6 from the paper
+                elseif(wtd(i,j) .le. 0) then
+                    kcell(i,j) = ksat(i,j)*(wtd(i,j)+1.5+fdepth_sent(i,j)) !equation S4 from the paper 
+                else
+                    kcell(i,j) = ksat(i,j)*(0+1.5+fdepth_sent(i,j)) !maxes out when water is at the surface, to avoid instabilities in surface water movement.
                 endif
-            end do
+            endif
+        end do
         end do
 
         write(6,*) 'kcell done',nmax,pid,nini(pid)
 
         do j=2,nmax!-1 !-2 !I think there may be some issues with the very last processor here overshooting
-            do i=2,n2-1
-                if(landmask(i,j) .gt. 0 ) then
-                    ! alpha = time step / area
-                 ! Approx. small distance between N and S edges, so just use cos (xlat(j)) at midpoint
-                 ! N-S, then W-E
-                 !finite difference method
-                 wtdnew(i,j) = wtd(i,j) + kcell(i,j) * alpha(j) / cos(xlat(j)) &
-                                    * (head(i,j-1) - 2*head(i,j) + head(i,j+1))/dx &
-                               + kcell(i,j) * alpha(j) * cos(xlat(j)) &
-                                    * (head(i-1,j) - 2*head(i,j) + head(i+1,j))/dx 
- 
-                endif
-            end do
+        do i=2,n2-1
+            if(landmask(i,j) .gt. 0 ) then
+                ! alpha = time step / area
+             ! Approx. small distance between N and S edges, so just use cos (xlat(j)) at midpoint
+             ! N-S, then W-E
+             !finite difference method
+             wtdnew(i,j) = wtd(i,j) + kcell(i,j) * alpha(j) / cos(xlat(j)) &
+                                * (head(i,j-1) - 2*head(i,j) + head(i,j+1))/dx &
+                           + kcell(i,j) * alpha(j) * cos(xlat(j)) &
+                                * (head(i-1,j) - 2*head(i,j) + head(i+1,j))/dx 
+            endif
+        end do
         end do
 
  
