@@ -1,5 +1,6 @@
 #include "Array2D.hpp"
 #include <algorithm>
+#include <cassert>
 #include <iomanip>
 #include <iostream>
 #include <queue>
