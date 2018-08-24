@@ -34,7 +34,7 @@ class GridCellZ {
     z = z0;
   }
   bool operator>(const GridCellZ& a) const { 
-    return z>a.z;
+    return z<a.z; //Less than sorts the queue in reverse
   }
 };
 
