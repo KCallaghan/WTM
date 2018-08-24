@@ -116,8 +116,9 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
       continue;
 
     //I am a peak
-    std::cout<<"Enqueuing "<<x<<" "<<y<<std::endl;
+    std::cerr<<"Enqueuing "<<x<<" "<<y<<std::endl;
     q.emplace(x,y,myelev);
+    processed(x,y)++;
   }
 
   std::cout<<"Peaks found = "<<q.size()<<std::endl;
@@ -128,11 +129,17 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
     const auto c = q.top();
     q.pop();
 
-    std::cout<<c.x<<" "<<c.y<<" "<<std::setprecision(40)<<c.z<<std::endl;
+    //Cell has been modified since it was emplaced, so we skip it
+    if(HydroHeight(c.x,c.y,topo,wtd)!=c.z)
+      continue;
 
-    processed(c.x,c.y) = true;
+    std::cerr<<"Popping "<<c.x<<" "<<c.y<<" "<<std::setprecision(40)<<c.z<<std::endl;
+    std::cout<<"\tNew top: "<<q.top().x<<" "<<q.top().y<<std::endl;
 
-    assert(topo(c.x,c.y)>OCEAN_LEVEL);
+    processed(c.x,c.y)++;
+
+    // if(processed(c.x,c.y)>100)
+      // continue;
 
     assert(topo(c.x,c.y)>OCEAN_LEVEL);
 
@@ -146,7 +153,7 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
     const int  ny      = c.y+dy[max_n];
     const auto nheight = HydroHeight(nx,ny,topo,wtd);
 
-    std::cout<<"\tLowest neighbour: "<<nx<<" "<<ny<<std::endl;
+    // std::cerr<<"\tLowest neighbour: "<<nx<<" "<<ny<<std::endl;
 
     //We've found a downhill neighbour, now we need to move water that direction
 
@@ -156,13 +163,13 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
       wtd(nx,ny)   = 0; //TODO: Probably unnecessary
     } else {
       const double water_to_move = std::min(wtd(c.x,c.y),(float)((c.z-nheight)/2.0));
-      if(water_to_move>1e-4){
+      if(water_to_move>1e-3){
         wtd(c.x,c.y) -= water_to_move;
         wtd(nx,ny)   += water_to_move;   
-        std::cout<<"\tWater to move: "<<water_to_move<<std::endl;
+        std::cerr<<"\tWater to move: "<<std::setprecision(40)<<water_to_move<<std::endl;
 
         //Enqueue the neighbour we've just passed water to
-        std::cout<<"Enqueuing "<<nx<<" "<<ny<<std::endl;
+        std::cerr<<"\tEnqueuing (move) "<<nx<<" "<<ny<<std::endl;
         q.emplace(nx,ny,HydroHeight(nx,ny,topo,wtd));
       }
     }
@@ -173,6 +180,7 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
     for(int n=0;n<neighbours;n++){
       const int  nx      = c.x + dx[n];
       const int  ny      = c.y + dy[n];
+      std::cout<<"\tConsidering "<<nx<<" "<<ny<<std::endl;
       if(!topo.inGrid(nx,ny))
         continue;
 
@@ -190,10 +198,11 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
         continue;
       //Don't add neighbours whose hydrologic height is too similar to the focal
       //cell
-      if(processed(nx,ny)) // && std::abs(nheight-cheight_new)<1e-6)
+      if(processed(nx,ny)>0) // && std::abs(nheight-cheight_new)<1e-6)
         continue;
 
-      std::cout<<"Enqueuing "<<nx<<" "<<ny<<std::endl;
+      std::cerr<<"Enqueuing (neigh) "<<nx<<" "<<ny<<std::endl;
+      processed(nx,ny)++;
       q.emplace(nx,ny,nheight);
     }
   }
