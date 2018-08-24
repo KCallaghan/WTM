@@ -103,6 +103,8 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
 
     processed(c.x,c.y) = true;
 
+    assert(topo(c.x,c.y)>OCEAN_LEVEL);
+
     //Figure out where we're sending this cell's water
     double max_slope = 0;   //Maximum slope we've seen so far. Setting to 0 ensures that we only consider downhill neighbours.
     int max_n        = -1;  //Lowest downhill neighbour
