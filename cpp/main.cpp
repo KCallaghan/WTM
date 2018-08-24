@@ -136,7 +136,7 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
 
     assert(topo(c.x,c.y)>OCEAN_LEVEL);
 
-    const int max_n = GetLowestNeighbour(c.x,c.y,topo,wtd);
+    const auto max_n = GetLowestNeighbour(c.x,c.y,topo,wtd);
 
     //max_n is the lowest neighbour
     if(max_n==-1) //There was no lowest neighbour
