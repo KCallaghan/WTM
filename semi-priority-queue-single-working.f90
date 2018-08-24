@@ -178,7 +178,7 @@ end do
 MAIN: do while(converged .eq.0) !loop for moving surface water to equilibrium
 
 
-    hold=h_values
+    hold    = h_values
     counter = counter + 1
 
 !The nested do loop below loops through all cells in the array, but in the order of highest cells first. 
@@ -250,9 +250,9 @@ MAIN: do while(converged .eq.0) !loop for moving surface water to equilibrium
     end do
 
     do row=1,n2
-        do col = 1,n3
-            arr(2,(row-1)*n3+col)=col
-        end do
+    do col = 1,n3
+        arr(2,(row-1)*n3+col)=col
+    end do
     end do
 
     call MergeSort(hz_1D,Merge_size,T,arr)
