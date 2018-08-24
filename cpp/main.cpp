@@ -64,7 +64,7 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
     if(wtd(x,y)<=0)
       continue;
     //The current cell is an ocean, so ignore it.
-    if(topo(x,y)==OCEAN_LEVEL)
+    if(topo(x,y)<=OCEAN_LEVEL)
       continue;
 
     //Is any neighbour higher than me?
@@ -133,7 +133,7 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
     //We've found a downhill neighbour, now we need to move water that direction
 
     //Is my neighbour an ocean?
-    if(topo(nx,ny)==OCEAN_LEVEL){ //TODO: This might be a special value
+    if(topo(nx,ny)<=OCEAN_LEVEL){ //TODO: This might be a special value
       wtd(c.x,c.y) = 0;
       wtd(nx,ny)   = 0; //TODO: Probably unnecessary
     } else {
@@ -168,7 +168,7 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
       if(wtd(nx,ny)<=0)
         continue;
       //Don't process the oceans
-      if(topo(nx,ny)==OCEAN_LEVEL)
+      if(topo(nx,ny)<=OCEAN_LEVEL)
         continue;
       //Don't add neighbours whose hydrologic height is too similar to the focal
       //cell
