@@ -21,6 +21,11 @@ const int dy8[8] = {0, -1,-1,-1,0,1,1, 1};
 const int dx4[8] = {-1, 0,1,0};
 const int dy4[8] = { 0,-1,0,1};
 
+const int *const dx  = dx8;
+const int *const dy  = dy8;
+const int neighbours = 8;
+
+
 const int OCEAN_LEVEL = 0;
 
 
