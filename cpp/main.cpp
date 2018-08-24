@@ -45,12 +45,33 @@ double HydroHeight(const int x, const int y, const Array2D<float> &topo, const A
 }
 
 
-void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
-  const int *const dx  = dx8;
-  const int *const dy  = dy8;
-  const int neighbours = 8;
 
-  Array2D<bool> processed(topo.width(),topo.height(),false);
+int GetLowestNeighbour(const int x, const int y, const Array2D<float> &topo, const Array2D<float> &wtd){
+  //Figure out where we're sending this cell's water
+  double max_slope = 0;   //Maximum slope we've seen so far. Setting to 0 ensures that we only consider downhill neighbours.
+  int    max_n     = -1;  //Lowest downhill neighbour
+  const auto myheight = HydroHeight(x,y,topo,wtd);
+  for(int n=0;n<neighbours;n++){
+    const int nx       = x + dx[n];
+    const int ny       = y + dy[n];
+    const auto nheight = HydroHeight(nx,ny,topo,wtd);
+    if(!topo.inGrid(nx,ny)) //Edge cell
+      continue;
+
+    const double slope = myheight-nheight; //Slope to the neighbour
+    if(slope>max_slope){
+      max_slope = slope;
+      max_n     = n;
+    }
+  }
+
+  return max_n;
+}
+
+
+
+void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
+  Array2D<int> processed(topo.width(),topo.height(),0);
 
   std::priority_queue<GridCellZ, std::vector<GridCellZ>, std::greater<GridCellZ> > q;
 
@@ -105,22 +126,9 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
 
     assert(topo(c.x,c.y)>OCEAN_LEVEL);
 
-    //Figure out where we're sending this cell's water
-    double max_slope = 0;   //Maximum slope we've seen so far. Setting to 0 ensures that we only consider downhill neighbours.
-    int max_n        = -1;  //Lowest downhill neighbour
-    for(int n=0;n<neighbours;n++){
-      const int nx       = c.x + dx[n];
-      const int ny       = c.y + dy[n];
-      const auto nheight = HydroHeight(nx,ny,topo,wtd);
-      if(!topo.inGrid(nx,ny)) //Edge cell
-        continue;
+    assert(topo(c.x,c.y)>OCEAN_LEVEL);
 
-      const double slope = c.z-nheight; //Slope to the neighbour
-      if(slope>max_slope){
-        max_slope = slope;
-        max_n     = n;
-      }
-    }
+    const int max_n = GetLowestNeighbour(c.x,c.y,topo,wtd);
 
     //max_n is the lowest neighbour
     if(max_n==-1) //There was no lowest neighbour
