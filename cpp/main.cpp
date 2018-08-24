@@ -92,7 +92,7 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
     for(int n=0;n<neighbours;n++){
       const int nx = x + dx[n];
       const int ny = y + dy[n];
-      if(!topo.inGrid(nx,ny)) //Edge cell
+      if(!topo.inGrid(nx,ny)) //Cell is out of bounds
         continue;
       //Neighbour cell has no water, so ignore it. It may be higher than the
       //focal cell, but it can't pass flow into the focal cell.
