@@ -114,6 +114,8 @@ void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
     q.emplace(x,y,myelev);
   }
 
+  std::cout<<"Peaks found = "<<q.size()<<std::endl;
+
   //Move water from high places to low places
   while(!q.empty()){
     //Get the highest cell in the hydroscape
