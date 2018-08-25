@@ -9,8 +9,9 @@
 
 template<class T>
 class Array2D {
- private:
+ public:
   T *data;
+ private:
   int mywidth  = -1;
   int myheight = -1;
   void getDimLength(const int ncid, const int dimnum);
