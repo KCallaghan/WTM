@@ -1,6 +1,7 @@
 #include "Array2D.hpp"
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -10,29 +11,35 @@
 #include <string>
 #include <utility>
 
+constexpr double SQ2 = std::sqrt(2.0);
+
 //1 2 3
 //0   4
 //7 6 5
-//                      0  1  2  3 4 5 6  7              
-const int dx8[8]    = {-1,-1, 0, 1,1,1,0,-1};
-const int dy8[8]    = {0, -1,-1,-1,0,1,1, 1};
-const int d8inverse = {4,  5, 6, 7,0,1,2, 3};
+//                      0  1  2  3 4 5 6  7
+const int dx8[8]       = {-1,-1, 0, 1,1,1,0,-1};
+const int dy8[8]       = {0, -1,-1,-1,0,1,1, 1};
+const double dr8[8]    = {1,SQ2,1,SQ2,1,SQ2,1,SQ2};
+const int d8inverse[8] = {4,  5, 6, 7,0,1,2, 3};
 
-//  1 
+//  1
 //0   2
 //  3
 //                      0  1 2 3
-const int dx4[8]    = {-1, 0,1,0};
-const int dy4[8]    = { 0,-1,0,1};
-const int d4inverse = { 2, 3,0,1};
+const int dx4[8]       = {-1, 0,1,0};
+const int dy4[8]       = { 0,-1,0,1};
+const double dr4[4]    = { 1, 1,1,1};
+const int d4inverse[4] = { 2, 3,0,1};
 
-const int *const dx       = dx8;
-const int *const dy       = dy8;
-const int *const dinverse = d8inverse;
-const int neighbours      = 8;
+const int    *const dx       = dx8;
+const int    *const dy       = dy8;
+const int    *const dinverse = d8inverse;
+const double *const dr       = dr8;
+const int neighbours         = 8;
 
 
-const int OCEAN_LEVEL = 0;
+const float  OCEAN_LEVEL = 0;
+const int8_t NO_FLOW     = -1;
 
 class GridCell {
  public:
@@ -53,335 +60,368 @@ class GridCellZ {
     y = y0;
     z = z0;
   }
-  bool operator>(const GridCellZ& a) const { 
+  bool operator>(const GridCellZ& a) const {
     return z>a.z; //Less than sorts the queue in reverse
   }
 };
 
 
 
-double HydroHeight(const int x, const int y, const Array2D<float> &topo, const Array2D<float> &wtd){
-  return topo(x,y)+wtd(x,y);
-}
+void ProcessDepression(
+  int cx0,
+  int cy0,
+  Array2D<bool>        &processed,
+  const Array2D<float> &topo,
+  const Array2D<int>   &flowdirs,
+  Array2D<float> &wtd,
+  Array2D<float> &hydro_surf,
+  int outlet
+){
+  std::vector<int> depression_cells;
 
-
-
-int GetLowestNeighbour(const int x, const int y, const Array2D<float> &topo, const Array2D<float> &wtd){
-  //Figure out where we're sending this cell's water
-  double max_slope = 0;   //Maximum slope we've seen so far. Setting to 0 ensures that we only consider downhill neighbours.
-  int    max_n     = -1;  //Lowest downhill neighbour
-  const auto myheight = HydroHeight(x,y,topo,wtd);
-  for(int n=0;n<neighbours;n++){
-    const int nx       = x + dx[n];
-    const int ny       = y + dy[n];
-    const auto nheight = HydroHeight(nx,ny,topo,wtd);
-    if(!topo.inGrid(nx,ny)) //Edge cell
-      continue;
-
-    const double slope = myheight-nheight; //Slope to the neighbour
-    if(slope>max_slope){
-      max_slope = slope;
-      max_n     = n;
+  if(outlet==-1){
+    int cx = cx0;
+    int cy = cy0;
+    while(true){
+      const int n  = flowdirs(cx,cy);
+      const int nx = cx+dx[n];
+      const int ny = cy+dy[n];
+      //If we start going back downhill, we've reached the outlet
+      if(topo(nx,ny)<topo(cx,cy)){
+        outlet = topo.xyToI(cx,cy);
+        break;
+      }
     }
   }
 
-  return max_n;
-}
+  const auto outlet_elev = topo(outlet);
 
-
-
-void ComplicatedDepressionDistribute(){
-
-}
-
-
-//Returns the amount of excess water after filling the depression. May be 0.
-double DepressionDistribute(
-  const int deplabel,
-  const Array2D<int> &label,
-  const double spill_elevation,
-  Array2D<float> &wtd,
-  double water_volume
-){
-  //Find volume of depression
-  double dep_volume = 0;
-  #pragma omp parallel for collapse(2) reduction(+:dep_volume)
-  for(int y=0;y<wtd.height();y++)
-  for(int x=0;x<wtd.width();x++){
-    if(label(x,y)!=deplabel)
-      continue;
-    dep_volume += spill_elevation - topo(x,y);
-    if(wtd(x,y)<0)
-      dep_volume += -wtd(x,y);
-  }
-
-  if(dep_volume<water_volume){
-    //Depression couldn't hold all the incoming water, so we fill it entirely.
-    #pragma omp parallel for collapse(2)
-    for(int y=0;y<wtd.height();y++)
-    for(int x=0;x<wtd.width();x++){   
-      if(label(x,y)!=deplabel)
-        continue;
-      wtd(x,y) = spill_elevation - topo(x,y);
-    } 
-    return water_volume-dep_volume;
-  } else {
-    ComplicatedDepressionDistribute()
-    return 0; //TODO
-  }
-}
-
-
-void SurfaceWater2(const Array2D<float> &topo, Array2D<float> &wtd){
-  const int NOT_DEP = -1;
-  Array2D<int>  label    (topo.width(),topo.height(),NOT_DEP); //All depressions are unlabeled
-  Array2D<bool> processed(topo.width(),topo.height(),false);
-  Array2D<int>  flowdirs (topo.width(),topo.height(),-1   );
-
-  int next_dep_id = 0;                //First value that is not unlabaled
-
-  std::vector<float> spill_elevation;
-  std::map<GridCell, double> depression_volume;
-
-  //Sort cells so that the lowest cell comes off the queue first
   std::priority_queue<GridCellZ, std::vector<GridCellZ>, std::greater<GridCellZ> > pq;
 
-  //Add all edge cells to the queue TODO: Terribly inefficient
-  for(int y=0;y<topo.height();y++)
-  for(int x=0;x<topo.width();x++)
-    if(topo.isEdgeCell(x,y))
-      pq.emplace(x,y,topo(x,y));
+  const int original_cx0 = cx0;
+  const int original_cy0 = cy0;
 
-
+  //Climb into depression
+  pq.emplace(cx0, cy0, hydro_surf(c0));
   while(!pq.empty()){
     const auto c = pq.top();
-    pq.pop();
 
+    bool has_lower = false;
     for(int n=0;n<neighbours;n++){
-      const int nx = x + dx[n];
-      const int ny = y + dy[n];
-      if(!topo.inGrid(nx,ny)) //Cell is out of bounds
-        continue;
-      if(processed(nx,ny))    //Cell has already been in the queue
-        continue;
-      processed(nx,ny) = true;
-
-      //Is the neighbouring cell lower than I am?
-      if(topo(nx,ny)<=topo(x,y)){ //Cell is part of a depression
-        int deplabel = label(x,y);
-        if(deplabel==0){ //I don't have a label: this is a new depression
-          deplabel = next_dep_id++;
-          spill_elevation.push_back(topo(x,y));
-          depression_volume.push_back(0);
-        }
-        label(nx,ny) = deplabel;
-        pq.emplace(nx,ny,topo(x,y));
-      } else {
-        pq.emplace(nx,ny,topo(nx,ny));
-      }
-      flowdirs(nx,ny) = dinverse[n];
+      const int nx = c.x+dx[n];
+      const int ny = c.y+dy[n];
+      if(hydro_surf(nx,ny)<hydro_surf(c.x,c.y))
+        has_lower = true;
+      pq.emplace(nx,ny,hydro_surf(nx,ny));
+    }
+    if(!has_lower){
+      cx0 = c.x;
+      cy0 = c.y;
+      c0  = topo.xyToI(c.x,c.y);
+      break;
     }
   }
 
-  //At this point every depression is labeled with a unique id [0,*), each id
-  //has a corresponding spill elevation, and each cell has a pointer to its
-  //downstream "parent" cell.
+  //Climb out of depression along entry path
+  {
+    int cx = cx0;
+    int cy = cy0;
+    while(true){
+      if(cx==original_cx0 && cy==original_cy0)
+        break;
+      depression_cells.push_back(topo.xyToI(cx,cy));
+      const auto n = flowdirs(cx,cy);
+      cx           = cx+dx[n];
+      cy           = cy+dy[n];
+    }
+  }
+
+  while(!depression_cells.empty()){
+    if(hydro_surf(c)>topo(c))
+      break;
+    if(wtd(c)==0) //We ran out of water
+      return;
+    if(!depression_cells.empty()){
+      const int n = depression_cells.back();
+      depression_cells.pop_back();
+      wtd(n) += wtd(c);
+      wtd(c)  = 0;
+    }
+  }
+
+
+  double water_volume = wtd(cx0,cy0);
+  wtd(cx0,cy0) = 0;
+
+
+
+  //Climb out of depression
+  pq.emplace(cx0, cy0, hydro_surf(c0));
+  double volume         = 0;
+  double cell_area      = 0;
+  double base_area      = 0;
+  double previous_level = 0;
+  while(!pq.empty()){
+    const auto c = pq.top();
+
+    if(wtd(c.x,c.y)>0){
+      water_volume += wtd(c.x,c.y); //Gather water, especially on flats.
+      wtd(c.x,c.y)  = 0;
+    }
+
+    volume        += cell_area*(hydro_surf(c.x,c.y)-previous_level);
+    previous_level = hydro_surf(c.x,c.y);
+    cell_area     += 1;
+    base_area     += 1*hydro_surf(c.x,c.y); //Cell area * Cell Elevation
+    // WaterVolume=(WaterEl-Aelev)*Aarea+(WaterEl-Belev)*Barea+(WaterEl-Celev)*Carea+...
+    // 0=(WaterEl-Aelev)*Aarea+(WaterEl-Belev)*Barea+(WaterEl-Celev)*Carea+...-WaterVolume
+    // 0=(Aarea+Barea+Carea+...)*WaterEl-(Aarea*Aelev+Barea*Belev+Carea*Celev+...)-WaterVolume
+    // 0=TotalArea*WaterEl-BaseAreaTimesBaseHeight-WaterVolume
+    // WaterEl=(BaseAreaTimesBaseHeight+WaterVolume)/TotalArea
+    if(volume>water_volume){
+      const auto water_elev = (base_area+water_volume)/cell_area;
+      for(const auto &dc: depression_cells)
+        hydro_surf(dc) = water_elev;
+      return;
+    }
+
+    depression_cells.push_back(topo.xyToI(c.x,c.y));
+
+    for(int n=0;n<neighbours;n++){
+      const int nx = c.x+dx[n];
+      const int ny = c.y+dy[n];
+      if(processed(nx,ny))
+        continue;
+      if(hydro_surf(nx,ny)<hydro_surf(c.x,c.y)){
+        outlet = true;
+        break;
+      }
+      processed(nx,ny) = true;
+      pq.emplace(nx,ny,hydro_surf(nx,ny));
+    }
+
+    if(outlet){
+      const auto outlet_elev = hydro_surf(c.x,c.y);
+      for(const auto &dc: depression_cells)
+        hydro_surf(dc) = outlet_elev;
+      water_volume -= volume;
+
+      if(hydro_surf(c.x,c.y)<outlet_elev)
+        ProcessDepression(c.x,c.y,processed,topo,wtd,hydro_surf);
+      else 
+        wtd(outlet) = water_volume;
+      return;
+    }
+  }
+}
+
+
+
+void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
+  //Floating-point math means that adding and subtracting water from the `wtd`
+  //offset surface will yield non-flat lake surfaces. Therefore, we create a
+  //hydraulic surface which captures the level of the water.
+  Array2D<float> hydro_surf(topo.width(),topo.height(),0);
+  for(int i=0;i<topo.size();i++)
+    hydro_surf(i) = topo(i);
+
+  //Our first step is to move all of the water downstream into pit cells. To do
+  //so, we calculate steepest-descent flow directions for each cell (though we
+  //could also use MFD). Later, we will calculate a new set of flow directions
+  //which provide paths out of depressions. Using such flow directions now would
+  //mean that some water on the slopes of depressions would not automatically
+  //drain to the middle complicating the algorithm later.
+
+  //The flowdirs array points downstream. We use int8_t to save memory
+  Array2D<int8_t>  flowdirs(topo.width(),topo.height(),NO_FLOW);
+
+  //Find the steepest descent neighbour for each cell
+  #pragma omp parallel for collapse(2)
+  for(int y=0;y<topo.height();y++)
+  for(int x=0;x<topo.width();x++){
+    double greatest_slope = 0;
+    auto   max_n          = NO_FLOW;
+    for(int n=0;n<neighbours;n++){
+      const int nx = x+dx[n];
+      const int ny = y+dy[n];
+      const auto slope = (topo(x,y)-topo(nx,ny))/dr[n];
+      if(slope>greatest_slope){
+        greatest_slope = slope;
+        max_n          = n;
+      }
+    }
+    flowdirs(x,y) = max_n;
+  }
 
   //Calculate how many upstream cells flow into each cell
   Array2D<char>  dependencies(topo.width(),topo.height(),0);
   #pragma omp parallel for collapse(2)
   for(int y=0;y<topo.height();y++)
-  for(int x=0;x<topo.width();x++)
-  for(int n=0;n<neighbours;n++)
-    if(flowdirs[n]==dinverse[n])
-      dependencies(x,y)++;
+  for(int x=0;x<topo.width();x++){
+    if(flowdirs(x,y)==NO_FLOW)
+      continue;
+    for(int n=0;n<neighbours;n++){
+      const int nx = x+dx[n];
+      const int ny = y+dy[n];
+      if(flowdirs(nx,ny)==dinverse[n])
+        dependencies(x,y)++;
+    }
+  }
 
-  //Find the peaks
-  std::queue<GridCell> q;
-  for(int y=0;y<topo.height();y++)
-  for(int x=0;x<topo.width();x++)
-    if(dependencies(x,y)==0)
-      q.emplace(x,y);
+  //Find the peaks. These are the cells into which no other cells pass flow. We
+  //know the flow accumulation of the peaks without having to perform any
+  //recursive calculations; they just pass flow downstream. From the peaks, we
+  //can begin a breadth-first traversal in the downstream direction by adding
+  //each cell to the frontier/queue as its dependency count drops to zero.
+  std::queue<int> q;
+  #pragma omp parallel for //TODO: Use a custom reduction
+  for(int i=0;i<topo.size();i++)
+    if(dependencies(i)==0 && flowdirs(i)!=-1)  //Is it a peak?
+      #pragma omp critical
+      q.emplace(i);         //Yes.
 
+  //Starting with the peaks, pass flow downstream
   while(!q.empty()){
-    const auto c = q.front();
-    q.pop();
+    const auto c = q.front();          //Copy focal cell from queue
+    q.pop();                           //Clear focal cell from queue
 
-    const auto n = flowdirs(c.x,c.y);
-    const int  nx = c.x+dx[n];
-    const int  ny = c.y+dy[n];
+    //Coordinates of downstream neighbour, if any
+    const auto n  = flowdirs(c); 
 
-    if(label(c.x,c.y)==NOT_DEP && label(nx,ny)==NOT_DEP){ //I'm not a depression and neither is downstream neighbour
-      if(wtd(c.x,c.y)>=0){
-        wtd(nx,ny)  += wtd(c.x,c.y);
-        wtd(c.x,c.y) = 0;
-      }
-    } else if(label(c.x,c.y)==NOT_DEP && label(nx,ny)!=NOT_DEP){ //Passing flow into a depression
-      if(wtd(c.x,c.y)>=0){
-        depression_volume[label(nx,ny)] += wtd(c.x,c.y);
-        wtd(c.x,c.y)                     = 0;
-      }
-    } else if(label(c.x,c.y)!=NOT_DEP && label(nx,ny)==NOT_DEP){ //Passing flow out of a depression
-      const auto this_dep        = label(c.x,c.y);
-      const auto leftover_volume = DepressionDistribute(
-        this_dep,
-        label,
-        spill_elevation[this_dep],
-        wtd,
-        depression_volume[this_dep]
-      );
-      wtd(nx,ny) += leftover_volume;
-    } else { //Passing flow around a depression
-      if(topo(nx,ny)>topo(c.x,c.y)){ //This is the pit cell of a depression
-        depression_volume[c] = wtd(c.x,c.y);
-        wtd(c.x,c.y) = 0;
-      } else {                       //Moving towards a pit cell
-        if(wtd(c.x,c.y)>=0){
-          wtd(nx,ny)  += wtd(c.x,c.y);
-          wtd(c.x,c.y) = 0;
-        }
-      }
+    //If downstream neighbour is the ocean, we drop our water into it and the
+    //ocean is unaffected.
+    if(wtd(c)<=OCEAN_LEVEL){
+      wtd(c) = 0;
+      continue;
     }
 
-    if(--dependencies(nx,ny)==0)
-      q.emplace(nx,ny);
+    //If we have water, pass it downstream.
+    if(wtd(c)>0){
+      wtd(n) += wtd(c);
+      wtd(c)  = 0;
+    }
+
+    //Decrement the neighbour's dependencies. If there are no more dependencies,
+    //we can process the neighbour.
+    if(--dependencies(n)==0)
+      q.emplace(n);                   //Add neighbour to the queue
   }
-}
 
 
+  //At this point the water is located at the pit cells of all of the
+  //depressions. Now we'll use the Priority-Flood method to determine a
+  //processing order for depressions.
 
+  //Indicates whether a cell has previously been processed by the algorithm.
+  //This prevents the algorithm from going in an infinite loop.
+  Array2D<bool> processed(topo.width(),topo.height(),false);
 
-void SurfaceWater(const Array2D<float> &topo, Array2D<float> &wtd){
-  Array2D<int> processed(topo.width(),topo.height(),0);
+  //The priority queue ensures that cells are visited in order from lowest to
+  //highest
+  std::priority_queue<GridCellZ, std::vector<GridCellZ>, std::greater<GridCellZ> > pq;
 
-  std::priority_queue<GridCellZ, std::vector<GridCellZ>, std::greater<GridCellZ> > q;
+  ////////////////////
+  //Locate depressions
+  ////////////////////
 
-  //Find the hydrologic peaks: those places into which no 
+  //We start by adding all the edge cells to the priority queue
+  for(int y=0;y<topo.height();y++){
+    pq.emplace(0,             y,topo(0,             y));
+    pq.emplace(topo.width()-1,y,topo(topo.width()-1,y));
+  }
+  for(int x=0;x<topo.width();x++){
+    pq.emplace(x, 0,               topo(x,               0));
+    pq.emplace(x, topo.height()-1, topo(x, topo.height()-1));
+  }
+
+  //Visit cells in order from lowest to highest generating flow directions as we
+  //go.
+  while(!pq.empty()){
+    const auto c = pq.top();       //Copy cell with lowest elevation from priority queue
+    pq.pop();                      //Remove the copied cell from the priority queue
+
+    for(int n=0;n<neighbours;n++){
+      const int nx = c.x + dx[n];  //Use focal cell's x-coordinate plus offset to get neighbour x-coordinate
+      const int ny = c.y + dy[n];  //Use focal cell's y-coordinate plus offset to get neighbour y-coordinate
+      if(!topo.inGrid(nx,ny))      //Neighbour cell is out of bounds
+        continue;
+      if(processed(nx,ny))         //Cell has already been visited
+        continue;
+
+      processed(nx,ny) = true;     //Mark cell as having been visited
+
+      //Regardless of whether it was in a depression or not, we make a note that
+      //the neighbour cell's "downstream" flow direction was this focal cell.
+      //Roughly speaking, for cells which are not in depressions, this
+      //corresponds to flow directions similar to D8. Cells in depressions will
+      //drain to the depression's deepest point (the pit cell) and the deepest
+      //point will drain via the steepest path to the depression's spill point.
+      flowdirs(nx,ny) = n;
+
+      pq.emplace(nx,ny,topo(nx,ny));
+    }
+  }
+
+  //We now have flow directions which ensure that each cell has a path to the
+  //edge of the DEM. We now process the cells from the highest points down, thus
+  //ensuring that water is passed correctly from upstream to downstream lakes.
+
+  ////////////////////
+  //Flow Accumulation
+  ////////////////////
+
+  //Calculate how many upstream cells flow into each cell
+  dependencies.setAll(0);
+  #pragma omp parallel for collapse(2)
   for(int y=0;y<topo.height();y++)
   for(int x=0;x<topo.width();x++){
-    bool has_higher = false;
-    const auto myelev = HydroHeight(x,y,topo,wtd); //Elevation of focal cell
-
-    //The current cell has no water, so we ignore it.
-    if(wtd(x,y)<=0)
+    if(flowdirs(x,y)==NO_FLOW)
       continue;
-    //The current cell is an ocean, so ignore it.
-    if(topo(x,y)<=OCEAN_LEVEL)
-      continue;
-
-    //Is any neighbour higher than me?
     for(int n=0;n<neighbours;n++){
-      const int nx = x + dx[n];
-      const int ny = y + dy[n];
-      if(!topo.inGrid(nx,ny)) //Cell is out of bounds
-        continue;
-      //Neighbour cell has no water, so ignore it. It may be higher than the
-      //focal cell, but it can't pass flow into the focal cell.
-      if(wtd(nx,ny)<=0)             
-        continue;
-      const auto nelev = HydroHeight(nx,ny,topo,wtd);
-      if(nelev>myelev){
-        has_higher = true;
-        break;
-      }
+      const int nx = x+dx[n];
+      const int ny = y+dy[n];
+      if(flowdirs(nx,ny)==dinverse[n])
+        dependencies(x,y)++;
     }
-
-    //I had a higher neighbour, so I am not a peak
-    if(has_higher)
-      continue;
-
-    //I am a peak
-    std::cerr<<"Enqueuing "<<x<<" "<<y<<std::endl;
-    q.emplace(x,y,myelev);
-    processed(x,y)++;
   }
 
-  std::cout<<"Peaks found = "<<q.size()<<std::endl;
+  //Find the peaks. These are the cells into which no other cells pass flow. We
+  //know the flow accumulation of the peaks without having to perform any
+  //recursive calculations; they just pass flow downstream. From the peaks, we
+  //can begin a breadth-first traversal in the downstream direction by adding
+  //each cell to the frontier/queue as its dependency count drops to zero.
 
-  //Move water from high places to low places
+  //Note that `q` is empty, since that was a condition to end a `while` loop
+  //above.
+  #pragma omp parallel for //TODO: Use a custom reduction
+  for(int i=0;i<topo.size();i++)
+    if(dependencies(i)==0 && flowdirs(i)!=-1)  //Is it a peak?
+      #pragma omp critical
+      q.emplace(i);         //Yes.
+
+
+  //Starting with the peaks, pass flow downstream
   while(!q.empty()){
-    //Get the highest cell in the hydroscape
-    const auto c = q.top();
-    q.pop();
+    const auto c = q.front();         //Copy focal cell from queue
+    q.pop();                          //Clear focal cell from queue
 
-    //Cell has been modified since it was emplaced, so we skip it
-    if(HydroHeight(c.x,c.y,topo,wtd)!=c.z)
-      continue;
+    const auto n = flowdirs(c);       //Find the "downstream" neighbour of the focal cell
 
-    std::cerr<<"Popping "<<c.x<<" "<<c.y<<" "<<std::setprecision(40)<<c.z<<std::endl;
-    // std::cout<<"\tNew top: "<<q.top().x<<" "<<q.top().y<<std::endl;
+    if(hydro_surf(n)>hydro_surf(c) && wtd(c)!=0)  //If the neighbour is higher than we are
+      ProcessDepression(c,processed,topo,wtd,hydro_surf);
 
-    processed(c.x,c.y)++;
-
-    // if(processed(c.x,c.y)>100)
-      // continue;
-
-    assert(topo(c.x,c.y)>OCEAN_LEVEL);
-
-    const auto max_n = GetLowestNeighbour(c.x,c.y,topo,wtd);
-
-    //max_n is the lowest neighbour
-    if(max_n==-1) //There was no lowest neighbour
-      continue;
-
-    const int  nx      = c.x+dx[max_n];
-    const int  ny      = c.y+dy[max_n];
-    const auto nheight = HydroHeight(nx,ny,topo,wtd);
-
-    // std::cerr<<"\tLowest neighbour: "<<nx<<" "<<ny<<std::endl;
-
-    //We've found a downhill neighbour, now we need to move water that direction
-
-    //Is my neighbour an ocean?
-    if(topo(nx,ny)<=OCEAN_LEVEL){ //TODO: This might be a special value
-      wtd(c.x,c.y) = 0;
-      wtd(nx,ny)   = 0; //TODO: Probably unnecessary
-    } else {
-      const double water_to_move = std::min(wtd(c.x,c.y),(float)((c.z-nheight)/2.0));
-      if(water_to_move>1e-3){
-        wtd(c.x,c.y) -= water_to_move;
-        wtd(nx,ny)   += water_to_move;
-        std::cerr<<"\tWater to move: "<<std::setprecision(40)<<water_to_move<<std::endl;
-
-        //Enqueue the neighbour we've just passed water to
-        std::cerr<<"\tEnqueuing (move) "<<nx<<" "<<ny<<std::endl;
-        q.emplace(nx,ny,HydroHeight(nx,ny,topo,wtd));
-      }
+    if(wtd(c)>=0){
+      wtd(n) += wtd(c);
+      wtd(c)  = 0;
     }
 
-    const auto cheight_new = HydroHeight(c.x,c.y,topo,wtd);
-
-    //Add appropriate neighbours to priority queue
-    for(int n=0;n<neighbours;n++){
-      const int  nx      = c.x + dx[n];
-      const int  ny      = c.y + dy[n];
-      // std::cout<<"\tConsidering "<<nx<<" "<<ny<<std::endl;
-      if(!topo.inGrid(nx,ny))
-        continue;
-
-      const auto nheight = HydroHeight(nx,ny,topo,wtd);
-
-      //Don't add the neighbour we passed water to, since we added it already
-      //above
-      if(n==max_n)
-        continue;
-      //If there's no water in the neighbour, we can skip it.
-      if(wtd(nx,ny)<=0)
-        continue;
-      //Don't process the oceans
-      if(topo(nx,ny)<=OCEAN_LEVEL)
-        continue;
-      //Don't add neighbours whose hydrologic height is too similar to the focal
-      //cell
-      if(processed(nx,ny)>0) // && std::abs(nheight-cheight_new)<1e-6)
-        continue;
-
-      std::cerr<<"Enqueuing (neigh) "<<nx<<" "<<ny<<std::endl;
-      processed(nx,ny)++;
-      q.emplace(nx,ny,nheight);
-    }
+    //Decrement the neighbour's dependencies. If there are no more dependencies,
+    //we can process the neighbour.
+    if(--dependencies(n)==0)
+      q.emplace(n);                   //Add neighbour to the queue
   }
 }
+
 
 
 
@@ -401,13 +441,13 @@ int main(int argc, char **argv){
   Array2D<float> fslope(dir+"/Mad_020500_fslope_rotated.nc", "value");   //100/(1+150*slope) - Used with fslope to generate efolding depth
   Array2D<float> topo  (dir+"/Mad_020500_topo_rotated.nc",   "value");   //Terrain height
   Array2D<float> ksat  (dir+"/Mad_ksat_rotated.nc",          "value");   //Hydrologic conductivity
-  Array2D<float> wtd   (dir+"/Mad_021000_wtd_rotated.nc",    "value"); 
+  Array2D<float> wtd   (dir+"/Mad_021000_wtd_rotated.nc",    "value");
 
   if(run_type=="equilibrium")
     throw std::runtime_error("equilibrium not implemented!");
   else if (run_type=="transient"){
     //Pass
-  } else 
+  } else
     throw std::runtime_error("Expected 'equilibrium' or 'transient'!");
 
   //TODO: Make sure all files have same dimensions
