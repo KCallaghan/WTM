@@ -1,10 +1,12 @@
 #ifndef _array2d_hpp_
 #define _array2d_hpp_
 
+#include <cassert>
 #include <string>
 #include <iostream>
 #include <netcdf.h>
 #include <stdexcept>
+#include <type_traits>
 #include <memory>
 
 template<class T>
@@ -29,6 +31,8 @@ class Array2D {
   int  size()   const;
   bool isEdgeCell(const int x, const int y) const;
   bool inGrid(const int x, const int y) const;
+  void setAll(const T val0);
+  int  xyToI(const int x, const int y) const;
 };
 
 template<class T>
@@ -106,12 +110,12 @@ Array2D<T>::~Array2D() {
 
 template<class T>
 T& Array2D<T>::operator()(const int x, const int y) {
-  return data[y*mywidth+(x%mywidth)];
+  return data[y*mywidth+x];
 }
 
 template<class T>
 T  Array2D<T>::operator()(const int x, const int y) const {
-  return data[y*mywidth+(x%mywidth)];
+  return data[y*mywidth+x];
 }
 
 template<class T>
@@ -146,7 +150,87 @@ bool Array2D<T>::isEdgeCell(const int x, const int y) const {
 
 template<class T>
 bool Array2D<T>::inGrid(const int x, const int y) const {
-  return y>=0 || y<=myheight-1;
+  return 0<=x && 0<=y && x<mywidth && y<myheight;
 }
+
+template<class T>
+void Array2D<T>::setAll(const T val0){
+  for(int i=0;i<size();i++)
+    data[i] = val0;
+}
+
+template<class T>
+int Array2D<T>::xyToI(const int x, const int y) const {
+  assert(x>=0 && y>=0 && x<width() && y<height());
+  return y*width()+x;
+}
+
+
+
+
+
+
+
+
+
+
+
+template<class T>
+void SaveAsNetCDF(const Array2D<T> &arr, const std::string filename, const std::string datavar){
+  /* When we create netCDF variables and dimensions, we get back an
+  * ID for each one. */
+  int ncid, x_dimid, y_dimid, varid;
+  int dimids[2];
+
+  //For error handling
+  int retval;
+
+  //Create the file. The NC_CLOBBER parameter tells netCDF to overwrite this
+  //file, if it already exists.
+  if ((retval = nc_create(filename.c_str(), NC_CLOBBER, &ncid)))
+    throw std::runtime_error("Failed to create file '" + filename + "'! Error: " + nc_strerror(retval));
+
+  //Define the dimensions. NetCDF will hand back an ID for each.
+  if ((retval = nc_def_dim(ncid, "x", arr.height(), &x_dimid)))
+    throw std::runtime_error("Failed to create x dimension in file '" + filename + "'! Error: " + nc_strerror(retval));
+  if ((retval = nc_def_dim(ncid, "y", arr.width(), &y_dimid)))
+    throw std::runtime_error("Failed to create y dimension in file '" + filename + "'! Error: " + nc_strerror(retval));
+
+  //The dimids array is used to pass the IDs of the dimensions of the variable.
+  dimids[0] = x_dimid;
+  dimids[1] = y_dimid;
+
+  //Define the variable. The type of the variable in this case is NC_INT (4-byte
+  //integer).
+  nc_type dtype;
+  if(std::is_same<T, int32_t>::value)
+    dtype = NC_INT;
+  else
+    throw std::runtime_error("Unimplemented data type found when writing file '" + filename + "'!");
+
+  if ((retval = nc_def_var(ncid, datavar.c_str(), dtype, 2, dimids, &varid)))
+    throw std::runtime_error("Failed to create variable '" + datavar + "' in file '" + filename + "'! Error: " + nc_strerror(retval));
+
+  //End define mode. This tells netCDF we are done defining metadata.
+  if ((retval = nc_enddef(ncid)))
+    throw std::runtime_error("Could not end define mode when making file '" + filename + "'! Error: " + nc_strerror(retval));
+
+  //Write the pretend data to the file. Although netCDF supports reading and
+  //writing subsets of data, in this case we write all the data in one
+  //operation.
+  if(std::is_same<T, int32_t>::value){
+    if ((retval = nc_put_var_int(ncid, varid, arr.data)))
+      throw std::runtime_error("Failed to write data to file '" + filename + "'! Error: " + nc_strerror(retval));
+  }
+
+  //Close the file. This frees up any internal netCDF resources associated with
+  //the file, and flushes any buffers.
+  if ((retval = nc_close(ncid)))
+    throw std::runtime_error("Failed to close file '" + filename + "'! Error: " + nc_strerror(retval));
+}
+
+
+
+
 
 #endif
