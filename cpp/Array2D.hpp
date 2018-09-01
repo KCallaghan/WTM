@@ -175,6 +175,8 @@ int Array2D<T>::xyToI(const int x, const int y) const {
 
 
 
+
+
 template<class T>
 void SaveAsNetCDF(const Array2D<T> &arr, const std::string filename, const std::string datavar){
   /* When we create netCDF variables and dimensions, we get back an
@@ -205,6 +207,8 @@ void SaveAsNetCDF(const Array2D<T> &arr, const std::string filename, const std::
   nc_type dtype;
   if(std::is_same<T, int32_t>::value)
     dtype = NC_INT;
+  else if(std::is_same<T, float>::value)
+    dtype = NC_FLOAT;
   else
     throw std::runtime_error("Unimplemented data type found when writing file '" + filename + "'!");
 
@@ -219,7 +223,10 @@ void SaveAsNetCDF(const Array2D<T> &arr, const std::string filename, const std::
   //writing subsets of data, in this case we write all the data in one
   //operation.
   if(std::is_same<T, int32_t>::value){
-    if ((retval = nc_put_var_int(ncid, varid, arr.data)))
+    if ((retval = nc_put_var_int(ncid, varid, (const int*)arr.data)))
+      throw std::runtime_error("Failed to write data to file '" + filename + "'! Error: " + nc_strerror(retval));
+  } else if(std::is_same<T, float>::value){
+    if ((retval = nc_put_var_float(ncid, varid, (const float*)arr.data)))
       throw std::runtime_error("Failed to write data to file '" + filename + "'! Error: " + nc_strerror(retval));
   }
 
@@ -228,9 +235,6 @@ void SaveAsNetCDF(const Array2D<T> &arr, const std::string filename, const std::
   if ((retval = nc_close(ncid)))
     throw std::runtime_error("Failed to close file '" + filename + "'! Error: " + nc_strerror(retval));
 }
-
-
-
 
 
 #endif
