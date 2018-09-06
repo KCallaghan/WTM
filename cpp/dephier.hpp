@@ -144,6 +144,16 @@ class Depression {
   //Elevation of the outlet cell. Since the outlet cell has the lowest elevation
   //of any path leading from a depression, we initialize this to infinity.
   elev_t  out_elev = std::numeric_limits<elev_t>::infinity();
+  //The depressions form a binary tree. Each depression has two child
+  //depressions: one left and one right.
+  label_t lchild = NO_VALUE;
+  label_t rchild = NO_VALUE;
+  //Number of cells contained within the depression
+  uint32_t cell_count = 0;
+  //Volume of the depression
+  double   dep_vol    = 0;
+  //Water currently contained within the depression
+  double   water_vol  = 0;
 };
 
 
@@ -599,7 +609,9 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       //Be sure that this happens AFTER we are done using the `depa` and `depb`
       //references since they will be invalidated if `depressions` has to
       //resize!
-      depressions.emplace_back();
+      auto &newdep  = depressions.emplace_back();
+      newdep.childa = depa_set;
+      newdep.childb = depb_set;
       djset.mergeAintoB(depa_set, newlabel); //A has a parent now
       djset.mergeAintoB(depb_set, newlabel); //B has a parent now
     }
