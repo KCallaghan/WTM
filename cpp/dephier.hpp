@@ -409,10 +409,10 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       const auto ni     = dem.xyToI(nx,ny);           //Flat index of neighbour
       const auto nlabel = label(ni);                  //Label of neighbour
 
-      if(nlabel==NO_DEP){                //Neighbour has not been visited yet
-        label(ni) = clabel;              //Give the neighbour my label
-        pq.emplace(nx,ny,dem(ni));       //Add the neighbour to the priority queue
-        flowdirs(nx,ny) = dinverse[n];   //Neighbour flows in the direction of this cell
+      if(nlabel==NO_DEP){                             //Neighbour has not been visited yet
+        label(ni) = clabel;                           //Give the neighbour my label
+        pq.emplace(nx,ny,dem(ni));                    //Add the neighbour to the priority queue
+        flowdirs(nx,ny) = dinverse[n];                //Neighbour flows in the direction of this cell
       } else if (nlabel==clabel) {
         //Skip because we are not interested in ourself. That would be vain.
         //Note that this case will come up frequently as we traverse flats since
