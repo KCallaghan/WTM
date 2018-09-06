@@ -61,6 +61,10 @@ typedef int32_t label_t;
 const label_t NO_PARENT = -1;
 const label_t NO_VALUE  = -1;
 
+//We use an 8-bit signed integer for labeling D4/D8/Rho4/Rho8 flow directions.
+typedef int8_t flowdir_t;
+const flowdir_t NO_FLOW = -1;
+
 
 
 //Used for holding the coordinates of a cell and its associated elevation. This
@@ -219,7 +223,8 @@ const label_t OCEAN  = 0;
 template<class elev_t, Topology topo>
 std::vector<Depression<elev_t> > GetDepressionHierarchy(
   const Array2D<elev_t> &dem,
-  Array2D<int> &label
+  Array2D<int>          &label,
+  Array2D<int8_t>       &flowdirs
 ){
   //A D4 or D8 topology can be used.
   const int    *dx;
@@ -407,6 +412,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       if(nlabel==NO_DEP){                //Neighbour has not been visited yet
         label(ni) = clabel;              //Give the neighbour my label
         pq.emplace(nx,ny,dem(ni));       //Add the neighbour to the priority queue
+        flowdirs(nx,ny) = dinverse[n];   //Neighbour flows in the direction of this cell
       } else if (nlabel==clabel) {
         //Skip because we are not interested in ourself. That would be vain.
         //Note that this case will come up frequently as we traverse flats since

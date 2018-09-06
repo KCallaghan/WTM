@@ -27,7 +27,11 @@ int main(int argc, char **argv){
   Array2D<float> dem(in_name,"value");   //Recharge (Percipitation minus Evapotranspiration)
 
   //Initialize labels to indicate that none of the cells are part of depressions
-  Array2D<label_t> label(dem.width(),dem.height(),NO_DEP);
+  Array2D<label_t> label   (dem.width(),dem.height(),NO_DEP);
+
+  //Initialize flow directions to indicate that none of the cells flow anywhere
+  Array2D<flowdir_t> flowdirs(dem.width(),dem.height(),NO_FLOW);
+
   //Label the ocean cells. This is a precondition for using
   //`GetDepressionHierarchy()`.
   #pragma omp parallel for
@@ -36,7 +40,7 @@ int main(int argc, char **argv){
       label(i) = OCEAN;
 
   //Label all the depressions and get the hierarchy connecting them.
-  const auto deps = GetDepressionHierarchy<float,Topology::D8>(dem, label);
+  const auto deps = GetDepressionHierarchy<float,Topology::D8>(dem, label, flowdirs);
 
   //TODO: Remove. For viewing test cases.
   if(label.width()<1000){
