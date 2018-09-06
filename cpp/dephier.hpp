@@ -150,11 +150,28 @@ class Depression {
   label_t rchild = NO_VALUE;
   //Number of cells contained within the depression
   uint32_t cell_count = 0;
-  //Volume of the depression
+  //Volume of the depression. Used in the Water Level Equation (see below).
   double   dep_vol    = 0;
-  //Water currently contained within the depression
+  //Water currently contained within the depression. Used in the Water Level
+  //Equation (see below).
   double   water_vol  = 0;
 };
+
+
+
+//TODO: Read this
+//We need an efficient way to determine the volume of a depression. To do so, we
+//note that if the outlet of a depression containing cells of elevations
+//$\{a,b,c,d\}$ is known and at elevation $o$, then the volume of the depression
+//is $(o-a)+(o-b)+(o-c)+(o-d)=4o-a-b-c-d=4o-sum(elevations)$. This says that, if
+//we keep track of the number of cells in a depression and their total
+//elevation, it is possible to calculate the volume of a depression at any time
+//based on a hypothetical outlet level. We call this the Water Level Equation.
+
+//Our strategy will be to keep track of the necessary components of the water
+//level equation for each depression and each outlet. Then as the outlets of
+//depression become known we can use the WLE to calculate their volumes. The
+//volume of a depression is its WLE minus the WLEs of its child depressions.
 
 
 
