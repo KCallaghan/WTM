@@ -56,15 +56,15 @@ int main(int argc, char **argv){
   //it to the `water_vol` for the appropriate depression. Use the labels array
   //to determine the appropriate depression.
 
-  //TODO 4/5. Perform a depth-first traversal of the depression hierarchy (start
-  //with depressions for which `parent==NO_PARENT`. When you reach the leaves if
-  //`water_vol>dep_vol` then try to overflow into the neighbouring depression if
-  //its `water_vol<dep_vol`. To do so search neighbour cells of `out_cell` for
-  //the lowest cell labeled `odep` and follow that one's flow path until it
-  //terminates. Add excess water to that depression's `water_vol`. After both
-  //child depressions have been visited they will be finished trying to share
-  //their water and their excess water is added to their parent's `water_vol`.
-  //Repeat the overflow attempt.
+  //TODO 4/5. Perform a depth-first post-order traversal of the depression
+  //hierarchy (start with depressions for which `parent==NO_PARENT`. When you
+  //reach the leaves if `water_vol>dep_vol` then try to overflow into the
+  //neighbouring depression if its `water_vol<dep_vol`. To do so search
+  //neighbour cells of `out_cell` for the lowest cell labeled `odep` and follow
+  //that one's flow path until it terminates. Add excess water to that
+  //depression's `water_vol`. After both child depressions have been visited
+  //they will be finished trying to share their water and their excess water is
+  //added to their parent's `water_vol`. Repeat the overflow attempt.
 
   //TODO 6: Adjust the hydrologic elevations. If a depression has `water_vol>0`
   //then all of its child depression are full. What remains is to use a
@@ -72,7 +72,10 @@ int main(int argc, char **argv){
   //cells should be flooded. If a depression is a leaf depression (no children)
   //then start the PQ at the pit_cell. Otherwise, start at the pit cell of any
   //child depression since all children are flooded to at least the level of the
-  //`out_elev` connecting the uppermost two children in the hierarchy.
+  //`out_elev` connecting the uppermost two children in the hierarchy. Cells
+  //should be added to the queue with elevation equal to at least the `out_elev`
+  //of the depression's children and, if `water_vol<dep_vol` should not exceed
+  //the `out_elev` of the depression itself.
 
 
 
