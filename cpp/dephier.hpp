@@ -172,6 +172,9 @@ class Outlet {
   //Elevation of the cell linking A and B
   elev_t  out_elev = std::numeric_limits<elev_t>::infinity();
 
+  //TODO: Each outlet should also track the number of cells contained in the
+  //depression and the volume of the depression
+
   //Standard issue constructor
   Outlet(label_t depa0, label_t depb0, label_t out_cell0, elev_t out_elev0){
     depa     = depa0;
@@ -410,6 +413,9 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       //However, it is harmless to check on them again.
     }
 
+    //TODO: Update the appropriate depression's cell_count and dep_vol variables
+    //here.
+
     //Consider the cell's neighbours
     for(int n=0;n<neighbours;n++){
       const int nx = ModFloor(c.x+dx[n],dem.width()); //Get neighbour's x-coordinate using an offset and wrapping
@@ -449,6 +455,9 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
         //comparators we developed earlier ensure that this is done correctly,
         //so here we just try to add the current outlet to the database; if it
         //shouldn't be there, then nothing will happen.
+
+        //TODO: Make a note of the depression's current number of cells and
+        //"volume"
         outlet_database.emplace(clabel,nlabel,out_cell,out_elev);
       }
     }
@@ -574,10 +583,12 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       //Get a reference to Depression A MetaLabel.
       auto &dep = depressions.at(depa_set);
 
+      //TODO: Calculate a final cell count and "volume" for the depression
+
       // std::cerr<<"\tMerging "<<depa_set<<" into the ocean via "<<outlet.depb<<"!"<<std::endl;
 
       //If this depression has already found the ocean then don't merge it
-      //again.
+      //again. (TODO: Richard)
       // if(dep.out_cell==OCEAN)
         // continue;
 
@@ -606,6 +617,9 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       depb.out_elev = outlet.out_elev; //Make a note that this is B's outlet's elevation
       depa.odep     = depa_set;        //Make a note that A overflows into B
       depb.odep     = depb_set;        //Make a note that B overflows into A
+
+      //TODO: Calculate final cell counts and true dep_vols for each depression
+
       //Be sure that this happens AFTER we are done using the `depa` and `depb`
       //references since they will be invalidated if `depressions` has to
       //resize!

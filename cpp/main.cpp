@@ -40,7 +40,41 @@ int main(int argc, char **argv){
       label(i) = OCEAN;
 
   //Label all the depressions and get the hierarchy connecting them.
+  
+  //TODO: 0. Calculate the number of cells within and volume of each depression.
+  //This will take place inside of GetDepressionHierarchy.
   const auto deps = GetDepressionHierarchy<float,Topology::D8>(dem, label, flowdirs);
+
+  //TODO 1. DONE. Get flow directions for all cells. 
+
+  //TODO 2. Perform a flow accumulation moving water downhill and filling
+  //groundwater as you go. Look at `misc/main.cpp`. Recall that we did this by
+  //counting depressions, finding peaks, and using a queue to control a breadth-
+  //first traversal from the peaks downwards.
+
+  //TODO 3. As part of the above, when flow can't go downhill any farther, add
+  //it to the `water_vol` for the appropriate depression. Use the labels array
+  //to determine the appropriate depression.
+
+  //TODO 4/5. Perform a depth-first traversal of the depression hierarchy (start
+  //with depressions for which `parent==NO_PARENT`. When you reach the leaves if
+  //`water_vol>dep_vol` then try to overflow into the neighbouring depression if
+  //its `water_vol<dep_vol`. To do so search neighbour cells of `out_cell` for
+  //the lowest cell labeled `odep` and follow that one's flow path until it
+  //terminates. Add excess water to that depression's `water_vol`. After both
+  //child depressions have been visited they will be finished trying to share
+  //their water and their excess water is added to their parent's `water_vol`.
+  //Repeat the overflow attempt.
+
+  //TODO 6: Adjust the hydrologic elevations. If a depression has `water_vol>0`
+  //then all of its child depression are full. What remains is to use a
+  //priority-queue and the Water Level Equation (see dephier.cpp) to find which
+  //cells should be flooded. If a depression is a leaf depression (no children)
+  //then start the PQ at the pit_cell. Otherwise, start at the pit cell of any
+  //child depression since all children are flooded to at least the level of the
+  //`out_elev` connecting the uppermost two children in the hierarchy.
+
+
 
   //TODO: Remove. For viewing test cases.
   if(label.width()<1000){
