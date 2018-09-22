@@ -22,7 +22,7 @@ constexpr double SQ2 = std::sqrt(2.0);
 //1 2 3
 //0   4
 //7 6 5
-//                         0  1  2  3 4 5 6  7
+//                                0  1  2  3 4 5 6  7
 //x-offset from focal cell
 static const int dx8[8]       = {-1,-1, 0, 1,1,1,0,-1};   
 //y-offset from focal cell
@@ -37,7 +37,7 @@ static const int d8inverse[8] = {4,  5, 6, 7,0,1,2, 3};
 //  1
 //0   2
 //  3
-//                         0  1 2 3
+//                                0  1 2 3
 //x-offset from focal cell
 static const int dx4[8]       = {-1, 0,1,0};
 //y-offset from focal cell
