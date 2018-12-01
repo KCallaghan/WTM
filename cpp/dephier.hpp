@@ -24,16 +24,16 @@ constexpr double SQ2 = std::sqrt(2.0);
 //1 2 3
 //0   4
 //7 6 5
-//                                0  1  2  3 4 5 6  7
+//                                0    1   2    3  4    5  6   7
 //x-offset from focal cell
-static const int dx8[8]       = {-1,-1, 0, 1,1,1,0,-1};   
+static const int dx8[8]       = {-1,  -1,  0,   1, 1,   1, 0, -1};   
 //y-offset from focal cell
-static const int dy8[8]       = {0, -1,-1,-1,0,1,1, 1};   
+static const int dy8[8]       = { 0,  -1, -1,  -1, 0,   1, 1,  1};   
 //Horizontal distance from focal cell to neighbours
-static const double dr8[8]    = {1,SQ2,1,SQ2,1,SQ2,1,SQ2};
+static const double dr8[8]    = { 1, SQ2,  1, SQ2, 1, SQ2, 1,SQ2};
 //Each number indicates a direction opposite of the one implied by its position
 //in the array
-static const int d8inverse[8] = {4,  5, 6, 7,0,1,2, 3};   
+static const int d8inverse[8] = { 4,   5,  6,   7, 0,   1, 2,  3};   
 
 //Implements D4 connectivity
 //  1
