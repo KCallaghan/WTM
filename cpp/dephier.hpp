@@ -92,7 +92,7 @@ class GridCellZk_high {
     //This may seem odd, but it is true. It's because C++ specifies its 
     //priority queue as a min-heap.
     if(z==a.z)      //If two or more cells are of equal elevation than the one 
-      return k>a.k; //added last (most recently) is the one that is returned.
+      return k<a.k; //added last (most recently) is the one that is returned.
     else
       return z>a.z; //Otherwise the one that is of lowest elevation comes first
   }
