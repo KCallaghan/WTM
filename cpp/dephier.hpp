@@ -641,8 +641,8 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       //references since they will be invalidated if `depressions` has to
       //resize!
       auto &newdep  = depressions.emplace_back();
-      newdep.childa = depa_set;
-      newdep.childb = depb_set;
+      newdep.lchild = depa_set;
+      newdep.rchild = depb_set;
       djset.mergeAintoB(depa_set, newlabel); //A has a parent now
       djset.mergeAintoB(depb_set, newlabel); //B has a parent now
     }
