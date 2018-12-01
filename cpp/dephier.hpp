@@ -119,7 +119,7 @@ class GridCellZk_high_pq : public std::priority_queue<GridCellZk_high<T>, std::v
 
 
 
-//This class holds information about a depression. It's pit cell and outlet cell
+//This class holds information about a depression. Its pit cell and outlet cell
 //(in flat-index form) as well as the elevations of these cells. It also notes
 //the depression's parent. The parent of the depression is the outlet through
 //which it must flow in order to reach the ocean. If a depression has more than
