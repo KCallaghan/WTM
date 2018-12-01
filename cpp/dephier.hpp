@@ -1,7 +1,7 @@
 #ifndef _dephier_hpp_
 #define _dephier_hpp_
 
-#include "Array2D.hpp"
+#include <richdem/common/Array2D.hpp>
 #include "DisjointDenseIntSet.hpp"
 #include <algorithm>
 #include <cassert>
@@ -15,6 +15,8 @@
 #include <string>
 #include <unordered_set>
 #include <utility>
+
+namespace rd = richdem;
 
 constexpr double SQ2 = std::sqrt(2.0);
 
@@ -252,9 +254,9 @@ const label_t OCEAN  = 0;
 //for all other cells.
 template<class elev_t, Topology topo>
 std::vector<Depression<elev_t> > GetDepressionHierarchy(
-  const Array2D<elev_t> &dem,
-  Array2D<int>          &label,
-  Array2D<int8_t>       &flowdirs
+  const rd::Array2D<elev_t> &dem,
+  rd::Array2D<int>          &label,
+  rd::Array2D<int8_t>       &flowdirs
 ){
   //A D4 or D8 topology can be used.
   const int    *dx;
@@ -663,7 +665,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 //Utility function for doing various relabelings based on the depression
 //hierarchy.
 template<class elev_t>
-void LastLayer(Array2D<label_t> &label, const Array2D<float> &dem, const std::vector<Depression<elev_t>> &depressions){
+void LastLayer(rd::Array2D<label_t> &label, const rd::Array2D<float> &dem, const std::vector<Depression<elev_t>> &depressions){
   #pragma omp parallel for collapse(2)
   for(int y=0;y<label.height();y++)
   for(int x=0;x<label.width();x++){
