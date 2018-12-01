@@ -278,7 +278,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
     throw std::runtime_error("Unrecognised topology!");
   }
 
-
+  (void)dr; //TODO: Suppresses compilation warning about `dr` not being used.
 
   //Depressions are identified by a number [0,*). The ocean is always
   //"depression" 0. This vector holds the depressions.
@@ -474,7 +474,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
         //shouldn't be there, then nothing will happen.
 
         //TODO: Make a note of the depression's current number of cells and
-        //"volume"
+        //"volume" //TODO: Note that this avoids adding duplicate cells
         outlet_database.emplace(clabel,nlabel,out_cell,out_elev);
       }
     }
