@@ -39,7 +39,7 @@ int main(int argc, char **argv){
   //Label the ocean cells. This is a precondition for using
   //`GetDepressionHierarchy()`.
   #pragma omp parallel for
-  for(int i=0;i<label.size();i++)
+  for(unsigned int i=0;i<label.size();i++)
     if(dem(i)==0)
       label(i) = OCEAN;
 
