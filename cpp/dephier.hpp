@@ -1,7 +1,7 @@
 #ifndef _dephier_hpp_
 #define _dephier_hpp_
 
-#include <richdem/common/Array2D.hpp>
+#include "Array2D.hpp"
 #include "DisjointDenseIntSet.hpp"
 #include <algorithm>
 #include <cassert>
@@ -16,30 +16,28 @@
 #include <unordered_set>
 #include <utility>
 
-namespace rd = richdem;
-
 constexpr double SQ2 = std::sqrt(2.0);
 
 //Implements D8 connectivity
 //1 2 3
 //0   4
 //7 6 5
-//                                0    1   2    3  4    5  6   7
+//                         0  1  2  3 4 5 6  7
 //x-offset from focal cell
-static const int dx8[8]       = {-1,  -1,  0,   1, 1,   1, 0, -1};   
+static const int dx8[8]       = {-1,-1, 0, 1,1,1,0,-1};   
 //y-offset from focal cell
-static const int dy8[8]       = { 0,  -1, -1,  -1, 0,   1, 1,  1};   
+static const int dy8[8]       = {0, -1,-1,-1,0,1,1, 1};   
 //Horizontal distance from focal cell to neighbours
-static const double dr8[8]    = { 1, SQ2,  1, SQ2, 1, SQ2, 1,SQ2};
+static const double dr8[8]    = {1,SQ2,1,SQ2,1,SQ2,1,SQ2};
 //Each number indicates a direction opposite of the one implied by its position
 //in the array
-static const int d8inverse[8] = { 4,   5,  6,   7, 0,   1, 2,  3};   
+static const int d8inverse[8] = {4,  5, 6, 7,0,1,2, 3};   
 
 //Implements D4 connectivity
 //  1
 //0   2
 //  3
-//                                0  1 2 3
+//                         0  1 2 3
 //x-offset from focal cell
 static const int dx4[8]       = {-1, 0,1,0};
 //y-offset from focal cell
@@ -92,7 +90,7 @@ class GridCellZk_high {
     //This may seem odd, but it is true. It's because C++ specifies its 
     //priority queue as a min-heap.
     if(z==a.z)      //If two or more cells are of equal elevation than the one 
-      return k<a.k; //added last (most recently) is the one that is returned.
+      return k>a.k; //added last (most recently) is the one that is returned.
     else
       return z>a.z; //Otherwise the one that is of lowest elevation comes first
   }
@@ -119,7 +117,7 @@ class GridCellZk_high_pq : public std::priority_queue<GridCellZk_high<T>, std::v
 
 
 
-//This class holds information about a depression. Its pit cell and outlet cell
+//This class holds information about a depression. It's pit cell and outlet cell
 //(in flat-index form) as well as the elevations of these cells. It also notes
 //the depression's parent. The parent of the depression is the outlet through
 //which it must flow in order to reach the ocean. If a depression has more than
@@ -248,37 +246,15 @@ const label_t OCEAN  = 0;
 
 
 
-//TODO
-//Print a priority queue
-// template<class elev_t>
-// std::ostream& operator<<(std::ostream &out, const GridCellZk_high<elev_t> &gc){
-//   out<<"("<<gc.x<<","<<gc.y<<","<<gc.z<<","<<gc.k<<")";
-//   return out;
-// }
-
-// template <class T, class S, class C>
-// void PrintPQ(const std::priority_queue<T, S, C>& q) {
-//     struct HackedQueue : private std::priority_queue<T, S, C> {
-//         static const S& Container(const std::priority_queue<T, S, C>& q) {
-//             return q.*&HackedQueue::c;
-//         }
-//     };
-//     for(const auto &x: HackedQueue::Container(q))
-//       std::cerr<<x<<" ";
-//     std::cerr<<std::endl;
-// }
-
-
-
 //Calculate the hierarchy of depressions. Takes as input a digital elevation
 //model and a set of labels. The labels should have `OCEAN` for cells
 //representing the "ocean" (the place to which depressions drain) and `NO_DEP`
 //for all other cells.
 template<class elev_t, Topology topo>
 std::vector<Depression<elev_t> > GetDepressionHierarchy(
-  const rd::Array2D<elev_t> &dem,
-  rd::Array2D<int>          &label,
-  rd::Array2D<int8_t>       &flowdirs
+  const Array2D<elev_t> &dem,
+  Array2D<int>          &label,
+  Array2D<int8_t>       &flowdirs
 ){
   //A D4 or D8 topology can be used.
   const int    *dx;
@@ -302,7 +278,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
     throw std::runtime_error("Unrecognised topology!");
   }
 
-  (void)dr; //TODO: Suppresses compilation warning about `dr` not being used.
+
 
   //Depressions are identified by a number [0,*). The ocean is always
   //"depression" 0. This vector holds the depressions.
@@ -347,9 +323,6 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
     oceandep.pit_cell = NO_VALUE;
   }
 
-  //TODO: For showing where pit cells are
-  // rd::Array2D<uint8_t> pit_cell_map(dem.width(), dem.height(), 0);
-
 
   //Here we find the pit cells of internally-draining regions. We define these
   //to be cells without any downstream neighbours. Note that this means we will
@@ -382,24 +355,8 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       pit_cell_count++;       //Add to pit cell count. Parallel safe because of reduction.
       #pragma omp critical    //Only one thread can safely access pq at a time
       pq.emplace(x,y,dem(x,y)); //Add cell to pq
-      // pit_cell_map(x,y) = 1; //TODO
     }
   }
-
-
-
-  //TODO: Show pit cells
-  // std::cerr<<"PIT CELLS\n";
-  // for(int y=0;y<dem.height();y++){
-  //   for(int x=0;x<dem.width(); x++){
-  //     if(pit_cell_map(x,y)==0)
-  //       std::cerr<<std::setw(3)<<"X"<<" ";
-  //     else
-  //       std::cerr<<std::setw(3)<<" "<<" ";
-  //   }
-  //   std::cerr<<"\n";
-  // }
-  // std::cerr<<std::endl;
 
 
 
@@ -439,23 +396,16 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
   //cells are of the same elevation then we visit the one added last (most
   //recently) first.
   while(!pq.empty()){
-    // std::cerr<<"PQ: ";
-    // PrintPQ(pq);
-    // std::cerr<<std::endl;
-
     const auto c = pq.top();               //Copy cell with lowest elevation from priority queue
     pq.pop();                              //Remove the copied cell from the priority queue
     const auto celev = c.z;                //Elevation of focal cell
     const auto ci    = dem.xyToI(c.x,c.y); //Flat-index of focal cell
     auto clabel      = label(ci);          //Nominal label of cell
 
-    // std::cerr<<"d Removing ("<<c.x<<","<<c.y<<") with nominal label = "<<clabel<<std::endl;
-
     if(clabel==OCEAN){
       //This cell is an ocean cell or a cell that flows into the ocean without
       //encountering any depressions on the way. Upon encountering it we do not
       //need to do anything special.
-      // std::cerr<<"d \tOcean cell"<<std::endl;
     } else if(clabel==NO_DEP){
       //Since cells label their neighbours and ocean cells are labeled in the
       //initialization, the only way to get to a cell that is still labeled as
@@ -469,7 +419,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       newdep.pit_cell = dem.xyToI(c.x,c.y);         //Make a note of the pit cell's location
       newdep.pit_elev = celev;                      //Make a note of the pit cell's elevation
       label(ci)       = clabel;                     //Update cell with new label
-      // std::cerr<<"d \tNew depression from pit cell with label = "<<clabel<<" at "<<c.x<<" "<<c.y<<std::endl;
+      // std::cerr<<"\tNew depression from pit cell with label = "<<clabel<<" at "<<c.x<<" "<<c.y<<std::endl;
     } else {
       //Cell has already been assigned to a depression. In this case, one of two
       //things is true. (1) This cell is on the frontier of our search, in which
@@ -524,32 +474,21 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
         //shouldn't be there, then nothing will happen.
 
         //TODO: Make a note of the depression's current number of cells and
-        //"volume" //TODO: Note that this avoids adding duplicate cells
+        //"volume"
         outlet_database.emplace(clabel,nlabel,out_cell,out_elev);
       }
     }
 
     //TODO: Remove. Prints the elevation and labels arrays for testing.
     if(label.width()<1000){
-      std::cerr<<std::setw(3)<<" "<<"    ";
-      for(int x=0;x<label.width();x++)
-        std::cerr<<std::setw(3)<<x<<" ";  
-      std::cerr<<"    ";  
-      for(int x=0;x<label.width();x++)
-        std::cerr<<std::setw(3)<<x<<" ";        
-      std::cerr<<std::endl;      
       for(int y=0;y<label.height();y++){
-        std::cerr<<std::setw(3)<<y<<"    ";
         for(int x=0;x<label.width();x++)
           std::cerr<<std::setw(3)<<dem(x,y)<<" ";  
         std::cerr<<"    ";  
         for(int x=0;x<label.width();x++)
           std::cerr<<std::setw(3)<<label(x,y)<<" ";
-        std::cerr<<"       "<<std::setw(3)<<y;
         std::cerr<<std::endl;
       }
-      for(int x=0;x<label.width();x++)
-        std::cerr<<std::setw(3)<<x<<" ";        
       std::cerr<<std::endl;
     }
 
@@ -624,8 +563,8 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
   for(auto &outlet: outlets){
     auto depa_set = djset.findSet(outlet.depa); //Find the ultimate parent of Depression A
     auto depb_set = djset.findSet(outlet.depb); //Find the ultimate parent of Depression B
-    // std::cerr<<"d Considering "<<outlet.depa<<" "<<outlet.depb<<std::endl;
-    // std::cerr<<"d \tConsidering "<<depa_set<<" "<<depb_set<<std::endl;
+    // std::cerr<<"Considering "<<outlet.depa<<" "<<outlet.depb<<std::endl;
+    // std::cerr<<"\tConsidering "<<depa_set<<" "<<depb_set<<std::endl;
     
     //If the depressions are already part of the same meta-depression, then
     //nothing needs to be done.
@@ -663,7 +602,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 
       //TODO: Calculate a final cell count and "volume" for the depression
 
-      // std::cerr<<"d \tMerging "<<depa_set<<" into the ocean via "<<outlet.depb<<"!"<<std::endl;
+      // std::cerr<<"\tMerging "<<depa_set<<" into the ocean via "<<outlet.depb<<"!"<<std::endl;
 
       //If this depression has already found the ocean then don't merge it
       //again. (TODO: Richard)
@@ -685,8 +624,8 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       auto &depa          = depressions.at(depa_set); //Reference to Depression A MetaLabel
       auto &depb          = depressions.at(depb_set); //Reference to Depression B MetaLabel
       const auto newlabel = depressions.size();       //Label of A and B's new parent depression
-      // std::cerr<<"d \tMerging "<<depa_set<<" and "<<depb_set<<" into "<<newlabel<<"!"<<std::endl;
-      // std::cerr<<"d \tNew parent = "<<newlabel<<std::endl;
+      // std::cerr<<"\tMerging "<<depa_set<<" and "<<depb_set<<" into "<<newlabel<<"!"<<std::endl;
+      // std::cerr<<"\tNew parent = "<<newlabel<<std::endl;
       depa.parent   = newlabel;        //Set Depression A's parent to be the new meta-depression
       depb.parent   = newlabel;        //Set Depression B's parent to be the new meta-depression
       depa.out_cell = outlet.out_cell; //Make a note that this is A's outlet
@@ -702,8 +641,8 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       //references since they will be invalidated if `depressions` has to
       //resize!
       auto &newdep  = depressions.emplace_back();
-      newdep.lchild = depa_set;
-      newdep.rchild = depb_set;
+      newdep.childa = depa_set;
+      newdep.childb = depb_set;
       djset.mergeAintoB(depa_set, newlabel); //A has a parent now
       djset.mergeAintoB(depb_set, newlabel); //B has a parent now
     }
@@ -724,7 +663,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 //Utility function for doing various relabelings based on the depression
 //hierarchy.
 template<class elev_t>
-void LastLayer(rd::Array2D<label_t> &label, const rd::Array2D<float> &dem, const std::vector<Depression<elev_t>> &depressions){
+void LastLayer(Array2D<label_t> &label, const Array2D<float> &dem, const std::vector<Depression<elev_t>> &depressions){
   #pragma omp parallel for collapse(2)
   for(int y=0;y<label.height();y++)
   for(int x=0;x<label.width();x++){
@@ -743,3 +682,4 @@ void LastLayer(rd::Array2D<label_t> &label, const rd::Array2D<float> &dem, const
 }
 
 #endif
+

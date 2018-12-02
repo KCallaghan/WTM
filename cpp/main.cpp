@@ -1,6 +1,6 @@
+#include "Array2D.hpp"
 #include "dephier.hpp"
 #include "DisjointDenseIntSet.hpp"
-#include "netcdf.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -9,14 +9,10 @@
 #include <iomanip>
 #include <iostream>
 #include <queue>
-#include <richdem/common/Array2D.hpp>
-#include <richdem/flats/flats.hpp>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <utility>
-
-namespace rd = richdem;
 
 int main(int argc, char **argv){
   if(argc!=4){
@@ -28,18 +24,18 @@ int main(int argc, char **argv){
   const std::string out_name  = argv[2];
   const std::string out_graph = argv[3];
 
-  rd::Array2D<float> dem = LoadData<float>(in_name,std::string("value"));   //Recharge (Percipitation minus Evapotranspiration)
+  Array2D<float> dem(in_name,"value");   //Recharge (Percipitation minus Evapotranspiration)
 
   //Initialize labels to indicate that none of the cells are part of depressions
-  rd::Array2D<label_t> label   (dem.width(),dem.height(),NO_DEP);
+  Array2D<label_t> label   (dem.width(),dem.height(),NO_DEP);
 
   //Initialize flow directions to indicate that none of the cells flow anywhere
-  rd::Array2D<flowdir_t> flowdirs(dem.width(),dem.height(),NO_FLOW);
+  Array2D<flowdir_t> flowdirs(dem.width(),dem.height(),NO_FLOW);
 
   //Label the ocean cells. This is a precondition for using
   //`GetDepressionHierarchy()`.
   #pragma omp parallel for
-  for(unsigned int i=0;i<label.size();i++)
+  for(int i=0;i<label.size();i++)
     if(dem(i)==0)
       label(i) = OCEAN;
 
@@ -108,3 +104,4 @@ int main(int argc, char **argv){
 
   return 0;
 }
+
