@@ -2,12 +2,13 @@
 #define _array2d_hpp_
 
 #include <cassert>
-#include <string>
+#include <fstream>
 #include <iostream>
+#include <memory>
 #include <netcdf.h>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
-#include <memory>
 
 template<class T>
 class Array2D {
@@ -17,9 +18,11 @@ class Array2D {
   int mywidth  = -1;
   int myheight = -1;
   void getDimLength(const int ncid, const int dimnum);
+  void loadDEM(const std::string filename);
+  void loadNC(const std::string filename, const std::string datavar);
  public:
   Array2D() = default;
-  Array2D(std::string filename, std::string datavar);
+  Array2D(const std::string filename, const std::string datavar);
   Array2D(const int width0, const int height0, const T val0);
   ~Array2D();
   T&   operator()(const int x, const int y);
@@ -55,7 +58,17 @@ void Array2D<T>::getDimLength(const int ncid, const int dimnum){
 }
 
 template<class T>
-Array2D<T>::Array2D(std::string filename, std::string datavar){
+Array2D<T>::Array2D(const std::string filename, const std::string datavar){
+  if(filename.substr(filename.size()-3)=="dem")
+    loadDEM(filename);
+  else if(filename.substr(filename.size()-2)=="nc")
+    loadNC(filename, datavar);
+  else
+    throw std::runtime_error("Unrecognized file extension!");
+}
+
+template<class T>
+void Array2D<T>::loadNC(const std::string filename, const std::string datavar){
   /* This will be the netCDF ID for the file and data variable. */
   int ncid, varid, retval, dim_count;
 
@@ -88,10 +101,45 @@ Array2D<T>::Array2D(std::string filename, std::string datavar){
   if ((retval = nc_get_var_float(ncid, varid, data)))
     throw std::runtime_error("Failed to read data from '"+datavar+" from file '" + filename + "'! Error: " + nc_strerror(retval));
 
+ // for(int i=0;i<mywidth*myheight;i++)
+   // std::cout<<data[i]<<std::endl;
+
   /* Close the file, freeing all resources. */
   if ((retval = nc_close(ncid)))
     throw std::runtime_error("Failed to close file '" + filename + "'!");
 }
+
+
+
+template<class T>
+void Array2D<T>::loadDEM(const std::string filename){
+  std::ifstream fin(filename);
+
+  std::string header;
+  int val;
+
+  fin>>header>>mywidth;
+  if(header!="ncols")
+    throw std::runtime_error("Not ncols");
+
+  fin>>header>>myheight;
+  if(header!="nrows")
+    throw std::runtime_error("Not ncols");
+
+  fin>>header>>val; //xllcorner
+  fin>>header>>val; //yllcorner
+  fin>>header>>val; //cellsize
+  fin>>header>>val; //no_data value
+
+  data = new float[mywidth*myheight];
+
+  for(int y=0;y<myheight;y++)
+  for(int x=0;x<mywidth; x++)
+    fin>>data[y*mywidth+x];
+}
+
+
+
 
 template<class T>
 Array2D<T>::Array2D(const int width0, const int height0, const T val0) {

@@ -431,7 +431,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
     auto clabel      = label(ci);          //Nominal label of cell
     
 
-   // std::cout<<"Elevation "<<celev<<std::endl;
+    std::cout<<"Elevation "<<celev<<std::endl;
 
     if(clabel==OCEAN){
       //This cell is an ocean cell or a cell that flows into the ocean without
@@ -458,7 +458,72 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 
 
       // std::cerr<<"\tNew depression from pit cell with label = "<<clabel<<" at "<<c.x<<" "<<c.y<<std::endl;
-    } else {
+    } else if(clabel < 0){                 //we now need to process this outlet cell
+        //Add the outlet to the database. But note that if an outlet linking
+        //these two depressions has previously been found then that other outlet
+        //is of equal or lesser elevation than the current one and should be
+        //retained instead of the current one. The hash functions and Outlet
+        //comparators we developed earlier ensure that this is done correctly,
+        //so here we just try to add the current outlet to the database; if it
+        //shouldn't be there, then nothing will happen.
+
+        //TODO: Make a note of the depression's current number of cells and
+        //volume                                                                                          --> Done in the for loop below. 
+       
+        auto out_cell = ci;    //Pretend focal cell is the outlet
+        auto out_elev = celev; //Note its height
+        double a_vol = 0;                               //volumes of the two depressions up to this outlet. 
+        double b_vol = 0;
+        auto a_cells = 0;
+        auto b_cells = 0;
+        auto nlabel = 0;
+       
+
+          //the outlet stores the volume and number of cells in that depression up to that point. The depression itself should then store the total number of cells and total sum of elevations (but not volume).
+          //we know that that's the lowest link between those two depressions, but not if it's the lowest overall outlet of the depression (vs if it's an inlet). 
+          //I have added two separate variables to the outlet class, one for volume of each depression. 
+          //now, how to access the appropriate depression in this context to get its number of cells and elevations? I am using another for loop, but surely there is a better way.
+
+        clabel = -clabel; //switch back to the right label for the depression. 
+
+            for(int n=0;n<neighbours;n++){
+              const int nx = ModFloor(c.x+dx[n],dem.width()); //Get neighbour's x-coordinate using an offset and wrapping
+              const int ny = c.y + dy[n];                     //Get neighbour's y-coordinate using an offset
+              if(!dem.inGrid(nx,ny))                          //Is this cell in the grid?
+                continue;                                     //Nope: out of bounds.
+              const auto ni     = dem.xyToI(nx,ny);           //Flat index of neighbour
+              const auto nlabel = label(ni);                  //Label of neighbour
+              const auto nelev = dem(ni);                     //elevation of neighbour, for water level equation
+
+              if (nlabel != clabel) break;
+            }
+
+
+          for(auto &mydep: depressions){
+            if(mydep.dep_label == clabel ) {                                    //still think there must be a better way to call up this data! 
+              a_vol = mydep.cell_count * out_elev - mydep.dep_sum_elevations;
+              a_cells = mydep.cell_count;
+              std::cout<<"depression A cells: "<<mydep.cell_count<<" sum of elevations "<<mydep.dep_sum_elevations<<" outlet elevation "<<out_elev<<" volume "<<a_vol<<std::endl;
+             }
+            if(mydep.dep_label == nlabel) {
+               b_vol = mydep.cell_count * out_elev - mydep.dep_sum_elevations;
+               b_cells = mydep.cell_count;
+            }
+          
+  
+          }
+
+        outlet_database.emplace(clabel,nlabel,out_cell,out_elev,a_vol,b_vol,a_cells,b_cells);                           //sometimes I'm getting negative volumes. I think/hope it's because it's still calculating those volumes even when it's not the first outlet and those aren't the ones that are being recorded, but not quite sure how to test for this. 
+        
+              
+
+
+
+//std::cout<<"we've reached a depression, yay"<<std::endl;
+    }
+
+
+      else {
       //Cell has already been assigned to a depression. In this case, one of two
       //things is true. (1) This cell is on the frontier of our search, in which
       //case the cell has neighbours which have not yet been seen. (2) This cell
@@ -496,7 +561,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
         }
 
 
-      } else if (nlabel==clabel) {
+      } else if (nlabel== clabel) {
         //Skip because we are not interested in ourself. That would be vain.
         //Note that this case will come up frequently as we traverse flats since
         //the first cell to be visited in a flat labels all the cells in the
@@ -514,50 +579,29 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
         double b_vol = 0;
         auto a_cells = 0;
         auto b_cells = 0;
+        auto cx = c.x;
+        auto cy = c.y;
 
 
         if(dem(ni)>out_elev){  //Check to see if we were wrong and the neighbour cell is higher.
           out_cell = ni;       //Neighbour cell was higher. Note it.
           out_elev = dem(ni);  //Note neighbour's elevation
+          cx = nx;
+          cy = ny;
         }
 
-        //Add the outlet to the database. But note that if an outlet linking
-        //these two depressions has previously been found then that other outlet
-        //is of equal or lesser elevation than the current one and should be
-        //retained instead of the current one. The hash functions and Outlet
-        //comparators we developed earlier ensure that this is done correctly,
-        //so here we just try to add the current outlet to the database; if it
-        //shouldn't be there, then nothing will happen.
 
-        //TODO: Make a note of the depression's current number of cells and
-        //volume                                                                                          --> Done in the for loop below. 
-       
+        label(out_cell) = -clabel;                           //Give the neighbour a special outlet label
+      //  pq.emplace(cx,cy,out_elev);                    //Add the neighbour to the priority queue
 
 
-          //the outlet stores the volume and number of cells in that depression up to that point. The depression itself should then store the total number of cells and total sum of elevations (but not volume).
-          //we know that that's the lowest link between those two depressions, but not if it's the lowest overall outlet of the depression (vs if it's an inlet). 
-          //I have added two separate variables to the outlet class, one for volume of each depression. 
-          //now, how to access the appropriate depression in this context to get its number of cells and elevations? I am using another for loop, but surely there is a better way.
+//create the outlet object
+      //  outlet_database.emplace(clabel,nlabel,out_cell,out_elev,a_vol,b_vol,a_cells,b_cells);       
 
-
-          for(auto &mydep: depressions){
-            if(mydep.dep_label == clabel ) {                                    //still think there must be a better way to call up this data! 
-              a_vol = mydep.cell_count * out_elev - mydep.dep_sum_elevations;
-              a_cells = mydep.cell_count;
-      //        std::cout<<"depression A cells: "<<mydep.cell_count<<" sum of elevations "<<mydep.dep_sum_elevations<<" outlet elevation "<<out_elev<<" volume "<<a_vol<<std::endl;
-             }
-            if(mydep.dep_label == nlabel) {
-               b_vol = mydep.cell_count * out_elev - mydep.dep_sum_elevations;
-               b_cells = mydep.cell_count;
-            }
-          
-  
-          }
-
-        outlet_database.emplace(clabel,nlabel,out_cell,out_elev,a_vol,b_vol,a_cells,b_cells);                           //sometimes I'm getting negative volumes. I think/hope it's because it's still calculating those volumes even when it's not the first outlet and those aren't the ones that are being recorded, but not quite sure how to test for this. 
-        
-              
       }
+
+      
+      
 
 
     }

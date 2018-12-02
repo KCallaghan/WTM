@@ -8,7 +8,7 @@
 #ifndef _dephier_hpp_
 #define _dephier_hpp_
 
-#include "Array2D.hpp"
+#include <richdem/common/Array2D.hpp>
 #include "DisjointDenseIntSet.hpp"
 #include <algorithm>
 #include <cassert>
@@ -23,13 +23,15 @@
 #include <unordered_set>
 #include <utility>
 
+namespace rd = richdem;
+
 constexpr double SQ2 = std::sqrt(2.0);
 
 //Implements D8 connectivity
 //1 2 3
 //0   4
 //7 6 5
-//                         0  1  2  3 4 5 6  7
+//                                0  1  2  3 4 5 6  7
 //x-offset from focal cell
 static const int dx8[8]       = {-1,-1, 0, 1,1,1,0,-1};   
 //y-offset from focal cell
@@ -44,7 +46,7 @@ static const int d8inverse[8] = {4,  5, 6, 7,0,1,2, 3};
 //  1
 //0   2
 //  3
-//                         0  1 2 3
+//                                0  1 2 3
 //x-offset from focal cell
 static const int dx4[8]       = {-1, 0,1,0};
 //y-offset from focal cell
@@ -97,7 +99,7 @@ class GridCellZk_high {
     //This may seem odd, but it is true. It's because C++ specifies its 
     //priority queue as a min-heap.
     if(z==a.z)      //If two or more cells are of equal elevation than the one 
-      return k>a.k; //added last (most recently) is the one that is returned.
+      return k<a.k; //added last (most recently) is the one that is returned.
     else
       return z>a.z; //Otherwise the one that is of lowest elevation comes first
   }
@@ -124,11 +126,11 @@ class GridCellZk_high_pq : public std::priority_queue<GridCellZk_high<T>, std::v
 
 
 
-//This class holds information about a depression. It's pit cell and outlet cell
-//(in flat-index form) as well as the elevations of these cells. It also notes
+//This class holds information about a depression. Its pit cell and outlet cell
+//(in flat-index form) as well as the elevations of these cells. It also notes                                                   //what is flat-index form?
 //the depression's parent. The parent of the depression is the outlet through
 //which it must flow in order to reach the ocean. If a depression has more than
-//one outlet at the same level one of them is arbitrarily chosen; hopefully this
+//one outlet at the same level one of them is arbitrarily chosen; hopefully this                                                  //so, everything should have a parent except for the ocean, right?
 //happens only rarely in natural environments.
 template<class elev_t>
 class Depression {
@@ -155,19 +157,27 @@ class Depression {
   //depressions: one left and one right.
   label_t lchild = NO_VALUE;
   label_t rchild = NO_VALUE;
-
-
+  //Indicates whether the parent link is to either the ocean or a depression
+  //that links to the ocean
+  bool ocean_parent = false;
+  //Indicates depressions which link to the ocean through this depression, but
+  //are not subdepressions. That is, these ocean-linked depressions may be at
+  //the top of high cliffs and spilling into this depression.
+  std::vector<int> ocean_linked;
   //the label of the depression, for calling it up again
   label_t dep_label = 0;
   //Number of cells contained within the depression
   uint32_t cell_count = 0;
   //Total of elevations within the depression, used in the WLE. Because I think I need to start adding up total elevations before I know the outlet of the depression. 
-  double dep_sum_elevations = 0;
+  //double dep_sum_elevations = 0;
   //Volume of the depression. Used in the Water Level Equation (see below).
   double   dep_vol    = 0;
   //Water currently contained within the depression. Used in the Water Level
   //Equation (see below).
   double   water_vol  = 0;
+
+  double total_elevation = 0;
+
 };
 
 
@@ -179,7 +189,7 @@ class Depression {
 //is $(o-a)+(o-b)+(o-c)+(o-d)=4o-a-b-c-d=4o-sum(elevations)$. This says that, if
 //we keep track of the number of cells in a depression and their total
 //elevation, it is possible to calculate the volume of a depression at any time
-//based on a hypothetical outlet level. We call this the Water Level Equation.                                                              //What about those cells which are above the outlet? You are including these (as negatives) in the outlet volume, but these will never be filled with water. Or is that why you have the alternative water_vol?
+//based on a hypothetical outlet level. We call this the Water Level Equation.                                                          
 
 //Our strategy will be to keep track of the necessary components of the water
 //level equation for each depression and each outlet. Then as the outlets of
@@ -203,10 +213,10 @@ class Outlet {
   elev_t  out_elev = std::numeric_limits<elev_t>::infinity();
 
 
-  double depa_vol = 0;
-  double depb_vol = 0;
-  int depa_cells = 0;
-  int depb_cells = 0;
+//  double depa_vol = 0;    //volume and number of cells in each of the two depressions linked by this outlet. 
+//  double depb_vol = 0;
+//  int depa_cells = 0;
+//  int depb_cells = 0;
 
 
 
@@ -214,15 +224,15 @@ class Outlet {
   //depression and the volume of the depression - DONE! (I think)
 
   //Standard issue constructor
-  Outlet(label_t depa0, label_t depb0, label_t out_cell0, elev_t out_elev0,double depa_vol0,double depb_vol0,int depa_cells0,int depb_cells0){
+  Outlet(label_t depa0, label_t depb0, label_t out_cell0, elev_t out_elev0){
     depa     = depa0;
     depb     = depb0;
     out_cell = out_cell0;
     out_elev = out_elev0;
-    depa_vol = depa_vol0;
-    depb_vol = depb_vol0;
-    depa_cells = depa_cells0;
-    depb_cells = depb_cells0;
+  //  depa_vol = depa_vol0;
+    //depb_vol = depb_vol0;
+   // depa_cells = depa_cells0;
+    //depb_cells = depb_cells0;
   }
 
   //Determines whether one outlet is the same as another. Note that we do not
@@ -277,9 +287,9 @@ const label_t OCEAN  = 0;
 //for all other cells.
 template<class elev_t, Topology topo>                                                     
 std::vector<Depression<elev_t> > GetDepressionHierarchy(
-  const Array2D<elev_t> &dem,
-  Array2D<int>          &label,
-  Array2D<int8_t>       &flowdirs
+  const rd::Array2D<elev_t> &dem,
+  rd::Array2D<int>          &label,
+  rd::Array2D<int8_t>       &flowdirs
 ){
   //A D4 or D8 topology can be used.
   const int    *dx;
@@ -302,6 +312,8 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
   } else {
     throw std::runtime_error("Unrecognised topology!");
   }
+
+  (void)dr; //Hide warning that dr is not used
 
 
  std::cout<<"top"<<std::endl;
@@ -347,6 +359,9 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
     oceandep.pit_elev = -std::numeric_limits<elev_t>::infinity();
     //It's so deep we can't find its bottom
     oceandep.pit_cell = NO_VALUE;
+  //  std::cout<<"ocean dep label"<<oceandep.dep_label<<"  "<<OCEAN<<std::endl;
+    oceandep.dep_label = 0;
+   // oceandep.parent = 0;
   }
 
 
@@ -422,17 +437,14 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
   //cells are of the same elevation then we visit the one added last (most
   //recently) first.
 
- 
   while(!pq.empty()){
     const auto c = pq.top();               //Copy cell with lowest elevation from priority queue
     pq.pop();                              //Remove the copied cell from the priority queue
     const auto celev = c.z;                //Elevation of focal cell
     const auto ci    = dem.xyToI(c.x,c.y); //Flat-index of focal cell
     auto clabel      = label(ci);          //Nominal label of cell
-    
 
-   // std::cout<<"Elevation "<<celev<<std::endl;
-
+// std::cout<<"Now pulling cell number "<<ci<<" with elevation "<<celev<<std::endl;
     if(clabel==OCEAN){
       //This cell is an ocean cell or a cell that flows into the ocean without
       //encountering any depressions on the way. Upon encountering it we do not
@@ -446,25 +458,26 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       //depressions as flat cells will relabel their neighbours and the first                                                 
       //cell found in a flat determines the label for the entirety of that flat.
       clabel          = depressions.size();         //In a 0-based indexing system, size is equal to the id of the next flat
-   
+      std::cout<<"and giving it label "<<clabel<<std::endl;
       auto &newdep    = depressions.emplace_back(); //Add the next flat (increases size by 1)
       newdep.pit_cell = dem.xyToI(c.x,c.y);         //Make a note of the pit cell's location
       newdep.pit_elev = celev;                      //Make a note of the pit cell's elevation
-      newdep.dep_label = clabel;                    //I am storing the label in the object so that I can find it later and call up the number of cells and volume (better way of doing this?)
+      newdep.dep_label = clabel;                    //I am storing the label in the object so that I can find it later and call up the number of cells and volume (better way of doing this?) -- I have since realised I can use the index in the depressions array. So perhaps the label is no longer needed?
       label(ci)       = clabel;                     //Update cell with new label                                                           
-      newdep.cell_count = 1;                                                                            
+   //   newdep.cell_count = 1;                        //this is a new depression, so it contains one cell, the current (pit) cell.                                                     
       // newdep.dep_vol =                                                                                 we can't do this yet because we don't have the outlet cell yet. 
-      newdep.dep_sum_elevations = celev;            //I am storing the total sum of all elevations within the depression to use later in the Water Level Equation. 
+  //    newdep.dep_sum_elevations = celev;            //I am storing the total sum of all elevations within the depression to use later in the Water Level Equation. So far, the sum of all elevations is this single pit cell. 
 
 
       // std::cerr<<"\tNew depression from pit cell with label = "<<clabel<<" at "<<c.x<<" "<<c.y<<std::endl;
     } else {
+
       //Cell has already been assigned to a depression. In this case, one of two
       //things is true. (1) This cell is on the frontier of our search, in which
       //case the cell has neighbours which have not yet been seen. (2) This cell
       //was part of a flat which has previously been processed by a wavefront
       //beginning at some other cell. In this case, all of this cell's
-      //neighbours will have already been seen and added to the priority queue.
+      //neighbours will have already been seen and added to the priority queue.                           //not so harmless if we need to do the volume the way I think we do... by adding the elevation of each cell as it is processed, meaning it'll be a problem if any given cell is processed more than once. 
       //However, it is harmless to check on them again.
     }
 
@@ -479,27 +492,17 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
         continue;                                     //Nope: out of bounds.
       const auto ni     = dem.xyToI(nx,ny);           //Flat index of neighbour
       const auto nlabel = label(ni);                  //Label of neighbour
-      const auto nelev = dem(ni);                     //elevation of neighbour, for water level equation
+  //    const auto nelev = dem(ni);                     //elevation of neighbour, for water level equation
 
 
-      if(nlabel==NO_DEP){                             //Neighbour has not been visited yet                                                         
+      if(nlabel==NO_DEP){                             //Neighbour has not been visited yet                    Okay - it looks like we only add things to the queue that haven't been labelled yet. So that means no given cell should be processed twice, right?                                                 
         label(ni) = clabel;                           //Give the neighbour my label
         pq.emplace(nx,ny,dem(ni));                    //Add the neighbour to the priority queue
         flowdirs(nx,ny) = dinverse[n];                //Neighbour flows in the direction of this cell
-
-
-        for(auto &mydep: depressions){
-          if(mydep.dep_label == clabel ) {
-             mydep.cell_count++;
-             mydep.dep_sum_elevations += nelev;                         //surely there is a better way to modify an existing depression object than to cycle through all of them to find the one I'm looking for?
-          }
-        }
-
-
       } else if (nlabel==clabel) {
         //Skip because we are not interested in ourself. That would be vain.
         //Note that this case will come up frequently as we traverse flats since
-        //the first cell to be visited in a flat labels all the cells in the
+        //the first cell to be visited in a flat labels all the cells in the                                              //how and where does it do so? Can we either stop it from doing so or make some other accommodation for volume calculation?
         //flat like itself. All of the other cells in the flat will come off of
         //the priority queue later and, in looking at their neighbours, reach
         //this point.
@@ -510,10 +513,10 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
         //the depression. The outlet is the higher of the two.
         auto out_cell = ci;    //Pretend focal cell is the outlet
         auto out_elev = celev; //Note its height
-        double a_vol = 0;                               //volumes of the two depressions up to this outlet. 
-        double b_vol = 0;
-        auto a_cells = 0;
-        auto b_cells = 0;
+ //       double a_vol = 0;                               //volumes of the two depressions up to this outlet. 
+   //     double b_vol = 0;
+     //   auto a_cells = 0;
+       // auto b_cells = 0;
 
 
         if(dem(ni)>out_elev){  //Check to see if we were wrong and the neighbour cell is higher.
@@ -530,32 +533,27 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
         //shouldn't be there, then nothing will happen.
 
         //TODO: Make a note of the depression's current number of cells and
-        //volume                                                                                          --> Done in the for loop below. 
+        //volume                                                                                          --> Done below. 
        
 
 
           //the outlet stores the volume and number of cells in that depression up to that point. The depression itself should then store the total number of cells and total sum of elevations (but not volume).
           //we know that that's the lowest link between those two depressions, but not if it's the lowest overall outlet of the depression (vs if it's an inlet). 
           //I have added two separate variables to the outlet class, one for volume of each depression. 
-          //now, how to access the appropriate depression in this context to get its number of cells and elevations? I am using another for loop, but surely there is a better way.
-
-
-          for(auto &mydep: depressions){
-            if(mydep.dep_label == clabel ) {                                    //still think there must be a better way to call up this data! 
-              a_vol = mydep.cell_count * out_elev - mydep.dep_sum_elevations;
-              a_cells = mydep.cell_count;
-      //        std::cout<<"depression A cells: "<<mydep.cell_count<<" sum of elevations "<<mydep.dep_sum_elevations<<" outlet elevation "<<out_elev<<" volume "<<a_vol<<std::endl;
-             }
-            if(mydep.dep_label == nlabel) {
-               b_vol = mydep.cell_count * out_elev - mydep.dep_sum_elevations;
-               b_cells = mydep.cell_count;
-            }
-          
-  
-          }
-
-        outlet_database.emplace(clabel,nlabel,out_cell,out_elev,a_vol,b_vol,a_cells,b_cells);                           //sometimes I'm getting negative volumes. I think/hope it's because it's still calculating those volumes even when it's not the first outlet and those aren't the ones that are being recorded, but not quite sure how to test for this. 
         
+
+  //      a_vol = depressions[clabel].cell_count * out_elev - depressions[clabel].dep_sum_elevations;
+    //    b_vol = depressions[nlabel].cell_count * out_elev - depressions[nlabel].dep_sum_elevations;
+
+      //  a_cells = depressions[clabel].cell_count;
+        //b_cells = depressions[nlabel].cell_count;
+
+        
+    //    outlet_database.emplace(clabel,nlabel,out_cell,out_elev,a_vol,b_vol,a_cells,b_cells);                           //I am NO LONGER getting negative volumes! Hooray! However, we should only do this when we actually reach the outlet cell at its turn in the priority queue. How to do so? 
+       
+
+        outlet_database.emplace(clabel,nlabel,out_cell,out_elev);   
+
               
       }
 
@@ -567,17 +565,17 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
         
 
     //TODO: Remove. Prints the elevation and labels arrays for testing.
-    if(label.width()<1000){
-      for(int y=0;y<label.height();y++){
-        for(int x=0;x<label.width();x++)
-          std::cerr<<std::setw(3)<<dem(x,y)<<" ";  
-        std::cerr<<"    ";  
-        for(int x=0;x<label.width();x++)
-          std::cerr<<std::setw(3)<<label(x,y)<<" ";
-        std::cerr<<std::endl;
-      }
-      std::cerr<<std::endl;
-    }
+ //   if(label.width()`0){
+  //    for(int y=0;y<label.height();y++){
+  //      for(int x=0;x<label.width();x++)
+   //       std::cerr<<std::setw(3)<<dem(x,y)<<" ";  
+  //      std::cerr<<"    ";  
+  //      for(int x=0;x<label.width();x++)
+   //       std::cerr<<std::setw(3)<<label(x,y)<<" ";
+   //     std::cerr<<std::endl;
+  //    }
+  //    std::cerr<<std::endl;
+ //   }
 
 
   }
@@ -649,6 +647,11 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 
   //Visit outlets in order of elevation from lowest to highest. If two outlets
   //are at the same elevation, choose one arbitrarily.
+
+//auto complete = 0;
+  //while(complete == 0){
+    //complete = 1;
+
   for(auto &outlet: outlets){
     auto depa_set = djset.findSet(outlet.depa); //Find the ultimate parent of Depression A
     auto depb_set = djset.findSet(outlet.depb); //Find the ultimate parent of Depression B
@@ -688,6 +691,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 
       //Get a reference to Depression A MetaLabel.
       auto &dep = depressions.at(depa_set);
+      // auto &dep1 = depressions.at(depb_set); //TODO
 
       //TODO: Calculate a final cell count and "volume" for the depression                                                -->Each outlet has recorded the cell count and volume for its two depressions. So what would we want here? The totals for metadepressions? 
       //                                                                                                                  //I have recorded the new totals in depression A but not sure if this is right. 
@@ -702,12 +706,13 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       assert(dep.out_cell==-1);
 
       //Point this depression to the ocean through Depression B Label
-      dep.parent   = outlet.depb;        //Set Depression A MetaLabel parent
-      dep.out_elev = outlet.out_elev;    //Set Depression A MetaLabel outlet elevation                                     I'm a little confused about this. Didn't we find the outlets above? Why is this being recorded down here?
-      dep.out_cell = outlet.out_cell;    //Set Depression A MetaLabel outlet cell index
-      dep.odep     = outlet.depb;        //Depression A MetaLabel overflows into Depression B
-      dep.cell_count = outlet.depa_cells + outlet.depb_cells;
-      dep.dep_vol = outlet.depa_vol + outlet.depb_vol;                                                                    //is this right? Dep A now has the total cells and volume of both deps A and B? Is this what we wanted here?
+      dep.parent       = outlet.depb;        //Set Depression A MetaLabel parent
+      dep.out_elev     = outlet.out_elev;    //Set Depression A MetaLabel outlet elevation                                     
+      dep.out_cell     = outlet.out_cell;    //Set Depression A MetaLabel outlet cell index
+      dep.odep         = outlet.depb;        //Depression A MetaLabel overflows into Depression B
+      dep.ocean_parent = true;
+      depressions.at(outlet.depb).ocean_linked.emplace_back(depa_set);
+      std::cout<<"dep a set "<<depa_set<<std::endl;
       djset.mergeAintoB(depa_set,OCEAN); //Make a note that Depression A MetaLabel has a path to the ocean
     } else {
       //Neither depression has found the ocean, so we merge the two depressions
@@ -731,16 +736,22 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       //Be sure that this happens AFTER we are done using the `depa` and `depb`
       //references since they will be invalidated if `depressions` has to
       //resize!
-      auto &newdep  = depressions.emplace_back();
+      const auto depa_pitcell_temp = depa.pit_cell;
+
+      auto &newdep  = depressions.emplace_back();                                                                       //is it right to create a new depression for the metadepression like this?
       newdep.lchild = depa_set;
-      newdep.rchild = depb_set;
+      newdep.rchild = depb_set; 
+      newdep.dep_label = newlabel;
+      newdep.pit_cell = depa_pitcell_temp;
+      
+    //  
       djset.mergeAintoB(depa_set, newlabel); //A has a parent now
       djset.mergeAintoB(depb_set, newlabel); //B has a parent now
-      newdep.cell_count = outlet.depa_cells + outlet.depb_cells;                                        //getting the cell count and volume for the new metadepression. 
-      newdep.dep_vol = outlet.depa_vol + outlet.depb_vol;                             
-    //  std::cout<<"cells  "<<outlet.depa_cells<<"  "<<outlet.depb_cells<<"  count  "<<newdep.cell_count<<"  vol  "<<outlet.depa_vol<<"  "<<outlet.depb_vol<<"  "<<newdep.dep_vol<<std::endl;
+   //   newdep.cell_count = outlet.depa_cells + outlet.depb_cells;                                        //getting the cell count and volume for the new metadepression. 
+    //  newdep.dep_vol = outlet.depa_vol + outlet.depb_vol;                             
     }
   }
+
 
   //At this point we have a 2D array in which each cell is labeled. This label
   //corresponds to either the root node (the ocean) or a leaf node of a binary
@@ -748,6 +759,36 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 
   //The labels array has been modified in place. The depression hierarchy is
   //returned.
+
+
+
+  //Get the marginal depression cell counts and total elevations
+  for(unsigned int i=0;i<dem.size();i++){
+    const auto my_elev = dem(i);
+    auto clabel        = label(i);
+    
+    while(clabel!=OCEAN && my_elev>depressions.at(clabel).out_elev)
+      clabel = depressions[clabel].parent;
+
+    if(clabel==OCEAN)
+      continue;
+
+    depressions[clabel].cell_count++;
+    depressions[clabel].total_elevation += dem(i);
+  }
+
+  //Calculate marginal depression volume
+  // for(auto &dep: depressions)
+    // dep.dep_vol = dep.cell_count*dep.out_elev-dep.total_elevation;
+
+  //Calculate total depression volume
+  for(auto &dep: depressions){
+    dep.dep_vol = dep.cell_count*dep.out_elev-dep.total_elevation;
+    if(dep.lchild!=NO_VALUE)
+      dep.dep_vol += depressions.at(dep.lchild).dep_vol;
+    if(dep.rchild!=NO_VALUE)
+      dep.dep_vol += depressions.at(dep.rchild).dep_vol;
+  }
 
   return depressions;
 }
@@ -757,7 +798,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 //Utility function for doing various relabelings based on the depression
 //hierarchy.
 template<class elev_t>
-void LastLayer(Array2D<label_t> &label, const Array2D<float> &dem, const std::vector<Depression<elev_t>> &depressions){
+void LastLayer(rd::Array2D<label_t> &label, const rd::Array2D<float> &dem, const std::vector<Depression<elev_t>> &depressions){
   #pragma omp parallel for collapse(2)
   for(int y=0;y<label.height();y++)
   for(int x=0;x<label.width();x++){
