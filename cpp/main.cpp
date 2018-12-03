@@ -207,35 +207,34 @@ void Overflow(
 
   auto &this_dep = deps.at(current_depression);
 
-  //TODO: Does this really explore ALL the children?
+  //Visit child depressions. When these both overflow, then we spread water
+  //across them by spreading water across their common metadepression
   Overflow(this_dep.lchild, deps);
-
-  //If this is false, but the previous was true, then we have found a depression that links to a depression that links to a ... that links to the ocean
   Overflow(this_dep.rchild, deps);
 
   //Catch depression that link to the ocean through this one. These are special
-  //cases because we will never spread water across them and the current
-  //depression: they only flow into the current depression
-
+  //cases because we will never spread water across the union of these
+  //depressions and the current depressions: they only flow into the current
+  //depression
   for(const auto c: this_dep.ocean_linked)
     Overflow(c, deps);
 
+  //If the current depression is the ocean then at this point we've visited all
+  //of its ocean-linked depressions (the ocean has no children). Since we do not
+  //otherwise want to modify the ocean we quit here.
   if(current_depression==OCEAN)
     return;
 
   std::cout<<"depression number "<<this_dep.dep_label<<" volume "<<this_dep.dep_vol<<" water "<<this_dep.water_vol<<std::endl;
 
-  //Each depression will store the total volume of water it and all of its children contains.
-  //That way the excess water a depression stores beyond that of its children is calculated as
-  //Volume(Parent) - Volume(Children)
+  //Each depression has an associated dep_vol. This is the TOTAL volume of the
+  //meta-depression including all of its children. This property answers the
+  //question, "How much water can this meta-depression hold?"
 
-  //The depression is large enough to hold all of the water it contains, so we
-  //stop trying to fill it. Since we are keeping track of total volumes we
-  //propagate this water volume upward.
-  if(this_dep.water_vol<=this_dep.dep_vol){
-    deps.at(this_dep.parent).water_vol += this_dep.water_vol;
-    return;
-  }
+  //Each depression also has an asoociated water volume called `water_vol`. This
+  //will stored the MARGINAL volume of the water in the depression. That is, for
+  //each depression this indicates how much water is in this depression that
+  //would not fit into its child depressions.
 
   //We are overflowing the depression
   if(this_dep.odep == OCEAN){
@@ -245,27 +244,36 @@ void Overflow(
     //The current depression's outlet is into the ocean. Since the ocean can
     //absorb an infinite amount of water without changing its water volume, we
     //simply set the amount of water contained in the current depression to be
-    //equal to its depression volume. We throw away the excess water beyond this
-    //since it does not affect the ocean.
-    this_dep.water_vol = this_dep.dep_vol;
-  } else {
-   // std::cout<<"depression number "<<this_dep.dep_label<<" volume "<<this_dep.dep_vol<<" water "<<this_dep.water_vol<<std::endl;
-    //The neighbouring depression is not the ocean; therefore, we should try to
-    //overflow into it. To do so, we first calculate the excess water beyond
-    //what this depression can hold (if this depression could hold all the
-    //water, then we would have stopped above).
-    float extra_water            = this_dep.water_vol - this_dep.dep_vol;
+    //either its water_vol (the depression doesn't overflow) or equal to its
+    //depression volume (the excess water is thrown into the ocean, which is
+    //unaffected).
+    this_dep.water_vol = std::min(this_dep.water_vol,this_dep.dep_vol);
+  } else if(this_dep.water_vol>this_dep.dep_vol) {
+    //The neighbouring depression is not the ocean and this depression is
+    //overflowing (therefore, all of its children are full)
+    assert(this_dep.lchild==NO_VALUE || deps.at(this_dep.lchild).water_vol==deps.at(this_dep.lchild).dep_vol);
+    assert(this_dep.rchild==NO_VALUE || deps.at(this_dep.rchild).water_vol==deps.at(this_dep.rchild).dep_vol);
 
-    //Now that we've figured out how much excess water there is, we mark this depression as being filled
+    //The marginal volume of this depression is larger than what it can hold, so
+    //we determine the amount that overflows, the "extra water".
+    double extra_water  = this_dep.water_vol - this_dep.dep_vol;
+  
+    //Now that we've figured out how much excess water there is, we fill this
+    //depression to its brim. Note that we don't use addition or subtraction
+    //here to ensure floating-point equality.
     this_dep.water_vol = this_dep.dep_vol;
 
-    auto &outlet_dep      = deps.at(this_dep.odep);              //Depression this one overflows into
+    auto &outlet_dep = deps.at(this_dep.odep);                             //Depression this one overflows into
 
     outlet_dep.water_vol += extra_water;                                   //Add excess water to the overflow depression
     if(outlet_dep.water_vol>outlet_dep.dep_vol){                           //Water in overflow depression exceeds its volume
       extra_water          = outlet_dep.water_vol - outlet_dep.dep_vol;    //Find out how much overflow depression overflowed by
       outlet_dep.water_vol = outlet_dep.dep_vol;                           //Mark overflow depression as being entirely filled
     }
+
+    //Extra water should always be >=0. If, for floating-point reasons it is a
+    //small negative number, we will cross that bridge when we come to it.
+    assert(extra_water>=0);
 
     //Since if a depression links directly to an ocean its odep and parent
     //values are both OCEAN, we have overflowed into the ocean in the upper part
@@ -275,13 +283,12 @@ void Overflow(
     //At this point extra_water is the amount of water that is left when both
     //this depression and its overflow depression are completely filled. We add
     //this extra water to this depression's (and therefore it's overflow
-    //depression's) parent. We also add this depression's water volume since we
-    //are tracking totals.
-    deps.at(this_dep.parent).water_vol += this_dep.water_vol + extra_water;          //add any remaining water to the parent depression.
-  
+    //depression's) parent.
+    deps.at(this_dep.parent).water_vol += extra_water;
+    std::cout<<"parent number "<<deps.at(this_dep.parent).dep_label<<" now has water volume "<<deps.at(this_dep.parent).water_vol<<std::endl;
   }
-  std::cout<<"and after: depression number "<<this_dep.dep_label<<" volume "<<this_dep.dep_vol<<" water "<<this_dep.water_vol<<std::endl;
 
+  std::cout<<"and after: depression number "<<this_dep.dep_label<<" volume "<<this_dep.dep_vol<<" water "<<this_dep.water_vol<<std::endl;
 }
 
  
