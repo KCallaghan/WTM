@@ -131,13 +131,13 @@ void SurfaceWater(
     if(ndir==NO_FLOW){ //TODO: For debugging
       pit_cells_found++;
     } else { //TODO: Fix this monkey patching
-      const int x  = c%flowdirs.width();
-      const int y  = c/flowdirs.width();
+      int x,y;
+      topo.iToxy(c,x,y);
       const int nx = x+dx[ndir];
       const int ny = y+dy[ndir];
       n            = topo.xyToI(nx,ny);
+      assert(n>=0);
     }
-
 
     //TODO: Might need this - could also check label
     //If downstream neighbour is the ocean, we drop our water into it and the
