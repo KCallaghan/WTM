@@ -164,8 +164,10 @@ void SurfaceWater(
   
       //Decrement the neighbour's dependencies. If there are no more dependencies,
       //we can process the neighbour.
-      if(--dependencies(n)==0)
+      if(--dependencies(n)==0){                            //CHECK this is a hack! Something is wrong with the dependencies matrix, should never go below 0 but it sometimes does. 
+        assert(dependencies(n)>=0);
         q.emplace(n);                   //Add neighbour to the queue
+      }
     }
   }
 
