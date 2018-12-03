@@ -535,9 +535,11 @@ SubtreeDepressionInfo Find_filled(
   SubtreeDepressionInfo left_info  = Find_filled(this_dep.lchild,deps,topo,label,wtd,level+"\t");                              //This should check everything that is an immediate child of the ocean, so we're supposed to hit all the depressions like this. 
   SubtreeDepressionInfo right_info = Find_filled(this_dep.rchild,deps,topo,label,wtd,level+"\t");   
 
-  for(const auto c: this_dep.ocean_linked){
+  for(const auto c: this_dep.ocean_linked)
     SubtreeDepressionInfo temp =  Find_filled(c, deps, topo, label, wtd, level+"\t"); //TODO: need to add to combined
-  }
+
+  if(current_depression==OCEAN)
+    return SubtreeDepressionInfo();              //better place to put this? CHECK
 
   std::cerr<<level<<"Water volume is "<<this_dep.water_vol<<" and depression volume is "<<this_dep.dep_vol<<std::endl;
 
