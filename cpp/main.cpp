@@ -154,7 +154,7 @@ void SurfaceWater(
    //   std::cout<<"the total water in this depression is "<<deps[label(c)].water_vol<<" and it is depression "<<label(c)<<std::endl;
         wtd(c) = 0; //Clean up as we go
       }
-    } else{                               //not a pit cell
+    } else {                               //not a pit cell
       //If we have water, pass it downstream.
       if(wtd(c)>0){ //Groundwater can go negative, so it's important to make sure that we are only passing positive water around
         std::cout<<"we have water coming from "<<c<<" and going to "<<n<<std::endl;
