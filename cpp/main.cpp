@@ -12,7 +12,6 @@
 #include <iostream>
 #include <queue>
 #include <richdem/common/Array2D.hpp>
-#include <richdem/flats/flats.hpp>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -77,7 +76,7 @@ void SurfaceWater(
   rd::Array2D<char>  dependencies(topo.width(),topo.height(),0);
   #pragma omp parallel for collapse(2)
   for(int y=0;y<topo.height();y++)
-  for(int x=0;x<topo.width(); x++)
+  for(int x=0;x<topo.width(); x++){
   for(int n=0;n<neighbours;n++){                           //Loop through neighbours
     const int nx = x+dx[n];                                //Identify coordinates of neighbour
     const int ny = y+dy[n];
@@ -86,6 +85,8 @@ void SurfaceWater(
     if(flowdirs(nx,ny)==dinverse[n])  //CHECK WITH RICHARD           //(int)topo.xyToI(x,y))              //Does my neighbour flow into me?
       dependencies(x,y)++;                                 //Increment my dependencies
   }
+  //std::cout<<"cell "<<x<<" "<<y<<" dependencies "<<dependencies(x,y)<<std::endl;
+}
 
   int pit_cell_count = 0;
   int peak_count     = 0;
@@ -157,7 +158,7 @@ void SurfaceWater(
     } else {                               //not a pit cell
       //If we have water, pass it downstream.
       if(wtd(c)>0){ //Groundwater can go negative, so it's important to make sure that we are only passing positive water around
-        std::cout<<"we have water coming from "<<c<<" and going to "<<n<<std::endl;
+    //    std::cout<<"we have water coming from "<<c<<" and going to "<<n<<std::endl;
         wtd(n) += wtd(c);  //Add water to downstream neighbour. This might result in filling up the groundwater table, which could have been negative
         wtd(c)  = 0;       //Clean up as we go
       }
@@ -289,25 +290,37 @@ void Overflow(
   }
 
   std::cout<<"and after: depression number "<<this_dep.dep_label<<" volume "<<this_dep.dep_vol<<" water "<<this_dep.water_vol<<std::endl;
+
+  //All overflowing depressions should by now have overflowed all the way down
+  //to the ocean. We must now spread the water in the depressions out by setting
+  //appropriate values for wtd.
 }
 
  
 
 
-//All overflowing depressions should by now have overflowed all the way down to the ocean. 
-//We must now handle the actual water in the depressions and move it to wtd. 
-//Completely full depressions and partially filled depressions must both update the wtd with their water. 
 
 
 
+//Simple data structure to hold information needed to spread water in a filled
+//metadepression.
 class SubtreeDepressionInfo {
  public:
-  float water_vol = 0;
-  float dep_vol   = 0;
-  int   cells     = 0;
-  int   bot_label = -1;
+  //One of the depressions at the bottom of the meta-depression. We use this to
+  //identify a pit cell from which to start flooding.
+  int   leaf_label = -1;          
+  //The metadepression containing all of the children. This metadepression is
+  //guaranteed to be large enough to hold all of the water of its children plus
+  //whatever exists only in the metadepression itself. We use this to determine
+  //the water and depression volumes.
   int   top_label = -1;
+  //Here we keep track of which depressions are contained within the
+  //metadepression. This allows us to limit the spreading function to cells
+  //within the metadepression.
   std::unordered_set<int> my_labels;
+  //Total water of all the depressions up to and including the one identified by
+  //top_label
+  double water_vol = 0;
 };
 
 
@@ -315,11 +328,14 @@ class SubtreeDepressionInfo {
 
 template<class elev_t>
 void Fill_Water(
-  SubtreeDepressionInfo                  &stdi,
-  const std::vector<Depression<elev_t> > &deps,
-  const rd::Array2D<float>               &topo,
-  const rd::Array2D<label_t>             &label,
-  rd::Array2D<float>                     &wtd
+  //Identifies a meta-depression through which water should be spread, leaf node
+  //from which the water should be spread, valid depressions across which water
+  //can spread, and the amount of water to spread
+  SubtreeDepressionInfo                  &stdi,  
+  const std::vector<Depression<elev_t> > &deps,  //Depression hierarchy
+  const rd::Array2D<float>               &topo,  //Topographic data for calculating marginal volumes as we attempt to spread water
+  const rd::Array2D<label_t>             &label, //2D array in which each cell is labeled with the leaf depression it belongs to
+  rd::Array2D<float>                     &wtd    //Water table depth: we transfer water into this
 ){
   //Nothing to do if we have no water
   if(stdi.water_vol==0)
@@ -327,36 +343,57 @@ void Fill_Water(
 
   //changing tactics to start always from the leaves, then work your way up until you find something that isn't completely full. 
   std::cerr<<"\n\n\033[35m####################### Fill Water\033[39m"<<std::endl;
+
+  //TODO: Use hashset to avoid allocating massive chunks of memory.
   rd::Array2D<bool> visited(topo.width(),topo.height(),false);
-
-  const auto pit_cell    = deps.at(stdi.bot_label).pit_cell;
-  double total_elevation = 0;
-  std::cout<<"pit cell "<<pit_cell<<" "<<stdi.bot_label<<std::endl;
-
+ 
+  //Priority queue that sorts cells by lowest elevation first. If two cells are
+  //of equal elevation the one added most recently is popped first. The ordering
+  //of the cells processed by this priority queue need not match the ordering of
+  //the cells processed by the depression hierarchy.
   GridCellZk_high_pq<elev_t> flood_q;                          
 
-  std::cerr<<"Bottom label      = "<<stdi.bot_label<<std::endl;
-  std::cerr<<"Depression volume = "<<stdi.dep_vol<<"\n";
+  std::cerr<<"Bottom label      = "<<stdi.leaf_label<<std::endl;
+  std::cerr<<"Depression volume = "<<deps.at(stdi.top_label).dep_vol<<"\n";
   std::cerr<<"Water volume      = "<<stdi.water_vol<<std::endl;
   std::cerr<<"Allowed labels    = ";
   for(auto x:stdi.my_labels)
     std::cerr<<x<<" ";
   std::cerr<<std::endl;
 
-  assert(pit_cell>=0);
+ 
+  { //Scope to limit pit_cell
+    //Cell from which we can begin flooding the meta-depression. Which one we
+    //choose is arbitrary, since we will fill all of the leaf depressions and
+    //intermediate metadepressions until and including when we reach the
+    //depression identified by stdi.top_label
+    const auto pit_cell    = deps.at(stdi.leaf_label).pit_cell;
+    std::cout<<"pit cell "<<pit_cell<<" "<<stdi.leaf_label<<std::endl;
+    assert(pit_cell>=0);
 
-  flood_q.emplace(
-    pit_cell % topo.width(),
-    pit_cell / topo.width(),
-    topo(pit_cell)
-  );                    //create a new priority queue starting with the pit cell of the depression
+    flood_q.emplace(
+      pit_cell % topo.width(),
+      pit_cell / topo.width(),
+      topo(pit_cell)
+    );                    //create a new priority queue starting with the pit cell of the depression
 
-  visited(pit_cell) = true;//label(pit_cell);         // show that we have already added this cell to those that have water. We need a better way to do this. 
+    visited(pit_cell) = true;//label(pit_cell);         // show that we have already added this cell to those that have water. We need a better way to do this. 
+  }
 
-  double current_volume;
-  GridCellZk_high<elev_t> c(0,0,0,0);
+  double current_volume;              //TODO: This is out here for debugging purposes. SHould be moved inside pq
+  GridCellZk_high<elev_t> c(0,0,0,0); //TODO: Out for debugging should be in pq
 
+  //Cells whose wtd will be affected as we spread water around
   std::vector<int> cells_affected;
+
+  //Stores the sum of the elevations of all of the cells in cells_affected. Used
+  //for calculating the volume we've seen so far. (See explanation above or in
+  //dephier.hpp TODO)
+  double total_elevation = 0;
+
+
+  //TODO: It's possible to accelerate this by greedily eating cells which belong
+  //"only" to the meta-depression.
 
   std::cout<<"about to start the flood_q while loop "<<label(1,1)<<std::endl;
   while(!flood_q.empty()){
@@ -367,21 +404,27 @@ void Fill_Water(
     std::cout<<"x and y "<<c.x<< " "<<c.y<<std::endl;
     std::cout<<"current cell elevation "<<topo(c.x,c.y)<<std::endl;
 
-    //We have two volumes to keep track of. One is the above ground volume formed by the virtual waterline we are raising,
-    //the other is the volume of water that the water table can absorb. We track `total_wtd` as a summed variable since
-    //we will always fill it, if possible. We keep track of above ground volume as a multiplied variable since we will
-    //adjust the final water level only above the ground.
+    //We keep track of the current volume of the depression by noting the total
+    //elevation of the cells we've seen as well as the number of cells we've
+    //seen.
 
-    //TODO: Note that the current cell's above ground volume and wtd do not contribute at all. This a choice that Kerry and Richard discussed
-    //It is as though there is a virtual water line coincident with the edge of the current cell. No water infiltrates into this cell
-    //or is stored above it - only cells previously visited are considered when doing volume calculations.
-    current_volume = (cells_affected.size()*topo(c.x,c.y) - total_elevation);       //get the current volume of this part of the depression //TODO: local var
+    //TODO: Note that the current cell's above ground volume and wtd do not
+    //contribute at all. This a choice that Kerry and Richard discussed. It is
+    //as though there is a virtual water line coincident with the edge of the
+    //current cell. No water infiltrates into this cell or is stored above it -
+    //only cells previously visited are considered when doing volume
+    //calculations.
 
-    std::cout<<"volume "<<current_volume<<" "<<cells_affected.size()<<" "<<topo(c.x,c.y)<<" "<<total_elevation<<std::endl;
+    //Current volume of this subset of the metadepression. Since we might climb
+    //over a saddle point, this value can occasionally be negative. It will be
+    //positive by the time we need to spread the water around.
+    current_volume = cells_affected.size()*topo(c.x,c.y) - total_elevation; //TODO: Local var
 
-    if(stdi.water_vol<0 && stdi.water_vol>-1e-6) //TODO: Sprinkle this liberally everywhere
-      stdi.water_vol = 0;
-    assert(stdi.water_vol>=0);
+    std::cout<<"volume "<<current_volume<<" cells "<<cells_affected.size()<<" topo "<<topo(c.x,c.y)<<" total "<<total_elevation<<std::endl;
+
+    //TODO: If this is false by a small margin, then it's a floating point issue
+    //and this should be adjusted to be >=-1e-6 and water_vol should be made 0
+    assert(stdi.water_vol>=0); 
 
     //All the cells within this depression should have water table depths less
     //than or equal to zero because we have moved all of their water down slope
@@ -402,85 +445,123 @@ void Fill_Water(
     //2. The water surface is below the height of the cell because there is sufficient topographic volume to hold all the water.
     //   In this case, the cell's water table is left unaffected.
 
-    if(stdi.water_vol<=current_volume-wtd(c.x,c.y)){         //if this volume will accommodate all of the water, stop adding cells
+    if(stdi.water_vol<=current_volume-wtd(c.x,c.y)){
+      //The current scope of the depression plus the water storage capacity of
+      //this cell is sufficient to store all of the water. We'll stop adding
+      //cells and fill things now.
       const auto my_elev = topo(c.x,c.y);
 
       std::cerr<<"Attempting to fill depression..."<<std::endl;
       std::cerr<<"\tLabel of last cell       = "<<label(c.x,c.y)       <<std::endl;
       std::cerr<<"\tWater volume             = "<<stdi.water_vol       <<std::endl;
-      std::cerr<<"\tDepression volume        = "<<stdi.dep_vol         <<std::endl;
-      std::cout<<"\tDepression number        = "<<stdi.bot_label       <<std::endl;
+      std::cerr<<"\tDepression volume        = "<<deps.at(stdi.top_label).dep_vol         <<std::endl;
+      std::cout<<"\tDepression number        = "<<stdi.leaf_label       <<std::endl;
       std::cerr<<"\tCurrent volume           = "<<current_volume       <<std::endl;
       std::cerr<<"\tTotal elevation          = "<<total_elevation      <<std::endl;
       std::cerr<<"\tCurrent elevation        = "<<my_elev              <<std::endl;
       std::cerr<<"\tNumber of cells affected = "<<cells_affected.size()<<std::endl;  
 
-      //Above we only required that the volume of water be less than the current
-      //volume plus the available infiltration space of the current cell. If the
-      //current volume is not enough to hold all the water, that we means we
-      //have to stash some of it in the current cell's water table.
+      //We will fill the depression so that the surface of the water is at this
+      //elevation.
+      double water_level;
+
       if(current_volume<stdi.water_vol){ //TODO: Check stdi.my_labels.count(label(c.x,c.y))==0 ?
+        //The volume of water exceeds what we can hold above ground, so we will
+        //stash as much as we can in this cell's water table. This is okay
+        //because the above ground volume plus this cell's water table IS enough
+        //volume (per the if-clause above).
+        std::cout<<"we are in the if"<<std::endl;
         //Fill in as much of this cell's water table as we can
         const double fill_amount = stdi.water_vol - current_volume;
         assert(fill_amount>=0);
         wtd(c.x,c.y)   += fill_amount;
-        stdi.water_vol -= fill_amount;
+        stdi.water_vol -= fill_amount;   //Doesn't matter because we don't use water_vol anymore
+        water_level     = topo(c.x,c.y);
+      } else if (current_volume==stdi.water_vol){
+        //The volume of water is exactly equal to the above ground volume so we
+        //set the water level equal to this cell's elevation
+        water_level = topo(c.x,c.y);
+      } else {
+        //The water volume is less than this cell's elevation, so we calculate
+        //what the water level should be.
+
+        //We have that Volume = (Water Level)*(Cell Count)-(Total Elevation)
+        //rearranging this gives us:
+        water_level = (stdi.water_vol+total_elevation)/cells_affected.size();
       }
 
-      //At this point we know that the surface of the water should be at or below the elevation of the cell
-      const double water_level = (stdi.water_vol+total_elevation)/cells_affected.size();
 
       //TODO: Use floating-point comparisons in these asserts.
       //Water level must be higher than (or equal to) the previous cell we looked at, but lower than (or equal to) the current cell
+      std::cout<<"water level = "<<water_level<<" last topo "<<topo(cells_affected.back())<<" "<<bool(topo(cells_affected.back())<=water_level)<<std::endl;
       assert(cells_affected.size()==0 || topo(cells_affected.back())<=water_level);
+      std::cout<<"water level = "<<water_level<<" my topo "<<topo(c.x,c.y)<<std::endl;
       assert(water_level<=topo(c.x,c.y));
 
       std::cerr<<"Adjusting wtd of depression...\n";
       std::cerr<<"\twater_level = "<<water_level<<std::endl;
       for(const auto c: cells_affected){
         std::cerr<<"Cell ("<<(c%topo.width())<<","<<(c/topo.width())<<") has elev="<<topo(c)<<", label="<<label(c)<<", wtd_old="<<wtd(c);
-        wtd(c) = water_level - topo(c);
+        assert(wtd(c)>=0);               //This should be true since we have been filling wtds as we go.
+        assert(water_level>=topo(c));
+        wtd(c) = water_level - topo(c);  //only change the wtd if it is an increase, here. We can't take water away from cells that already have it (ie reduce groundwater in saddle cells within a metadepression.)
         std::cerr<<", wtd_new="<<wtd(c)<<std::endl;
         assert(wtd(c)>=0);
       }
-        
+
+      //We've spread the water, so we're done        
       return;
       
-    } else {
-      //During the adding of neighbours neighbours might get added are are lower than we are and belong to a different
-      //depression (notably, this happens at the edge of a flat abuting an ocean). These cells will then be popped
-      //and could be processed inappropriately. To prevent this, we skip them here.
-      if(stdi.my_labels.count(label(c.x,c.y))==0)
+    }  else {
+      //We haven't found enough volume for the water yet.
+
+      std::cout<<"we are in the else"<<std::endl;
+
+      //During the adding of neighbours neighbours might get added that are
+      //lower than we are and belong to a different depression (notably, this
+      //happens at the edge of a flat abuting an ocean). These cells will then
+      //be popped and could be processed inappropriately. To prevent this, we
+      //skip them here.
+      if(stdi.my_labels.count(label(c.x,c.y))==0){  //CHECK. This was preventing cells that flowed to the ocean from allowing my depression volume to update. Is this way ok? Is this even needed?
+        std::cerr<<"Line "<<__LINE__<<std::endl;
+        if(flood_q.empty())
+          std::cout<<"that was the last cell"<<std::endl;
         continue;
+      }
 
-      //We haven't found enough volume for the water yet. Add this cell's neighbours and move on to the next
-      //highest cell, which will add the volume of the cell we've just visited
+      //Okay, we're allow to add this cell's neighbours since this cell is part
+      //of the metadepression.
 
-      //Add the cell we've just visited, so that its volume is available in the next iteration
-      cells_affected.emplace_back(topo.xyToI(c.x,c.y));   //list all of the cells in which the wtd will be changing
+      //Add this cell to those affected so that its volume is available for
+      //filling.
+      cells_affected.emplace_back(topo.xyToI(c.x,c.y));
 
       //Fill in cells' water tables as we go
-      stdi.water_vol += wtd(c.x,c.y);   
-      wtd(c.x,c.y)    = 0;
+      assert(wtd(c.x,c.y)<=0);
+      stdi.water_vol += wtd(c.x,c.y);  //We use += because wtd is less than or equal to zero
+      wtd(c.x,c.y)    = 0;             //Now we are sure that wtd is 0, since we've just filled it
       
       //Add the current cell's information to the running total
-      total_elevation += topo(c.x,c.y);   //TODO: Should this be wtd?
+      total_elevation += topo(c.x,c.y);   //TODO: Should this be wtd? No. Since wtd is zero as of the lines just above.
 
-      //TODO: Use labels to prevent visiting places we shouldn't
       for(int n=0;n<neighbours;n++){
+        std::cerr<<"in the for "<<n<<std::endl;
         const int nx = c.x + dx[n]; //TODO ModFloor(x+dx[n],topo.width()); //Get neighbour's x-coordinate using an offset and wrapping
         const int ny = c.y + dy[n];                     //Get neighbour's y-coordinate using an offset
-        if(!topo.inGrid(nx,ny))                          //Is this cell in the grid?
+        if(!topo.inGrid(nx,ny))   {                       //Is this cell in the grid?
+          std::cerr<<"out of grid"<<std::endl;
           continue;                                     //Nope: out of bounds.
+        }
      
-        std::cout<<"PQ inspecting ("<<nx<<","<<ny<<") which has label "<<label(nx,ny)<<std::endl;
+        std::cerr<<"PQ inspecting ("<<nx<<","<<ny<<") which has label "<<label(nx,ny)<<std::endl;
         //Ocean cells may be found at the edge of a depression. They might get
         //added to this list even if there are other, lower, cells within the
         //depression which have not yet been explored. This happens when a flat
         //abutts an ocean. The side of the flat near the ocean will see the
         //ocean and try to add it. The ocean would then be called instead of
         //more cells within the depression. Therefore, we do not add ocean
-        //cells. 
+        //cells.
+
         //We must use the ocean level rather than the ocean label, or we will
         //mistakenly miss adding higher cells which belong to the ocean's depression
         //e.g. an escarpment before the ocean. 
@@ -525,18 +606,16 @@ void Fill_Water(
   
 
 
-//TODO: Use a hashset to keep track of which depression labels are valid for filling
 template<class elev_t>
 SubtreeDepressionInfo Find_filled(
-  const int                               current_depression,
-  const std::vector<Depression<elev_t> > &deps, 
-  const rd::Array2D<float>               &topo,  
-  const rd::Array2D<label_t>             &label, 
-  rd::Array2D<float>                     &wtd,
-  std::string level ="" //TODO
+  const int                               current_depression,    //Depression we are currently in
+  const std::vector<Depression<elev_t> > &deps,                  //Depression hierarchy
+  const rd::Array2D<float>               &topo,                  //Topographic data (used for determinining volumes as we're spreading stuff)
+  const rd::Array2D<label_t>             &label,                 //Array indicating which leaf depressions each cell belongs to
+  rd::Array2D<float>                     &wtd,                   //Water table depth
+  std::string level =""                                          //TODO: For debugging
 ){
   //Stop when we reach one level below the leaves
-
   if(current_depression==NO_VALUE)
     return SubtreeDepressionInfo();
 
@@ -544,113 +623,72 @@ SubtreeDepressionInfo Find_filled(
 
   const auto& this_dep = deps.at(current_depression);
 
-  SubtreeDepressionInfo left_info  = Find_filled(this_dep.lchild,deps,topo,label,wtd,level+"\t");                              //This should check everything that is an immediate child of the ocean, so we're supposed to hit all the depressions like this. 
+  //We start by visiting all of the ocean-linked depressions. They don't need to
+  //pass us anything because their water has already been transferred to this
+  //metadepression tree by Overflow(). Similar, it doesn't mater what their leaf
+  //labels are since we will never spread water into them.
+  for(const auto c: this_dep.ocean_linked)
+    Find_filled(c, deps, topo, label, wtd, level+"\t");
+
+  //At this point we've visited all of the ocean-linked depressions. Since all
+  //depressions link to the ocean and the ocean has no children, this means we
+  //have visited all the depressions and spread their water. Since we don't wish
+  //to modify the ocean, we are done.
+  if(current_depression==OCEAN)
+    return SubtreeDepressionInfo();
+
+  //We visit both of the children. We need to keep track of info from these
+  //because we may spread water across them.
+  SubtreeDepressionInfo left_info  = Find_filled(this_dep.lchild,deps,topo,label,wtd,level+"\t");
   SubtreeDepressionInfo right_info = Find_filled(this_dep.rchild,deps,topo,label,wtd,level+"\t");   
 
-  for(const auto c: this_dep.ocean_linked)
-    SubtreeDepressionInfo temp =  Find_filled(c, deps, topo, label, wtd, level+"\t"); //TODO: need to add to combined
-
-  if(current_depression==OCEAN)
-    return SubtreeDepressionInfo();              //better place to put this? CHECK
-
-  std::cerr<<level<<"Water volume is "<<this_dep.water_vol<<" and depression volume is "<<this_dep.dep_vol<<std::endl;
-
-  //The water volume should never be greater than the depression volume because
-  //otherwise we would have overflowed the water into the neighbouring
-  //depression and moved the excess to the parent.
-  if(this_dep.water_vol>this_dep.dep_vol){ //TODO: Make this an assert?
-    throw std::runtime_error("water_vol>dep_vol");
-  }
-
   SubtreeDepressionInfo combined;
-  combined.water_vol = this_dep.water_vol;//left_info.water_vol + right_info.water_vol + this_dep.water_vol; //Water volumes are now total, not marginal
-  std::cerr<<level<<"Getting combined water volumes "<<left_info.water_vol<<" "<<right_info.water_vol<<" "<<this_dep.water_vol<<std::endl;
-  
-  combined.dep_vol   = this_dep.dep_vol;                                                //Depression volumes are total
-  std::cerr<<level<<"Getting combined depression volumes "<<left_info.dep_vol<<" "<<right_info.dep_vol<<" "<<this_dep.dep_vol<<std::endl;
-  
-  combined.cells     = left_info.cells + right_info.cells;
-
   combined.my_labels.emplace(current_depression);
   combined.my_labels.merge(left_info.my_labels);
   combined.my_labels.merge(right_info.my_labels);
 
-  if(left_info.bot_label==NO_VALUE)
-    combined.bot_label = current_depression;
-  else
-    combined.bot_label = left_info.bot_label; //Choose left because right is not guaranteed to exist
+  //Add together marginal water volumes to produce a total water volume for the metadepression
+  combined.water_vol = this_dep.water_vol+left_info.water_vol+right_info.water_vol;
+
+  combined.leaf_label = left_info.leaf_label;  //Choose left because right is not guaranteed to exist
+  if(combined.leaf_label==NO_VALUE)            //If there's no label, then there was no child
+    combined.leaf_label = current_depression;  //Therefore, this is a leaf depression
 
   combined.top_label = current_depression;
 
-  //Depressions that overflow have water_vol=dep_vol, so we don't want to spread
-  //that water around yet. (There's a special case in which a depression has
-  //*exactly* water_vol=dep_vol, but this is taken care of by its parent)
-  //However, once we've reached a point where our parent is ocean-linking, we've
-  //reached the farthest point that water can be passed up and need to spread it
-  //around.
 
-  //Why is this so? Because if we go up farther we will either end up spreading
-  //water across the ocean, or across an ocean-linking depression. In general,
-  //ocean-linking depressions are BELOW us (like at the bottom of a tall cliff),
-  //so trying to spread across this depression and its parent doesn't make
-  //sense.
 
-  //We want to avoid spreading water around more than once. Therefore, we want
-  //to find the largest grouping of depressions which will share water. Thus,
-  //when we see `combined.water_vol==combined.dep_vol`, this means we *could*
-  //spread water around, but that would waste time since we might spread the
-  //metadepression's water across the same cells. Therefore, we skip cases where
-  //`water_vol==dep_vol` and only trigger on cases where `water_vol<dep_vol`.
+  std::cerr<<level<<"Total water volume is "<<combined.water_vol<<" and depression volume is "<<this_dep.dep_vol<<std::endl;
 
-  //However, if the parent of this depression is the ocean-linking, then we
-  //don't want to try spreading water across the whole ocean (or something at
-  //the bottom of a cliff) as well as the metadepression. Therefore, if this
-  //depression's parent is ocean-linking, we stop and spread the water, even if
-  //`water_vol==dep_vol`
+  //The water volume should never be greater than the depression volume because
+  //otherwise we would have overflowed the water into the neighbouring
+  //depression and moved the excess to the parent.
+  if(combined.water_vol>this_dep.dep_vol){ //TODO: Make this an assert?
+    throw std::runtime_error("water_vol>dep_vol");
+  }
 
-  //There is another case in which we want to immediately spread water. Imagine
-  //the situation below:
-  //      ___ _ _ _  _C_       ___
-  //         \  A   /   \  B  /
-  //          \    /     \_ _/
-  //           \__/       \_/
-  //We are in depression A and its water volume exactly equals its depression
-  //volume, so we should spread. But we can't capture this using
-  //`water_vol<=dep_vol` for reasons explained above. However, we need to spread
-  //now because if we delegate spreading to C, then C might place all of A's
-  //water into B, which would not be appropriate. Therefore, if
-  //`water_vol==dep_vol` and B's `water_vol<dep_vol`, then B has not overflowed
-  //into C so we should be spreading A and B separately, rather than adding them
-  //both to C and letting C spread across both of them.
 
-  const auto odep = deps.at(deps.at(combined.top_label).odep);
 
-  if(combined.water_vol<combined.dep_vol || this_dep.ocean_parent || (combined.water_vol==combined.dep_vol && odep.water_vol!=odep.dep_vol)){
-    //If this depression's parent is the ocean, we want to spread the water now.
-    //If we wait, we'll try to spread it across the whole ocean. However, we
-    //have to guarantee that there is enough volume in the depression to contain
-    //the water.
-    if(this_dep.parent==OCEAN && combined.water_vol>combined.dep_vol){
-      std::cerr<<"this is dep "<<this_dep.dep_label<<" vol "<<this_dep.dep_vol<<" "<<" water "<<this_dep.water_vol<<std::endl;
-      std::cerr<<"combined vol "<<combined.dep_vol<<" "<<" water "<<combined.water_vol<<std::endl;
-      throw std::logic_error("Water volume must be <= depression volume if depression's parent is the ocean.");
-    }
+  //Since depressions store their marginal water volumes, if a parent depression
+  //has 0 marginal water volume, then both of its children have sufficient
+  //depression volume to store all of their water. However, if our parent is an
+  //ocean-link then we are guaranteed to be able to fill now because excess
+  //water will have been transferred into the parent and we don't want to pool
+  //the parent's water with our own (it might be at the bottom of a cliff).
+
+  if(deps.at(this_dep.parent).water_vol==0 || this_dep.ocean_parent){
+    assert(combined.water_vol<=this_dep.dep_vol);
 
     //If both of a depression's children have already spread their water, we do not
     //want to attempt to do so again in an empty parent depression. 
     //We check to see if both children have finished spreading water. 
 
-    if(    (this_dep.lchild!=NO_VALUE && left_info.water_vol>0)                      //TODO: This would be easier to deal with if we switch back to marginal water volume
-        || (this_dep.rchild!=NO_VALUE && right_info.water_vol>0) 
-        || (this_dep.lchild == NO_VALUE && this_dep.rchild == NO_VALUE)
-    ){
-      Fill_Water(combined, deps, topo, label, wtd);
-    }
+    Fill_Water(combined, deps, topo, label, wtd);
 
-    SubtreeDepressionInfo temp;
-    return temp;
+    //At this point there should be no more water all the way up the tree until
+    //we pass through an ocean link, so we pass this up as a kind of null value.
+    return SubtreeDepressionInfo();
   } else {
-
     return combined;
   }
 }
@@ -713,32 +751,27 @@ int main(int argc, char **argv){
 
   rd::Array2D<float> topo = LoadData<float>(in_name,std::string("value"));   //Recharge (Percipitation minus Evapotranspiration)
 
-  // richdem::ResolveFlatsEpsilon(topo); //TODO: Shouldn't need this.
-
-  rd::Array2D<float> wtd (topo.width(),topo.height(),1);
-
- 
-  //Initialize labels to indicate that none of the cells are part of depressions
-  rd::Array2D<label_t> label   (topo.width(),topo.height(),NO_DEP);
-
-  //Initialize flow directions to indicate that none of the cells flow anywhere
-  flowdirs.resize(topo.width(),topo.height(),NO_FLOW);
+  rd::Array2D<float>     wtd     (topo.width(), topo.height(), 1      ); //All cells have some water
+  rd::Array2D<label_t>   label   (topo.width(), topo.height(), NO_DEP ); //No cells are part of a depression
+  rd::Array2D<flowdir_t> flowdirs(topo.width(), topo.height(), NO_FLOW); //No cells flow anywhere
 
   //Label the ocean cells. This is a precondition for using
   //`GetDepressionHierarchy()`.
   #pragma omp parallel for
   for(unsigned int i=0;i<label.size();i++)
-    if(topo(i)==OCEAN_LEVEL)
+    if(topo(i)==OCEAN_LEVEL){ //Ocean Level is assumed to be lower than any other cells (even Death Valley)
       label(i) = OCEAN;
+      wtd  (i) = 0;
+    }
 
-  //Label all the depressions and get the hierarchy connecting them.
-
+  //Generate flow directions, label all the depressions, and get the hierarchy
+  //connecting them
   auto deps = GetDepressionHierarchy<float,Topology::D8>(topo, label, flowdirs);
 
- for(auto &depression: deps){
+  for(auto &depression: deps){
     std::cout<<" we are on depression "<<depression.dep_label<<std::endl;
     std::cout<<"all the pit cells are "<<depression.pit_cell<<std::endl;
- }
+  }
 
 
 
@@ -762,32 +795,21 @@ int main(int argc, char **argv){
     fgraph<<"}\n";
   }
 
-  SaveAsNetCDF(topo,out_name+"-topo.nc","value");
-  SaveAsNetCDF(label,out_name+"-labels_raw.nc","value");
-
-  // LastLayer(label, topo, deps);
-
+  SaveAsNetCDF(topo, out_name+"-topo.nc",       "value");
+  SaveAsNetCDF(label,out_name+"-labels_raw.nc", "value");
   SaveAsNetCDF(label,out_name+"-labels_proc.nc","value");
 
 
 
-  //Set all ocean cells to 0 wtd
-  for(unsigned int i=0;i<wtd.size();i++){
-    wtd(i)=1;
-    if(topo(i)<=OCEAN_LEVEL)
-      wtd(i)=0;
-  }
-
-  //for(auto &depression: deps){
-//std::cout<<depression.lchild<<"label "<<depression.dep_label<<std::endl;
-//}
 
   SurfaceWater(topo, wtd, label,deps,flowdirs);
 
   PrintDEM("labels", label);
   PrintDEM("wtd", wtd);
 
- 
+
+
+
 
   Overflow(OCEAN, deps);
 
@@ -797,9 +819,7 @@ int main(int argc, char **argv){
     std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
   std::cerr<<std::endl;
 
-
   PrintDEM("wtd", wtd, 9);
-
 
   for(auto &depression:deps){//(unsigned int d=0;d<deps.size();d++){
     std::cerr<<"Here's the list of all depressions with their parents and children: "
@@ -817,28 +837,24 @@ int main(int argc, char **argv){
   
 
   std::cerr<<"\n\n\033[91m#######################Finding Filled\033[39m"<<std::endl;
+
+
+
+
+
   Find_filled(OCEAN,deps,topo,label,wtd);                              //This should check everything that is an immediate child of the ocean, so we're supposed to hit all the depressions like this. 
-
-
-
- // Fill_Water(deps,topo,label,wtd);
        
   SaveAsNetCDF(wtd,out_name+"-wtd.nc","value");
 
 
-  std::cout<<"LIne "<<__LINE__<<std::endl;
-
- // std::ofstream fout("/z/out.dat");
-
- // fout.write(reinterpret_cast<const char*>(wtd.data), wtd.size()*sizeof(float));
+  std::cerr<<"Finished"<<std::endl;
 
   if(topo.width()<1000){
-    PrintDEM("topo", topo, 9);
-    PrintDEM("Flowdirs", flowdirs, 9);
-    PrintDEM("wtd", wtd, 9);
+    PrintDEM("topo",     topo    );
+    PrintDEM("Flowdirs", flowdirs);
+    PrintDEM("wtd",      wtd     );
+    PrintDEM("labels",   label   );
   }
 
   return 0;
 }
-
-

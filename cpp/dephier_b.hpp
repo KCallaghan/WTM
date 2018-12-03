@@ -166,18 +166,18 @@ class Depression {
   std::vector<int> ocean_linked;
   //the label of the depression, for calling it up again
   label_t dep_label = 0;
-  //Number of cells contained within the depression
+  //Number of cells contained within the depression and its children
   uint32_t cell_count = 0;
   //Total of elevations within the depression, used in the WLE. Because I think I need to start adding up total elevations before I know the outlet of the depression. 
   //double dep_sum_elevations = 0;
-  //Volume of the depression. Used in the Water Level Equation (see below).
+  //Volume of the depression and its children. Used in the Water Level Equation (see below).
   double   dep_vol    = 0;
   //Water currently contained within the depression. Used in the Water Level
   //Equation (see below).
   double   water_vol  = 0;
 
+  //Total elevation of cells contained with the depression and its children
   double total_elevation = 0;
-
 };
 
 
@@ -791,17 +791,22 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
     depressions[clabel].total_elevation += dem(i);
   }
 
-  //Calculate marginal depression volume
-  // for(auto &dep: depressions)
-    // dep.dep_vol = dep.cell_count*dep.out_elev-dep.total_elevation;
-
-  //Calculate total depression volume
+  //Calculate total depression volumes and cell counts
   for(auto &dep: depressions){
+    //Use marginal values to calculate updated depression volume
     dep.dep_vol = dep.cell_count*dep.out_elev-dep.total_elevation;
-    if(dep.lchild!=NO_VALUE)
-      dep.dep_vol += depressions.at(dep.lchild).dep_vol;
-    if(dep.rchild!=NO_VALUE)
-      dep.dep_vol += depressions.at(dep.rchild).dep_vol;
+    if(dep.lchild!=NO_VALUE){
+      dep.dep_vol         += depressions.at(dep.lchild).dep_vol;
+      dep.cell_count      += depressions.at(dep.lchild).cell_count;
+      dep.total_elevation += depressions.at(dep.lchild).total_elevation;
+    }
+    if(dep.rchild!=NO_VALUE){
+      dep.dep_vol         += depressions.at(dep.rchild).dep_vol;
+      dep.cell_count      += depressions.at(dep.rchild).cell_count;
+      dep.total_elevation += depressions.at(dep.rchild).total_elevation;
+    }
+    //TODO: Or use total values here to calculate total depression volume? Which
+    //one is more numerically accurate?
   }
 
   return depressions;
