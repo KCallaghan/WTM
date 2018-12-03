@@ -83,7 +83,7 @@ void SurfaceWater(
     const int ny = y+dy[n];
     if(!topo.inGrid(nx,ny))
       continue;    
-    if(flowdirs(nx,ny)==(int)topo.xyToI(x,y))              //Does my neighbour flow into me?
+    if(flowdirs(nx,ny)==dinverse[n])  //CHECK WITH RICHARD           //(int)topo.xyToI(x,y))              //Does my neighbour flow into me?
       dependencies(x,y)++;                                 //Increment my dependencies
   }
 
