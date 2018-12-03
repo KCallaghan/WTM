@@ -392,7 +392,8 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
     bool has_lower     = false;    //Pretend we have no lower neighbours
     for(int n=0;n<neighbours;n++){ //Check out our neighbours
       //Use offset to get neighbour x coordinate, wrapping as needed
-      const int nx = ModFloor(x+dx[n],dem.width()); 
+      // const int nx = ModFloor(x+dx[n],dem.width()); 
+      const int nx = x+dx[n];
       //Use offset to get neighbour y coordinate
       const int ny = y+dy[n];      
       if(!dem.inGrid(nx,ny))  //Is cell outside grid (too far North/South)?
@@ -496,7 +497,8 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 
     //Consider the cell's neighbours
     for(int n=0;n<neighbours;n++){
-      const int nx = ModFloor(c.x+dx[n],dem.width()); //Get neighbour's x-coordinate using an offset and wrapping
+      // const int nx = ModFloor(c.x+dx[n],dem.width()); //Get neighbour's x-coordinate using an offset and wrapping
+      const int nx = c.x + dx[n];                     //Get neighbour's y-coordinate using an offset
       const int ny = c.y + dy[n];                     //Get neighbour's y-coordinate using an offset
       if(!dem.inGrid(nx,ny))                          //Is this cell in the grid?
         continue;                                     //Nope: out of bounds.
