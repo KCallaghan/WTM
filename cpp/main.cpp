@@ -775,12 +775,7 @@ int main(int argc, char **argv){
   PrintDEM("labels", label);
   PrintDEM("wtd", wtd);
 
-  for(int y=0;y<topo.height();y++){                       //add all of the cells
-    for(int x=0;x<topo.width();x++){
-      std::cout<<"x "<<x<<" y "<<y<<" flow "<<int(flowdirs(x,y))<<std::endl;
-    }
-  }
-
+ 
 
   Overflow(OCEAN, deps);
 
