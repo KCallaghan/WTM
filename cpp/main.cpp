@@ -472,9 +472,13 @@ void Fill_Water(
         //abutts an ocean. The side of the flat near the ocean will see the
         //ocean and try to add it. The ocean would then be called instead of
         //more cells within the depression. Therefore, we do not add ocean
-        //cells.
+        //cells. 
+        //We must use the ocean level rather than the ocean label, or we will
+        //mistakenly miss adding higher cells which belong to the ocean's depression
+        //e.g. an escarpment before the ocean. 
+
         if(!visited(nx,ny) && topo(nx,ny)>OCEAN_LEVEL){                  // add the neighbour only if it hasn't been added before 
-          std::cout<<"\tadding to the queue a value of "<<topo(nx,ny)<<" "<<" nx "<<nx<<" ny "<<ny<<" x "<<c.x<<" y "<<c.y<<std::endl;
+          std::cerr<<"\tadding to the queue a value of "<<topo(nx,ny)<<" "<<" nx "<<nx<<" ny "<<ny<<" x "<<c.x<<" y "<<c.y<<std::endl;
           flood_q.emplace(nx,ny,topo(nx,ny));      //add all neighbours that haven't been added before to the queue. 
           visited(nx,ny) = true;
         }
