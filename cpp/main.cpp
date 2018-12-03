@@ -699,7 +699,7 @@ int main(int argc, char **argv){
 
   rd::Array2D<float> topo = LoadData<float>(in_name,std::string("value"));   //Recharge (Percipitation minus Evapotranspiration)
 
-  richdem::ResolveFlatsEpsilon(topo);
+  // richdem::ResolveFlatsEpsilon(topo); //TODO: Shouldn't need this.
 
   rd::Array2D<float> wtd (topo.width(),topo.height(),1);
 
