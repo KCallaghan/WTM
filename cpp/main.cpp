@@ -27,7 +27,7 @@ const double *const dr       = dr8;
 const int neighbours         = 8;
 
 
-const float  OCEAN_LEVEL = -9;
+const float  OCEAN_LEVEL = -9999;  //ocean_level in the topo file must be lower than any non-ocean cell. 
 
 
 rd::Array2D<flowdir_t> flowdirs; //TODO: Make non-global
