@@ -301,6 +301,8 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
   rd::Array2D<int>          &label,
   rd::Array2D<int8_t>       &flowdirs
 ){
+  std::cerr<<"\033[91m##########Getting depression hierarchy\033[39m"<<std::endl;
+
   //A D4 or D8 topology can be used.
   const int    *dx;
   const int    *dy;
