@@ -285,6 +285,16 @@ const label_t OCEAN  = 0;
 //model and a set of labels. The labels should have `OCEAN` for cells
 //representing the "ocean" (the place to which depressions drain) and `NO_DEP`
 //for all other cells.
+//
+//@param  dem   - 2D array of elevations. May be in any data format.
+//
+//@return label - A label indiciate which depression the cell belongs to.
+//                The indicated label is always the leaf of the depression
+//                hierarchy, or the OCEAN.
+//
+//        flowdirs - A value [0,7] indicated which direction water from the cell
+//                   flows in order to go "downhill". All cells have a flow
+//                   direction (even flats) except for pit cells.
 template<class elev_t, Topology topo>                                                     
 std::vector<Depression<elev_t> > GetDepressionHierarchy(
   const rd::Array2D<elev_t> &dem,
