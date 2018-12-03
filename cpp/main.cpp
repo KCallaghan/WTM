@@ -714,7 +714,7 @@ int main(int argc, char **argv){
   //`GetDepressionHierarchy()`.
   #pragma omp parallel for
   for(unsigned int i=0;i<label.size();i++)
-    if(topo(i)==-9)
+    if(topo(i)==OCEAN_LEVEL)
       label(i) = OCEAN;
 
   //Label all the depressions and get the hierarchy connecting them.
