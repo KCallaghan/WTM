@@ -742,8 +742,8 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       depb.out_cell = outlet.out_cell; //Make a note that this is B's outlet
       depa.out_elev = outlet.out_elev; //Make a note that this is A's outlet's elevation
       depb.out_elev = outlet.out_elev; //Make a note that this is B's outlet's elevation
-      depa.odep     = depa_set;        //Make a note that A overflows into B                                                They are both overflowing into each other? Surely only true in one direction. 
-      depb.odep     = depb_set;        //Make a note that B overflows into A
+      depa.odep     = depb_set;        //Make a note that A overflows into B                                                They are both overflowing into each other? Surely only true in one direction. 
+      depb.odep     = depa_set;        //Make a note that B overflows into A
 
       //TODO: Calculate final cell counts and true dep_vols for each depression                                             Surely each depression already has its own final cell count and volume, and since we now have a NEW metadepression, we only need to store that info for the new one?
    
