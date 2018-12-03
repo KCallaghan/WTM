@@ -648,6 +648,7 @@ SubtreeDepressionInfo Find_filled(
   combined.my_labels.merge(right_info.my_labels);
 
   //Add together marginal water volumes to produce a total water volume for the metadepression
+  std::cerr<<"This water vol="<<this_dep.water_vol<<", LWV="<<left_info.water_vol<<", RWV="<<right_info.water_vol<<std::endl;
   combined.water_vol = this_dep.water_vol+left_info.water_vol+right_info.water_vol;
 
   combined.leaf_label = left_info.leaf_label;  //Choose left because right is not guaranteed to exist
@@ -751,6 +752,8 @@ int main(int argc, char **argv){
 
   rd::Array2D<float> topo = LoadData<float>(in_name,std::string("value"));   //Recharge (Percipitation minus Evapotranspiration)
 
+  PrintDEM("Topography", topo);
+
   rd::Array2D<float>     wtd     (topo.width(), topo.height(), 1      ); //All cells have some water
   rd::Array2D<label_t>   label   (topo.width(), topo.height(), NO_DEP ); //No cells are part of a depression
   rd::Array2D<flowdir_t> flowdirs(topo.width(), topo.height(), NO_FLOW); //No cells flow anywhere
@@ -767,6 +770,14 @@ int main(int argc, char **argv){
   //Generate flow directions, label all the depressions, and get the hierarchy
   //connecting them
   auto deps = GetDepressionHierarchy<float,Topology::D8>(topo, label, flowdirs);
+
+  PrintDEM("labels", label);
+
+  std::cerr<<"\033[91m######################Depression Info\033[39m"<<std::endl;
+  std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
+  for(unsigned int d=0;d<deps.size();d++)
+    std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
+  std::cerr<<std::endl;
 
   //TODO: Remove. For viewing test cases.
   if(label.width()<1000){
@@ -797,7 +808,7 @@ int main(int argc, char **argv){
 
   SurfaceWater(topo, wtd, label,deps,flowdirs);
 
-  PrintDEM("labels", label);
+
   PrintDEM("wtd", wtd);
 
 
