@@ -423,6 +423,7 @@ void Fill_Water(
       //At this point we know that the surface of the water should be at or below the elevation of the cell
       const double water_level = (stdi.water_vol+total_elevation)/cells_affected.size();
 
+      //TODO: Use floating-point comparisons in these asserts.
       //Water level must be higher than (or equal to) the previous cell we looked at, but lower than (or equal to) the current cell
       assert(cells_affected.size()==0 || topo(cells_affected.back())<=water_level);
       assert(water_level<=topo(c.x,c.y));
