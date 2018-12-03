@@ -151,7 +151,7 @@ void SurfaceWater(
     if (n == NO_FLOW){    //if this is a pit cell, move the water to the appropriate depression's water_vol.    
       if(wtd(c)>0){
         deps[label(c)].water_vol += wtd(c);
-        std::cout<<"Giving water to "<<label(c)<<" "<<c<<" "<<deps[label(c)].water_vol<<std::endl;
+        // std::cout<<"Giving water to "<<label(c)<<" "<<c<<" "<<deps[label(c)].water_vol<<std::endl;
    //   std::cout<<"the total water in this depression is "<<deps[label(c)].water_vol<<" and it is depression "<<label(c)<<std::endl;
         wtd(c) = 0; //Clean up as we go
       }
@@ -226,7 +226,7 @@ void Overflow(
   if(current_depression==OCEAN)
     return;
 
-  std::cout<<"depression number "<<this_dep.dep_label<<" volume "<<this_dep.dep_vol<<" water "<<this_dep.water_vol<<std::endl;
+  // std::cout<<"depression number "<<this_dep.dep_label<<" volume "<<this_dep.dep_vol<<" water "<<this_dep.water_vol<<std::endl;
 
   //Each depression has an associated dep_vol. This is the TOTAL volume of the
   //meta-depression including all of its children. This property answers the
@@ -286,10 +286,10 @@ void Overflow(
     //this extra water to this depression's (and therefore it's overflow
     //depression's) parent.
     deps.at(this_dep.parent).water_vol += extra_water;
-    std::cout<<"parent number "<<deps.at(this_dep.parent).dep_label<<" now has water volume "<<deps.at(this_dep.parent).water_vol<<std::endl;
+    // std::cout<<"parent number "<<deps.at(this_dep.parent).dep_label<<" now has water volume "<<deps.at(this_dep.parent).water_vol<<std::endl;
   }
 
-  std::cout<<"and after: depression number "<<this_dep.dep_label<<" volume "<<this_dep.dep_vol<<" water "<<this_dep.water_vol<<std::endl;
+  // std::cout<<"and after: depression number "<<this_dep.dep_label<<" volume "<<this_dep.dep_vol<<" water "<<this_dep.water_vol<<std::endl;
 
   //All overflowing depressions should by now have overflowed all the way down
   //to the ocean. We must now spread the water in the depressions out by setting
@@ -767,13 +767,6 @@ int main(int argc, char **argv){
   //Generate flow directions, label all the depressions, and get the hierarchy
   //connecting them
   auto deps = GetDepressionHierarchy<float,Topology::D8>(topo, label, flowdirs);
-
-  for(auto &depression: deps){
-    std::cout<<" we are on depression "<<depression.dep_label<<std::endl;
-    std::cout<<"all the pit cells are "<<depression.pit_cell<<std::endl;
-  }
-
-
 
   //TODO: Remove. For viewing test cases.
   if(label.width()<1000){

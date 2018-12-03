@@ -471,7 +471,6 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       //depressions as flat cells will relabel their neighbours and the first                                                 
       //cell found in a flat determines the label for the entirety of that flat.
       clabel          = depressions.size();         //In a 0-based indexing system, size is equal to the id of the next flat
-      std::cout<<"and giving it label "<<clabel<<std::endl;
       auto &newdep    = depressions.emplace_back(); //Add the next flat (increases size by 1)
       newdep.pit_cell = dem.xyToI(c.x,c.y);         //Make a note of the pit cell's location
       newdep.pit_elev = celev;                      //Make a note of the pit cell's elevation
