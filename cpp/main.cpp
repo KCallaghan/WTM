@@ -54,7 +54,7 @@ void PrintDEM(const std::string title, const rd::Array2D<flowdir_t> &arr, const 
 
 //TODO
 // template<class T>
-// void mWvol(const int dep, std::vector<Depression<elev_t> > &deps){
+// void mWvol(const int dep, DepressionHierarchy<elev_t> &deps){
 // 
 // }
 
@@ -62,11 +62,11 @@ void PrintDEM(const std::string title, const rd::Array2D<flowdir_t> &arr, const 
 //Richard: Checked this
 template<class elev_t>
 void SurfaceWater(
-  const rd::Array2D<elev_t>        &topo,
-  rd::Array2D<float>               &wtd,
-  const rd::Array2D<int>           &label,
-  std::vector<Depression<elev_t> > &deps,
-  const rd::Array2D<flowdir_t>     &flowdirs
+  const rd::Array2D<elev_t>    &topo,
+  rd::Array2D<float>           &wtd,
+  const rd::Array2D<int>       &label,
+  DepressionHierarchy<elev_t>  &deps,
+  const rd::Array2D<flowdir_t> &flowdirs
 ){
   //Our first step is to move all of the water downstream into pit cells. To do
   //so, we use the steepest-descent flow directions provided by the depression
@@ -195,13 +195,21 @@ void SurfaceWater(
   //to determine the appropriate depression.
 
 
+// template<class elev_t>
+// void OverflowInto(
+
+//   const label_t stop_point,
+//   std::vector
+// ){
+
+// }
 
 
 //Richard: Checked this
 template<class elev_t>
 void Overflow(
   int current_depression,
-  std::vector<Depression<elev_t> > &deps
+  DepressionHierarchy<elev_t> &deps
 ){
   if(current_depression==NO_VALUE)
     return;
@@ -331,11 +339,11 @@ void Fill_Water(
   //Identifies a meta-depression through which water should be spread, leaf node
   //from which the water should be spread, valid depressions across which water
   //can spread, and the amount of water to spread
-  SubtreeDepressionInfo                  &stdi,  
-  const std::vector<Depression<elev_t> > &deps,  //Depression hierarchy
-  const rd::Array2D<float>               &topo,  //Topographic data for calculating marginal volumes as we attempt to spread water
-  const rd::Array2D<label_t>             &label, //2D array in which each cell is labeled with the leaf depression it belongs to
-  rd::Array2D<float>                     &wtd    //Water table depth: we transfer water into this
+  SubtreeDepressionInfo             &stdi,  
+  const DepressionHierarchy<elev_t> &deps,  //Depression hierarchy
+  const rd::Array2D<float>          &topo,  //Topographic data for calculating marginal volumes as we attempt to spread water
+  const rd::Array2D<label_t>        &label, //2D array in which each cell is labeled with the leaf depression it belongs to
+  rd::Array2D<float>                &wtd    //Water table depth: we transfer water into this
 ){
   //Nothing to do if we have no water
   if(stdi.water_vol==0)
@@ -608,12 +616,12 @@ void Fill_Water(
 
 template<class elev_t>
 SubtreeDepressionInfo Find_filled(
-  const int                               current_depression,    //Depression we are currently in
-  const std::vector<Depression<elev_t> > &deps,                  //Depression hierarchy
-  const rd::Array2D<float>               &topo,                  //Topographic data (used for determinining volumes as we're spreading stuff)
-  const rd::Array2D<label_t>             &label,                 //Array indicating which leaf depressions each cell belongs to
-  rd::Array2D<float>                     &wtd,                   //Water table depth
-  std::string level =""                                          //TODO: For debugging
+  const int                          current_depression,    //Depression we are currently in
+  const DepressionHierarchy<elev_t> &deps,                  //Depression hierarchy
+  const rd::Array2D<float>          &topo,                  //Topographic data (used for determinining volumes as we're spreading stuff)
+  const rd::Array2D<label_t>        &label,                 //Array indicating which leaf depressions each cell belongs to
+  rd::Array2D<float>                &wtd,                   //Water table depth
+  std::string level =""                                     //TODO: For debugging
 ){
   //Stop when we reach one level below the leaves
   if(current_depression==NO_VALUE)

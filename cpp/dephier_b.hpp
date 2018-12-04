@@ -286,6 +286,9 @@ const label_t OCEAN  = 0;
 
 
 
+template<typename elev_t>
+using DepressionHierarchy = std::vector<Depression<elev_t>>;
+
 //Calculate the hierarchy of depressions. Takes as input a digital elevation
 //model and a set of labels. The labels should have `OCEAN` for cells
 //representing the "ocean" (the place to which depressions drain) and `NO_DEP`
@@ -301,7 +304,7 @@ const label_t OCEAN  = 0;
 //                   flows in order to go "downhill". All cells have a flow
 //                   direction (even flats) except for pit cells.
 template<class elev_t, Topology topo>                                                     
-std::vector<Depression<elev_t> > GetDepressionHierarchy(
+DepressionHierarchy<elev_t> GetDepressionHierarchy(
   const rd::Array2D<elev_t> &dem,
   rd::Array2D<int>          &label,
   rd::Array2D<int8_t>       &flowdirs
@@ -337,7 +340,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 
   //Depressions are identified by a number [0,*). The ocean is always
   //"depression" 0. This vector holds the depressions.
-  std::vector<Depression<elev_t> > depressions;
+  DepressionHierarchy<elev_t> depressions;
 
   //This keeps track of the outlets we find. Each pair of depressions can only
   //be linked once and the first link found between them is the one which is
@@ -817,7 +820,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 //Utility function for doing various relabelings based on the depression
 //hierarchy.
 template<class elev_t>
-void LastLayer(rd::Array2D<label_t> &label, const rd::Array2D<float> &dem, const std::vector<Depression<elev_t>> &depressions){
+void LastLayer(rd::Array2D<label_t> &label, const rd::Array2D<float> &dem, const DepressionHierarchy<elev_t> &depressions){
   #pragma omp parallel for collapse(2)
   for(int y=0;y<label.height();y++)
   for(int x=0;x<label.width();x++){
