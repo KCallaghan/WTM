@@ -163,7 +163,7 @@ class Depression {
   //Indicates depressions which link to the ocean through this depression, but
   //are not subdepressions. That is, these ocean-linked depressions may be at
   //the top of high cliffs and spilling into this depression.
-  std::vector<int> ocean_linked;
+  std::vector<label_t> ocean_linked;
   //the label of the depression, for calling it up again
   label_t dep_label = 0;
   //Number of cells contained within the depression and its children
