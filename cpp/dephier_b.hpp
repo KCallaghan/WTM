@@ -660,11 +660,6 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 
   //Visit outlets in order of elevation from lowest to highest. If two outlets
   //are at the same elevation, choose one arbitrarily.
-
-//auto complete = 0;
-  //while(complete == 0){
-    //complete = 1;
-
   for(auto &outlet: outlets){
     auto depa_set = djset.findSet(outlet.depa); //Find the ultimate parent of Depression A
     auto depb_set = djset.findSet(outlet.depb); //Find the ultimate parent of Depression B
@@ -704,7 +699,6 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
 
       //Get a reference to Depression A MetaLabel.
       auto &dep = depressions.at(depa_set);
-      // auto &dep1 = depressions.at(depb_set); //TODO
 
       //TODO: Calculate a final cell count and "volume" for the depression                                                -->Each outlet has recorded the cell count and volume for its two depressions. So what would we want here? The totals for metadepressions? 
       //                                                                                                                  //I have recorded the new totals in depression A but not sure if this is right. 
@@ -756,8 +750,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       newdep.rchild = depb_set; 
       newdep.dep_label = newlabel;
       newdep.pit_cell = depa_pitcell_temp;
-      
-    //  
+
       djset.mergeAintoB(depa_set, newlabel); //A has a parent now
       djset.mergeAintoB(depb_set, newlabel); //B has a parent now
    //   newdep.cell_count = outlet.depa_cells + outlet.depb_cells;                                        //getting the cell count and volume for the new metadepression. 
