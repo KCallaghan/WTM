@@ -144,9 +144,14 @@ class Depression {
   //Parent depression. If both this depression and its neighbour fill up, this
   //parent depression is the one which will contain the overflow.
   label_t parent   = NO_PARENT;
-  //Outlet depression. The depression into which this one overflows. Usually its
-  //neighbour depression, but sometimes the ocean.
+  //Outlet depression. The metadepression into which this one overflows. Usually
+  //its neighbour depression, but sometimes the ocean.
   label_t odep     = NO_VALUE;
+  //When a metadepression overflows it does so into the metadepression indicated
+  //by `odep`. However, odep must flood from the bottom up. Therefore, we keep
+  //track of the `geolink`, which indicates what leaf depression the overflow is
+  //initially routed into.
+  label_t geolink  = NO_VALUE;
   //Elevation of the pit cell. Since the pit cell has the lowest elevation of
   //any cell in the depression, we initialize this to infinity.
   elev_t  pit_elev = std::numeric_limits<elev_t>::infinity();
@@ -718,6 +723,7 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       dep.out_cell     = outlet.out_cell;    //Set Depression A MetaLabel outlet cell index
       dep.odep         = outlet.depb;        //Depression A MetaLabel overflows into Depression B
       dep.ocean_parent = true;
+      dep.geolink      = outlet.depb;        //Metadepression(A) overflows, geographically, into Depression B
       depressions.at(outlet.depb).ocean_linked.emplace_back(depa_set);
       std::cout<<"dep a set "<<depa_set<<std::endl;
       djset.mergeAintoB(depa_set,OCEAN); //Make a note that Depression A MetaLabel has a path to the ocean
@@ -737,6 +743,8 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       depb.out_elev = outlet.out_elev; //Make a note that this is B's outlet's elevation
       depa.odep     = depb_set;        //Make a note that A overflows into B                                                They are both overflowing into each other? Surely only true in one direction. 
       depb.odep     = depa_set;        //Make a note that B overflows into A
+      depa.geolink  = outlet.depb;     //Meta(A) overflows, geographically, into B
+      depb.geolink  = outlet.depa;     //Meta(B) overflows, geographically, into A
 
       //TODO: Calculate final cell counts and true dep_vols for each depression                                             Surely each depression already has its own final cell count and volume, and since we now have a NEW metadepression, we only need to store that info for the new one?
    
