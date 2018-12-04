@@ -713,10 +713,10 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       assert(dep.out_cell==-1);
 
       //Point this depression to the ocean through Depression B Label
-      dep.parent       = outlet.depb;        //Set Depression A MetaLabel parent
-      dep.out_elev     = outlet.out_elev;    //Set Depression A MetaLabel outlet elevation                                     
-      dep.out_cell     = outlet.out_cell;    //Set Depression A MetaLabel outlet cell index
-      dep.odep         = outlet.depb;        //Depression A MetaLabel overflows into Depression B
+      dep.parent       = outlet.depb;        //Set Depression Meta(A) parent
+      dep.out_elev     = outlet.out_elev;    //Set Depression Meta(A) outlet elevation                                     
+      dep.out_cell     = outlet.out_cell;    //Set Depression Meta(A) outlet cell index
+      dep.odep         = outlet.depb;        //Depression Meta(A) overflows into Depression B
       dep.ocean_parent = true;
       depressions.at(outlet.depb).ocean_linked.emplace_back(depa_set);
       std::cout<<"dep a set "<<depa_set<<std::endl;
@@ -729,14 +729,14 @@ std::vector<Depression<elev_t> > GetDepressionHierarchy(
       const auto newlabel = depressions.size();       //Label of A and B's new parent depression
       // std::cerr<<"\tMerging "<<depa_set<<" and "<<depb_set<<" into "<<newlabel<<"!"<<std::endl;
       // std::cerr<<"\tNew parent = "<<newlabel<<std::endl;
-      depa.parent   = newlabel;        //Set Depression A's parent to be the new meta-depression
-      depb.parent   = newlabel;        //Set Depression B's parent to be the new meta-depression
-      depa.out_cell = outlet.out_cell; //Make a note that this is A's outlet
-      depb.out_cell = outlet.out_cell; //Make a note that this is B's outlet
-      depa.out_elev = outlet.out_elev; //Make a note that this is A's outlet's elevation
-      depb.out_elev = outlet.out_elev; //Make a note that this is B's outlet's elevation
-      depa.odep     = depb_set;        //Make a note that A overflows into B                                                They are both overflowing into each other? Surely only true in one direction. 
-      depb.odep     = depa_set;        //Make a note that B overflows into A
+      depa.parent   = newlabel;        //Set Meta(A)'s parent to be the new meta-depression
+      depb.parent   = newlabel;        //Set Meta(B)'s parent to be the new meta-depression
+      depa.out_cell = outlet.out_cell; //Note that this is Meta(A)'s outlet
+      depb.out_cell = outlet.out_cell; //Note that this is Meta(B)'s outlet
+      depa.out_elev = outlet.out_elev; //Note that this is Meta(A)'s outlet's elevation
+      depb.out_elev = outlet.out_elev; //Note that this is Meta(B)'s outlet's elevation
+      depa.odep     = depb_set;        //Note that Meta(A) overflows, logically, into Meta(B)
+      depb.odep     = depa_set;        //Note that Meta(B) overflows, logically, into Meta(A)
 
       //TODO: Calculate final cell counts and true dep_vols for each depression                                             Surely each depression already has its own final cell count and volume, and since we now have a NEW metadepression, we only need to store that info for the new one?
    
