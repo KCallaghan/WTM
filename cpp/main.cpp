@@ -14,6 +14,7 @@
 #include <richdem/common/Array2D.hpp>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
@@ -195,14 +196,93 @@ void SurfaceWater(
   //to determine the appropriate depression.
 
 
-// template<class elev_t>
-// void OverflowInto(
+//When water overflows from one depression into another, this function ensures
+//that chained overflows and infiltration take place.
+//
+//A depression has three places it can put the water it's received.
+//The depression will try to stash water in these three places sequentially.
+//  1. It can store the water in itself
+//  2. It can overflow into its neighbouring depression (by following a geolink to that depression's leaf)
+//  3. It can overflow into its parent
+//
+//Options (2) and (3) result in a recursive call. If there's enough water,
+//eventually repeated calls to (3) will bring the function to the parent of the
+//depression that originally called it (through its neighbour). At this point we
+//stash the water in the parent and exit.
+//
+//Since we might end up calling the function again and again if there's a
+//complex series of overflows, the `jump_table` argument holds the location of
+//where the water ultimately ended up. Everything between the original node and
+//this destination is then full which means that we only traverse each part of a
+//filled hierarchy once.
+//
+//Note that since we only call this function on the leaf nodes of depressions
+//the jump_table only needs to use leaves as its keys.
+//
+//@return The depression where the water ultimately ended up
+template<class elev_t>
+label_t OverflowInto(
+  const label_t                         root,
+  const label_t                         stop_node,
+  DepressionHierarchy<elev_t>          &deps,
+  std::unordered_map<label_t, label_t> &jump_table,  //Shortcut from one depression to its next known empty neighbour
+  double                                extra_water
+){
+  auto &this_dep = deps.at(root);
 
-//   const label_t stop_point,
-//   std::vector
-// ){
+  //TODO: Could simulate water running down flowpath into depression so that wtd
+  //fills up more realistically
 
-// }
+  if(root==OCEAN)                        //We've reached the ocean
+    return OCEAN;                        //Time to stop: there's nowhere higher in the depression hierarchy
+
+  //FIRST PLACE TO STASH WATER: IN THIS DEPRESSION
+
+  //We've gone around in a loop and found the original node's parent. That means
+  //it's time to stop.
+  if(root==stop_node){                   //We've made a loop, so everything is full
+    if(this_dep.parent==OCEAN)           //If our parent is the ocean
+      return OCEAN;                      //Then the extra water just goes away
+    else                                 //Otherwise
+      this_dep.water_vol += extra_water; //This node, the original node's parent, gets the extra water
+    return stop_node;
+  }
+
+  assert(this_dep.water_vol<=this_dep.dep_vol);
+  if(this_dep.water_vol<this_dep.dep_vol){                                              //Can this depression hold any water?
+    const double capacity = this_dep.dep_vol - this_dep.water_vol;                      //Yes. How much can it hold?
+    if(extra_water<capacity){                                                           //Is it enough to hold all the extra water?
+      this_dep.water_vol  = std::min(this_dep.water_vol+extra_water,this_dep.dep_vol);  //Yup. But let's be careful about floating-point stuff
+      extra_water         = 0;                                                          //No more extra water
+    } else {                                                                            //It wasn't enough to hold all the water
+      this_dep.water_vol = this_dep.dep_vol;                                            //So we fill it all the way.
+      extra_water       -= capacity;                                                    //And have that much less extra water to worry about
+    }
+  }
+
+  if(extra_water==0)                                                                    //If there's no more extra water
+    return root;                                                                        //Call it quits
+
+  //Okay, so there's extra water and we can't fit it into this depression
+
+  //SECOND PLACE TO STASH WATER: IN THIS DEPRESSION'S NEIGHBOUR
+  //Maybe we can fit it into this depression's overflow depression!
+
+  if(this_dep.odep==NO_VALUE)      //Does the depression even have such a neighbour? 
+    return jump_table[root] = OverflowInto(this_dep.parent, stop_node, deps, jump_table, extra_water);  //Nope. Pass the water to the parent
+
+  //Can overflow depression hold more water?
+  const auto &odep = deps.at(this_dep.odep);
+  if(odep.water_vol<odep.dep_vol)  //Yes. Move the water geographically into that depression's leaf.
+    return jump_table[root] = OverflowInto(this_dep.geolink, stop_node, deps, jump_table, extra_water);
+
+  //Okay, so the extra water didn't fit into this depression or its overflow
+  //depression. That means we pass it to this depression's parent.
+
+  //THIRD PLACE TO STASH WATER: IN THIS DEPRESSION'S PARENT
+  return jump_table[root] = OverflowInto(this_dep.parent, stop_node, deps, jump_table, extra_water);
+}
+
 
 
 //Richard: Checked this
