@@ -326,12 +326,12 @@ class SubtreeDepressionInfo {
  public:
   //One of the depressions at the bottom of the meta-depression. We use this to
   //identify a pit cell from which to start flooding.
-  int   leaf_label = -1;          
+  int   leaf_label = NO_VALUE;          
   //The metadepression containing all of the children. This metadepression is
   //guaranteed to be large enough to hold all of the water of its children plus
   //whatever exists only in the metadepression itself. We use this to determine
   //the water and depression volumes.
-  int   top_label = -1;
+  int   top_label = NO_VALUE;
   //Here we keep track of which depressions are contained within the
   //metadepression. This allows us to limit the spreading function to cells
   //within the metadepression.
@@ -450,9 +450,9 @@ void Fill_Water(
     //their cells are allowed to have wtd>0. Thus, we raise a warning if we are
     //looking at a cell in this unfilled depression with wtd>0.
     if(stdi.my_labels.count(label(c.x,c.y))==1 && wtd(c.x,c.y)>0){
-      PrintDEM("Flowdirs", flowdirs, 9);
-      PrintDEM("wtd", wtd, 9);
-      PrintDEM("Labels", label, 9);
+ //     PrintDEM("Flowdirs", flowdirs, 9);
+ //     PrintDEM("wtd", wtd, 9);
+ //     PrintDEM("Labels", label, 9);
       throw std::runtime_error("A cell was discovered in an unfilled depression with wtd>0!");
     }
 
@@ -610,8 +610,8 @@ void Fill_Water(
   std::cerr<<"\tCurrent volume           = "<<current_volume       <<std::endl;
   std::cerr<<"\tTotal elevation          = "<<total_elevation      <<std::endl;
   std::cerr<<"\tNumber of cells affected = "<<cells_affected.size()<<std::endl;  
-  PrintDEM("Visited", visited);
-  PrintDEM("Labels",  label  );
+//  PrintDEM("Visited", visited);
+ // PrintDEM("Labels",  label  );
   throw std::runtime_error("PQ loop exited without filling a depression!");
 
 }
