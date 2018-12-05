@@ -34,22 +34,42 @@ rd::Array2D<flowdir_t> flowdirs; //TODO: Make non-global
 
 template<class T>
 void PrintDEM(const std::string title, const rd::Array2D<T> &arr, const int width=2){
-  std::cout<<"\n"<<title<<std::endl;
+  std::cerr<<"\n"<<title<<std::endl;
+  std::cerr<<std::setw(2)<<" "<<"    ";
+  for(int x=0;x<arr.width();x++)
+    std::cerr<<std::setw(width)<<x<<" ";
+  std::cerr<<"\n"<<std::endl;
   for(int y=0;y<arr.height();y++){
+    std::cerr<<std::setw(2)<<y<<"    ";
     for(int x=0;x<arr.width(); x++)
-      std::cout<<std::setw(width)<<arr(x,y)<<" ";
-    std::cout<<std::endl;
+      std::cerr<<std::setw(width)<<arr(x,y)<<" ";
+    std::cerr<<"     "<<std::setw(2)<<y<<std::endl;
   }
+  std::cerr<<"\n"<<std::setw(2)<<" "<<"    ";
+  for(int x=0;x<arr.width();x++)
+    std::cerr<<std::setw(width)<<x<<" ";
+  std::cerr<<"\n"<<std::endl;  
 }
+
+
 
 template<>
 void PrintDEM(const std::string title, const rd::Array2D<flowdir_t> &arr, const int width){
-  std::cout<<"\n"<<title<<std::endl;
+  std::cerr<<"\n"<<title<<std::endl;
+  std::cerr<<std::setw(2)<<" "<<"    ";
+  for(int x=0;x<arr.width();x++)
+    std::cerr<<std::setw(width)<<x<<" ";
+  std::cerr<<"\n"<<std::endl;
   for(int y=0;y<arr.height();y++){
+    std::cerr<<std::setw(2)<<y<<"    ";
     for(int x=0;x<arr.width(); x++)
-      std::cout<<std::setw(width)<<(int)arr(x,y)<<" ";
-    std::cout<<std::endl;
+      std::cerr<<std::setw(width)<<(int)arr(x,y)<<" ";
+    std::cerr<<"     "<<std::setw(2)<<y<<std::endl;
   }
+  std::cerr<<"\n"<<std::setw(2)<<" "<<"    ";
+  for(int x=0;x<arr.width();x++)
+    std::cerr<<std::setw(width)<<x<<" ";
+  std::cerr<<"\n"<<std::endl;  
 }
 
 
