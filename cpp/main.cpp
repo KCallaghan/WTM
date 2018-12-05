@@ -583,7 +583,7 @@ void Fill_Water(
       std::cout<<"water level = "<<water_level<<" last topo "<<topo(cells_affected.back())<<" "<<bool(topo(cells_affected.back())<=water_level)<<std::endl;
       assert(cells_affected.size()==0 || topo(cells_affected.back())<=water_level);
       std::cout<<"water level = "<<water_level<<" my topo "<<topo(c.x,c.y)<<std::endl;
-      assert(water_level<=topo(c.x,c.y));
+      assert(topo(c.x,c.y)-water_level>=-1e-3);
 
       std::cerr<<"Adjusting wtd of depression...\n";
       std::cerr<<"\twater_level = "<<water_level<<std::endl;
