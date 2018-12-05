@@ -26,7 +26,8 @@ const double *const dr       = dr8;
 const int neighbours         = 8;
 
 
-const float  OCEAN_LEVEL = -9999;  //ocean_level in the topo file must be lower than any non-ocean cell. 
+
+const float  OCEAN_LEVEL = 0;  //ocean_level in the topo file must be lower than any non-ocean cell. 
 
 
 rd::Array2D<flowdir_t> flowdirs; //TODO: Make non-global
@@ -681,7 +682,7 @@ void Fill_Water(
         //mistakenly miss adding higher cells which belong to the ocean's depression
         //e.g. an escarpment before the ocean. 
 
-        if(!visited(nx,ny) && topo(nx,ny)>OCEAN_LEVEL){                  // add the neighbour only if it hasn't been added before 
+        if(!visited(nx,ny) && (label(nx,ny)!=OCEAN || topo(nx,ny)>OCEAN_LEVEL)){                  // add the neighbour only if it hasn't been added before 
           // std::cerr<<"\tadding to the queue a value of "<<topo(nx,ny)<<" "<<" nx "<<nx<<" ny "<<ny<<" x "<<c.x<<" y "<<c.y<<std::endl;
           flood_q.emplace(nx,ny,topo(nx,ny));      //add all neighbours that haven't been added before to the queue. 
           visited(nx,ny) = true;
