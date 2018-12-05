@@ -10,6 +10,7 @@
 #include <iostream>
 #include <queue>
 #include <richdem/common/Array2D.hpp>
+#include <richdem/common/timer.hpp>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -837,11 +838,17 @@ int main(int argc, char **argv){
     return -1;
   }
 
+  rd::Timer timer_overall;
+  rd::Timer timer_io;
+  timer_overall.start();
+
   const std::string in_name   = argv[1];
   const std::string out_name  = argv[2];
   const std::string out_graph = argv[3];
 
+  timer_io.start();
   rd::Array2D<float> topo = LoadData<float>(in_name,std::string("value"));   //Recharge (Percipitation minus Evapotranspiration)
+  timer_io.stop();
 
   PrintDEM("Topography", topo);
 
@@ -927,11 +934,6 @@ int main(int argc, char **argv){
   
 
   std::cerr<<"\n\n\033[91m#######################Finding Filled\033[39m"<<std::endl;
-
-
-
-
-
   Find_filled(OCEAN,deps,topo,label,wtd);                              //This should check everything that is an immediate child of the ocean, so we're supposed to hit all the depressions like this. 
        
   SaveAsNetCDF(wtd,out_name+"-wtd.nc","value");
@@ -945,6 +947,9 @@ int main(int argc, char **argv){
     PrintDEM("wtd",      wtd     );
     PrintDEM("labels",   label   );
   }
+
+  std::cerr<<"Wall-time = "<<timer_overall.stop()  <<" s"<<std::endl;
+  std::cerr<<"IO time   = "<<timer_io.accumulated()<<" s"<<std::endl;
 
   return 0;
 }
