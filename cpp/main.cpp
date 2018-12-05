@@ -875,6 +875,13 @@ int main(int argc, char **argv){
   Overflow(OCEAN, deps, jump_table);
   jump_table = std::unordered_map<label_t, label_t>();
 
+  std::cerr<<"\033[91m######################Depression Info\033[39m"<<std::endl;
+  std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
+  for(unsigned int d=0;d<deps.size();d++)
+    std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
+  std::cerr<<std::endl;
+
+
   std::cerr<<"\n";
   std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
   for(unsigned int d=0;d<deps.size();d++)
