@@ -328,7 +328,6 @@ void Overflow(
   if(current_depression==OCEAN)
     return;
 
-  // std::cout<<"depression number "<<this_dep.dep_label<<" volume "<<this_dep.dep_vol<<" water "<<this_dep.water_vol<<std::endl;
 
   //Each depression has an associated dep_vol. This is the TOTAL volume of the
   //meta-depression including all of its children. This property answers the
