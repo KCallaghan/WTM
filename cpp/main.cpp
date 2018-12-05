@@ -26,6 +26,8 @@ const double *const dr       = dr8;
 const int neighbours         = 8;
 
 
+const double FP_ERROR = 1e-4;
+
 
 const float  OCEAN_LEVEL = 0;  //ocean_level in the topo file must be lower than any non-ocean cell. 
 
@@ -615,7 +617,7 @@ void Fill_Water(
       //TODO: Use floating-point comparisons in these asserts.
       //Water level must be higher than (or equal to) the previous cell we looked at, but lower than (or equal to) the current cell
       // std::cerr<<"water level = "<<water_level<<" last topo "<<topo(cells_affected.back())<<" "<<bool(topo(cells_affected.back())<=water_level)<<std::endl;
-      assert(cells_affected.size()==0 || topo(cells_affected.back())<=water_level+FP_ERROR);
+      assert(cells_affected.size()==0 || topo(cells_affected.back())<=water_level+FP_ERROR); 
       // std::cerr<<"water level = "<<water_level<<" my topo "<<topo(c.x,c.y)<<std::endl;
       assert(topo(c.x,c.y)-water_level>=-1e-3);
 
@@ -625,10 +627,12 @@ void Fill_Water(
         // std::cerr<<"Cell ("<<(c%topo.width())<<","<<(c/topo.width())<<") has elev="<<topo(c)<<", label="<<label(c)<<", wtd_old="<<wtd(c);
         assert(wtd(c)>=0);               //This should be true since we have been filling wtds as we go.
         if(water_level<topo(c)){
-          PrintCellsAffectedProfile(cells_affected,my_elev,topo);
-          assert(water_level>=topo(c));
+          // PrintCellsAffectedProfile(cells_affected,my_elev,topo);
+          assert(water_level>=topo(c)-FP_ERROR);
         }
         wtd(c) = water_level - topo(c);  //only change the wtd if it is an increase, here. We can't take water away from cells that already have it (ie reduce groundwater in saddle cells within a metadepression.)
+        if(-FP_ERROR<=wtd(c) && wtd(c)<0)
+          wtd(c) = 0;
         // std::cerr<<", wtd_new="<<wtd(c)<<std::endl;
         assert(wtd(c)>=0);
       }
