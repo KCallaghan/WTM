@@ -39,8 +39,12 @@ void PrintDEM(const std::string title, const rd::Array2D<T> &arr, const int widt
   std::cerr<<"\n"<<std::endl;
   for(int y=0;y<arr.height();y++){
     std::cerr<<std::setw(2)<<y<<"    ";
-    for(int x=0;x<arr.width(); x++)
-      std::cerr<<std::setw(width)<<arr(x,y)<<" ";
+    for(int x=0;x<arr.width(); x++){
+      if (std::is_same<T, flowdir_t>::value)
+        std::cerr<<std::setw(width)<<(int)arr(x,y)<<" ";
+      else
+        std::cerr<<std::setw(width)<<arr(x,y)<<" ";
+    }
     std::cerr<<"     "<<std::setw(2)<<y<<std::endl;
   }
   std::cerr<<"\n"<<std::setw(2)<<" "<<"    ";
@@ -58,27 +62,6 @@ void PrintDepressionInfo(const DepressionHierarchy<elev_t> &deps){
   for(unsigned int d=0;d<deps.size();d++)
     std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
   std::cerr<<std::endl;
-}
-
-
-
-template<>
-void PrintDEM(const std::string title, const rd::Array2D<flowdir_t> &arr, const int width){
-  std::cerr<<"\n"<<title<<std::endl;
-  std::cerr<<std::setw(2)<<" "<<"    ";
-  for(int x=0;x<arr.width();x++)
-    std::cerr<<std::setw(width)<<x<<" ";
-  std::cerr<<"\n"<<std::endl;
-  for(int y=0;y<arr.height();y++){
-    std::cerr<<std::setw(2)<<y<<"    ";
-    for(int x=0;x<arr.width(); x++)
-      std::cerr<<std::setw(width)<<(int)arr(x,y)<<" ";
-    std::cerr<<"     "<<std::setw(2)<<y<<std::endl;
-  }
-  std::cerr<<"\n"<<std::setw(2)<<" "<<"    ";
-  for(int x=0;x<arr.width();x++)
-    std::cerr<<std::setw(width)<<x<<" ";
-  std::cerr<<"\n"<<std::endl;  
 }
 
 
