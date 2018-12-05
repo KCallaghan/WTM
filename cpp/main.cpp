@@ -795,7 +795,7 @@ int main(int argc, char **argv){
   //connecting them
   auto deps = GetDepressionHierarchy<float,Topology::D8>(topo, label, flowdirs);
 
-  PrintDEM("labels", label);
+ // PrintDEM("labels", label);
 
   std::cerr<<"\033[91m######################Depression Info\033[39m"<<std::endl;
   std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
@@ -833,7 +833,7 @@ int main(int argc, char **argv){
   SurfaceWater(topo, wtd, label,deps,flowdirs);
 
 
-  PrintDEM("wtd", wtd);
+//  PrintDEM("wtd", wtd);
 
 
 
@@ -847,7 +847,7 @@ int main(int argc, char **argv){
     std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
   std::cerr<<std::endl;
 
-  PrintDEM("wtd", wtd, 9);
+ // PrintDEM("wtd", wtd, 9);
 
   for(auto &depression:deps){//(unsigned int d=0;d<deps.size();d++){
     std::cerr<<"Here's the list of all depressions with their parents and children: "
