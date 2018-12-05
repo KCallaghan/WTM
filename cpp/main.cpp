@@ -97,17 +97,16 @@ void SurfaceWater(
   rd::Array2D<char>  dependencies(topo.width(),topo.height(),0);
   #pragma omp parallel for collapse(2)
   for(int y=0;y<topo.height();y++)
-  for(int x=0;x<topo.width(); x++){
+  for(int x=0;x<topo.width(); x++)
   for(int n=0;n<neighbours;n++){                           //Loop through neighbours
     const int nx = x+dx[n];                                //Identify coordinates of neighbour
     const int ny = y+dy[n];
     if(!topo.inGrid(nx,ny))
       continue;    
-    if(flowdirs(nx,ny)==dinverse[n])  //CHECK WITH RICHARD           //(int)topo.xyToI(x,y))              //Does my neighbour flow into me?
+    if(flowdirs(nx,ny)==dinverse[n])                       //Does my neighbour flow into me?
       dependencies(x,y)++;                                 //Increment my dependencies
   }
-  //std::cout<<"cell "<<x<<" "<<y<<" dependencies "<<dependencies(x,y)<<std::endl;
-}
+  
 
 
   //TODO: remove - this was for debugging purposes. 
@@ -134,9 +133,9 @@ void SurfaceWater(
   //each cell to the frontier/queue as its dependency count drops to zero.
   std::queue<int> q;
   for(unsigned int i=0;i<topo.size();i++){
-    if(dependencies(i)==0)// && flowdirs(i)!=NO_FLOW)  //Is it a peak?
-      q.emplace(i);       
-  }  //Yes.
+    if(dependencies(i)==0)                             //Is it a peak?
+      q.emplace(i);                                    //Yes.
+  }  
 
   int pit_cells_found = 0; //TODO: For debugging
   int cells_traversed = 0; //TODO: For debugging
@@ -187,7 +186,7 @@ void SurfaceWater(
       //we can process the neighbour.
       if(--dependencies(n)==0){                            //CHECK this is a hack! Something is wrong with the dependencies matrix, should never go below 0 but it sometimes does. 
         assert(dependencies(n)>=0);
-        q.emplace(n);                   //Add neighbour to the queue
+        q.emplace(n);                                      //Add neighbour to the queue
       }
     }
   }
@@ -221,7 +220,7 @@ void Overflow(
 ){
   if(current_depression==NO_VALUE)
     return;
-
+  
   auto &this_dep = deps.at(current_depression);
 
   //Visit child depressions. When these both overflow, then we spread water
@@ -247,7 +246,7 @@ void Overflow(
   //meta-depression including all of its children. This property answers the
   //question, "How much water can this meta-depression hold?"
 
-  //Each depression also has an asoociated water volume called `water_vol`. This
+  //Each depression also has an associated water volume called `water_vol`. This
   //will stored the MARGINAL volume of the water in the depression. That is, for
   //each depression this indicates how much water is in this depression that
   //would not fit into its child depressions.
@@ -287,6 +286,7 @@ void Overflow(
       outlet_dep.water_vol = outlet_dep.dep_vol;                           //Mark overflow depression as being entirely filled
     }
 
+  
     //Extra water should always be >=0. If, for floating-point reasons it is a
     //small negative number, we will cross that bridge when we come to it.
     assert(extra_water>=0);
@@ -298,7 +298,7 @@ void Overflow(
 
     //At this point extra_water is the amount of water that is left when both
     //this depression and its overflow depression are completely filled. We add
-    //this extra water to this depression's (and therefore it's overflow
+    //this extra water to this depression's (and therefore its overflow
     //depression's) parent.
     deps.at(this_dep.parent).water_vol += extra_water;
     // std::cout<<"parent number "<<deps.at(this_dep.parent).dep_label<<" now has water volume "<<deps.at(this_dep.parent).water_vol<<std::endl;
@@ -392,7 +392,7 @@ void Fill_Water(
       topo(pit_cell)
     );                    //create a new priority queue starting with the pit cell of the depression
 
-    visited(pit_cell) = true;//label(pit_cell);         // show that we have already added this cell to those that have water. We need a better way to do this. 
+    visited(pit_cell) = true;         // show that we have already added this cell to those that have water. We need a better way to do this. 
   }
 
   double current_volume;              //TODO: This is out here for debugging purposes. SHould be moved inside pq
@@ -488,7 +488,7 @@ void Fill_Water(
         std::cout<<"we are in the if"<<std::endl;
         //Fill in as much of this cell's water table as we can
         const double fill_amount = stdi.water_vol - current_volume;
-        assert(fill_amount>=0);
+        assert(fill_amount>=0);                               
         wtd(c.x,c.y)   += fill_amount;
         stdi.water_vol -= fill_amount;   //Doesn't matter because we don't use water_vol anymore
         water_level     = topo(c.x,c.y);
@@ -655,7 +655,7 @@ SubtreeDepressionInfo Find_filled(
   //We visit both of the children. We need to keep track of info from these
   //because we may spread water across them.
   SubtreeDepressionInfo left_info  = Find_filled(this_dep.lchild,deps,topo,label,wtd,level+"\t");
-  SubtreeDepressionInfo right_info = Find_filled(this_dep.rchild,deps,topo,label,wtd,level+"\t");   
+  SubtreeDepressionInfo right_info = Find_filled(this_dep.rchild,deps,topo,label,wtd,level+"\t");
 
   SubtreeDepressionInfo combined;
   combined.my_labels.emplace(current_depression);
