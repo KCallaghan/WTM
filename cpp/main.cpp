@@ -337,6 +337,16 @@ void Overflow(
   if(current_depression==OCEAN)
     return;
 
+  {
+    const int lchild = this_dep.lchild;
+    const int rchild = this_dep.rchild;
+
+    //Add child's water to this depression
+    if(lchild!=NO_VALUE && deps.at(lchild).water_vol==deps.at(lchild).dep_vol)
+      this_dep.water_vol += deps.at(lchild).water_vol;
+    if(rchild!=NO_VALUE && deps.at(rchild).water_vol==deps.at(rchild).dep_vol)
+      this_dep.water_vol += deps.at(rchild).water_vol;
+  }
 
   //Each depression has an associated dep_vol. This is the TOTAL volume of the
   //meta-depression including all of its children. This property answers the
