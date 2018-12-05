@@ -74,6 +74,15 @@ void PrintDEM(const std::string title, const rd::Array2D<flowdir_t> &arr, const 
 
 
 
+template<class elev_t>
+void PrintCellsAffectedProfile(const std::vector<int> &cells_affected, const elev_t last_elev, const rd::Array2D<elev_t> &topo){
+  std::cerr<<"\nCellsAffectedProfile: ";
+  for(const auto x: cells_affected)
+    std::cerr<<std::setw(2)<<topo(x)<<" ";
+  std::cerr<<std::setw(2)<<last_elev<<std::endl;
+}
+
+
 //Richard: Checked this
 template<class elev_t>
 void SurfaceWater(
@@ -383,6 +392,14 @@ void Overflow(
   //All overflowing depressions should by now have overflowed all the way down
   //to the ocean. We must now spread the water in the depressions by setting
   //appropriate values for wtd.
+
+  //Sanity checks
+  for(int d=0;d<(int)deps.size();d++){
+    const auto &dep = deps.at(d);
+    assert(dep.water_vol==0 || dep.water_vol<=dep.dep_vol);
+    assert(dep.water_vol==0 || deps.at(dep.lchild).water_vol<dep.water_vol);
+    assert(dep.water_vol==0 || deps.at(dep.rchild).water_vol<dep.water_vol);
+  }
 }
 
  
@@ -589,7 +606,10 @@ void Fill_Water(
       for(const auto c: cells_affected){
         std::cerr<<"Cell ("<<(c%topo.width())<<","<<(c/topo.width())<<") has elev="<<topo(c)<<", label="<<label(c)<<", wtd_old="<<wtd(c);
         assert(wtd(c)>=0);               //This should be true since we have been filling wtds as we go.
-        assert(water_level>=topo(c));
+        if(water_level<topo(c)){
+          PrintCellsAffectedProfile(cells_affected,my_elev,topo);
+          assert(water_level>=topo(c));
+        }
         wtd(c) = water_level - topo(c);  //only change the wtd if it is an increase, here. We can't take water away from cells that already have it (ie reduce groundwater in saddle cells within a metadepression.)
         std::cerr<<", wtd_new="<<wtd(c)<<std::endl;
         assert(wtd(c)>=0);
