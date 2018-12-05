@@ -28,8 +28,35 @@ const int neighbours         = 8;
 
 const float  OCEAN_LEVEL = -9999;  //ocean_level in the topo file must be lower than any non-ocean cell. 
 
-
 rd::Array2D<flowdir_t> flowdirs; //TODO: Make non-global
+template<class T>
+void PrintStamp(const std::string title, const rd::Array2D<T> &arr, const int x0, const int y0, const int r, const int width=2){
+  std::cout<<"\n"<<title<<std::endl;
+  for(int y=std::max(y0-r,0);y<std::min(y0+r+1,arr.height());  y++){
+    for(int x=std::max(x0-r,0);x<std::min(x0+r+1,arr.width()); x++){
+      if(x==x0 && y==y0) std::cout<<"\033[91m";
+      std::cout<<std::setw(width)<<arr(x,y)<<" ";
+      if(x==x0 && y==y0) std::cout<<"\033[39m";
+    }
+    std::cout<<std::endl;
+  }
+}
+
+template<class T>
+void PrintStampWithSpecialCells(const std::string title, const rd::Array2D<T> &arr, const std::vector<int> &sc, const int x0, const int y0, const int r, const int width=2){
+  std::cout<<"\n"<<title<<std::endl;
+  for(int y=std::max(y0-r,0);y<std::min(y0+r+1,arr.height());  y++){
+    for(int x=std::max(x0-r,0);x<std::min(x0+r+1,arr.width()); x++){
+      bool colour = false;
+      if(x==x0 && y==y0)                   {std::cout<<"\033[91m"; colour=true;}
+      else if(std::find(sc.begin(),sc.end(),arr.xyToI(x,y))!=sc.end()) {std::cout<<"\033[92m"; colour=true;}
+      std::cout<<std::setw(width)<<arr(x,y)<<" ";
+      if(colour) std::cout<<"\033[39m";
+    }
+    std::cout<<std::endl;
+  }
+}
+
 
 template<class T>
 void PrintDEM(const std::string title, const rd::Array2D<T> &arr, const int width=2){
