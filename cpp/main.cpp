@@ -11,6 +11,7 @@
 #include <queue>
 #include <richdem/common/Array2D.hpp>
 #include <richdem/common/timer.hpp>
+#include <richdem/common/ProgressBar.hpp>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -90,9 +91,15 @@ void SurfaceWater(
   DepressionHierarchy<elev_t>  &deps,
   const rd::Array2D<flowdir_t> &flowdirs
 ){
+  rd::Timer timer;
+  rd::ProgressBar progress;
+  timer.start();
+
   //Our first step is to move all of the water downstream into pit cells. To do
   //so, we use the steepest-descent flow directions provided by the depression
   //hierarchy code
+
+  std::cerr<<"p Moving surface water downstream..."<<std::endl;
 
   //Calculate how many upstream cells flow into each cell
   rd::Array2D<char>  dependencies(topo.width(),topo.height(),0);
@@ -141,7 +148,10 @@ void SurfaceWater(
   int cells_traversed = 0; //TODO: For debugging
 
   //Starting with the peaks, pass flow downstream
+  progress.start(topo.size());
   while(!q.empty()){
+    ++progress;
+
     const auto c = q.front();          //Copy focal cell from queue
     q.pop();                           //Clear focal cell from queue
 
@@ -193,9 +203,11 @@ void SurfaceWater(
       }
     }
   }
+  progress.stop();
 
-  std::cerr<<"Found pit cells = "<<pit_cells_found<<std::endl;
-  std::cerr<<"Cells traversed = "<<cells_traversed<<std::endl;
+  std::cerr<<"m Found pit cells = "<<pit_cells_found<<std::endl;
+  std::cerr<<"m Cells traversed = "<<cells_traversed<<std::endl;
+  std::cerr<<"t Moving water downill = "<<timer.stop()<<" s"<<std::endl;
 }
 
 
