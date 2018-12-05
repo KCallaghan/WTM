@@ -837,7 +837,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   }
   progress.stop();
 
-  std::cerr<<"t Depression Hierarchy Wall-Time = "<<timer_overall.stop()<<"s"<<std::endl;
+  std::cerr<<"t Depression Hierarchy Wall-Time = "<<timer_overall.stop()<<" s"<<std::endl;
 
   return depressions;
 }
