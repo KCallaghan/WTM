@@ -105,17 +105,15 @@ void SurfaceWater(
   rd::Array2D<char>  dependencies(topo.width(),topo.height(),0);
   #pragma omp parallel for collapse(2)
   for(int y=0;y<topo.height();y++)
-  for(int x=0;x<topo.width(); x++){
-  for(int n=0;n<neighbours;n++){                           //Loop through neighbours
-    const int nx = x+dx[n];                                //Identify coordinates of neighbour
+  for(int x=0;x<topo.width(); x++)
+  for(int n=0;n<neighbours;n++){      //Loop through neighbours
+    const int nx = x+dx[n];           //Identify coordinates of neighbour
     const int ny = y+dy[n];
     if(!topo.inGrid(nx,ny))
       continue;    
-    if(flowdirs(nx,ny)==dinverse[n])  //CHECK WITH RICHARD           //(int)topo.xyToI(x,y))              //Does my neighbour flow into me?
-      dependencies(x,y)++;                                 //Increment my dependencies
+    if(flowdirs(nx,ny)==dinverse[n])  //Does my neighbour flow into me?
+      dependencies(x,y)++;            //Increment my dependencies
   }
-  //std::cout<<"cell "<<x<<" "<<y<<" dependencies "<<dependencies(x,y)<<std::endl;
-}
 
   int pit_cell_count = 0;
   int peak_count     = 0;
