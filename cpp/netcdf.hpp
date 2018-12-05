@@ -93,12 +93,14 @@ rd::Array2D<T> LoadDEM(const std::string filename){
   if(header!="nrows")
     throw std::runtime_error("Not ncols");
 
+  rd::Array2D<T> temp(mywidth,myheight);
+
   fin>>header>>val; //xllcorner
   fin>>header>>val; //yllcorner
   fin>>header>>val; //cellsize
   fin>>header>>val; //no_data value
-
-  rd::Array2D<T> temp(mywidth,myheight);
+  if(header=="NODATA_value")
+    temp.setNoData(val);
 
   for(int y=0;y<myheight;y++)
   for(int x=0;x<mywidth; x++)
