@@ -115,9 +115,9 @@ void SurfaceWater(
     if(dependencies(i)==0 && flowdirs(i)==NO_FLOW)
       flat_count++;
   }
-  std::cout<<"Found "<<pit_cell_count<<" pit cells."<<std::endl;
-  std::cout<<"Found "<<peak_count    <<" peak cells."<<std::endl;
-  std::cout<<"Found "<<flat_count    <<" flat cells."<<std::endl;
+  std::cerr<<"Found "<<pit_cell_count<<" pit cells."<<std::endl;
+  std::cerr<<"Found "<<peak_count    <<" peak cells."<<std::endl;
+  std::cerr<<"Found "<<flat_count    <<" flat cells."<<std::endl;
 
 
   //Find the peaks. These are the cells into which no other cells pass flow (i.e. 0 dependencies). We
@@ -188,8 +188,8 @@ void SurfaceWater(
     }
   }
 
-  std::cout<<"Found pit cells = "<<pit_cells_found<<std::endl;
-  std::cout<<"Cells traversed = "<<cells_traversed<<std::endl;
+  std::cerr<<"Found pit cells = "<<pit_cells_found<<std::endl;
+  std::cerr<<"Cells traversed = "<<cells_traversed<<std::endl;
 }
 
 
@@ -209,7 +209,6 @@ void SurfaceWater(
   //TODO 3. As part of the above, when flow can't go downhill any farther, add        DONE
   //it to the `water_vol` for the appropriate depression. Use the labels array
   //to determine the appropriate depression.
-
 
 //When water overflows from one depression into another, this function ensures
 //that chained overflows and infiltration take place.
