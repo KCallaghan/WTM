@@ -109,6 +109,8 @@ void SurfaceWater(
   //std::cout<<"cell "<<x<<" "<<y<<" dependencies "<<dependencies(x,y)<<std::endl;
 }
 
+
+  //TODO: remove - this was for debugging purposes. 
   int pit_cell_count = 0;
   int peak_count     = 0;
   int flat_count     = 0;
