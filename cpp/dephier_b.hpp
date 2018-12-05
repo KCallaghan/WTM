@@ -795,15 +795,18 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   }
 
   //Calculate total depression volumes and cell counts
-  for(auto &dep: depressions){
+  for(int d=0;d<(int)depressions.size();d++){
+    auto &dep = depressions.at(d);
     //Use marginal values to calculate updated depression volume
     dep.dep_vol = dep.cell_count*dep.out_elev-dep.total_elevation;
     if(dep.lchild!=NO_VALUE){
+      assert(dep.lchild<d);
       dep.dep_vol         += depressions.at(dep.lchild).dep_vol;
       dep.cell_count      += depressions.at(dep.lchild).cell_count;
       dep.total_elevation += depressions.at(dep.lchild).total_elevation;
     }
     if(dep.rchild!=NO_VALUE){
+      assert(dep.rchild<d);
       dep.dep_vol         += depressions.at(dep.rchild).dep_vol;
       dep.cell_count      += depressions.at(dep.rchild).cell_count;
       dep.total_elevation += depressions.at(dep.rchild).total_elevation;
