@@ -400,14 +400,6 @@ void Overflow(
   //All overflowing depressions should by now have overflowed all the way down
   //to the ocean. We must now spread the water in the depressions by setting
   //appropriate values for wtd.
-
-  //Sanity checks
-  for(int d=0;d<(int)deps.size();d++){
-    const auto &dep = deps.at(d);
-    assert(dep.water_vol==0 || dep.water_vol<=dep.dep_vol);
-    assert(dep.water_vol==0 || deps.at(dep.lchild).water_vol<dep.water_vol);
-    assert(dep.water_vol==0 || deps.at(dep.rchild).water_vol<dep.water_vol);
-  }
 }
 
  
@@ -885,12 +877,6 @@ int main(int argc, char **argv){
 
   //TODO: Remove. For viewing test cases.
   if(label.width()<1000){
-  //  for(int y=0;y<label.height();y++){
-      //for(int x=0;x<label.width();x++)
-    //    std::cout<<std::setw(3)<<label(x,y)<<"checking ";
-  //    std::cout<<std::endl;
-//    }
-
     //GraphViz dot-style output for drawing depression hierarchy graphs.
     std::ofstream fgraph(out_graph);
     fgraph<<"digraph {\n";
@@ -921,6 +907,14 @@ int main(int argc, char **argv){
   std::unordered_map<label_t, label_t> jump_table;
   Overflow(OCEAN, deps, jump_table);
   jump_table = std::unordered_map<label_t, label_t>();
+
+  //Sanity checks
+  for(int d=1;d<(int)deps.size();d++){
+    const auto &dep = deps.at(d);
+    assert(dep.water_vol==0 || dep.water_vol<=dep.dep_vol);
+    assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) || (dep.lchild!=NO_VALUE && deps.at(dep.lchild).water_vol<dep.water_vol));
+    assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) || (dep.rchild!=NO_VALUE && deps.at(dep.rchild).water_vol<dep.water_vol));
+  }
 
   std::cerr<<"\033[91m######################Depression Info\033[39m"<<std::endl;
   std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
