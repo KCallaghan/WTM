@@ -248,7 +248,6 @@ label_t OverflowInto(
     return stop_node;
   }
 
-  assert(this_dep.water_vol<=this_dep.dep_vol);
   if(this_dep.water_vol<this_dep.dep_vol){                                              //Can this depression hold any water?
     const double capacity = this_dep.dep_vol - this_dep.water_vol;                      //Yes. How much can it hold?
     if(extra_water<capacity){                                                           //Is it enough to hold all the extra water?
