@@ -798,7 +798,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   for(int d=0;d<(int)depressions.size();d++){
     auto &dep = depressions.at(d);
     //Use marginal values to calculate updated depression volume
-    dep.dep_vol = dep.cell_count*dep.out_elev-dep.total_elevation;
     if(dep.lchild!=NO_VALUE){
       assert(dep.lchild<d);
       dep.dep_vol         += depressions.at(dep.lchild).dep_vol;
@@ -811,6 +810,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       dep.cell_count      += depressions.at(dep.rchild).cell_count;
       dep.total_elevation += depressions.at(dep.rchild).total_elevation;
     }
+    dep.dep_vol = dep.cell_count*dep.out_elev-dep.total_elevation; //TODO: Putting this below if-clauses seems to fix a problem, but it is unclear why
     //TODO: Or use total values here to calculate total depression volume? Which
     //one is more numerically accurate?
   }
