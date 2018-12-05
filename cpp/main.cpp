@@ -51,6 +51,17 @@ void PrintDEM(const std::string title, const rd::Array2D<T> &arr, const int widt
 
 
 
+template<class elev_t>
+void PrintDepressionInfo(const DepressionHierarchy<elev_t> &deps){
+  std::cerr<<"\033[91m######################Depression Info\033[39m"<<std::endl;
+  std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
+  for(unsigned int d=0;d<deps.size();d++)
+    std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
+  std::cerr<<std::endl;
+}
+
+
+
 template<>
 void PrintDEM(const std::string title, const rd::Array2D<flowdir_t> &arr, const int width){
   std::cerr<<"\n"<<title<<std::endl;
@@ -871,11 +882,7 @@ int main(int argc, char **argv){
 
   PrintDEM("labels", label);
 
-  std::cerr<<"\033[91m######################Depression Info\033[39m"<<std::endl;
-  std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
-  for(unsigned int d=0;d<deps.size();d++)
-    std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
-  std::cerr<<std::endl;
+  PrintDepressionInfo(deps);
 
   //TODO: Remove. For viewing test cases.
   if(label.width()<1000){
@@ -910,11 +917,7 @@ int main(int argc, char **argv){
   Overflow(OCEAN, deps, jump_table);
   jump_table = std::unordered_map<label_t, label_t>();
 
-  std::cerr<<"\033[91m######################Depression Info\033[39m"<<std::endl;
-  std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
-  for(unsigned int d=0;d<deps.size();d++)
-    std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
-  std::cerr<<std::endl;
+  PrintDepressionInfo(deps);
 
   //Sanity checks
   for(int d=1;d<(int)deps.size();d++){
