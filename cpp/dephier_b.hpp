@@ -797,22 +797,20 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //Calculate total depression volumes and cell counts
   for(int d=0;d<(int)depressions.size();d++){
     auto &dep = depressions.at(d);
-    //Use marginal values to calculate updated depression volume
     if(dep.lchild!=NO_VALUE){
       assert(dep.lchild<d);
-      dep.dep_vol         += depressions.at(dep.lchild).dep_vol;
       dep.cell_count      += depressions.at(dep.lchild).cell_count;
       dep.total_elevation += depressions.at(dep.lchild).total_elevation;
     }
     if(dep.rchild!=NO_VALUE){
       assert(dep.rchild<d);
-      dep.dep_vol         += depressions.at(dep.rchild).dep_vol;
       dep.cell_count      += depressions.at(dep.rchild).cell_count;
       dep.total_elevation += depressions.at(dep.rchild).total_elevation;
     }
-    dep.dep_vol = dep.cell_count*dep.out_elev-dep.total_elevation; //TODO: Putting this below if-clauses seems to fix a problem, but it is unclear why
-    //TODO: Or use total values here to calculate total depression volume? Which
-    //one is more numerically accurate?
+    //This has to be after the foregoing because the cells added by the if-
+    //clauses have additional volume above their spill elevations that cannot be
+    //counted simply by adding their volumes to their parent depression.
+    dep.dep_vol = dep.cell_count*dep.out_elev-dep.total_elevation;
   }
 
   return depressions;
