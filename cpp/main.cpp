@@ -910,6 +910,12 @@ int main(int argc, char **argv){
   Overflow(OCEAN, deps, jump_table);
   jump_table = std::unordered_map<label_t, label_t>();
 
+  std::cerr<<"\033[91m######################Depression Info\033[39m"<<std::endl;
+  std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
+  for(unsigned int d=0;d<deps.size();d++)
+    std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
+  std::cerr<<std::endl;
+
   //Sanity checks
   for(int d=1;d<(int)deps.size();d++){
     const auto &dep = deps.at(d);
@@ -917,12 +923,6 @@ int main(int argc, char **argv){
     assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) || (dep.lchild!=NO_VALUE && deps.at(dep.lchild).water_vol<dep.water_vol));
     assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) || (dep.rchild!=NO_VALUE && deps.at(dep.rchild).water_vol<dep.water_vol));
   }
-
-  std::cerr<<"\033[91m######################Depression Info\033[39m"<<std::endl;
-  std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
-  for(unsigned int d=0;d<deps.size();d++)
-    std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
-  std::cerr<<std::endl;
 
   PrintDEM("wtd", wtd, 9);
 
