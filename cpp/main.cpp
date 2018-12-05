@@ -750,6 +750,8 @@ SubtreeDepressionInfo Find_filled(
     //want to attempt to do so again in an empty parent depression. 
     //We check to see if both children have finished spreading water. 
 
+    std::cout<<"my labels length " <<combined.my_labels.size()<<std::endl;
+  //  std::cout<<"my labels " <<combined.my_labels<<std::endl;
     Fill_Water(combined, deps, topo, label, wtd);
 
     //At this point there should be no more water all the way up the tree until
