@@ -80,6 +80,9 @@ template<class T>
 rd::Array2D<T> LoadDEM(const std::string filename){
   std::ifstream fin(filename);
 
+  if(!fin.good())
+    throw std::runtime_error("Failed to open file '"+filename+"'!");
+
   std::string header;
   int val;
 
