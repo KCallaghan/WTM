@@ -881,13 +881,6 @@ int main(int argc, char **argv){
     std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
   std::cerr<<std::endl;
 
-
-  std::cerr<<"\n";
-  std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
-  for(unsigned int d=0;d<deps.size();d++)
-    std::cerr<<std::setw(20)<<d<<std::setw(10)<<deps.at(d).dep_vol<<std::setw(10)<<deps.at(d).water_vol<<std::endl;
-  std::cerr<<std::endl;
-
   PrintDEM("wtd", wtd, 9);
 
   for(auto &depression:deps){//(unsigned int d=0;d<deps.size();d++){
