@@ -25,6 +25,7 @@ const int    *const dinverse = d8inverse;
 const double *const dr       = dr8;
 const int neighbours         = 8;
 
+const float fp_error = 0.01;//1e-3;
 
 const float  OCEAN_LEVEL = -9999;  //ocean_level in the topo file must be lower than any non-ocean cell. 
 
@@ -441,7 +442,7 @@ void Fill_Water(
 
     //TODO: If this is false by a small margin, then it's a floating point issue
     //and this should be adjusted to be >=-1e-6 and water_vol should be made 0
-    assert(stdi.water_vol>=0); 
+    assert(stdi.water_vol>= -fp_error);               
 
     //All the cells within this depression should have water table depths less
     //than or equal to zero because we have moved all of their water down slope
@@ -511,9 +512,9 @@ void Fill_Water(
       //TODO: Use floating-point comparisons in these asserts.
       //Water level must be higher than (or equal to) the previous cell we looked at, but lower than (or equal to) the current cell
       std::cout<<"water level = "<<water_level<<" last topo "<<topo(cells_affected.back())<<" "<<bool(topo(cells_affected.back())<=water_level)<<std::endl;
-      assert(cells_affected.size()==0 || topo(cells_affected.back())<=water_level);
+      assert(cells_affected.size()==0 || (topo(cells_affected.back()) - water_level) <= fp_error);        
       std::cout<<"water level = "<<water_level<<" my topo "<<topo(c.x,c.y)<<std::endl;
-      assert(water_level<=topo(c.x,c.y));
+      assert(water_level - topo(c.x,c.y) <= fp_error);                                                  
 
       std::cerr<<"Adjusting wtd of depression...\n";
       std::cerr<<"\twater_level = "<<water_level<<std::endl;
@@ -681,7 +682,7 @@ SubtreeDepressionInfo Find_filled(
   //The water volume should never be greater than the depression volume because
   //otherwise we would have overflowed the water into the neighbouring
   //depression and moved the excess to the parent.
-  if(combined.water_vol>this_dep.dep_vol){ //TODO: Make this an assert?
+  if(combined.water_vol - this_dep.dep_vol > -fp_error){ //TODO: Make this an assert?
     throw std::runtime_error("water_vol>dep_vol");
   }
 
