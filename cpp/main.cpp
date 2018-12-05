@@ -53,12 +53,6 @@ void PrintDEM(const std::string title, const rd::Array2D<flowdir_t> &arr, const 
 }
 
 
-//TODO
-// template<class T>
-// void mWvol(const int dep, DepressionHierarchy<elev_t> &deps){
-// 
-// }
-
 
 //Richard: Checked this
 template<class elev_t>
