@@ -256,7 +256,8 @@ label_t OverflowInto(
   //FIRST PLACE TO STASH WATER: IN THIS DEPRESSION
 
   //We've gone around in a loop and found the original node's parent. That means
-  //it's time to stop.
+  //it's time to stop. (This may be the leaf node of another metadepression, the
+  //ocean, or a standard node.)
   if(root==stop_node){                   //We've made a loop, so everything is full
     if(this_dep.parent==OCEAN)           //If our parent is the ocean
       return OCEAN;                      //Then the extra water just goes away
@@ -279,21 +280,36 @@ label_t OverflowInto(
   if(extra_water==0)                                                                    //If there's no more extra water
     return root;                                                                        //Call it quits
 
+  //TODO: Use jump table
+
   //Okay, so there's extra water and we can't fit it into this depression
 
   //SECOND PLACE TO STASH WATER: IN THIS DEPRESSION'S NEIGHBOUR
   //Maybe we can fit it into this depression's overflow depression!
 
-  if(this_dep.odep==NO_VALUE)      //Does the depression even have such a neighbour? 
+  auto &pdep = deps.at(this_dep.parent);
+  if(this_dep.odep==NO_VALUE){      //Does the depression even have such a neighbour? 
+    if(this_dep.parent!=OCEAN && pdep.water_vol==0) //At this point we're full and heading to our parent, so it needs to know that it contains our water
+      pdep.water_vol += this_dep.water_vol;
     return jump_table[root] = OverflowInto(this_dep.parent, stop_node, deps, jump_table, extra_water);  //Nope. Pass the water to the parent
+  }
 
   //Can overflow depression hold more water?
-  const auto &odep = deps.at(this_dep.odep);
-  if(odep.water_vol<odep.dep_vol)  //Yes. Move the water geographically into that depression's leaf.
+  auto &odep = deps.at(this_dep.odep);
+  if(odep.water_vol<odep.dep_vol){  //Yes. Move the water geographically into that depression's leaf.
+    if(this_dep.parent!=OCEAN && pdep.water_vol==0 && odep.water_vol+extra_water>odep.dep_vol) //It might take a while, but our neighbour will overflow, so our parent needs to know about our water volumes
+      pdep.water_vol += this_dep.water_vol + odep.dep_vol;           //Neighbour's water_vol will equal its dep_vol
     return jump_table[root] = OverflowInto(this_dep.geolink, stop_node, deps, jump_table, extra_water);
+  }
 
   //Okay, so the extra water didn't fit into this depression or its overflow
   //depression. That means we pass it to this depression's parent.
+
+  //If we've got here we have a neighbour, but we couldn't stash water in the
+  //neighbour because it was full. So we need to see if our parent knows about
+  //us.
+  if(this_dep.parent!=OCEAN && pdep.water_vol==0)
+    pdep.water_vol += this_dep.water_vol + odep.water_vol;
 
   //THIRD PLACE TO STASH WATER: IN THIS DEPRESSION'S PARENT
   return jump_table[root] = OverflowInto(this_dep.parent, stop_node, deps, jump_table, extra_water);
