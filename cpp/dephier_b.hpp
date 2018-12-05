@@ -9,6 +9,8 @@
 #define _dephier_hpp_
 
 #include <richdem/common/Array2D.hpp>
+#include <richdem/common/timer.hpp>
+#include <richdem/common/ProgressBar.hpp>
 #include "DisjointDenseIntSet.hpp"
 #include <algorithm>
 #include <cassert>
@@ -309,6 +311,10 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   rd::Array2D<int>          &label,
   rd::Array2D<int8_t>       &flowdirs
 ){
+  rd::ProgressBar progress;
+  rd::Timer timer_overall;
+  timer_overall.start();
+
   std::cerr<<"\033[91m##########Getting depression hierarchy\033[39m"<<std::endl;
 
   //A D4 or D8 topology can be used.
@@ -334,9 +340,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   }
 
   (void)dr; //Hide warning that dr is not used
-
-
- std::cout<<"top"<<std::endl;
 
   //Depressions are identified by a number [0,*). The ocean is always
   //"depression" 0. This vector holds the depressions.
@@ -385,6 +388,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   }
 
 
+  std::cerr<<"p Finding pit cells..."<<std::endl;
+
   //Here we find the pit cells of internally-draining regions. We define these
   //to be cells without any downstream neighbours. Note that this means we will
   //identify all flat cells as being pit cells. For DEMs with many flat cells,
@@ -395,9 +400,11 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //flat cells. Regardless, the algorithm will deal gracefully with the flats it
   //finds and this shouldn't slow things down too much!
   int pit_cell_count = 0;
+  progress.start(dem.size());
   #pragma omp parallel for collapse(2) reduction(+:pit_cell_count)
   for(int y=0;y<dem.height();y++)  //Look at all the cells
   for(int x=0;x<dem.width() ;x++){ //Yes, all of them
+    ++progress;
     const auto my_elev = dem(x,y); //Focal cell's elevation
     bool has_lower     = false;    //Pretend we have no lower neighbours
     for(int n=0;n<neighbours;n++){ //Check out our neighbours
@@ -419,6 +426,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       pq.emplace(x,y,dem(x,y)); //Add cell to pq
     }
   }
+  progress.stop();
 
 
 
@@ -458,7 +466,12 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //cells are of the same elevation then we visit the one added last (most
   //recently) first.
 
+  std::cerr<<"p Searching for outlets..."<<std::endl;
+
+  progress.start(dem.size());
   while(!pq.empty()){
+    ++progress;
+
     const auto c = pq.top();               //Copy cell with lowest elevation from priority queue
     pq.pop();                              //Remove the copied cell from the priority queue
     const auto celev = c.z;                //Elevation of focal cell
@@ -600,9 +613,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
 
   }
-
-  std::cout<<"here"<<std::endl;  
-
+  progress.stop();
 
   //At this point every cell is associated with the label of a depression. Each
   //depression contains the cells lower than its outlet elevation as well as all
@@ -666,9 +677,13 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //needed.
   DisjointDenseIntSet djset(depressions.size());
 
+  std::cerr<<"p Constructing hierarchy from outlets..."<<std::endl;
+
   //Visit outlets in order of elevation from lowest to highest. If two outlets
   //are at the same elevation, choose one arbitrarily.
+  progress.start(outlets.size());
   for(auto &outlet: outlets){
+    ++progress;
     auto depa_set = djset.findSet(outlet.depa); //Find the ultimate parent of Depression A
     auto depb_set = djset.findSet(outlet.depb); //Find the ultimate parent of Depression B
     // std::cerr<<"Considering "<<outlet.depa<<" "<<outlet.depb<<std::endl;
@@ -728,7 +743,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       dep.ocean_parent = true;
       dep.geolink      = outlet.depb;        //Metadepression(A) overflows, geographically, into Depression B
       depressions.at(outlet.depb).ocean_linked.emplace_back(depa_set);
-      std::cout<<"dep a set "<<depa_set<<std::endl;
       djset.mergeAintoB(depa_set,OCEAN); //Make a note that Depression A MetaLabel has a path to the ocean
     } else {
       //Neither depression has found the ocean, so we merge the two depressions
@@ -768,6 +782,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     //  newdep.dep_vol = outlet.depa_vol + outlet.depb_vol;                             
     }
   }
+  progress.stop();
 
 
   //At this point we have a 2D array in which each cell is labeled. This label
@@ -778,9 +793,12 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //returned.
 
 
+  std::cerr<<"p Calculating depression marginal volumes..."<<std::endl;
 
   //Get the marginal depression cell counts and total elevations
+  progress.start(dem.size());
   for(unsigned int i=0;i<dem.size();i++){
+    ++progress;
     const auto my_elev = dem(i);
     auto clabel        = label(i);
     
@@ -793,9 +811,14 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     depressions[clabel].cell_count++;
     depressions[clabel].total_elevation += dem(i);
   }
+  progress.stop();
 
+  std::cerr<<"p Calculating depression total volumes..."<<std::endl;
   //Calculate total depression volumes and cell counts
+  progress.start(depressions.size());
   for(int d=0;d<(int)depressions.size();d++){
+    ++progress;
+
     auto &dep = depressions.at(d);
     if(dep.lchild!=NO_VALUE){
       assert(dep.lchild<d);
@@ -812,6 +835,9 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     //counted simply by adding their volumes to their parent depression.
     dep.dep_vol = dep.cell_count*dep.out_elev-dep.total_elevation;
   }
+  progress.stop();
+
+  std::cerr<<"t Depression Hierarchy Wall-Time = "<<timer_overall.stop()<<"s"<<std::endl;
 
   return depressions;
 }
