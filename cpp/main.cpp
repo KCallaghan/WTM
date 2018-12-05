@@ -318,10 +318,13 @@ void Overflow(
 
 
 
-
-
 //Simple data structure to hold information needed to spread water in a filled
 //metadepression.
+
+const int SDI_UNINITIALIZED = -3;
+const int SDI_FILLED        = -2;
+const int SDI_HAS_WATER     = -1;
+
 class SubtreeDepressionInfo {
  public:
   //One of the depressions at the bottom of the meta-depression. We use this to
@@ -339,8 +342,10 @@ class SubtreeDepressionInfo {
   //Total water of all the depressions up to and including the one identified by
   //top_label
   double water_vol = 0;
+  //Flag used to enforces invariants
+  int    flag  = SDI_UNINITIALIZED;
+  bool is_leaf = false;
 };
-
 
 
 
@@ -669,12 +674,35 @@ SubtreeDepressionInfo Find_filled(
   std::cerr<<"This water vol="<<this_dep.water_vol<<", LWV="<<left_info.water_vol<<", RWV="<<right_info.water_vol<<std::endl;
   combined.water_vol = this_dep.water_vol+left_info.water_vol+right_info.water_vol;
 
-  combined.leaf_label = left_info.leaf_label;  //Choose left because right is not guaranteed to exist
-  if(combined.leaf_label==NO_VALUE)            //If there's no label, then there was no child
-    combined.leaf_label = current_depression;  //Therefore, this is a leaf depression
+  //Either both of the children are NO_VALUE or both of the children are valid depressions
+  assert( (left_info.leaf_label==NO_VALUE && right_info.leaf_label==NO_VALUE) || (left_info.leaf_label!=NO_VALUE && right_info.leaf_label!=NO_VALUE) );
+
+  const bool is_leaf = left_info.leaf_label==NO_VALUE && right_info.leaf_label==NO_VALUE;
+
+  if(is_leaf){                                     //This depression is a leaf
+    if(combined.water_vol<=0){//} fp_error && this_dep.dep_vol > fp_error){ // else some teeny tiny depressions are mistakenly marked as filled
+      combined.flag = SDI_FILLED;
+    }
+    else if(combined.water_vol>0){
+      combined.flag = SDI_HAS_WATER;
+      if(combined.water_vol < fp_error && deps.at(this_dep.parent).water_vol == 0 && deps.at(this_dep.parent).dep_vol > this_dep.dep_vol + deps.at(this_dep.odep).dep_vol)
+        combined.flag = SDI_FILLED;
+      if(deps.at(this_dep.odep).filled_below == true  && deps.at(this_dep.odep).parent == this_dep.parent)
+        combined.flag = SDI_FILLED;
+
+    }
+
+    else
+      throw std::runtime_error("Discovered a leaf with negative water!");
+    assert(combined.water_vol==this_dep.water_vol);
+
+    combined.leaf_label = current_depression;      
+  } else {                                         //This depression is not a leaf
+    combined.flag       = SDI_UNINITIALIZED;       //combined does not have a flag yet unless it was a leaf (see above)
+    combined.leaf_label = left_info.leaf_label;    //Arbitrarily choose one of the leaves to represent the leaf label
+  }
 
   combined.top_label = current_depression;
-
 
 
   std::cerr<<level<<"Total water volume is "<<combined.water_vol<<" and depression volume is "<<this_dep.dep_vol<<std::endl;
@@ -697,6 +725,26 @@ SubtreeDepressionInfo Find_filled(
 
   if(deps.at(this_dep.parent).water_vol==0 || this_dep.ocean_parent){
     assert(combined.water_vol<=this_dep.dep_vol);
+  if(this_dep.water_vol < fp_error){
+
+
+    if(combined.is_leaf || (left_info.flag == SDI_FILLED &&right_info.flag == SDI_FILLED))
+      combined.flag = SDI_FILLED; //Filling was trivial in this case because there was nothing to do
+    if(left_info.flag == SDI_HAS_WATER || right_info.flag == SDI_HAS_WATER)
+      combined.flag = SDI_HAS_WATER;
+    if(deps.at(this_dep.parent).dep_vol > this_dep.dep_vol + deps.at(this_dep.odep).dep_vol && deps.at(this_dep.parent).water_vol < fp_error)
+      combined.flag = SDI_FILLED;
+    
+    return combined;
+  }
+    //Spreading should happen on the lowest level possible. Since we've already
+    //overflowed between depressions, no parent should need to spread water if
+    //its children have and, if one child has spread water, the other should
+    //have also. This assert enforces this invariant.
+    if(!is_leaf){
+      assert(left_info.flag!=SDI_FILLED    && right_info.flag!=SDI_FILLED);
+      assert(left_info.flag==SDI_HAS_WATER && right_info.flag==SDI_HAS_WATER);
+    }
 
     //If both of a depression's children have already spread their water, we do not
     //want to attempt to do so again in an empty parent depression. 
@@ -706,8 +754,16 @@ SubtreeDepressionInfo Find_filled(
 
     //At this point there should be no more water all the way up the tree until
     //we pass through an ocean link, so we pass this up as a kind of null value.
-    return SubtreeDepressionInfo();
+    combined.flag = SDI_FILLED;
+    return combined;
   } else {
+    //Pass fill information up in order to enforce invariant. The left flag and
+    //the right flag must match because
+    assert(left_info.flag==right_info.flag);
+    assert(combined.water_vol - this_dep.dep_vol >= -fp_error);
+    assert(is_leaf || (left_info.flag==SDI_HAS_WATER && right_info.flag==SDI_HAS_WATER));
+    combined.flag = SDI_HAS_WATER;
+
     return combined;
   }
 }
