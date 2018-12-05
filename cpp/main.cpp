@@ -1,5 +1,3 @@
-//I can't figure out how to use the test cases (throws errors when trying to open the file)
-
 #include "dephier_b.hpp"
 #include "DisjointDenseIntSet.hpp"
 #include "netcdf.hpp"
