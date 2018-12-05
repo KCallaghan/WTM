@@ -5,7 +5,7 @@ export CXXFLAGS=--std=c++17 -g -O0 -Wall -Wno-unknown-pragmas -fsanitize=address
 export LIBS=-lnetcdf
 
 
-a.out: main.cpp Array2D.hpp DisjointDenseIntSet.hpp dephier_b.hpp
+a.out: main.cpp Array2D.hpp DisjointDenseIntSet.hpp dephier_b.hpp netcdf.hpp
 	g++-7 $(CXXFLAGS) $(RD_CXX_FLAGS) main.cpp richdem/include/richdem/richdem.cpp $(LIBS)
 
 clean:
