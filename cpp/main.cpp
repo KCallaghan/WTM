@@ -33,6 +33,7 @@ rd::Array2D<flowdir_t> flowdirs; //TODO: Make non-global
 
 template<class T>
 void PrintDEM(const std::string title, const rd::Array2D<T> &arr, const int width=2){
+  return;
   std::cerr<<"\n"<<title<<std::endl;
   std::cerr<<std::setw(2)<<" "<<"    ";
   for(int x=0;x<arr.width();x++)
@@ -58,6 +59,7 @@ void PrintDEM(const std::string title, const rd::Array2D<T> &arr, const int widt
 
 template<class elev_t>
 void PrintDepressionInfo(const DepressionHierarchy<elev_t> &deps){
+  return;
   std::cerr<<"\033[91m######################Depression Info\033[39m"<<std::endl;
   std::cerr<<std::setw(20)<<"Depression"<<std::setw(10)<<"Dep Vol"<<std::setw(10)<<"Water Vol"<<std::endl;
   for(unsigned int d=0;d<deps.size();d++)
@@ -388,6 +390,17 @@ void Overflow(
     //worry about the extra water here any more.
     OverflowInto(this_dep.geolink, this_dep.parent, deps, jump_table, extra_water);
 
+    assert(
+         this_dep.water_vol==0 
+      || this_dep.water_vol<=this_dep.dep_vol
+      || (this_dep.lchild==NO_VALUE && this_dep.rchild==NO_VALUE) 
+      || (
+              this_dep.lchild!=NO_VALUE && this_dep.rchild!=NO_VALUE
+           && deps.at(this_dep.lchild).water_vol<this_dep.water_vol
+           && deps.at(this_dep.rchild).water_vol<this_dep.water_vol
+         )
+    );
+
     // std::cout<<"parent number "<<deps.at(this_dep.parent).dep_label<<" now has water volume "<<deps.at(this_dep.parent).water_vol<<std::endl;
   }
 
@@ -441,7 +454,7 @@ void Fill_Water(
     return;
 
   //changing tactics to start always from the leaves, then work your way up until you find something that isn't completely full. 
-  std::cerr<<"\n\n\033[35m####################### Fill Water\033[39m"<<std::endl;
+  // std::cerr<<"\n\n\033[35m####################### Fill Water\033[39m"<<std::endl;
 
   //TODO: Use hashset to avoid allocating massive chunks of memory.
   rd::Array2D<bool> visited(topo.width(),topo.height(),false);
@@ -452,13 +465,13 @@ void Fill_Water(
   //the cells processed by the depression hierarchy.
   GridCellZk_high_pq<elev_t> flood_q;                          
 
-  std::cerr<<"Bottom label      = "<<stdi.leaf_label<<std::endl;
-  std::cerr<<"Depression volume = "<<deps.at(stdi.top_label).dep_vol<<"\n";
-  std::cerr<<"Water volume      = "<<water_vol<<std::endl;
-  std::cerr<<"Allowed labels    = ";
-  for(auto x:stdi.my_labels)
-    std::cerr<<x<<" ";
-  std::cerr<<std::endl;
+  // std::cerr<<"Bottom label      = "<<stdi.leaf_label<<std::endl;
+  // std::cerr<<"Depression volume = "<<deps.at(stdi.top_label).dep_vol<<"\n";
+  // std::cerr<<"Water volume      = "<<water_vol<<std::endl;
+  // std::cerr<<"Allowed labels    = ";
+  // for(auto x:stdi.my_labels)
+  //   std::cerr<<x<<" ";
+  // std::cerr<<std::endl;
 
  
   { //Scope to limit pit_cell
@@ -467,7 +480,6 @@ void Fill_Water(
     //intermediate metadepressions until and including when we reach the
     //depression identified by stdi.top_label
     const auto pit_cell    = deps.at(stdi.leaf_label).pit_cell;
-    std::cout<<"pit cell "<<pit_cell<<" "<<stdi.leaf_label<<std::endl;
     assert(pit_cell>=0);
 
     flood_q.emplace(
@@ -494,14 +506,9 @@ void Fill_Water(
   //TODO: It's possible to accelerate this by greedily eating cells which belong
   //"only" to the meta-depression.
 
-  std::cout<<"about to start the flood_q while loop "<<label(1,1)<<std::endl;
   while(!flood_q.empty()){
     c = flood_q.top(); //TODO local var
     flood_q.pop();
-
-    std::cout<<"width "  <<topo.width()<<std::endl;
-    std::cout<<"x and y "<<c.x<< " "<<c.y<<std::endl;
-    std::cout<<"current cell elevation "<<topo(c.x,c.y)<<std::endl;
 
     //We keep track of the current volume of the depression by noting the total
     //elevation of the cells we've seen as well as the number of cells we've
@@ -518,8 +525,6 @@ void Fill_Water(
     //over a saddle point, this value can occasionally be negative. It will be
     //positive by the time we need to spread the water around.
     current_volume = cells_affected.size()*topo(c.x,c.y) - total_elevation; //TODO: Local var
-
-    std::cout<<"volume "<<current_volume<<" cells "<<cells_affected.size()<<" topo "<<topo(c.x,c.y)<<" total "<<total_elevation<<std::endl;
 
     //TODO: If this is false by a small margin, then it's a floating point issue
     //and this should be adjusted to be >=-1e-6 and water_vol should be made 0
@@ -550,15 +555,15 @@ void Fill_Water(
       //cells and fill things now.
       const auto my_elev = topo(c.x,c.y);
 
-      std::cerr<<"Attempting to fill depression..."<<std::endl;
-      std::cerr<<"\tLabel of last cell       = "<<label(c.x,c.y)       <<std::endl;
-      std::cerr<<"\tWater volume             = "<<water_vol       <<std::endl;
-      std::cerr<<"\tDepression volume        = "<<deps.at(stdi.top_label).dep_vol         <<std::endl;
-      std::cout<<"\tDepression number        = "<<stdi.leaf_label       <<std::endl;
-      std::cerr<<"\tCurrent volume           = "<<current_volume       <<std::endl;
-      std::cerr<<"\tTotal elevation          = "<<total_elevation      <<std::endl;
-      std::cerr<<"\tCurrent elevation        = "<<my_elev              <<std::endl;
-      std::cerr<<"\tNumber of cells affected = "<<cells_affected.size()<<std::endl;  
+      // std::cerr<<"Attempting to fill depression..."<<std::endl;
+      // std::cerr<<"\tLabel of last cell       = "<<label(c.x,c.y)       <<std::endl;
+      // std::cerr<<"\tWater volume             = "<<water_vol       <<std::endl;
+      // std::cerr<<"\tDepression volume        = "<<deps.at(stdi.top_label).dep_vol         <<std::endl;
+      // std::cerr<<"\tDepression number        = "<<stdi.leaf_label       <<std::endl;
+      // std::cerr<<"\tCurrent volume           = "<<current_volume       <<std::endl;
+      // std::cerr<<"\tTotal elevation          = "<<total_elevation      <<std::endl;
+      // std::cerr<<"\tCurrent elevation        = "<<my_elev              <<std::endl;
+      // std::cerr<<"\tNumber of cells affected = "<<cells_affected.size()<<std::endl;  
 
       //We will fill the depression so that the surface of the water is at this
       //elevation.
@@ -569,7 +574,7 @@ void Fill_Water(
         //stash as much as we can in this cell's water table. This is okay
         //because the above ground volume plus this cell's water table IS enough
         //volume (per the if-clause above).
-        std::cout<<"we are in the if"<<std::endl;
+
         //Fill in as much of this cell's water table as we can
         const double fill_amount = water_vol - current_volume;
         assert(fill_amount>=0);
@@ -592,22 +597,22 @@ void Fill_Water(
 
       //TODO: Use floating-point comparisons in these asserts.
       //Water level must be higher than (or equal to) the previous cell we looked at, but lower than (or equal to) the current cell
-      std::cout<<"water level = "<<water_level<<" last topo "<<topo(cells_affected.back())<<" "<<bool(topo(cells_affected.back())<=water_level)<<std::endl;
-      assert(cells_affected.size()==0 || topo(cells_affected.back())<=water_level);
-      std::cout<<"water level = "<<water_level<<" my topo "<<topo(c.x,c.y)<<std::endl;
+      // std::cerr<<"water level = "<<water_level<<" last topo "<<topo(cells_affected.back())<<" "<<bool(topo(cells_affected.back())<=water_level)<<std::endl;
+      assert(cells_affected.size()==0 || topo(cells_affected.back())<=water_level+FP_ERROR);
+      // std::cerr<<"water level = "<<water_level<<" my topo "<<topo(c.x,c.y)<<std::endl;
       assert(topo(c.x,c.y)-water_level>=-1e-3);
 
-      std::cerr<<"Adjusting wtd of depression...\n";
-      std::cerr<<"\twater_level = "<<water_level<<std::endl;
+      // std::cerr<<"Adjusting wtd of depression...\n";
+      // std::cerr<<"\twater_level = "<<water_level<<std::endl;
       for(const auto c: cells_affected){
-        std::cerr<<"Cell ("<<(c%topo.width())<<","<<(c/topo.width())<<") has elev="<<topo(c)<<", label="<<label(c)<<", wtd_old="<<wtd(c);
+        // std::cerr<<"Cell ("<<(c%topo.width())<<","<<(c/topo.width())<<") has elev="<<topo(c)<<", label="<<label(c)<<", wtd_old="<<wtd(c);
         assert(wtd(c)>=0);               //This should be true since we have been filling wtds as we go.
         if(water_level<topo(c)){
           PrintCellsAffectedProfile(cells_affected,my_elev,topo);
           assert(water_level>=topo(c));
         }
         wtd(c) = water_level - topo(c);  //only change the wtd if it is an increase, here. We can't take water away from cells that already have it (ie reduce groundwater in saddle cells within a metadepression.)
-        std::cerr<<", wtd_new="<<wtd(c)<<std::endl;
+        // std::cerr<<", wtd_new="<<wtd(c)<<std::endl;
         assert(wtd(c)>=0);
       }
 
@@ -617,19 +622,13 @@ void Fill_Water(
     }  else {
       //We haven't found enough volume for the water yet.
 
-      std::cout<<"we are in the else"<<std::endl;
-
       //During the adding of neighbours neighbours might get added that are
       //lower than we are and belong to a different depression (notably, this
       //happens at the edge of a flat abuting an ocean). These cells will then
       //be popped and could be processed inappropriately. To prevent this, we
       //skip them here.
-      if(stdi.my_labels.count(label(c.x,c.y))==0){  //CHECK. This was preventing cells that flowed to the ocean from allowing my depression volume to update. Is this way ok? Is this even needed?
-        std::cerr<<"Line "<<__LINE__<<std::endl;
-        if(flood_q.empty())
-          std::cout<<"that was the last cell"<<std::endl;
+      if(stdi.my_labels.count(label(c.x,c.y))==0)  //CHECK. This was preventing cells that flowed to the ocean from allowing my depression volume to update. Is this way ok? Is this even needed?
         continue;
-      }
 
       //Okay, we're allow to add this cell's neighbours since this cell is part
       //of the metadepression.
@@ -647,15 +646,13 @@ void Fill_Water(
       total_elevation += topo(c.x,c.y);   //TODO: Should this be wtd? No. Since wtd is zero as of the lines just above.
 
       for(int n=0;n<neighbours;n++){
-        std::cerr<<"in the for "<<n<<std::endl;
+        // std::cerr<<"in the for "<<n<<std::endl;
         const int nx = c.x + dx[n]; //TODO ModFloor(x+dx[n],topo.width()); //Get neighbour's x-coordinate using an offset and wrapping
         const int ny = c.y + dy[n];                     //Get neighbour's y-coordinate using an offset
-        if(!topo.inGrid(nx,ny))   {                       //Is this cell in the grid?
-          std::cerr<<"out of grid"<<std::endl;
+        if(!topo.inGrid(nx,ny))                         //Is this cell in the grid?
           continue;                                     //Nope: out of bounds.
-        }
      
-        std::cerr<<"PQ inspecting ("<<nx<<","<<ny<<") which has label "<<label(nx,ny)<<std::endl;
+        // std::cerr<<"PQ inspecting ("<<nx<<","<<ny<<") which has label "<<label(nx,ny)<<std::endl;
         //Ocean cells may be found at the edge of a depression. They might get
         //added to this list even if there are other, lower, cells within the
         //depression which have not yet been explored. This happens when a flat
@@ -669,7 +666,7 @@ void Fill_Water(
         //e.g. an escarpment before the ocean. 
 
         if(!visited(nx,ny) && topo(nx,ny)>OCEAN_LEVEL){                  // add the neighbour only if it hasn't been added before 
-          std::cerr<<"\tadding to the queue a value of "<<topo(nx,ny)<<" "<<" nx "<<nx<<" ny "<<ny<<" x "<<c.x<<" y "<<c.y<<std::endl;
+          // std::cerr<<"\tadding to the queue a value of "<<topo(nx,ny)<<" "<<" nx "<<nx<<" ny "<<ny<<" x "<<c.x<<" y "<<c.y<<std::endl;
           flood_q.emplace(nx,ny,topo(nx,ny));      //add all neighbours that haven't been added before to the queue. 
           visited(nx,ny) = true;
         }
@@ -682,20 +679,20 @@ void Fill_Water(
   //Therefore, if we've reached this point, something has gone horribly wrong
   //somewhere. :-(
 
-  std::cerr<<"PQ loop exited without filling a depression!"<<std::endl;
+  // std::cerr<<"PQ loop exited without filling a depression!"<<std::endl;
   
-  std::cerr<<"Allowed labels = ";
-  for(auto x:stdi.my_labels)
-    std::cerr<<x<<" ";
-  std::cerr<<std::endl;
+  // std::cerr<<"Allowed labels = ";
+  // for(auto x:stdi.my_labels)
+  //   std::cerr<<x<<" ";
+  // std::cerr<<std::endl;
 
   std::cerr<<"\tLabel of last cell       = "<<label(c.x,c.y)       <<std::endl;
   std::cerr<<"\tWater volume             = "<<water_vol       <<std::endl;
   std::cerr<<"\tCurrent volume           = "<<current_volume       <<std::endl;
   std::cerr<<"\tTotal elevation          = "<<total_elevation      <<std::endl;
   std::cerr<<"\tNumber of cells affected = "<<cells_affected.size()<<std::endl;  
-  PrintDEM("Visited", visited);
-  PrintDEM("Labels",  label  );
+  // PrintDEM("Visited", visited);
+  // PrintDEM("Labels",  label  );
   throw std::runtime_error("PQ loop exited without filling a depression!");
 
 }
@@ -721,7 +718,7 @@ SubtreeDepressionInfo Find_filled(
   if(current_depression==NO_VALUE)
     return SubtreeDepressionInfo();
 
-  std::cerr<<level<<"\033[93mInspecting depression "<<current_depression<<"\033[39m"<<std::endl;
+  // std::cerr<<level<<"\033[93mInspecting depression "<<current_depression<<"\033[39m"<<std::endl;
 
   const auto& this_dep = deps.at(current_depression);
 
@@ -918,19 +915,19 @@ int main(int argc, char **argv){
 
   PrintDEM("wtd", wtd, 9);
 
-  for(auto &depression:deps){//(unsigned int d=0;d<deps.size();d++){
-    std::cerr<<"Here's the list of all depressions with their parents and children: "
-             <<depression.dep_label<<" "
-             <<std::setw(3)<<depression.parent   <<" "
-             <<std::setw(3)<<depression.lchild   <<" "
-             <<std::setw(3)<<depression.rchild   <<" "
-             <<depression.water_vol
-             <<std::endl;
-    std::cerr<<"\tOcean-linked = ";
-    for(auto x: depression.ocean_linked)
-      std::cerr<<x<<" ";
-    std::cerr<<std::endl;
-  }
+  // for(auto &depression:deps){//(unsigned int d=0;d<deps.size();d++){
+  //   std::cerr<<"Here's the list of all depressions with their parents and children: "
+  //            <<depression.dep_label<<" "
+  //            <<std::setw(3)<<depression.parent   <<" "
+  //            <<std::setw(3)<<depression.lchild   <<" "
+  //            <<std::setw(3)<<depression.rchild   <<" "
+  //            <<depression.water_vol
+  //            <<std::endl;
+  //   std::cerr<<"\tOcean-linked = ";
+  //   for(auto x: depression.ocean_linked)
+  //     std::cerr<<x<<" ";
+  //   std::cerr<<std::endl;
+  // }
   
 
   std::cerr<<"\n\n\033[91m#######################Finding Filled\033[39m"<<std::endl;
