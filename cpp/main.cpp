@@ -29,6 +29,8 @@ const int neighbours         = 8;
 const float  OCEAN_LEVEL = -9999;  //ocean_level in the topo file must be lower than any non-ocean cell. 
 
 rd::Array2D<flowdir_t> flowdirs; //TODO: Make non-global
+rd::Array2D<int> cell_ids; //TODO: Eliminate
+
 template<class T>
 void PrintStamp(const std::string title, const rd::Array2D<T> &arr, const int x0, const int y0, const int r, const int width=2){
   std::cout<<"\n"<<title<<std::endl;
@@ -767,7 +769,14 @@ int main(int argc, char **argv){
 
   rd::Array2D<float> topo = LoadData<float>(in_name,std::string("value"));   //Recharge (Percipitation minus Evapotranspiration)
 
-  PrintDEM("Topography", topo);
+//  PrintDEM("Topography", topo);
+
+  //TODO: eliminate
+  cell_ids.resize(topo.width(),topo.height());
+  for(int y=0;y<topo.height();y++)
+  for(int x=0;x<topo.width();x++)
+    cell_ids(x,y) = y*topo.width()+x;
+
 
   rd::Array2D<float>     wtd     (topo.width(), topo.height(), 1      ); //All cells have some water
   rd::Array2D<label_t>   label   (topo.width(), topo.height(), NO_DEP ); //No cells are part of a depression
