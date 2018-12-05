@@ -79,12 +79,6 @@ void PrintDEM(const std::string title, const rd::Array2D<flowdir_t> &arr, const 
 }
 
 
-//TODO
-// template<class T>
-// void mWvol(const int dep, std::vector<Depression<elev_t> > &deps){
-// 
-// }
-
 
 //Richard: Checked this
 template<class elev_t>
@@ -178,14 +172,11 @@ void SurfaceWater(
     if (n == NO_FLOW){    //if this is a pit cell, move the water to the appropriate depression's water_vol.    
       if(wtd(c)>0){
         deps[label(c)].water_vol += wtd(c);
-        // std::cout<<"Giving water to "<<label(c)<<" "<<c<<" "<<deps[label(c)].water_vol<<std::endl;
-   //   std::cout<<"the total water in this depression is "<<deps[label(c)].water_vol<<" and it is depression "<<label(c)<<std::endl;
         wtd(c) = 0; //Clean up as we go
       }
     } else {                               //not a pit cell
       //If we have water, pass it downstream.
       if(wtd(c)>0){ //Groundwater can go negative, so it's important to make sure that we are only passing positive water around
-    //    std::cout<<"we have water coming from "<<c<<" and going to "<<n<<std::endl;
         wtd(n) += wtd(c);  //Add water to downstream neighbour. This might result in filling up the groundwater table, which could have been negative
         wtd(c)  = 0;       //Clean up as we go
       }
@@ -204,11 +195,7 @@ void SurfaceWater(
 }
 
 
- //TODO: 0. Calculate the number of cells within and volume of each depression.   DONE 
-  //This will take place inside of GetDepressionHierarchy.
- 
 
- //TODO 1. DONE. Get flow directions for all cells. 
 
   //TODO 2. Perform a flow accumulation moving water downhill and filling             NEARLY DONE - think about oceans
   //groundwater as you go. Look at `misc/main.cpp`. Recall that we did this by
@@ -253,7 +240,6 @@ void Overflow(
   if(current_depression==OCEAN)
     return;
 
-  // std::cout<<"depression number "<<this_dep.dep_label<<" volume "<<this_dep.dep_vol<<" water "<<this_dep.water_vol<<std::endl;
 
   //Each depression has an associated dep_vol. This is the TOTAL volume of the
   //meta-depression including all of its children. This property answers the
