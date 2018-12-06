@@ -12,6 +12,7 @@
 #include <richdem/common/Array2D.hpp>
 #include <richdem/common/timer.hpp>
 #include <richdem/common/ProgressBar.hpp>
+#include <richdem/depressions/depressions.hpp>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -965,6 +966,16 @@ int main(int argc, char **argv){
   Find_filled(OCEAN,deps,topo,label,wtd);                              //This should check everything that is an immediate child of the ocean, so we're supposed to hit all the depressions like this. 
        
   SaveAsNetCDF(wtd,out_name+"-wtd.nc","value");
+
+  for(int i=0;i<topo.size();i++)
+    if(!topo.isNoData(i))
+      wtd(i) += topo(i);
+
+  SaveAsNetCDF(wtd,out_name+"-flooded.nc","value");
+
+  rd::FillDepressions<rd::Topology::D8>(topo);
+  SaveAsNetCDF(topo,out_name+"-filled.nc","value");
+
 
 
   std::cerr<<"Finished"<<std::endl;
