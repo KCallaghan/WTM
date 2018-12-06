@@ -22,7 +22,7 @@
 #include <queue>
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
+#include <unordered_map>
 #include <utility>
 
 namespace rd = richdem;
@@ -203,6 +203,20 @@ class Depression {
 //depression become known we can use the WLE to calculate their volumes. The
 //volume of a depression is its WLE minus the WLEs of its child depressions.
 
+class OutletLink {
+ public:
+  label_t depa;
+  label_t depb;
+  OutletLink() = default;
+  OutletLink(label_t depa0, label_t depb0){
+    depa = depa0;
+    depb = depb0;
+  }
+  bool operator==(const OutletLink &o) const {
+    return (depa==o.depa && depb==o.depb) || (depa==o.depb && depb==o.depa);
+  }
+};
+
 
 
 //A key part of the algorithm is keeping track of the outlets which connect
@@ -229,6 +243,8 @@ class Outlet {
 
   //TODO: Each outlet should also track the number of cells contained in the
   //depression and the volume of the depression - DONE! (I think)
+
+  Outlet() = default;
 
   //Standard issue constructor
   Outlet(label_t depa0, label_t depb0, label_t out_cell0, elev_t out_elev0){
@@ -261,7 +277,7 @@ class Outlet {
 //key for outlets here.
 template<class elev_t>
 struct OutletHash {
-  std::size_t operator()(const Outlet<elev_t> &out) const {
+  std::size_t operator()(const OutletLink &out) const {
     //XOR may not be the most robust key, but it is commutative, which means
     //that the order in which the depressions are stored in the outlet doesn't
     //affect the hash. (TODO: Use bit shifting to make a better hash)
@@ -348,7 +364,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //This keeps track of the outlets we find. Each pair of depressions can only
   //be linked once and the first link found between them is the one which is
   //retained.
-  typedef std::unordered_set<Outlet<elev_t>, OutletHash<elev_t>> outletdb_t;
+  typedef std::unordered_map<OutletLink, Outlet<elev_t>, OutletHash<elev_t>> outletdb_t;
   outletdb_t outlet_database;
 
   //The priority queue ensures that cells are visited in order from lowest to
@@ -583,11 +599,19 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
         
     //    outlet_database.emplace(clabel,nlabel,out_cell,out_elev,a_vol,b_vol,a_cells,b_cells);                           //I am NO LONGER getting negative volumes! Hooray! However, we should only do this when we actually reach the outlet cell at its turn in the priority queue. How to do so? 
-       
+        
 
-        outlet_database.emplace(clabel,nlabel,out_cell,out_elev);   
-
-              
+        //TODO
+        const OutletLink olink(clabel,nlabel);
+        if(outlet_database.count(olink)!=0){
+          auto &outlet = outlet_database.at(olink);
+          if(outlet.out_elev>out_elev){
+            outlet.out_cell = out_cell;
+            outlet.out_elev = out_elev;
+          }
+        } else {
+          outlet_database[olink] = Outlet<elev_t>(clabel,nlabel,out_cell,out_elev);   
+        }
       }
 
 
@@ -626,7 +650,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   outlets.reserve(outlet_database.size());
 
   //Copy the database into the vector
-  std::copy(outlet_database.begin(), outlet_database.end(), std::back_inserter(outlets));
+  for(const auto &o: outlet_database)
+    outlets.push_back(o.second);
 
   //It's a little difficult to free memory, but this should do it by replacing
   //the outlet database with an empty database.
