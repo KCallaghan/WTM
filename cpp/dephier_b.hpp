@@ -637,6 +637,10 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     return a.out_elev<b.out_elev;
   });
 
+  //TODO: For debugging
+  for(unsigned int i=0;i<outlets.size()-1;i++)
+    assert(outlets.at(i).out_elev<=outlets.at(i+1).out_elev);
+
   //Now that we have the outlets in order, we'll visit them from lowest to
   //highest. If two outlets are at the same elevation we visit them in an
   //arbitrary order. Each outlet we find is the unique lowest connection between
@@ -712,8 +716,9 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       // if(dep.out_cell==OCEAN)
         // continue;
 
-      //If this depression already has an outlet, then there's a big problem.
+      //Ensure we don't modify depressions that have already found their paths
       assert(dep.out_cell==-1);
+      assert(dep.odep==NO_VALUE);            
 
       //Point this depression to the ocean through Depression B Label
       dep.parent       = outlet.depb;        //Set Depression Meta(A) parent
@@ -729,6 +734,11 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //into a new depression.
       auto &depa          = depressions.at(depa_set); //Reference to Depression A MetaLabel
       auto &depb          = depressions.at(depb_set); //Reference to Depression B MetaLabel
+
+      //Ensure we haven't already given these depressions outlet information
+      assert(depa.odep==NO_VALUE);     
+      assert(depb.odep==NO_VALUE);
+
       const auto newlabel = depressions.size();       //Label of A and B's new parent depression
       // std::cerr<<"\tMerging "<<depa_set<<" and "<<depb_set<<" into "<<newlabel<<"!"<<std::endl;
       // std::cerr<<"\tNew parent = "<<newlabel<<std::endl;
