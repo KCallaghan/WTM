@@ -696,8 +696,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     ++progress;
     auto depa_set = djset.findSet(outlet.depa); //Find the ultimate parent of Depression A
     auto depb_set = djset.findSet(outlet.depb); //Find the ultimate parent of Depression B
-    // std::cerr<<"Considering "<<outlet.depa<<" "<<outlet.depb<<std::endl;
-    // std::cerr<<"\tConsidering "<<depa_set<<" "<<depb_set<<std::endl;
     
     //If the depressions are already part of the same meta-depression, then
     //nothing needs to be done.
@@ -734,8 +732,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       auto &dep = depressions.at(depa_set);
 
       //TODO: Calculate a final cell count and "volume" for the depression                                                -->Each outlet has recorded the cell count and volume for its two depressions. So what would we want here? The totals for metadepressions? 
-      //                                                                                                                  //I have recorded the new totals in depression A but not sure if this is right. 
-      // std::cerr<<"\tMerging "<<depa_set<<" into the ocean via "<<outlet.depb<<"!"<<std::endl;
 
       //If this depression has already found the ocean then don't merge it
       //again. (TODO: Richard)
@@ -766,8 +762,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       assert(depb.odep==NO_VALUE);
 
       const auto newlabel = depressions.size();       //Label of A and B's new parent depression
-      // std::cerr<<"\tMerging "<<depa_set<<" and "<<depb_set<<" into "<<newlabel<<"!"<<std::endl;
-      // std::cerr<<"\tNew parent = "<<newlabel<<std::endl;
       depa.parent   = newlabel;        //Set Meta(A)'s parent to be the new meta-depression
       depb.parent   = newlabel;        //Set Meta(B)'s parent to be the new meta-depression
       depa.out_cell = outlet.out_cell; //Note that this is Meta(A)'s outlet
