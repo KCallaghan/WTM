@@ -478,7 +478,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     const auto ci    = dem.xyToI(c.x,c.y); //Flat-index of focal cell
     auto clabel      = label(ci);          //Nominal label of cell
 
-// std::cout<<"Now pulling cell number "<<ci<<" with elevation "<<celev<<std::endl;
     if(clabel==OCEAN){
       //This cell is an ocean cell or a cell that flows into the ocean without
       //encountering any depressions on the way. Upon encountering it we do not
@@ -593,25 +592,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
 
     }
-      
-
-
-        
-
-    //TODO: Remove. Prints the elevation and labels arrays for testing.
- //   if(label.width()`0){
-  //    for(int y=0;y<label.height();y++){
-  //      for(int x=0;x<label.width();x++)
-   //       std::cerr<<std::setw(3)<<dem(x,y)<<" ";  
-  //      std::cerr<<"    ";  
-  //      for(int x=0;x<label.width();x++)
-   //       std::cerr<<std::setw(3)<<label(x,y)<<" ";
-   //     std::cerr<<std::endl;
-  //    }
-  //    std::cerr<<std::endl;
- //   }
-
-
   }
   progress.stop();
 
