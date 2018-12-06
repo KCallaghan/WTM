@@ -1,3 +1,5 @@
+#include "parameters.hpp"
+
 int main(){
   rd::Array2D<float> topo_start   = LoadData<float>(surfdatadir + time_start + "_topo_rotated.nc");
   rd::Array2D<float> topo_end     = LoadData<float>(surfdatadir + time_end   + "_topo_rotated.nc");
@@ -10,8 +12,6 @@ int main(){
 
   rd::Array2D<float> temp_start   = LoadData<float>(surfdatadir + time_start + "_temp_rotated.nc");
   rd::Array2D<float> temp_end     = LoadData<float>(surfdatadir + time_end   + "_temp_rotated.nc");
-
-
 
   rd::Array2D<bool>   equilibrated(topo.width(),topo.height(),false); //Indicates which cells must still be processed
   rd::Array2D<double> head        (topo.width(),topo.height(),   0);  //Indicates which cells must still be processed
