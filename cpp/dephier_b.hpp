@@ -750,11 +750,11 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //resize!
       const auto depa_pitcell_temp = depa.pit_cell;
 
-      auto &newdep  = depressions.emplace_back();                                                                       //is it right to create a new depression for the metadepression like this?
-      newdep.lchild = depa_set;
-      newdep.rchild = depb_set; 
+      auto &newdep     = depressions.emplace_back();                                                                       //is it right to create a new depression for the metadepression like this?
+      newdep.lchild    = depa_set;
+      newdep.rchild    = depb_set; 
       newdep.dep_label = newlabel;
-      newdep.pit_cell = depa_pitcell_temp;
+      newdep.pit_cell  = depa_pitcell_temp;
 
       djset.mergeAintoB(depa_set, newlabel); //A has a parent now
       djset.mergeAintoB(depb_set, newlabel); //B has a parent now
