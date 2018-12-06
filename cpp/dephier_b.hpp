@@ -204,20 +204,6 @@ class Depression {
 //depression become known we can use the WLE to calculate their volumes. The
 //volume of a depression is its WLE minus the WLEs of its child depressions.
 
-class OutletLink {
- public:
-  label_t depa;
-  label_t depb;
-  OutletLink() = default;
-  OutletLink(label_t depa0, label_t depb0){
-    depa = depa0;
-    depb = depb0;
-  }
-  bool operator==(const OutletLink &o) const {
-    return (depa==o.depa && depb==o.depb) || (depa==o.depb && depb==o.depa);
-  }
-};
-
 
 
 //A key part of the algorithm is keeping track of the outlets which connect
@@ -225,6 +211,24 @@ class OutletLink {
 //many inlets. All of the outlets and inlets taken together form a graph which
 //we can traverse to determine which way water flows. This class keeps track of
 //which cell links two depressions, as well as the elevation of that cell.
+
+//The OutletLink is used as a key for a hashtable which stores information about
+//the outlets.
+class OutletLink {
+ public:
+  label_t depa;
+  label_t depb;
+  OutletLink() = default;
+  OutletLink(label_t depa0, label_t depb0) : depa(depa0), depb (depb0) {}
+  //This is used to compare two outlets. The outlets are the same regardless of
+  //the order in which they store depressions
+  bool operator==(const OutletLink &o) const {
+    return (depa==o.depa && depb==o.depb) || (depa==o.depb && depb==o.depa);
+  }
+};
+
+//The outlet class stores, again, the depressions being linked as well as
+//information about the link
 template<class elev_t>
 class Outlet {
  public:
@@ -234,13 +238,10 @@ class Outlet {
   //Elevation of the cell linking A and B
   elev_t  out_elev = std::numeric_limits<elev_t>::infinity();
 
-
 //  double depa_vol = 0;    //volume and number of cells in each of the two depressions linked by this outlet. 
 //  double depb_vol = 0;
 //  int depa_cells = 0;
 //  int depb_cells = 0;
-
-
 
   //TODO: Each outlet should also track the number of cells contained in the
   //depression and the volume of the depression - DONE! (I think)
@@ -271,11 +272,9 @@ class Outlet {
   }
 };
 
-
-
-//We'll initially keep track of outlets using a hash-set. Hash sets require that
-//every item they contain be reducible to a numerical "key". We provide such a
-//key for outlets here.
+//We'll initially keep track of outlets using a hash table. Hash tables require
+//that every item they contain be reducible to a numerical "key". We provide
+//such a key for outlets here.
 template<class elev_t>
 struct OutletHash {
   std::size_t operator()(const OutletLink &out) const {
@@ -363,7 +362,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   DepressionHierarchy<elev_t> depressions;
 
   //This keeps track of the outlets we find. Each pair of depressions can only
-  //be linked once and the first link found between them is the one which is
+  //be linked once and the lowest link found between them is the one which is
   //retained.
   typedef std::unordered_map<OutletLink, Outlet<elev_t>, OutletHash<elev_t>> outletdb_t;
   outletdb_t outlet_database;
@@ -470,7 +469,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //many elevations. Later on we'll fix this and some of those outlets will
   //become inlets or the outlets of meta-depressions.
 
-  //The hash set of outlets will dynamically resize as we add elements to it.
+  //The hash table of outlets will dynamically resize as we add elements to it.
   //However, this slows things down a bit. Therefore, we presize the hash set to
   //be equal to be 3x the number of pit cells plus the ocean cell. 3 is just a
   //guess as to how many neighbouring depressions each depression will have. If
@@ -574,23 +573,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
           out_elev = dem(ni);  //Note neighbour's elevation
         }
 
-        //Add the outlet to the database. But note that if an outlet linking
-        //these two depressions has previously been found then that other outlet
-        //is of equal or lesser elevation than the current one and should be
-        //retained instead of the current one. The hash functions and Outlet
-        //comparators we developed earlier ensure that this is done correctly,
-        //so here we just try to add the current outlet to the database; if it
-        //shouldn't be there, then nothing will happen.
-
         //TODO: Make a note of the depression's current number of cells and
         //volume                                                                                          --> Done below. 
-       
-
-
-          //the outlet stores the volume and number of cells in that depression up to that point. The depression itself should then store the total number of cells and total sum of elevations (but not volume).
-          //we know that that's the lowest link between those two depressions, but not if it's the lowest overall outlet of the depression (vs if it's an inlet). 
-          //I have added two separate variables to the outlet class, one for volume of each depression. 
-        
 
   //      a_vol = depressions[clabel].cell_count * out_elev - depressions[clabel].dep_sum_elevations;
     //    b_vol = depressions[nlabel].cell_count * out_elev - depressions[nlabel].dep_sum_elevations;
@@ -602,19 +586,36 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     //    outlet_database.emplace(clabel,nlabel,out_cell,out_elev,a_vol,b_vol,a_cells,b_cells);                           //I am NO LONGER getting negative volumes! Hooray! However, we should only do this when we actually reach the outlet cell at its turn in the priority queue. How to do so? 
         
 
-        //TODO
-        const OutletLink olink(clabel,nlabel);
-        if(outlet_database.count(olink)!=0){
-          auto &outlet = outlet_database.at(olink);
-          if(outlet.out_elev>out_elev){
-            outlet.out_cell = out_cell;
-            outlet.out_elev = out_elev;
+        //We've found an outlet between two depressions. Now we need to
+        //determine if it is the lowest outlet between the two.
+
+        //Even though we pull cells off of the priority queue in order of
+        //increasing elevation, we can still add a link between depressions that
+        //is not as low as it could be. This can happen at saddle points, for
+        //instance, consider the cells A-H and their corresponding elevations.
+        //Cells in parantheses are in a neighbouring depression
+        //     (B) (C) (D)   (256) (197) (329)
+        //      A   X   E     228    X    319
+        //      H   G   F     255   184   254
+
+        //In this case we are at Cell X. Cells B, C, and D have previously been
+        //added. Cell G has added X and X has just been popped. X considers its
+        //neighbours in order from A to H. It finds B, at elevation 256, and
+        //makes a note that its depression links with B's depression. It then
+        //sees Cell C, which is in the same depression as B, and has to update
+        //the outlet information between the two depressions.
+
+        const OutletLink olink(clabel,nlabel);      //Create outlet link (order of clabel and nlabel doesn't matter)
+        if(outlet_database.count(olink)!=0){        //Determine if the outlet is already present
+          auto &outlet = outlet_database.at(olink); //It was. Use the outlet link to get the outlet information
+          if(outlet.out_elev>out_elev){             //Is the previously stored link higher than the new one?
+            outlet.out_cell = out_cell;             //Yes. So update the link with new outlet cell
+            outlet.out_elev = out_elev;             //Also, update the outlet's elevation
           }
-        } else {
+        } else {                                    //No preexisting link found; create a new one
           outlet_database[olink] = Outlet<elev_t>(clabel,nlabel,out_cell,out_elev);   
         }
       }
-
 
     }
   }
