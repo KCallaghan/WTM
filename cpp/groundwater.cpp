@@ -24,8 +24,6 @@ int main(int argc, char **argv){
   const double SEDGE  = -60;           //Southern-most latitude
   const double wtdmax = 0;             //Water table depth is 0. TODO: This should probably be changed when I start bringing in the lakes. 
 
-
-
   const double deltat = 365*24*3600.0; //Seconds in an annual timestep
   
   const double dltxy  = 120;           //There are 120 30 arc-second pieces in one degree
@@ -71,23 +69,27 @@ int main(int argc, char **argv){
   const std::string initdatadir = "initdata/"; //Mask and wtd go here
 
   timer_io.start();
-  rd::Array2D<float> topo   = LoadData<float>(surfdatadir       + region + "_topo.nc";
-  rd::Array2D<float> fdepth = LoadData<float>(surfdatadir       + region + "_fslope.nc";
-  rd::Array2D<float> ksat   = LoadData<float>(surfdatadir                + "_ksat.nc";
-  rd::Array2D<float> rech   = LoadData<float>(surfdatadir + HAD + region + "_rech.nc";
-  rd::Array2D<float> mask   = LoadData<float>(initdatadir       + region + "_mask.nc";
-  rd::Array2D<float> wtd    = LoadData<float>(initdatadir       + region + "_wtd.nc";
-  rd::Array2D<float> temp   = LoadData<float>(surfdatadir + HAD + region + "_temp.nc";
+  rd::Array2D<float> ksat   = LoadData<float>(surfdatadir                + "_ksat.nc");
+  rd::Array2D<float> mask   = LoadData<float>(initdatadir       + region + "_mask.nc");
+  rd::Array2D<float> wtd    = LoadData<float>(initdatadir       + region + "_wtd.nc");
+  rd::Array2D<float> temp   = LoadData<float>(surfdatadir + HAD + region + "_temp.nc");
+  rd::Array2D<float> topo   = LoadData<float>(surfdatadir       + region + "_topo.nc");
+  rd::Array2D<float> rech   = LoadData<float>(surfdatadir + HAD + region + "_rech.nc");
+  rd::Array2D<float> fdepth = LoadData<float>(surfdatadir       + region + "_fslope.nc");
   timer_io.stop();
 
   rd::Array2D<bool>   equilibrated(topo.width(),topo.height(),false); //Indicates which cells must still be processed
   rd::Array2D<double> head        (topo.width(),topo.height(),   0);  //Indicates which cells must still be processed
   rd::Array2D<bool>   landmask    (topo.width(),topo.height(),   0);  //TODO: Not initialized in Kerry's code
 
-
-  for(auto i=topo.i0();i<topo.size();i++)       //Change undefined cells to 0
+  for(auto i=topo.i0();i<topo.size();i++){       //Change undefined cells to 0
     if(topo(i)<=UNDEF)
       topo(i)=0;
+    // if(topo_start(i)<=UNDEF)
+    //   topo_start(i)=0;
+    // if(topo_end(i)<=UNDEF)
+    //   topo_end(i)=0;
+  }
 
   wtd.setAll(0);  //No longer using an input water table! 
 
@@ -112,25 +114,8 @@ int main(int argc, char **argv){
     if(fdepth_start<0.0001)
       fdepth_start = 0.0001; //Change undefined cells to 0. TODO: Shouldn't there be a cleaner way to do this?
   }
-
-
-
-
-
-
-
-
-
-
-
-
  
   //rech_month_read = (rech_read/12.)  
-
-
-
-
-
 
   //Determine area of cells at each latitude
   // std::vector<double> dvec xlat;
@@ -153,16 +138,12 @@ int main(int argc, char **argv){
   //     end do
   // end if
 
-
-
-
- 
   int iter = 0;            //Count the number of iterations. This is used to know when to switch from annual to monthly cycles. 
   
   int total_cells_to_equilibriate = 0.99*ntotal; //We will use this to get numbertotal less than x % land cells as equilibrium condition
   
   //Start of the main loop with condition - either number of iterations or % equilibrium. I am going for 99% equilibrium. 
-  while(total_cells_to_equilibriate-->0 && iter<400000){
+  while(total_cells_to_equilibriate>0 && iter<400000){
     if(rank==0) 
       std::cerr<<"Iteration #: "<<iter<<std::endl;
         // write (15,*) 'PID = 0. Numbertotal:',numbertotal,'ntotal',ntotal
@@ -223,10 +204,10 @@ int main(int argc, char **argv){
 
       //It seems like we are getting the total which will be discharged from each cell
       double q = 0;
-      q  = q + (kcell(i,j+1)+kcell(i,j))*(head(i,j+1)-head(i,j)) * cos(xlat(j)+pi/(180.*dltxy*2.)) //North   !soo... we're just adding to the total q each time? we're getting a total discharge but not actually moving it in these directions?
-      q  = q + (kcell(i,j-1)+kcell(i,j))*(head(i,j-1)-head(i,j)) * cos(xlat(j)-pi/(180.*dltxy*2.)) //South
-      q  = q + (kcell(i-1,j)+kcell(i,j))*(head(i-1,j)-head(i,j)) / cos(xlat(j))                    //West
-      q  = q + (kcell(i+1,j)+kcell(i,j))*(head(i+1,j)-head(i,j)) / cos(xlat(j))                    //East
+      q += (kcell(i,j+1)+kcell(i,j))*(head(i,j+1)-head(i,j)) * cos(xlat(j)+pi/(180.*dltxy*2.)) //North   !soo... we're just adding to the total q each time? we're getting a total discharge but not actually moving it in these directions?
+      q += (kcell(i,j-1)+kcell(i,j))*(head(i,j-1)-head(i,j)) * cos(xlat(j)-pi/(180.*dltxy*2.)) //South
+      q += (kcell(i-1,j)+kcell(i,j))*(head(i-1,j)-head(i,j)) / cos(xlat(j))                    //West
+      q += (kcell(i+1,j)+kcell(i,j))*(head(i+1,j)-head(i,j)) / cos(xlat(j))                    //East
 
       //And we multiply it with alpha, which somehow brings in the timestep?
       qlat(x,y) = alpha(j)*q;
@@ -242,6 +223,8 @@ int main(int argc, char **argv){
      //       (a) if total <0, meaning too much lateral flows i.e., water table is too high.
      //       (b) if total >0, meaning too little lateral flow, i.e., water table is too low.
 
+
+
       if(total .lt. -1.) then           //adjustment size depending on how far off it is
           wtd(i,j) = wtd(i,j) -d3       //we use d0-d3 as different size increments of adjustment
           numbercount = numbercount + 1 //and count the cell as not yet being in equilibrium. 
@@ -255,8 +238,9 @@ int main(int argc, char **argv){
           wtd(i,j) = wtd(i,j) -d0
           numbercount = numbercount + 1
 
-!##############################################################################################################change for lakes
-      elseif(total .gt. 1. .and.wtd(i,j).lt.wtdmax) then                   !for now, we have to prevent more from pooling on the surface or we never get equilibrium. BUT this clearly has to change with lakes!
+//##############################################################################################################change for lakes
+//for now, we have to prevent more from pooling on the surface or we never get equilibrium. BUT this clearly has to change with lakes!
+      elseif(total .gt. 1. .and.wtd(i,j).lt.wtdmax) then                   
           wtd(i,j) = wtd(i,j) +d3
           numbercount = numbercount + 1
       elseif (total .gt. 0.25 .and.wtd(i,j).lt.wtdmax) then
@@ -268,29 +252,21 @@ int main(int argc, char **argv){
       elseif (total .gt. thres .and.wtd(i,j).lt.wtdmax) then
           wtd(i,j) = wtd(i,j) +d0
           numbercount = numbercount + 1
-      !things which are between -thres and thres do not change; they are in equilibrium.
-      endif
 
-
-     if (numberold .ne. numbercount) then
-         mask(i+1,j) = 1 !tag cells to show they are still not in equilibrium.
-         mask(i-1,j) = 1
-         mask(i,j+1) = 1
-         mask(i,j-1) = 1
-         mask(i,j)   = 1
-     endif
-
-
-        endif
-    end do
-end do
-
+      if(-thres<=total && total<=thres){  //Did we adjust this cell?
+        total_cells_to_equilibriate--;   //If we didn't adjust the cell, we don't need to think about it again
+      } else {
+        const int eq_count = equilibrated(i+1,j)+equilibrated(i-1,j)+equilibrated(i,j+1)+equilibrated(i,j-1)+equilibrated(i,j);
+        total_cells_to_equilibriate -= eq_count;  //If these cells thought they were equilibrated, they thought wrong
+        mask(i+1,j) = false;
+        mask(i-1,j) = false;
+        mask(i,j+1) = false;
+        mask(i,j-1) = false;
+        mask(i,j)   = false;
+      }
 
 
  maskold = mask !to record which cells still need to be processed.
-
- numbertotal = numbercount !total number of cells still out of equilibrium this iteration
-                     
 
 
 //Sending and receiving the lines on either side of each section to allow for flow across those lines. 
