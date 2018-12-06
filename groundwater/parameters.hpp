@@ -10,6 +10,8 @@ class Parameters {
   int width      = -1;
   int height     = -1;
 
+  std::string name;
+
   std::string start_name;
   std::string end_name;
 
@@ -20,6 +22,8 @@ class Parameters {
   const double dy    = 6370000.*pi/(180.*delta_xy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
 
   double deltat = std::numeric_limits<double>::signaling_NaN();
+
+  void print() const;
 };
 
 Parameters LoadParameters(const std::string config_file);
