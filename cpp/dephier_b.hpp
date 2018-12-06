@@ -12,6 +12,7 @@
 #include <richdem/common/timer.hpp>
 #include <richdem/common/ProgressBar.hpp>
 #include "DisjointDenseIntSet.hpp"
+#include "netcdf.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -22,7 +23,7 @@
 #include <queue>
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
+#include <unordered_map>
 #include <utility>
 
 namespace rd = richdem;
@@ -210,6 +211,24 @@ class Depression {
 //many inlets. All of the outlets and inlets taken together form a graph which
 //we can traverse to determine which way water flows. This class keeps track of
 //which cell links two depressions, as well as the elevation of that cell.
+
+//The OutletLink is used as a key for a hashtable which stores information about
+//the outlets.
+class OutletLink {
+ public:
+  label_t depa;
+  label_t depb;
+  OutletLink() = default;
+  OutletLink(label_t depa0, label_t depb0) : depa(depa0), depb (depb0) {}
+  //This is used to compare two outlets. The outlets are the same regardless of
+  //the order in which they store depressions
+  bool operator==(const OutletLink &o) const {
+    return (depa==o.depa && depb==o.depb) || (depa==o.depb && depb==o.depa);
+  }
+};
+
+//The outlet class stores, again, the depressions being linked as well as
+//information about the link
 template<class elev_t>
 class Outlet {
  public:
@@ -219,16 +238,15 @@ class Outlet {
   //Elevation of the cell linking A and B
   elev_t  out_elev = std::numeric_limits<elev_t>::infinity();
 
-
 //  double depa_vol = 0;    //volume and number of cells in each of the two depressions linked by this outlet. 
 //  double depb_vol = 0;
 //  int depa_cells = 0;
 //  int depb_cells = 0;
 
-
-
   //TODO: Each outlet should also track the number of cells contained in the
   //depression and the volume of the depression - DONE! (I think)
+
+  Outlet() = default;
 
   //Standard issue constructor
   Outlet(label_t depa0, label_t depb0, label_t out_cell0, elev_t out_elev0){
@@ -254,14 +272,12 @@ class Outlet {
   }
 };
 
-
-
-//We'll initially keep track of outlets using a hash-set. Hash sets require that
-//every item they contain be reducible to a numerical "key". We provide such a
-//key for outlets here.
+//We'll initially keep track of outlets using a hash table. Hash tables require
+//that every item they contain be reducible to a numerical "key". We provide
+//such a key for outlets here.
 template<class elev_t>
 struct OutletHash {
-  std::size_t operator()(const Outlet<elev_t> &out) const {
+  std::size_t operator()(const OutletLink &out) const {
     //XOR may not be the most robust key, but it is commutative, which means
     //that the order in which the depressions are stored in the outlet doesn't
     //affect the hash. (TODO: Use bit shifting to make a better hash)
@@ -346,9 +362,9 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   DepressionHierarchy<elev_t> depressions;
 
   //This keeps track of the outlets we find. Each pair of depressions can only
-  //be linked once and the first link found between them is the one which is
+  //be linked once and the lowest link found between them is the one which is
   //retained.
-  typedef std::unordered_set<Outlet<elev_t>, OutletHash<elev_t>> outletdb_t;
+  typedef std::unordered_map<OutletLink, Outlet<elev_t>, OutletHash<elev_t>> outletdb_t;
   outletdb_t outlet_database;
 
   //The priority queue ensures that cells are visited in order from lowest to
@@ -453,7 +469,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //many elevations. Later on we'll fix this and some of those outlets will
   //become inlets or the outlets of meta-depressions.
 
-  //The hash set of outlets will dynamically resize as we add elements to it.
+  //The hash table of outlets will dynamically resize as we add elements to it.
   //However, this slows things down a bit. Therefore, we presize the hash set to
   //be equal to be 3x the number of pit cells plus the ocean cell. 3 is just a
   //guess as to how many neighbouring depressions each depression will have. If
@@ -478,7 +494,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     const auto ci    = dem.xyToI(c.x,c.y); //Flat-index of focal cell
     auto clabel      = label(ci);          //Nominal label of cell
 
-// std::cout<<"Now pulling cell number "<<ci<<" with elevation "<<celev<<std::endl;
     if(clabel==OCEAN){
       //This cell is an ocean cell or a cell that flows into the ocean without
       //encountering any depressions on the way. Upon encountering it we do not
@@ -558,23 +573,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
           out_elev = dem(ni);  //Note neighbour's elevation
         }
 
-        //Add the outlet to the database. But note that if an outlet linking
-        //these two depressions has previously been found then that other outlet
-        //is of equal or lesser elevation than the current one and should be
-        //retained instead of the current one. The hash functions and Outlet
-        //comparators we developed earlier ensure that this is done correctly,
-        //so here we just try to add the current outlet to the database; if it
-        //shouldn't be there, then nothing will happen.
-
         //TODO: Make a note of the depression's current number of cells and
         //volume                                                                                          --> Done below. 
-       
-
-
-          //the outlet stores the volume and number of cells in that depression up to that point. The depression itself should then store the total number of cells and total sum of elevations (but not volume).
-          //we know that that's the lowest link between those two depressions, but not if it's the lowest overall outlet of the depression (vs if it's an inlet). 
-          //I have added two separate variables to the outlet class, one for volume of each depression. 
-        
 
   //      a_vol = depressions[clabel].cell_count * out_elev - depressions[clabel].dep_sum_elevations;
     //    b_vol = depressions[nlabel].cell_count * out_elev - depressions[nlabel].dep_sum_elevations;
@@ -584,34 +584,40 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
         
     //    outlet_database.emplace(clabel,nlabel,out_cell,out_elev,a_vol,b_vol,a_cells,b_cells);                           //I am NO LONGER getting negative volumes! Hooray! However, we should only do this when we actually reach the outlet cell at its turn in the priority queue. How to do so? 
-       
-
-        outlet_database.emplace(clabel,nlabel,out_cell,out_elev);   
-
-              
-      }
-
-
-    }
-      
-
-
         
 
-    //TODO: Remove. Prints the elevation and labels arrays for testing.
- //   if(label.width()`0){
-  //    for(int y=0;y<label.height();y++){
-  //      for(int x=0;x<label.width();x++)
-   //       std::cerr<<std::setw(3)<<dem(x,y)<<" ";  
-  //      std::cerr<<"    ";  
-  //      for(int x=0;x<label.width();x++)
-   //       std::cerr<<std::setw(3)<<label(x,y)<<" ";
-   //     std::cerr<<std::endl;
-  //    }
-  //    std::cerr<<std::endl;
- //   }
+        //We've found an outlet between two depressions. Now we need to
+        //determine if it is the lowest outlet between the two.
 
+        //Even though we pull cells off of the priority queue in order of
+        //increasing elevation, we can still add a link between depressions that
+        //is not as low as it could be. This can happen at saddle points, for
+        //instance, consider the cells A-H and their corresponding elevations.
+        //Cells in parantheses are in a neighbouring depression
+        //     (B) (C) (D)   (256) (197) (329)
+        //      A   X   E     228    X    319
+        //      H   G   F     255   184   254
 
+        //In this case we are at Cell X. Cells B, C, and D have previously been
+        //added. Cell G has added X and X has just been popped. X considers its
+        //neighbours in order from A to H. It finds B, at elevation 256, and
+        //makes a note that its depression links with B's depression. It then
+        //sees Cell C, which is in the same depression as B, and has to update
+        //the outlet information between the two depressions.
+
+        const OutletLink olink(clabel,nlabel);      //Create outlet link (order of clabel and nlabel doesn't matter)
+        if(outlet_database.count(olink)!=0){        //Determine if the outlet is already present
+          auto &outlet = outlet_database.at(olink); //It was. Use the outlet link to get the outlet information
+          if(outlet.out_elev>out_elev){             //Is the previously stored link higher than the new one?
+            outlet.out_cell = out_cell;             //Yes. So update the link with new outlet cell
+            outlet.out_elev = out_elev;             //Also, update the outlet's elevation
+          }
+        } else {                                    //No preexisting link found; create a new one
+          outlet_database[olink] = Outlet<elev_t>(clabel,nlabel,out_cell,out_elev);   
+        }
+      }
+
+    }
   }
   progress.stop();
 
@@ -646,7 +652,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   outlets.reserve(outlet_database.size());
 
   //Copy the database into the vector
-  std::copy(outlet_database.begin(), outlet_database.end(), std::back_inserter(outlets));
+  for(const auto &o: outlet_database)
+    outlets.push_back(o.second);
 
   //It's a little difficult to free memory, but this should do it by replacing
   //the outlet database with an empty database.
@@ -656,6 +663,10 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   std::sort(outlets.begin(), outlets.end(), [](const Outlet<elev_t> &a, const Outlet<elev_t> &b){
     return a.out_elev<b.out_elev;
   });
+
+  //TODO: For debugging
+  for(unsigned int i=0;i<outlets.size()-1;i++)
+    assert(outlets.at(i).out_elev<=outlets.at(i+1).out_elev);
 
   //Now that we have the outlets in order, we'll visit them from lowest to
   //highest. If two outlets are at the same elevation we visit them in an
@@ -686,8 +697,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     ++progress;
     auto depa_set = djset.findSet(outlet.depa); //Find the ultimate parent of Depression A
     auto depb_set = djset.findSet(outlet.depb); //Find the ultimate parent of Depression B
-    // std::cerr<<"Considering "<<outlet.depa<<" "<<outlet.depb<<std::endl;
-    // std::cerr<<"\tConsidering "<<depa_set<<" "<<depb_set<<std::endl;
     
     //If the depressions are already part of the same meta-depression, then
     //nothing needs to be done.
@@ -724,16 +733,15 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       auto &dep = depressions.at(depa_set);
 
       //TODO: Calculate a final cell count and "volume" for the depression                                                -->Each outlet has recorded the cell count and volume for its two depressions. So what would we want here? The totals for metadepressions? 
-      //                                                                                                                  //I have recorded the new totals in depression A but not sure if this is right. 
-      // std::cerr<<"\tMerging "<<depa_set<<" into the ocean via "<<outlet.depb<<"!"<<std::endl;
 
       //If this depression has already found the ocean then don't merge it
       //again. (TODO: Richard)
       // if(dep.out_cell==OCEAN)
         // continue;
 
-      //If this depression already has an outlet, then there's a big problem.
+      //Ensure we don't modify depressions that have already found their paths
       assert(dep.out_cell==-1);
+      assert(dep.odep==NO_VALUE);            
 
       //Point this depression to the ocean through Depression B Label
       dep.parent       = outlet.depb;        //Set Depression Meta(A) parent
@@ -749,9 +757,12 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //into a new depression.
       auto &depa          = depressions.at(depa_set); //Reference to Depression A MetaLabel
       auto &depb          = depressions.at(depb_set); //Reference to Depression B MetaLabel
+
+      //Ensure we haven't already given these depressions outlet information
+      assert(depa.odep==NO_VALUE);     
+      assert(depb.odep==NO_VALUE);
+
       const auto newlabel = depressions.size();       //Label of A and B's new parent depression
-      // std::cerr<<"\tMerging "<<depa_set<<" and "<<depb_set<<" into "<<newlabel<<"!"<<std::endl;
-      // std::cerr<<"\tNew parent = "<<newlabel<<std::endl;
       depa.parent   = newlabel;        //Set Meta(A)'s parent to be the new meta-depression
       depb.parent   = newlabel;        //Set Meta(B)'s parent to be the new meta-depression
       depa.out_cell = outlet.out_cell; //Note that this is Meta(A)'s outlet
@@ -770,11 +781,11 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //resize!
       const auto depa_pitcell_temp = depa.pit_cell;
 
-      auto &newdep  = depressions.emplace_back();                                                                       //is it right to create a new depression for the metadepression like this?
-      newdep.lchild = depa_set;
-      newdep.rchild = depb_set; 
+      auto &newdep     = depressions.emplace_back();                                                                       //is it right to create a new depression for the metadepression like this?
+      newdep.lchild    = depa_set;
+      newdep.rchild    = depb_set; 
       newdep.dep_label = newlabel;
-      newdep.pit_cell = depa_pitcell_temp;
+      newdep.pit_cell  = depa_pitcell_temp;
 
       djset.mergeAintoB(depa_set, newlabel); //A has a parent now
       djset.mergeAintoB(depb_set, newlabel); //B has a parent now
@@ -812,6 +823,34 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     depressions[clabel].total_elevation += dem(i);
   }
   progress.stop();
+
+  { //Depression filling code
+    rd::Array2D<elev_t> dhfilled(dem);
+    for(int i=0;i<(int)dem.size();i++)
+      dhfilled(i) = dem(i);
+
+    //Get the marginal depression cell counts and total elevations
+    progress.start(dem.size());
+    for(unsigned int i=0;i<dem.size();i++){
+      ++progress;
+      auto clabel        = label(i);
+      
+      if(clabel==OCEAN)
+        continue;
+
+      while(depressions[clabel].parent!=OCEAN && !depressions[clabel].ocean_parent)
+        clabel = depressions[clabel].parent;
+
+      if(dem(i)<depressions[clabel].out_elev)
+        dhfilled(i) = depressions[clabel].out_elev;
+    }
+    progress.stop();
+
+    SaveAsNetCDF(dhfilled,"/z/out-dhfilled.nc","value");
+  }
+
+
+
 
   std::cerr<<"p Calculating depression total volumes..."<<std::endl;
   //Calculate total depression volumes and cell counts
