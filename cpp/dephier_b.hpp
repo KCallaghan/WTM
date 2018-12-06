@@ -12,6 +12,7 @@
 #include <richdem/common/timer.hpp>
 #include <richdem/common/ProgressBar.hpp>
 #include "DisjointDenseIntSet.hpp"
+#include "netcdf.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -827,6 +828,34 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     depressions[clabel].total_elevation += dem(i);
   }
   progress.stop();
+
+  { //Depression filling code
+    rd::Array2D<elev_t> dhfilled(dem);
+    for(int i=0;i<(int)dem.size();i++)
+      dhfilled(i) = dem(i);
+
+    //Get the marginal depression cell counts and total elevations
+    progress.start(dem.size());
+    for(unsigned int i=0;i<dem.size();i++){
+      ++progress;
+      auto clabel        = label(i);
+      
+      if(clabel==OCEAN)
+        continue;
+
+      while(depressions[clabel].parent!=OCEAN && !depressions[clabel].ocean_parent)
+        clabel = depressions[clabel].parent;
+
+      if(dem(i)<depressions[clabel].out_elev)
+        dhfilled(i) = depressions[clabel].out_elev;
+    }
+    progress.stop();
+
+    SaveAsNetCDF(dhfilled,"/z/out-dhfilled.nc","value");
+  }
+
+
+
 
   std::cerr<<"p Calculating depression total volumes..."<<std::endl;
   //Calculate total depression volumes and cell counts
