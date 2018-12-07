@@ -30,12 +30,16 @@ class Parameters {
   const double dx    = dy;
 
   bool interpolated = false;
+  
   double sedge  = std::numeric_limits<double>::signaling_NaN();
   double deltat = std::numeric_limits<double>::signaling_NaN();
+  double wtdmax = std::numeric_limits<double>::signaling_NaN();
 
   //Set for convenience within the code
   int width  = -1;
   int height = -1;
+
+  bool run_to_equilibrium = false;
 
   void print() const;
 };

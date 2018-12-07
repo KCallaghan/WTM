@@ -20,22 +20,24 @@ Parameters::Parameters(const std::string config_file){
     std::string key;
     ss>>key;
 
-    if     (key=="")             {}                 //Dummy key to make it easier to alphabetize list below
-    else if(key=="deltat")       ss>>deltat;
-    else if(key=="end_name")     ss>>end_name;
-    else if(key=="HAD")          ss>>HAD;
-    else if(key=="initdatadir")  ss>>initdatadir;
-    else if(key=="interpolated") ss>>interpolated;
-    else if(key=="iterations")   ss>>iterations;
-    else if(key=="maxiter")      ss>>maxiter;
-    else if(key=="name")         ss>>name;
-    else if(key=="region")       ss>>region;
-    else if(key=="run_type")     ss>>run_type;
-    else if(key=="sedge")        ss>>sedge;
-    else if(key=="start_name")   ss>>start_name;
-    else if(key=="surfdatadir")  ss>>surfdatadir;
-    else if(key=="time_start")   ss>>time_start;
-    else if(key=="time_end")     ss>>time_end;
+    if     (key=="")                   {}                 //Dummy key to make it easier to alphabetize list below
+    else if(key=="deltat")             ss>>deltat;
+    else if(key=="end_name")           ss>>end_name;
+    else if(key=="HAD")                ss>>HAD;
+    else if(key=="initdatadir")        ss>>initdatadir;
+    else if(key=="interpolated")       ss>>interpolated;
+    else if(key=="iterations")         ss>>iterations;
+    else if(key=="maxiter")            ss>>maxiter;
+    else if(key=="name")               ss>>name;
+    else if(key=="region")             ss>>region;
+    else if(key=="run_type")           ss>>run_type;
+    else if(key=="run_to_equilibrium") ss>>run_to_equilibrium;
+    else if(key=="sedge")              ss>>sedge;
+    else if(key=="start_name")         ss>>start_name;
+    else if(key=="surfdatadir")        ss>>surfdatadir;
+    else if(key=="time_start")         ss>>time_start;
+    else if(key=="time_end")           ss>>time_end;
+    else if(key=="wtdmax")             ss>>wtdmax;
     else
       throw std::runtime_error("Unrecognised key!");
   } 

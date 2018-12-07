@@ -12,9 +12,7 @@
 #include <string>
 #include <vector>
 
-const int ADJ_COARSE = 1;
-const int ADJ_MEDIUM = 2;
-const int ADJ_FINE   = 3;
+const double UNDEF  = -1.0e7;
 
 typedef std::vector<double> dvec;
 typedef rd::Array2D<float>  f2d;
@@ -38,14 +36,20 @@ double kcell(const int x, const int y, const ArrayPack &arp){
 }
 
 
-void EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
-  arp.done_old = arp.done_new;
-  auto deltat  = params.deltat;
+int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
+  int cells_left = 0;
+
+  //We're not allowed to change Parameters, so here we make some copies.
+  auto deltat = params.deltat;
+  auto alpha  = arp.alpha;
 
   //I have switched to 30000 iterations before switching to monthly
   //processing, because with 50000 it always seemed to be doing nothing for a
   //long time.
 
+  const int ADJ_COARSE = 1;
+  const int ADJ_MEDIUM = 2;
+  const int ADJ_FINE   = 3;
   const auto adjustment = ADJ_COARSE;
 
   //Different increments to use to move water table depth:
@@ -68,19 +72,23 @@ void EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
     throw std::runtime_error("Unrecognised increment value.");
   }
 
+  //Do these only once, since we will affect the arrays in a lasting way
+  if(iter==30000){
+    for(auto i=arp.rech.i0();i<arp.rech.size();i++)
+      arp.rech(i) /=12;
+    arp.done_old.setAll(false); //We changed the threshold, so we want to recheck all the cells.
+  }
 
-  if(iter==30000){  //Here we automatically switch to monthly processing,
+  //Do this at each iteration so we don't want to modify the parameter pack
+  if(iter>=30000){  //Here we automatically switch to monthly processing,
     std::cerr<<"30000 iterations: adjusting the values for monthly processing."<<std::endl;
-    thres       = thres/12.;
-    d0          = d0/12.;
-    d1          = d1/12.;
-    d2          = d2/12.;
-    d3          = d3/12.;
-    deltat      = params.deltat/12.;
-    alpha       = alphamonth;
-    rechmean    = rech_month;
-    maskold     = 1;            //Because we changed the threshold, so we want to recheck all the cells.
-    numbertotal = ntotal;
+    thres  = thres/12.;
+    d0     = d0/12.;
+    d1     = d1/12.;
+    d2     = d2/12.;
+    d3     = d3/12.;
+    deltat = params.deltat/12.;
+    alpha  = arp.alphamonth;
   }
 
   //!######################################################################################################## change for lakes
@@ -125,7 +133,7 @@ void EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
     //mm -> m
     // total=rechmean(x,y)*1.e-3 + qlat(x,y)
     //the layer is in metres already.
-    const double total = rechmean(x,y) + q;
+    const double total = arp.rech(x,y) + q;
 
    //       As recharge is fixed, the following applies:
    //       (a) if total <0, meaning too much lateral flows i.e., water table is too high.
@@ -133,22 +141,20 @@ void EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 
     //adjustment size depending on how far off it is
     //we use d0-d3 as different size increments of adjustment
-    if     (total<-1                          ) arp.wtd(x,y) += -d3;
-    else if(total<-0.25                       ) arp.wtd(x,y) += -d2;
-    else if(total<-0.05                       ) arp.wtd(x,y) += -d1;
-    else if(total<-thres                      ) arp.wtd(x,y) += -d0;
+    if     (total<-1                                 ) arp.wtd(x,y) += -d3;
+    else if(total<-0.25                              ) arp.wtd(x,y) += -d2;
+    else if(total<-0.05                              ) arp.wtd(x,y) += -d1;
+    else if(total<-thres                             ) arp.wtd(x,y) += -d0;
     //##############################################################################################################change for lakes
     //for now, we have to prevent more from pooling on the surface or we never get equilibrium. BUT this clearly has to change with lakes!
-    else if(total>1.    && arp.wtd(x,y)<wtdmax) arp.wtd(x,y) +=  d3;
-    else if(total>0.25  && arp.wtd(x,y)<wtdmax) arp.wtd(x,y) +=  d2;
-    else if(total>0.05  && arp.wtd(x,y)<wtdmax) arp.wtd(x,y) +=  d1;
-    else if(total>thres && arp.wtd(x,y)<wtdmax) arp.wtd(x,y) +=  d0;
+    else if(total>1.    && arp.wtd(x,y)<params.wtdmax) arp.wtd(x,y) +=  d3;
+    else if(total>0.25  && arp.wtd(x,y)<params.wtdmax) arp.wtd(x,y) +=  d2;
+    else if(total>0.05  && arp.wtd(x,y)<params.wtdmax) arp.wtd(x,y) +=  d1;
+    else if(total>thres && arp.wtd(x,y)<params.wtdmax) arp.wtd(x,y) +=  d0;
 
-    if(-thres<=total && total<=thres){  //Did we adjust this cell?
-      total_cells_to_equilibriate--;    //If we didn't adjust the cell, we don't need to think about it again
-    } else {
-      const int eq_count = arp.done_new(x+1,y)+arp.done_new(x-1,y)+arp.done_new(x,y+1)+arp.done_new(x,y-1)+arp.done_new(x,y);
-      total_cells_to_equilibriate -= eq_count;  //If these cells thought they were equilibrated, they thought wrong
+    if( !(-thres<=total && total<=thres)){  //Did we adjust this cell?
+      const int done_n      = arp.done_new(x+1,y)+arp.done_new(x-1,y)+arp.done_new(x,y+1)+arp.done_new(x,y-1)+arp.done_new(x,y);
+      cells_left           += done_n;  //If these cells thought they were equilibrated, they thought wrong
       arp.done_new(x+1,y  ) = false;
       arp.done_new(x-1,y  ) = false;
       arp.done_new(x,  y+1) = false;
@@ -157,12 +163,14 @@ void EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
     }
   }
 
- //maskold = mask !to record which cells still need to be processed.
+  arp.done_old = arp.done_new;
+
+  return cells_left;
 }
 
 
 
-void TransientRun(const Parameters &params, ArrayPack &arp, const int iter){
+int TransientRun(const Parameters &params, ArrayPack &arp, const int iter){
   if(params.interpolated && iter%120==0){
     for(auto i=arp.topo_start.i0();i<arp.topo_start.size();i++){
       arp.topo  (i) = (arp.topo_start  (i) * (1- iter/params.maxiter)) + (arp.topo_end  (i) * (iter/params.maxiter));
@@ -212,73 +220,29 @@ void TransientRun(const Parameters &params, ArrayPack &arp, const int iter){
     qeast  *= arp.alpha[y];
     qwest  *= arp.alpha[y];
 
-    wtdnew(x,y) = arp.wtd(x,y) + qnorth+qsouth+qeast+qwest;    //TODO: Check all of your signs! I'm not totally sure if it should be - or + here!
-
-    wtdnew(x,y+1) = arp.wtd(x,y+1) - qnorth;
-    wtdnew(x,y-1) = arp.wtd(x,y-1) - qsouth;
-    wtdnew(x-1,y) = arp.wtd(x-1,y) - qwest;
-    wtdnew(x+1,y) = arp.wtd(x+1,y) - qeast;
+    arp.wtd_new(x,y)   = arp.wtd(x,y) + qnorth+qsouth+qeast+qwest;    //TODO: Check all of your signs! I'm not totally sure if it should be - or + here!
+    arp.wtd_new(x,y+1) = arp.wtd(x,y+1) - qnorth;
+    arp.wtd_new(x,y-1) = arp.wtd(x,y-1) - qsouth;
+    arp.wtd_new(x-1,y) = arp.wtd(x-1,y) - qwest;
+    arp.wtd_new(x+1,y) = arp.wtd(x+1,y) - qeast;
   }
 
+  arp.wtd = arp.wtd_new;
+
+  return 1;
 }
 
 
 
-int main(int argc, char **argv){
-  richdem::Timer timer_io;
-
-  const double UNDEF  = -1.0e7;
-  const double wtdmax = 0;             //Water table depth is 0. TODO: This should probably be changed when I start bringing in the lakes.
-
-  if(argc!=4){
-    std::cerr<<"Syntax: "<<argv[0]<<" <Input> <Output> <OutGraph>"<<std::endl;
-    return -1;
-  }
-
-  ArrayPack arp;
-
-  //TODO: region and HAD params
-
-  Parameters params(argv[1]); //TODO
-
-  timer_io.start();
+void InitializeCommonBefore(Parameters &params, ArrayPack &arp){
   arp.ksat = LoadData<float>(params.surfdatadir                 + "_ksat.nc", "value");
   arp.land = LoadData<float>(params.initdatadir + params.region + "_mask.nc", "value");
 
-  if(params.run_type=="equilibrium")
-    arp.wtd = rd::Array2D<float>(arp.ksat,0);
-  else
-    arp.wtd = LoadData<float>(params.initdatadir + params.region + "_wtd.nc", "value");
-
-  arp.topo_start   = LoadData<float>(params.surfdatadir + params.time_start + "_topo_rotated.nc",   "value");
-  arp.rech_start   = LoadData<float>(params.surfdatadir + params.time_start + "_rech_rotated.nc",   "value");
-  arp.fslope_start = LoadData<float>(params.surfdatadir + params.time_start + "_fslope_rotated.nc", "value");
-  arp.temp_start   = LoadData<float>(params.surfdatadir + params.time_start + "_temp_rotated.nc",   "value");
-
-  if(params.interpolated){
-    arp.fslope_end = LoadData<float>(params.surfdatadir + params.time_end + "_fslope_rotated.nc", "value");
-    arp.topo_end   = LoadData<float>(params.surfdatadir + params.time_end + "_topo_rotated.nc",   "value");
-    arp.temp_end   = LoadData<float>(params.surfdatadir + params.time_end + "_temp_rotated.nc",   "value");
-    arp.rech_end   = LoadData<float>(params.surfdatadir + params.time_end + "_rech_rotated.nc",   "value");
-  }
-
-  arp.topo   = arp.topo_start;
-  arp.rech   = arp.rech_start;
-  arp.fdepth = arp.fslope_start;
-  arp.temp   = arp.temp_start;
+  params.width  = arp.ksat.width();
+  params.height = arp.ksat.height();
 
   arp.done_new.resize(arp.topo_start.width(),arp.topo_start.height(),false); //Indicates which cells must still be processed
   arp.done_old.resize(arp.topo_start.width(),arp.topo_start.height(),false); //Indicates which cells must still be processed
-
-  arp.check();
-  timer_io.stop();
-
-  for(auto i=arp.topo_start.i0();i<arp.topo_start.size();i++)       //Change undefined cells to 0
-    if(arp.topo_start(i)<=UNDEF)
-      arp.topo_start(i) = 0;
-  for(auto i=arp.topo_end.i0();i<arp.topo_end.size();i++)           //Change undefined cells to 0
-    if(arp.topo_end(i)<=UNDEF)
-      arp.topo_end(i) = 0;
 
   //Determine area of cells at each latitude
   arp.xlat.resize      (arp.topo_start.height());
@@ -295,48 +259,114 @@ int main(int argc, char **argv){
     arp.alpha[j]      = 0.5*params.deltat/area;
     arp.alphamonth[j] = 0.5*(params.deltat/12)/area;
   }
+}
 
+void InitializeEquilibrium(Parameters &params, ArrayPack &arp){
+  arp.fdepth = LoadData<float>(params.surfdatadir + "_fslope_rotated.nc", "value");
+  arp.rech   = LoadData<float>(params.surfdatadir + "_rech_rotated.nc",   "value");
+  arp.temp   = LoadData<float>(params.surfdatadir + "_temp_rotated.nc",   "value");
+  arp.topo   = LoadData<float>(params.surfdatadir + "_topo_rotated.nc",   "value");
+  arp.wtd    = rd::Array2D<float>(arp.ksat,0);
+
+  for(auto i=arp.fdepth.i0();i<arp.fdepth.size();i++){
+    if(arp.temp(i)>-5)
+      arp.fdepth(i) = arp.fdepth(i);
+    else if(arp.temp(i)<-14)
+      arp.fdepth(i) = arp.fdepth(i) * (0.17+0.005*arp.temp(i));
+    else
+      arp.fdepth(i) = arp.fdepth(i) * (1.5 + 0.1*arp.temp(i));
+
+    if(arp.fdepth(i)<0.0001)
+      arp.fdepth(i) = 0.0001; //Change undefined cells to 0. TODO: Shouldn't there be a cleaner way to do this?
+  } 
+
+  for(auto i=arp.rech.i0();arp.rech.size();i++){
+    arp.rech(i) *= 1e-3;
+    if(arp.rech(i)>=10000)
+      arp.rech(i) = 0;
+  }  
+
+  //Change undefined cells to 0
+  for(auto i=arp.topo.i0();i<arp.topo.size();i++)
+    if(arp.topo(i)<=UNDEF)
+      arp.topo(i) = 0;
+
+  for(auto i=arp.rech.i0();arp.rech.size();i++) 
+    arp.rech(i) = std::max(arp.rech(i), (float)0.);
+}
+
+void InitializeTransient(Parameters &params, ArrayPack &arp){
+  arp.fslope_start = LoadData<float>(params.surfdatadir + params.time_start + "_fslope_rotated.nc", "value");
+  arp.rech_start   = LoadData<float>(params.surfdatadir + params.time_start + "_rech_rotated.nc",   "value");
+  arp.temp_start   = LoadData<float>(params.surfdatadir + params.time_start + "_temp_rotated.nc",   "value");
+  arp.topo_start   = LoadData<float>(params.surfdatadir + params.time_start + "_topo_rotated.nc",   "value");
+
+  arp.fslope_end   = LoadData<float>(params.surfdatadir + params.time_end   + "_fslope_rotated.nc", "value");
+  arp.rech_end     = LoadData<float>(params.surfdatadir + params.time_end   + "_rech_rotated.nc",   "value");
+  arp.temp_end     = LoadData<float>(params.surfdatadir + params.time_end   + "_temp_rotated.nc",   "value");
+  arp.topo_end     = LoadData<float>(params.surfdatadir + params.time_end   + "_topo_rotated.nc",   "value");
+
+  arp.wtd = LoadData<float>(params.initdatadir + params.region + "_wtd.nc", "value");
+
+  //Change undefined cells to 0
+  for(auto i=arp.topo_start.i0();i<arp.topo_start.size();i++)
+    if(arp.topo_start(i)<=UNDEF)
+      arp.topo_start(i) = 0;
+  for(auto i=arp.topo_end.i0();i<arp.topo_end.size();i++)
+    if(arp.topo_end(i)<=UNDEF)
+      arp.topo_end(i) = 0;  
 
   //Setting it so recharge can only be positive
   for(auto i=arp.rech_start.i0();arp.rech_start.size();i++) arp.rech_start(i) = std::max(arp.rech_start(i), (float)0.);
-  for(auto i=arp.rech_end.i0();  arp.rech_end.size();  i++) arp.rech_end  (i) = std::max(arp.rech_end  (i), (float)0.);
+  for(auto i=arp.rech_end.i0();  arp.rech_end.size();  i++) arp.rech_end  (i) = std::max(arp.rech_end  (i), (float)0.);    
+  
+  //Converting to monthly
+  for(auto i=arp.rech_start.i0();arp.rech_start.size();i++){
+    arp.rech_start(i) /= 12;           
+    arp.rech_end  (i) /= 12;
+  }        
+}
+
+void InitializeCommonAfter(Parameters &params, ArrayPack &arp){
+  arp.check();
+}
+
+
+
+int main(int argc, char **argv){
+  richdem::Timer timer_io;
+
+  if(argc!=2){
+    std::cerr<<"Syntax: "<<argv[0]<<" <Configuration File>"<<std::endl;
+    return -1;
+  }
+
+  ArrayPack arp;
+
+  //TODO: region and HAD params
+
+  Parameters params(argv[1]);
+
+  InitializeCommonBefore(params, arp);
 
   if(params.run_type=="equilibrium"){
-    for(auto i=arp.rech_start.i0();arp.rech_start.size();i++){
-      arp.rech_start(i) *= 1e-3;
-      if(arp.rech_start(i)>=10000)
-        arp.rech_start(i) = 0;
-    }
+    InitializeEquilibrium(params, arp);
   } else if(params.run_type=="transient"){
-    for(auto i=arp.rech_start.i0();arp.rech_start.size();i++){
-      arp.rech_start(i) = std::max(arp.rech_start(i),(float)0);
-      arp.rech_start(i) /= 12;           //Converting to monthly
-      arp.rech_end  (i) = std::max(arp.rech_end(i),(float)0);
-      arp.rech_end  (i) /= 12;
-    }
+    InitializeTransient(params, arp);
   } else {
     throw std::runtime_error("Unrecognised run type!");
   }
 
-  for(auto i=arp.fdepth.i0();i<arp.fdepth.size();i++){
-    if(arp.temp(i)>-5)
-      arp.fdepth(i) = arp.fslope_start(i);
-    else if(arp.temp(i)<-14)
-      arp.fdepth(i) = arp.fslope_start(i) * (0.17+0.005*arp.temp(i));
-    else
-      arp.fdepth(i) = arp.fslope_start(i) * (1.5 + 0.1*arp.temp(i));
+  InitializeCommonAfter(params, arp);
 
-    if(arp.fdepth(i)<0.0001)
-      arp.fdepth(i) = 0.0001; //Change undefined cells to 0. TODO: Shouldn't there be a cleaner way to do this?
-  }
-
-
-  int iter = 0;                                  //Count the number of iterations. This is used to know when to switch from annual to monthly cycles.
-  int total_cells_to_equilibriate = 0.99*ntotal; //We will use this to get numbertotal less than x % land cells as equilibrium condition
+  int iter                  = 0;                           //Number of iterations made
+  int cells_to_equilibriate = params.width*params.height;  //Cells left that need to be equilibriated
 
   //Start of the main loop with condition - either number of iterations or % equilibrium. I am going for 99% equilibrium.
   while(true){
-    if(total_cells_to_equilibriate--==0)
+    int cells_left;
+
+    if(params.run_to_equilibrium && cells_to_equilibriate<=0.01*params.width*params.height)
       break;
     if(iter>=params.maxiter)
       break;
@@ -344,9 +374,9 @@ int main(int argc, char **argv){
     std::cerr<<"Iteration #: "<<iter<<std::endl;
 
     if(params.run_type=="equilibrium")
-      EquilibriumRun(params, arp, iter);
+      cells_left = EquilibriumRun(params, arp, iter);
     else if(params.run_type=="transient")
-      TransientRun(params, arp, iter);
+      cells_left = TransientRun(params, arp, iter);
 
     if(iter%10000==0){
       //Save the data: wtd

@@ -11,6 +11,7 @@ class ArrayPack {
  public:
   f2d ksat;   
   f2d wtd;
+  f2d wtd_new;
 
   f2d topo_start;   
   f2d rech_start;   
