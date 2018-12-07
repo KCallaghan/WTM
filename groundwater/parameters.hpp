@@ -4,28 +4,32 @@
 #include <string>
 #include <limits>
 
+const std::string UNINIT_STR = "uninitialized";
+
 class Parameters {
  public:
+  Parameters(const std::string config_file);
+
   int iterations = -1;
-  int width      = -1;
-  int height     = -1;
+  int maxiter    = -1;
 
-  std::string name;
+  std::string name        = UNINIT_STR;
+  std::string start_name  = UNINIT_STR;
+  std::string end_name    = UNINIT_STR;
+  std::string surfdatadir = UNINIT_STR;
+  std::string initdatadir = UNINIT_STR;
+  std::string region      = UNINIT_STR;
+  std::string HAD         = UNINIT_STR;
+  std::string run_type    = UNINIT_STR;
 
-  std::string start_name;
-  std::string end_name;
+  const int    delta_xy = 120; //There are 120 30 arc-second pieces in one degree
+  const double dy       = 6370000.*pi/(180.*delta_xy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
+  const double dx       = dy;
 
-  std::string surfdatadir;
-  std::string initdatadir;
-
-  const int delta_xy = 120; //There are 120 30 arc-second pieces in one degree
-  const double dy    = 6370000.*pi/(180.*delta_xy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
-
+  double sedge  = std::numeric_limits<double>::signaling_NaN();
   double deltat = std::numeric_limits<double>::signaling_NaN();
 
   void print() const;
 };
-
-Parameters LoadParameters(const std::string config_file);
 
 #endif
