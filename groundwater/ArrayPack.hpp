@@ -4,10 +4,11 @@
 #include <richdem/common/Array2D.hpp>
 #include <vector>
 
-typedef rd::Array2D<float>  f2d;
+typedef richdem::Array2D<float>  f2d;
 typedef std::vector<double> dvec;
 
 class ArrayPack {
+ public:
   f2d ksat;   
   f2d wtd;
 
@@ -26,9 +27,9 @@ class ArrayPack {
   f2d fdepth;
   f2d temp;
 
-  rd::Array2D<bool> done_new;   //Indicates which cells must still be processed
-  rd::Array2D<bool> done_old;   //Indicates which cells must still be processed
-  rd::Array2D<bool> land;
+  richdem::Array2D<bool> done_new;   //Indicates which cells must still be processed
+  richdem::Array2D<bool> done_old;   //Indicates which cells must still be processed
+  richdem::Array2D<bool> land;
 
   dvec xlat;
   dvec alpha;

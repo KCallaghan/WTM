@@ -1,8 +1,9 @@
 #ifndef _parameters_hpp_
 #define _parameters_hpp_
 
-#include <string>
+#include <cmath>
 #include <limits>
+#include <string>
 
 const std::string UNINIT_STR = "uninitialized";
 
@@ -21,13 +22,20 @@ class Parameters {
   std::string region      = UNINIT_STR;
   std::string HAD         = UNINIT_STR;
   std::string run_type    = UNINIT_STR;
+  std::string time_start  = UNINIT_STR;
+  std::string time_end    = UNINIT_STR;
 
-  const int    delta_xy = 120; //There are 120 30 arc-second pieces in one degree
-  const double dy       = 6370000.*pi/(180.*delta_xy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
-  const double dx       = dy;
+  const int    dltxy = 120; //There are 120 30 arc-second pieces in one degree
+  const double dy    = 6370000.*M_PI/(180.*dltxy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
+  const double dx    = dy;
 
+  bool interpolated = false;
   double sedge  = std::numeric_limits<double>::signaling_NaN();
   double deltat = std::numeric_limits<double>::signaling_NaN();
+
+  //Set for convenience within the code
+  int width  = -1;
+  int height = -1;
 
   void print() const;
 };
