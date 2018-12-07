@@ -31,7 +31,6 @@ Parameters::Parameters(const std::string config_file){
     else if(key=="name")               ss>>name;
     else if(key=="region")             ss>>region;
     else if(key=="run_type")           ss>>run_type;
-    else if(key=="run_to_equilibrium") ss>>run_to_equilibrium;
     else if(key=="sedge")              ss>>sedge;
     else if(key=="start_name")         ss>>start_name;
     else if(key=="surfdatadir")        ss>>surfdatadir;

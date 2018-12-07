@@ -39,8 +39,6 @@ class Parameters {
   int width  = -1;
   int height = -1;
 
-  bool run_to_equilibrium = false;
-
   void print() const;
 };
 

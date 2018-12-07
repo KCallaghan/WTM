@@ -347,6 +347,9 @@ int main(int argc, char **argv){
 
   Parameters params(argv[1]);
 
+  ///////////////////////////////
+  //Initialization section
+
   InitializeCommonBefore(params, arp);
 
   if(params.run_type=="equilibrium"){
@@ -359,6 +362,11 @@ int main(int argc, char **argv){
 
   InitializeCommonAfter(params, arp);
 
+
+
+  ///////////////////////////////
+  //Execution Section
+
   int iter                  = 0;                           //Number of iterations made
   int cells_to_equilibriate = params.width*params.height;  //Cells left that need to be equilibriated
 
@@ -366,7 +374,7 @@ int main(int argc, char **argv){
   while(true){
     int cells_left;
 
-    if(params.run_to_equilibrium && cells_to_equilibriate<=0.01*params.width*params.height)
+    if(params.run_type=="equilibrium" && cells_to_equilibriate<=0.01*params.width*params.height)
       break;
     if(iter>=params.maxiter)
       break;
