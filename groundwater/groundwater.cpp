@@ -1,4 +1,4 @@
-#include "netcdf.hpp"
+#include "../common/netcdf.hpp"
 #include "ArrayPack.hpp"
 #include "parameters.hpp"
 #include <cassert>
