@@ -220,11 +220,7 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter){
     qeast  *= arp.alpha[y];
     qwest  *= arp.alpha[y];
 
-    arp.wtd_new(x,y)   = arp.wtd(x,y) + qnorth+qsouth+qeast+qwest;    //TODO: Check all of your signs! I'm not totally sure if it should be - or + here!
-    arp.wtd_new(x,y+1) = arp.wtd(x,y+1) - qnorth;
-    arp.wtd_new(x,y-1) = arp.wtd(x,y-1) - qsouth;
-    arp.wtd_new(x-1,y) = arp.wtd(x-1,y) - qwest;
-    arp.wtd_new(x+1,y) = arp.wtd(x+1,y) - qeast;
+    arp.wtd_new(x,y) = arp.wtd(x,y) + qnorth+qsouth+qeast+qwest;    //TODO: Check all of your signs! I'm not totally sure if it should be - or + here!
   }
 
   arp.wtd = arp.wtd_new;
