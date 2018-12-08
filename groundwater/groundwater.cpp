@@ -127,7 +127,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
     q += (kcellE+my_kcell)*(headE-my_head) / std::cos(arp.xlat[y]);                             //East
 
     //And we multiply it with alpha, which somehow brings in the timestep?
-    q *= arp.alpha[y]*q;
+    q *= arp.alpha[y];
     //I think multiplying it with alpha gets the total that will be discharged as it builds up over that whole time.
 
     //mm -> m
