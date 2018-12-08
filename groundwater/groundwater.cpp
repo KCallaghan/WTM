@@ -209,18 +209,17 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter){
     const auto kcellW   = kcell(x-1,y,   arp);
     const auto kcellE   = kcell(x+1,y,   arp);
 
+    //TODO: Check all of your signs! I'm not totally sure if it should be - or + here!
     //It seems like we are getting the total which will be discharged from each cell
-    double qnorth = (kcellN+my_kcell)*(headN-my_head) * std::cos(arp.xlat[y]+M_PI/(180.*params.dltxy*2.)); //North
-    double qsouth = (kcellS+my_kcell)*(headS-my_head) * std::cos(arp.xlat[y]-M_PI/(180.*params.dltxy*2.)); //South
-    double qwest  = (kcellW+my_kcell)*(headW-my_head) / std::cos(arp.xlat[y]);                             //West
-    double qeast  = (kcellE+my_kcell)*(headE-my_head) / std::cos(arp.xlat[y]);                             //East
+    double q = 0;
+    q += (kcellN+my_kcell)*(headN-my_head) * std::cos(arp.xlat[y]+M_PI/(180.*params.dltxy*2.)); //North
+    q += (kcellS+my_kcell)*(headS-my_head) * std::cos(arp.xlat[y]-M_PI/(180.*params.dltxy*2.)); //South
+    q += (kcellW+my_kcell)*(headW-my_head) / std::cos(arp.xlat[y]);                             //West
+    q += (kcellE+my_kcell)*(headE-my_head) / std::cos(arp.xlat[y]);                             //East
 
-    qnorth *= arp.alpha[y];
-    qsouth *= arp.alpha[y];
-    qeast  *= arp.alpha[y];
-    qwest  *= arp.alpha[y];
+    q *= arp.alpha[y];
 
-    arp.wtd_new(x,y) = arp.wtd(x,y) + qnorth+qsouth+qeast+qwest;    //TODO: Check all of your signs! I'm not totally sure if it should be - or + here!
+    arp.wtd_new(x,y) = arp.wtd(x,y) + q;
   }
 
   arp.wtd = arp.wtd_new;
