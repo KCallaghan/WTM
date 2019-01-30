@@ -25,6 +25,8 @@ int main(int argc, char **argv){
 
   rd::Array2D<float>          wtd     (topo.width(), topo.height(), 1000       ); //All cells have some water
   rd::Array2D<dh::dh_label_t> label   (topo.width(), topo.height(), dh::NO_DEP ); //No cells are part of a depression
+  rd::Array2D<dh::dh_label_t> final_label   (topo.width(), topo.height(), dh::NO_DEP ); //No cells are part of a depression
+
   rd::Array2D<rd::flowdir_t>  flowdirs(topo.width(), topo.height(), rd::NO_FLOW); //No cells flow anywhere
 
   wtd.setNoData(topo.noData());
@@ -35,15 +37,16 @@ int main(int argc, char **argv){
   for(unsigned int i=0;i<label.size();i++){
     if(topo.isNoData(i) || topo(i)==dh::OCEAN_LEVEL){ //Ocean Level is assumed to be lower than any other cells (even Death Valley)
       label(i) = dh::OCEAN;
+      final_label(i) = dh::OCEAN;
       wtd  (i) = 0;
     }
   }
 
   //Generate flow directions, label all the depressions, and get the hierarchy
   //connecting them
-  auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>(topo, label, flowdirs);
+  auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>(topo, label, final_label, flowdirs,wtd);
 
-  dh::FillSpillMerge(topo, label, flowdirs, deps, wtd);
+  dh::FillSpillMerge(topo, label, final_label, flowdirs, deps, wtd);
 
   //TODO: Remove. For viewing test cases.
   if(label.width()<1000){

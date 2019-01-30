@@ -204,13 +204,20 @@ using DepressionHierarchy = std::vector<Depression<elev_t>>;
 //        flowdirs - A value [0,7] indicated which direction water from the cell
 //                   flows in order to go "downhill". All cells have a flow
 //                   direction (even flats) except for pit cells.
-template<class elev_t, Topology topo>                                                     
+
+
+
+ 
+
+
+template<class elev_t,  Topology topo, class wtd_t>                                                     
 DepressionHierarchy<elev_t> GetDepressionHierarchy(
   const rd::Array2D<elev_t> &dem,
   rd::Array2D<int>          &label,
   rd::Array2D<int>          &final_label,
   rd::Array2D<int8_t>       &flowdirs,
-  rd::Array2D<wtd_t>        &wtd
+  rd::Array2D<elev_t>          &wtd                  //HELP! I am very obviously using the wrong data type here. Can't get it to work using wtd_t! 
+
 ){
   rd::ProgressBar progress;
   rd::Timer timer_overall;
@@ -659,11 +666,13 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     const auto my_elev = dem(i);
     auto clabel        = label(i);
     
-    while(clabel!=OCEAN && my_elev>depressions.at(clabel).out_elev)
+    while(clabel!=OCEAN && my_elev>depressions.at(clabel).out_elev){
       clabel = depressions[clabel].parent;
-      final_label = clabel; //Richard, does this make sense here? I want another layer that contains the labels of which depressions these 
+      final_label(i) = clabel; //Richard, does this make sense here? I want another layer that contains the labels of which depressions these 
       //immediately belong to, even when it is a parent depression. This is so that I can change the wtd_vol in the correct place
       //when we have infiltration and wtd_vol of a depression changes. 
+    }
+
 
     if(clabel==OCEAN)
       continue;

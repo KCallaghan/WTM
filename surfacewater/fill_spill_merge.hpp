@@ -43,6 +43,7 @@ template<class elev_t, class wtd_t>
 void FillSpillMerge(
   const rd::Array2D<elev_t>     &topo,
   const rd::Array2D<dh_label_t> &label,
+  const rd::Array2D<dh_label_t> &final_label,
   const rd::Array2D<flowdir_t>  &flowdirs,
   DepressionHierarchy<elev_t>   &deps,
   rd::Array2D<wtd_t>            &wtd
@@ -53,6 +54,8 @@ static void MoveWaterIntoPits(
   const rd::Array2D<elev_t>    &topo,
   rd::Array2D<wtd_t>           &wtd,
   const rd::Array2D<int>       &label,
+  const rd::Array2D<dh_label_t> &final_label,
+
   DepressionHierarchy<elev_t>  &deps,
   const rd::Array2D<flowdir_t> &flowdirs
 );
@@ -125,6 +128,7 @@ template<class elev_t, class wtd_t>
 void FillSpillMerge(
   const rd::Array2D<elev_t>     &topo,
   const rd::Array2D<dh_label_t> &label,
+  const rd::Array2D<dh_label_t> &final_label,
   const rd::Array2D<flowdir_t>  &flowdirs,
   DepressionHierarchy<elev_t>   &deps,
   rd::Array2D<wtd_t>            &wtd
@@ -135,7 +139,7 @@ void FillSpillMerge(
 
 
   //We move standing water downhill to the pit cells of each depression
-  MoveWaterIntoPits(topo, label, flowdirs, deps, wtd);
+  MoveWaterIntoPits(topo, label,final_label, flowdirs, deps, wtd);
 
 
 
@@ -209,6 +213,8 @@ template<class elev_t, class wtd_t>
 static void MoveWaterIntoPits(
   const rd::Array2D<elev_t>    &topo,
   const rd::Array2D<int>       &label,
+  const rd::Array2D<int>       &final_label,
+
   const rd::Array2D<flowdir_t> &flowdirs,
   DepressionHierarchy<elev_t>  &deps,
   rd::Array2D<wtd_t>           &wtd
@@ -285,6 +291,12 @@ static void MoveWaterIntoPits(
     } else {                               //not a pit cell
       //If we have water, pass it downstream.
       if(wtd(c)>0){ //Groundwater can go negative, so it's important to make sure that we are only passing positive water around
+        if(wtd(n)<0) {   //the neighbour can store some water underground. This means we need to update wtd_vol since we are using some of it up here.
+          deps[final_label(c)].wtd_vol -= std::min(wtd(c), -wtd(n)); //change it by the minimum of the water we're adding here or the water the new cell can accomodate underground. 
+
+//how do we know which depression this is directly a part of? We know the label, but the cell may still be part directly of a higher parent depression.
+        }
+
         wtd(n) += wtd(c);  //Add water to downstream neighbour. This might result in filling up the groundwater table, which could have been negative
         wtd(c)  = 0;       //Clean up as we go
       }
