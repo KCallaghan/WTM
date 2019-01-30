@@ -31,7 +31,7 @@ const int        neighbours = 8;
 
 const double FP_ERROR = 1e-4;
 
-const float  OCEAN_LEVEL = 0;  //ocean_level in the topo file must be lower than any non-ocean cell. 
+const float  OCEAN_LEVEL = -9999;  //ocean_level in the topo file must be lower than any non-ocean cell. 
 
 
 
@@ -132,8 +132,14 @@ void FillSpillMerge(
   rd::Timer timer_overall;
   timer_overall.start();
   
+
+
   //We move standing water downhill to the pit cells of each depression
   MoveWaterIntoPits(topo, label, flowdirs, deps, wtd);
+
+
+
+
 
   { 
     //Scope to limit `timer_overflow` and `jump_table`. Also ensures
@@ -353,6 +359,12 @@ static void MoveWaterInDepHier(
 
   auto &this_dep = deps.at(current_depression);
 
+
+
+
+
+
+
   //Visit child depressions. When these both overflow, then we spread water
   //across them by spreading water across their common metadepression
   MoveWaterInDepHier(this_dep.lchild, deps, jump_table);
@@ -378,15 +390,16 @@ static void MoveWaterInDepHier(
     //Only if both children are full should their water make its way to this
     //parent
     if(lchild!=NO_VALUE
-      && deps.at(lchild).water_vol==deps.at(lchild).dep_vol
-      && deps.at(rchild).water_vol==deps.at(rchild).dep_vol
+      && deps.at(lchild).water_vol==deps.at(lchild).wtd_vol
+      && deps.at(rchild).water_vol==deps.at(rchild).wtd_vol
     )
     this_dep.water_vol += deps.at(lchild).water_vol + deps.at(rchild).water_vol;
   }
 
   //Each depression has an associated dep_vol. This is the TOTAL volume of the
   //meta-depression including all of its children. This property answers the
-  //question, "How much water can this meta-depression hold?"
+  //question, "How much water can this meta-depression hold above ground?"
+  //The wtd_vol then answers how much the depression can hold in TOTAL, including below-ground. 
 
   //Each depression also has an associated water volume called `water_vol`. This
   //stores the TOTAL volume of the water in the depression. That is, for each
@@ -408,21 +421,21 @@ static void MoveWaterInDepHier(
     //either its water_vol (the depression doesn't overflow) or equal to its
     //depression volume (the excess water is thrown into the ocean, which is
     //unaffected).
-    this_dep.water_vol = std::min(this_dep.water_vol,this_dep.dep_vol);
-  } else if(this_dep.water_vol>this_dep.dep_vol) {
+    this_dep.water_vol = std::min(this_dep.water_vol,this_dep.wtd_vol);
+  } else if(this_dep.water_vol>this_dep.wtd_vol) {
     //The neighbouring depression is not the ocean and this depression is
     //overflowing (therefore, all of its children are full)
-    assert(this_dep.lchild==NO_VALUE || deps.at(this_dep.lchild).water_vol==deps.at(this_dep.lchild).dep_vol);
-    assert(this_dep.rchild==NO_VALUE || deps.at(this_dep.rchild).water_vol==deps.at(this_dep.rchild).dep_vol);
+    assert(this_dep.lchild==NO_VALUE || deps.at(this_dep.lchild).water_vol==deps.at(this_dep.lchild).wtd_vol);
+    assert(this_dep.rchild==NO_VALUE || deps.at(this_dep.rchild).water_vol==deps.at(this_dep.rchild).wtd_vol);
 
     //The marginal volume of this depression is larger than what it can hold, so
     //we determine the amount that overflows, the "extra water".
-    double extra_water = this_dep.water_vol - this_dep.dep_vol;
+    double extra_water = this_dep.water_vol - this_dep.wtd_vol;
   
     //Now that we've figured out how much excess water there is, we fill this
     //depression to its brim. Note that we don't use addition or subtraction
     //here to ensure floating-point equality.
-    this_dep.water_vol = this_dep.dep_vol;
+    this_dep.water_vol = this_dep.wtd_vol;
 
     //OverflowInto will initially send water to this depression's neighbour's
     //leaf depression via the geolink. If everything fills up, the water will
@@ -432,7 +445,7 @@ static void MoveWaterInDepHier(
 
     assert(
          this_dep.water_vol==0 
-      || this_dep.water_vol<=this_dep.dep_vol
+      || this_dep.water_vol<=this_dep.wtd_vol
       || (this_dep.lchild==NO_VALUE && this_dep.rchild==NO_VALUE) 
       || (
               this_dep.lchild!=NO_VALUE && this_dep.rchild!=NO_VALUE
@@ -520,13 +533,13 @@ static dh_label_t OverflowInto(
     return stop_node;
   }
 
-  if(this_dep.water_vol<this_dep.dep_vol){                                              //Can this depression hold any water?
-    const double capacity = this_dep.dep_vol - this_dep.water_vol;                      //Yes. How much can it hold?
-    if(extra_water<capacity){                                                           //Is it enough to hold all the extra water?
-      this_dep.water_vol  = std::min(this_dep.water_vol+extra_water,this_dep.dep_vol);  //Yup. But let's be careful about floating-point stuff
+  if(this_dep.water_vol<this_dep.wtd_vol){                                              //Can this depression hold any water?
+    const double capacity = this_dep.wtd_vol - this_dep.water_vol;                      //Yes. How much can it hold?
+    if(extra_water<=capacity){                                                          //Is it enough to hold all the extra water?
+      this_dep.water_vol  = std::min(this_dep.water_vol+extra_water,this_dep.wtd_vol);  //Yup. But let's be careful about floating-point stuff
       extra_water         = 0;                                                          //No more extra water
     } else {                                                                            //It wasn't enough to hold all the water
-      this_dep.water_vol = this_dep.dep_vol;                                            //So we fill it all the way.
+      this_dep.water_vol = this_dep.wtd_vol;                                            //So we fill it all the way.
       extra_water       -= capacity;                                                    //And have that much less extra water to worry about
     }
   }
@@ -550,9 +563,9 @@ static dh_label_t OverflowInto(
 
   //Can overflow depression hold more water?
   auto &odep = deps.at(this_dep.odep);
-  if(odep.water_vol<odep.dep_vol){  //Yes. Move the water geographically into that depression's leaf.
-    if(this_dep.parent!=OCEAN && pdep.water_vol==0 && odep.water_vol+extra_water>odep.dep_vol) //It might take a while, but our neighbour will overflow, so our parent needs to know about our water volumes
-      pdep.water_vol += this_dep.water_vol + odep.dep_vol;           //Neighbour's water_vol will equal its dep_vol
+  if(odep.water_vol<odep.wtd_vol){  //Yes. Move the water geographically into that depression's leaf.
+    if(this_dep.parent!=OCEAN && pdep.water_vol==0 && odep.water_vol+extra_water>odep.wtd_vol) //It might take a while, but our neighbour will overflow, so our parent needs to know about our water volumes
+      pdep.water_vol += this_dep.water_vol + odep.wtd_vol;           //Neighbour's water_vol will equal its dep_vol
     return jump_table[root] = OverflowInto(this_dep.geolink, stop_node, deps, jump_table, extra_water);
   }
 

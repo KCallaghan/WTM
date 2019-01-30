@@ -88,6 +88,13 @@ class Depression {
   //Equation (see below).
   double   water_vol  = 0;
 
+  //wtd_vol is the dep_vol plus any additional water which may be stored as groundwater. 
+  //When groundwater is fully saturated, wtd_vol == dep_vol. 
+  double wtd_vol = 0;
+
+  //extra parameter used to help calculate wtd_vol. 
+  double wtd_height = 0;
+
   //Total elevation of cells contained with the depression and its children
   double total_elevation = 0;
 };
@@ -201,7 +208,9 @@ template<class elev_t, Topology topo>
 DepressionHierarchy<elev_t> GetDepressionHierarchy(
   const rd::Array2D<elev_t> &dem,
   rd::Array2D<int>          &label,
-  rd::Array2D<int8_t>       &flowdirs
+  rd::Array2D<int>          &final_label,
+  rd::Array2D<int8_t>       &flowdirs,
+  rd::Array2D<wtd_t>        &wtd
 ){
   rd::ProgressBar progress;
   rd::Timer timer_overall;
@@ -652,12 +661,16 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     
     while(clabel!=OCEAN && my_elev>depressions.at(clabel).out_elev)
       clabel = depressions[clabel].parent;
+      final_label = clabel; //Richard, does this make sense here? I want another layer that contains the labels of which depressions these 
+      //immediately belong to, even when it is a parent depression. This is so that I can change the wtd_vol in the correct place
+      //when we have infiltration and wtd_vol of a depression changes. 
 
     if(clabel==OCEAN)
       continue;
 
     depressions[clabel].cell_count++;
     depressions[clabel].total_elevation += dem(i);
+    depressions[clabel].wtd_height -= wtd(i);  //negative because wtd will be negative when there is space. 
   }
   progress.stop();
 
@@ -704,11 +717,40 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       dep.total_elevation += depressions.at(dep.lchild).total_elevation;
       dep.cell_count      += depressions.at(dep.rchild).cell_count;
       dep.total_elevation += depressions.at(dep.rchild).total_elevation;
+ //     dep.wtd_height      += depressions.at(dep.lchild).wtd_height;
+ //     dep.wtd_height      += depressions.at(dep.rchild).wtd_height;
+
+      //the above is for making wtd_vol total. While this would be a more satisfying solution, it leads to us
+      //having to adjust wtd_vol through the entire depression heirarchy every time there is some infiltration
+      //in a single cell. So for now I am going to try storing wtd_vol as marginal. So it will be the dep_vol, plus
+      //any amount that can be stored within that particular level of depression underground. Won't include what can be 
+      //stored in leaves. I think this is okay since with our geolink method, we still go down to the leaf level when 
+      //overflowing water. 
     }
+
+    dep.wtd_height = dep.wtd_height + dep.total_elevation; //so now the wtd height is the total of elevations AND the additional underground amount
     //This has to be after the foregoing because the cells added by the if-
     //clauses have additional volume above their spill elevations that cannot be
     //counted simply by adding their volumes to their parent depression.
+   
     dep.dep_vol = dep.cell_count*static_cast<double>(dep.out_elev)-dep.total_elevation;
+
+
+
+
+  //We need to create yet another measure of volume which I 
+  //for now will call wtd_vol. This will be the dep_vol plus the additional
+  //volume allowed in the depression through storage as groundwater. 
+  //This is important because a depression may actually be able to store more 
+  //water than in its dep_vol. We may be overflowing a depression when it
+  //is not actually supposed to overflow! 
+  //When we do overflow, we will also have to keep track of changes to the wtd
+  //in the overflow depression, and associated changes in wtd_vol. When a depression
+  //is completely saturated in groundwater, we will have wtd_vol == dep_vol.
+    dep.wtd_vol = dep.cell_count*static_cast<double>(dep.out_elev)-dep.wtd_height;  //and so now I think we have the true possible storage in a depression here. 
+    
+
+
 
     assert(dep.lchild==NO_VALUE || depressions.at(dep.lchild).dep_vol+depressions.at(dep.rchild).dep_vol<=dep.dep_vol);
   }
