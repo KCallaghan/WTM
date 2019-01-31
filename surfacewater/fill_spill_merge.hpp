@@ -60,21 +60,36 @@ static void MoveWaterIntoPits(
   const rd::Array2D<flowdir_t> &flowdirs
 );
 
-template<class elev_t>
+
+template<class elev_t,class wtd_t>
 static void MoveWaterInDepHier(
   int                                         current_depression,
   DepressionHierarchy<elev_t>                &deps,
+  const rd::Array2D<elev_t>    &topo,
+  const rd::Array2D<int>       &label,
+  const rd::Array2D<flowdir_t> &flowdirs,
+  rd::Array2D<wtd_t>           &wtd,
+
+ 
   std::unordered_map<dh_label_t, dh_label_t> &jump_table
+
 );
 
-template<class elev_t>
+template<class elev_t, class wtd_t>
 static dh_label_t OverflowInto(
   const dh_label_t                            root,
+  const dh_label_t                            previous_dep,
   const dh_label_t                            stop_node,
+  const rd::Array2D<elev_t>    &topo,
+  const rd::Array2D<int>       &label,
+  const rd::Array2D<flowdir_t> &flowdirs,
+  rd::Array2D<wtd_t>           &wtd,
+
   DepressionHierarchy<elev_t>                &deps,
   std::unordered_map<dh_label_t, dh_label_t> &jump_table,
   double                                      extra_water
 );
+
 
 class SubtreeDepressionInfo;
 
@@ -155,7 +170,12 @@ void FillSpillMerge(
     //depressions which contain too much water overflow into depressions that
     //have less water. If enough overflow happens, then the water is ultimately
     //routed to the ocean.
-    MoveWaterInDepHier(OCEAN, deps, jump_table);
+    MoveWaterInDepHier(OCEAN, deps, topo,label,flowdirs,wtd,jump_table);
+
+
+
+
+
     std::cerr<<"t FlowInDepressionHierarchy: Overflow time = "<<timer_overflow.stop()<<std::endl;
   }
 
@@ -360,11 +380,18 @@ static void MoveWaterIntoPits(
 ///@return Modifies the depression hierarchy `deps` to indicate the amount of
 ///        water in each depression. This information can be used to add
 ///        standing surface water to the cells within a depression.
-template<class elev_t>
+template<class elev_t,class wtd_t>
 static void MoveWaterInDepHier(
   int                                         current_depression,
   DepressionHierarchy<elev_t>                &deps,
+  const rd::Array2D<elev_t>    &topo,
+  const rd::Array2D<int>       &label,
+  const rd::Array2D<flowdir_t> &flowdirs,
+  rd::Array2D<wtd_t>           &wtd,
+
+ 
   std::unordered_map<dh_label_t, dh_label_t> &jump_table
+
 ){
   if(current_depression==NO_VALUE)
     return;
@@ -379,15 +406,18 @@ static void MoveWaterInDepHier(
 
   //Visit child depressions. When these both overflow, then we spread water
   //across them by spreading water across their common metadepression
-  MoveWaterInDepHier(this_dep.lchild, deps, jump_table);
-  MoveWaterInDepHier(this_dep.rchild, deps, jump_table);
+  MoveWaterInDepHier(this_dep.lchild, deps, topo,label,flowdirs,wtd, jump_table);
+  MoveWaterInDepHier(this_dep.rchild, deps, topo,label,flowdirs,wtd, jump_table);
+
+
+
 
   //Catch depressions that link to the ocean through this one. These are special
   //cases because we will never spread water across the union of these
   //depressions and the current depressions: they only flow into the current
   //depression
   for(const auto c: this_dep.ocean_linked)
-    MoveWaterInDepHier(c, deps, jump_table);
+    MoveWaterInDepHier(c, deps, topo,label,flowdirs,wtd, jump_table);
 
   //If the current depression is the ocean then at this point we've visited all
   //of its ocean-linked depressions (the ocean has no children). Since we do not
@@ -453,7 +483,9 @@ static void MoveWaterInDepHier(
     //leaf depression via the geolink. If everything fills up, the water will
     //end up in this depression's parent. So at this point we don't have to
     //worry about the extra water here any more.
-    OverflowInto(this_dep.geolink, this_dep.parent, deps, jump_table, extra_water);
+    OverflowInto(this_dep.geolink, this_dep.dep_label, this_dep.parent, topo,label,flowdirs,wtd, deps, jump_table, extra_water);
+
+
 
     assert(
          this_dep.water_vol==0 
@@ -516,15 +548,22 @@ static void MoveWaterInDepHier(
 ///                   or, if the neighbour's full, to root's parent.
 //@return The depression where the water ultimately ended up. This is used to
 //        update the jump table
-template<class elev_t>
+template<class elev_t,class wtd_t>
 static dh_label_t OverflowInto(
   const dh_label_t                            root,
+  const dh_label_t                            previous_dep, //the previous depression. Sometimes we need to know where the water came from when we overflow it. 
   const dh_label_t                            stop_node,
+  const rd::Array2D<elev_t>    &topo,
+  const rd::Array2D<int>       &label,
+  const rd::Array2D<flowdir_t> &flowdirs,
+  rd::Array2D<wtd_t>           &wtd,
+
   DepressionHierarchy<elev_t>                &deps,
   std::unordered_map<dh_label_t, dh_label_t> &jump_table,  //Shortcut from one depression to its next known empty neighbour
   double                                      extra_water
 ){
   auto &this_dep = deps.at(root);
+  auto &last_dep = deps.at(previous_dep);
 
   //TODO: Could simulate water running down flowpath into depression so that wtd
   //fills up more realistically
@@ -540,8 +579,78 @@ static dh_label_t OverflowInto(
   if(root==stop_node){                   //We've made a loop, so everything is full
     if(this_dep.parent==OCEAN)           //If our parent is the ocean
       return OCEAN;                      //Then the extra water just goes away
-    else                                 //Otherwise
-      this_dep.water_vol += extra_water; //This node, the original node's parent, gets the extra water
+    else  {                               //Otherwise
+  //if this node is a normal parent, then I don't think it matters where in the depression the water goes, and it can just get added to this_dep.water_vol. 
+  //But if the original depression is ocean_linked to this depression, then the overflow is happening from a certain location and we need to route that water.  	
+  //in the case where the original depression was ocean_linked to this one, it won't be one of this depression's children. 
+
+        	  int move_to_cell;
+
+      if(this_dep.lchild==NO_VALUE || (this_dep.lchild != previous_dep && this_dep.rchild != previous_dep)){ //so either if this node has no children or if neither of its children was the previous depression - this implies the previous depression was ocean_linked. 
+        //in this case, we should move water to the inlet of this depression and let it flow downslope. Although this is only necessary if there is groundwater space available...
+        if(this_dep.wtd_vol > this_dep.dep_vol){ //okay, there is groundwater volume to fill, so we must move the water properly. 
+        	//the water must go to last_dep.out_cell
+        	extra_water += wtd(last_dep.out_cell); //+= since wtd is either negative or zero. 
+        	wtd(last_dep.out_cell) += extra_water;
+        	if(wtd(last_dep.out_cell)>0)
+        		wtd(last_dep.out_cell) = 0; //no need to keep a positive wtd here as we are still remembering any additional water as extra_water.
+        	if(extra_water > 0){    //it must then move downslope but we must also check that it moves towards this_dep and doesn't flow back into last_dep
+        	  int x,y;
+        	  move_to_cell = NO_VALUE;
+        	  topo.iToxy(last_dep.out_cell,x,y);
+        	  if(label(x+1,y)==this_dep.dep_label)
+        	  	move_to_cell = topo.xyToI(x+1,y);
+
+        	  if(label(x-1,y)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x-1,y)<topo(move_to_cell)))
+        	  	move_to_cell = topo.xyToI(x-1,y);
+
+        	  if(label(x,y+1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x,y+1)<topo(move_to_cell)))
+        	  	move_to_cell = topo.xyToI(x,y+1);
+        	  if(label(x,y-1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x,y-1)<topo(move_to_cell)))
+        	  	move_to_cell = topo.xyToI(x,y-1);
+        	  if(label(x-1,y-1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x-1,y-1)<topo(move_to_cell)))
+        	  	move_to_cell = topo.xyToI(x-1,y-1);
+        	  if(label(x-1,y+1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x-1,y+1)<topo(move_to_cell)))
+        	  	move_to_cell = topo.xyToI(x-1,y+1);
+        	  if(label(x+1,y-1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x+1,y-1)<topo(move_to_cell)))
+        	  	move_to_cell = topo.xyToI(x+1,y-1);
+        	  if(label(x+1,y+1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x+1,y+1)<topo(move_to_cell)))
+        	  	move_to_cell = topo.xyToI(x+1,y+1);
+
+              }   //so now we know which is the correct starting cell.
+
+            while(extra_water > 0){
+              const auto ndir = flowdirs(move_to_cell); 
+
+              extra_water += wtd(move_to_cell);
+              wtd(move_to_cell) += extra_water;
+              if(wtd(move_to_cell)>0)
+        		wtd(move_to_cell) = 0; 
+              if(ndir == NO_FLOW){
+              	this_dep.water_vol += extra_water;
+               	extra_water = 0;
+              }
+              else{
+                int x1,y1;
+                topo.iToxy(move_to_cell,x1,y1);
+                const int nx = x1+dx[ndir];
+                const int ny = y1+dy[ndir];
+                move_to_cell = topo.xyToI(nx,ny);
+                assert(move_to_cell>=0);
+              }
+            }
+        	//then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
+            
+    }
+
+
+
+        else
+          this_dep.water_vol += extra_water; //no groundwater volume to fill, so we can just give it the extra water. 
+        }
+      else
+        this_dep.water_vol += extra_water; //This node, the original node's parent, gets the extra water
+  }
     return stop_node;
   }
 
@@ -570,15 +679,17 @@ static dh_label_t OverflowInto(
   if(this_dep.odep==NO_VALUE){      //Does the depression even have such a neighbour? 
     if(this_dep.parent!=OCEAN && pdep.water_vol==0) //At this point we're full and heading to our parent, so it needs to know that it contains our water
       pdep.water_vol += this_dep.water_vol;
-    return jump_table[root] = OverflowInto(this_dep.parent, stop_node, deps, jump_table, extra_water);  //Nope. Pass the water to the parent
+    return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node, topo,label,flowdirs,wtd, deps, jump_table, extra_water);  //Nope. Pass the water to the parent
   }
 
+
+  
   //Can overflow depression hold more water?
   auto &odep = deps.at(this_dep.odep);
   if(odep.water_vol<odep.wtd_vol){  //Yes. Move the water geographically into that depression's leaf.
     if(this_dep.parent!=OCEAN && pdep.water_vol==0 && odep.water_vol+extra_water>odep.wtd_vol) //It might take a while, but our neighbour will overflow, so our parent needs to know about our water volumes
       pdep.water_vol += this_dep.water_vol + odep.wtd_vol;           //Neighbour's water_vol will equal its dep_vol
-    return jump_table[root] = OverflowInto(this_dep.geolink, stop_node, deps, jump_table, extra_water);
+    return jump_table[root] = OverflowInto(this_dep.geolink, this_dep.dep_label, stop_node, topo,label,flowdirs,wtd, deps, jump_table, extra_water);
   }
 
   //Okay, so the extra water didn't fit into this depression or its overflow
@@ -591,7 +702,7 @@ static dh_label_t OverflowInto(
     pdep.water_vol += this_dep.water_vol + odep.water_vol;
 
   //THIRD PLACE TO STASH WATER: IN THIS DEPRESSION'S PARENT
-  return jump_table[root] = OverflowInto(this_dep.parent, stop_node, deps, jump_table, extra_water);
+  return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node,topo,label,flowdirs,wtd, deps, jump_table, extra_water);
 }
 
 

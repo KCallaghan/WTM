@@ -210,7 +210,7 @@ using DepressionHierarchy = std::vector<Depression<elev_t>>;
  
 
 
-template<class elev_t,  Topology topo, class wtd_t>                                                     
+template<class elev_t,  Topology topo>                                                     
 DepressionHierarchy<elev_t> GetDepressionHierarchy(
   const rd::Array2D<elev_t> &dem,
   rd::Array2D<int>          &label,
