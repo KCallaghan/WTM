@@ -679,7 +679,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
     depressions[clabel].cell_count++;
     depressions[clabel].total_elevation += dem(i);
-    depressions[clabel].wtd_height -= wtd(i);  //negative because wtd will be negative when there is space. 
+    if(wtd(i) < 0)
+      depressions[clabel].wtd_height -= wtd(i);  //negative because wtd will be negative when there is space. 
   }
   progress.stop();
 

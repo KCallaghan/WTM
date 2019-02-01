@@ -182,7 +182,7 @@ void FillSpillMerge(
   //Sanity checks
   for(int d=1;d<(int)deps.size();d++){
     const auto &dep = deps.at(d);
-    assert(dep.water_vol==0 || dep.water_vol<=dep.dep_vol);
+    assert(dep.water_vol==0 || dep.water_vol<=dep.wtd_vol);
     assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) || (dep.lchild!=NO_VALUE && deps.at(dep.lchild).water_vol<dep.water_vol));
     assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) || (dep.rchild!=NO_VALUE && deps.at(dep.rchild).water_vol<dep.water_vol));
   }
@@ -590,61 +590,73 @@ static dh_label_t OverflowInto(
         //in this case, we should move water to the inlet of this depression and let it flow downslope. Although this is only necessary if there is groundwater space available...
         if(this_dep.wtd_vol > this_dep.dep_vol){ //okay, there is groundwater volume to fill, so we must move the water properly. 
         	//the water must go to last_dep.out_cell
+        	if(extra_water <= -wtd(last_dep.out_cell)){
+        	  wtd(last_dep.out_cell) += extra_water;
+        	  if(label(last_dep.out_cell) == this_dep.dep_label)  //if the out_cell is a labelled part of this depression, adjust the wtd_vol
+                this_dep.wtd_vol -= extra_water;
+ 
+        	  extra_water = 0;
+        	} else{
+
+           
         	extra_water += wtd(last_dep.out_cell); //+= since wtd is either negative or zero. 
-        	wtd(last_dep.out_cell) += extra_water;
-        	if(wtd(last_dep.out_cell)>0)
-        		wtd(last_dep.out_cell) = 0; //no need to keep a positive wtd here as we are still remembering any additional water as extra_water.
-        	if(extra_water > 0){    //it must then move downslope but we must also check that it moves towards this_dep and doesn't flow back into last_dep
-        	  int x,y;
-        	  move_to_cell = NO_VALUE;
-        	  topo.iToxy(last_dep.out_cell,x,y);
-        	  if(label(x+1,y)==this_dep.dep_label)
-        	  	move_to_cell = topo.xyToI(x+1,y);
+        	if(label(last_dep.out_cell) == this_dep.dep_label)  //if the out_cell is a labelled part of this depression, adjust the wtd_vol
+        	  this_dep.wtd_vol += wtd(last_dep.out_cell);
 
-        	  if(label(x-1,y)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x-1,y)<topo(move_to_cell)))
-        	  	move_to_cell = topo.xyToI(x-1,y);
+        	wtd(last_dep.out_cell) = 0; //since this amount has already been subtracted from extra_water
+        	if(extra_water > 0){    //Which is should be, due to if statement above, it must then move downslope but we must also check that it moves towards this_dep and doesn't flow back into last_dep
+         	  move_to_cell = NO_VALUE;
+         	  int x,y;
+         	  topo.iToxy(last_dep.out_cell,x,y);
 
-        	  if(label(x,y+1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x,y+1)<topo(move_to_cell)))
-        	  	move_to_cell = topo.xyToI(x,y+1);
-        	  if(label(x,y-1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x,y-1)<topo(move_to_cell)))
-        	  	move_to_cell = topo.xyToI(x,y-1);
-        	  if(label(x-1,y-1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x-1,y-1)<topo(move_to_cell)))
-        	  	move_to_cell = topo.xyToI(x-1,y-1);
-        	  if(label(x-1,y+1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x-1,y+1)<topo(move_to_cell)))
-        	  	move_to_cell = topo.xyToI(x-1,y+1);
-        	  if(label(x+1,y-1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x+1,y-1)<topo(move_to_cell)))
-        	  	move_to_cell = topo.xyToI(x+1,y-1);
-        	  if(label(x+1,y+1)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(x+1,y+1)<topo(move_to_cell)))
-        	  	move_to_cell = topo.xyToI(x+1,y+1);
+
+              for(int n=1;n<=neighbours;n++){ //Check out our neighbours
+      //Use offset to get neighbour x coordinate, wrapping as needed
+                const int nx = x+dx[n];
+      //Use offset to get neighbour y coordinate
+                const int ny = y+dy[n];      
+                if(!topo.inGrid(nx,ny))  //Is cell outside grid (too far North/South)?
+                  continue;             //Yup: skip it.
+                if(label(nx,ny)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(nx,ny)<topo(move_to_cell)))
+                	move_to_cell = topo.xyToI(nx,ny);
+               
 
               }   //so now we know which is the correct starting cell.
 
             while(extra_water > 0){
               const auto ndir = flowdirs(move_to_cell); 
 
-              extra_water += wtd(move_to_cell);
-              wtd(move_to_cell) += extra_water;
-              if(wtd(move_to_cell)>0)
-        		wtd(move_to_cell) = 0; 
-              if(ndir == NO_FLOW){
-              	this_dep.water_vol += extra_water;
-               	extra_water = 0;
-              }
-              else{
-                int x1,y1;
-                topo.iToxy(move_to_cell,x1,y1);
-                const int nx = x1+dx[ndir];
-                const int ny = y1+dy[ndir];
-                move_to_cell = topo.xyToI(nx,ny);
-                assert(move_to_cell>=0);
+            	if(extra_water <= -wtd(move_to_cell)){
+        	      wtd(move_to_cell) += extra_water;
+        	      extra_water = 0;
+            	} else{
+
+                  extra_water += wtd(move_to_cell);
+                  this_dep.wtd_vol += wtd(move_to_cell);
+                  assert(this_dep.wtd_vol >= this_dep.dep_vol);
+
+                  wtd(move_to_cell) = 0;
+          
+                  if(ndir == NO_FLOW){
+                 	this_dep.water_vol += extra_water;
+               	    extra_water = 0;
+                    }
+                  else{
+                    int x1,y1;
+                    topo.iToxy(move_to_cell,x1,y1);
+                    const int nx = x1+dx[ndir];
+                    const int ny = y1+dy[ndir];
+                    move_to_cell = topo.xyToI(nx,ny);
+                    assert(move_to_cell>=0);
               }
             }
         	//then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
-            
+          }
+      }
     }
 
 
-
+}
         else
           this_dep.water_vol += extra_water; //no groundwater volume to fill, so we can just give it the extra water. 
         }
@@ -657,11 +669,84 @@ static dh_label_t OverflowInto(
   if(this_dep.water_vol<this_dep.wtd_vol){                                              //Can this depression hold any water?
     const double capacity = this_dep.wtd_vol - this_dep.water_vol;                      //Yes. How much can it hold?
     if(extra_water<=capacity){                                                          //Is it enough to hold all the extra water?
+      if(this_dep.wtd_vol > this_dep.dep_vol){    //the depression has groundwater space. We need to move water properly from the outlet. 
+        if(extra_water <= -wtd(last_dep.out_cell)){
+          wtd(last_dep.out_cell) += extra_water;
+          if(label(last_dep.out_cell) == this_dep.dep_label)  //if the out_cell is a labelled part of this depression, adjust the wtd_vol
+            this_dep.wtd_vol -= extra_water;
+          extra_water = 0;
+        } else{
+        	extra_water += wtd(last_dep.out_cell);
+        	if(label(last_dep.out_cell) == this_dep.dep_label)  //if the out_cell is a labelled part of this depression, adjust the wtd_vol
+        	  this_dep.wtd_vol += wtd(last_dep.out_cell);
+         
+        	wtd(last_dep.out_cell) = 0; //since this amount has already been subtracted from extra_water
+        	if(extra_water > 0){    //Which is should be, due to if statement above, it must then move downslope but we must also check that it moves towards this_dep and doesn't flow back into last_dep
+         	  int move_to_cell;
+
+         	  move_to_cell = NO_VALUE;
+         	  int x,y;
+         	  topo.iToxy(last_dep.out_cell,x,y);
+
+              for(int n=1;n<=neighbours;n++){ //Check out our neighbours
+      //Use offset to get neighbour x coordinate, wrapping as needed
+                const int nx = x+dx[n];
+      //Use offset to get neighbour y coordinate
+                const int ny = y+dy[n];      
+                if(!topo.inGrid(nx,ny))  //Is cell outside grid (too far North/South)?
+                  continue;             //Yup: skip it.
+                if(label(nx,ny)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(nx,ny)<topo(move_to_cell)))
+                	move_to_cell = topo.xyToI(nx,ny);
+               
+
+        }  //so now we know which is the correct starting cell.
+
+            while(extra_water > 0){
+              const auto ndir = flowdirs(move_to_cell); 
+
+            	if(extra_water <= -wtd(move_to_cell)){
+        	      wtd(move_to_cell) += extra_water;
+        	      extra_water = 0;
+            	} else{
+
+                  extra_water += wtd(move_to_cell);
+                  this_dep.wtd_vol += wtd(move_to_cell);
+                  assert(this_dep.wtd_vol >= this_dep.dep_vol);
+
+                  wtd(move_to_cell) = 0;
+          
+                  if(ndir == NO_FLOW){
+                 	this_dep.water_vol += extra_water;
+               	    extra_water = 0;
+                    }
+                  else{
+                    int x1,y1;
+                    topo.iToxy(move_to_cell,x1,y1);
+                    const int nx = x1+dx[ndir];
+                    const int ny = y1+dy[ndir];
+                    move_to_cell = topo.xyToI(nx,ny);
+                    assert(move_to_cell>=0);
+              }
+            }
+        	//then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
+          }
+      }
+    }
+
+
+
+      } else{   //there is no groundwater space, so no need to worry about flow routing, just add the water to the depression. 
       this_dep.water_vol  = std::min(this_dep.water_vol+extra_water,this_dep.wtd_vol);  //Yup. But let's be careful about floating-point stuff
       extra_water         = 0;                                                          //No more extra water
-    } else {                                                                            //It wasn't enough to hold all the water
+      }
+    } else {                                                                            //It wasn't enough to hold all the water, so it will be completely filled and there is no need to worry about flow routing. 
+  //hmm, in cases like this the wtd_vol is not getting updated to recognise that the depression is now filled. 
+    //should we just artificially make wtd_vol = dep_vol even though we're not actually updating the wtd until the spreading water step in these cases?
+    
       this_dep.water_vol = this_dep.wtd_vol;                                            //So we fill it all the way.
       extra_water       -= capacity;                                                    //And have that much less extra water to worry about
+
+      this_dep.wtd_vol = this_dep.dep_vol; //to indicate that the depression no longer has additional groundwater space. 
     }
   }
 
@@ -689,6 +774,7 @@ static dh_label_t OverflowInto(
   if(odep.water_vol<odep.wtd_vol){  //Yes. Move the water geographically into that depression's leaf.
     if(this_dep.parent!=OCEAN && pdep.water_vol==0 && odep.water_vol+extra_water>odep.wtd_vol) //It might take a while, but our neighbour will overflow, so our parent needs to know about our water volumes
       pdep.water_vol += this_dep.water_vol + odep.wtd_vol;           //Neighbour's water_vol will equal its dep_vol
+  //is this right? Aren't we adding the odep.wtd_vol here AND then ading it again when we actually overflow into the parent?
     return jump_table[root] = OverflowInto(this_dep.geolink, this_dep.dep_label, stop_node, topo,label,flowdirs,wtd, deps, jump_table, extra_water);
   }
 
@@ -805,7 +891,7 @@ static SubtreeDepressionInfo FindDepressionsToFill(
   //The water volume should never be greater than the depression volume because
   //otherwise we would have overflowed the water into the neighbouring
   //depression and moved the excess to the parent.
-  assert(this_dep.water_vol<=this_dep.dep_vol);
+  assert(this_dep.water_vol<=this_dep.wtd_vol);
 
   //Since depressions store their marginal water volumes, if a parent depression
   //has 0 marginal water volume, then both of its children have sufficient
@@ -815,7 +901,7 @@ static SubtreeDepressionInfo FindDepressionsToFill(
   //the parent's water with our own (it might be at the bottom of a cliff).
 
   if(this_dep.water_vol<this_dep.dep_vol || this_dep.ocean_parent){
-    assert(this_dep.water_vol<=this_dep.dep_vol);
+    assert(this_dep.water_vol<=this_dep.wtd_vol);
 
     //If both of a depression's children have already spread their water, we do not
     //want to attempt to do so again in an empty parent depression. 
@@ -943,7 +1029,7 @@ static void FillDepressions(
     //Current volume of this subset of the metadepression. Since we might climb
     //over a saddle point, this value can occasionally be negative. It will be
     //positive by the time we need to spread the water around.
-    const double current_volume = cells_affected.size()*static_cast<double>(topo(c.x,c.y)) - total_elevation;
+    const double current_volume = cells_affected.size()*static_cast<double>(topo(c.x,c.y)) - total_elevation; 
 
     //NOTE: If this is false by a small margin, then it's a floating point issue
     //and this should be adjusted to be >=-1e-6 and water_vol should be made 0
@@ -980,7 +1066,7 @@ static void FillDepressions(
         //volume (per the if-clause above).
 
         //Fill in as much of this cell's water table as we can
-        const double fill_amount = water_vol - current_volume;
+        const double fill_amount = water_vol - current_volume;                               //TODO is it needed to update wtd_vol here? I think the code can work without doing so, but it would be better for error checking if we did. If we do, best way to do so?
         assert(fill_amount>=0);
         wtd(c.x,c.y)   += fill_amount;
         water_vol -= fill_amount;   //Doesn't matter because we don't use water_vol anymore
@@ -1025,8 +1111,9 @@ static void FillDepressions(
       //happens at the edge of a flat abuting an ocean). These cells will then
       //be popped and could be processed inappropriately. To prevent this, we
       //skip them here.
-      if(stdi.my_labels.count(label(c.x,c.y))==0)  //CHECK. This was preventing cells that flowed to the ocean from allowing my depression volume to update. Is this way ok? Is this even needed?
+      if(stdi.my_labels.count(label(c.x,c.y))==0) { //CHECK. This was preventing cells that flowed to the ocean from allowing my depression volume to update. Is this way ok? Is this even needed?
         continue;
+    }
 
       //Okay, we're allow to add this cell's neighbours since this cell is part
       //of the metadepression.
@@ -1034,6 +1121,7 @@ static void FillDepressions(
       //Add this cell to those affected so that its volume is available for
       //filling.
       cells_affected.emplace_back(topo.xyToI(c.x,c.y));
+
 
       //Fill in cells' water tables as we go
       assert(wtd(c.x,c.y)<=0);
