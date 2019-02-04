@@ -67,6 +67,8 @@ static void MoveWaterInDepHier(
   DepressionHierarchy<elev_t>                &deps,
   const rd::Array2D<elev_t>    &topo,
   const rd::Array2D<int>       &label,
+  const rd::Array2D<int>       &final_label,
+
   const rd::Array2D<flowdir_t> &flowdirs,
   rd::Array2D<wtd_t>           &wtd,
 
@@ -75,6 +77,25 @@ static void MoveWaterInDepHier(
 
 );
 
+
+
+template<class elev_t,class wtd_t>
+static void MoveWaterInOverflow(
+  float                          extra_water,
+  const dh_label_t               current_dep,
+  const dh_label_t               previous_dep,
+
+  const rd::Array2D<elev_t>      &topo,
+  rd::Array2D<wtd_t>             &wtd,
+  const rd::Array2D<flowdir_t>   &flowdirs,
+    const rd::Array2D<int>       &final_label,
+
+  DepressionHierarchy<elev_t>                &deps
+
+
+
+  );
+
 template<class elev_t, class wtd_t>
 static dh_label_t OverflowInto(
   const dh_label_t                            root,
@@ -82,6 +103,8 @@ static dh_label_t OverflowInto(
   const dh_label_t                            stop_node,
   const rd::Array2D<elev_t>    &topo,
   const rd::Array2D<int>       &label,
+  const rd::Array2D<int>       &final_label,
+
   const rd::Array2D<flowdir_t> &flowdirs,
   rd::Array2D<wtd_t>           &wtd,
 
@@ -151,14 +174,8 @@ void FillSpillMerge(
   rd::Timer timer_overall;
   timer_overall.start();
   
-
-
   //We move standing water downhill to the pit cells of each depression
   MoveWaterIntoPits(topo, label,final_label, flowdirs, deps, wtd);
-
-
-
-
 
   { 
     //Scope to limit `timer_overflow` and `jump_table`. Also ensures
@@ -170,10 +187,7 @@ void FillSpillMerge(
     //depressions which contain too much water overflow into depressions that
     //have less water. If enough overflow happens, then the water is ultimately
     //routed to the ocean.
-    MoveWaterInDepHier(OCEAN, deps, topo,label,flowdirs,wtd,jump_table);
-
-
-
+    MoveWaterInDepHier(OCEAN, deps, topo,label,final_label,flowdirs,wtd,jump_table);
 
 
     std::cerr<<"t FlowInDepressionHierarchy: Overflow time = "<<timer_overflow.stop()<<std::endl;
@@ -313,8 +327,7 @@ static void MoveWaterIntoPits(
       if(wtd(c)>0){ //Groundwater can go negative, so it's important to make sure that we are only passing positive water around
         if(wtd(n)<0) {   //the neighbour can store some water underground. This means we need to update wtd_vol since we are using some of it up here.
           deps[final_label(c)].wtd_vol -= std::min(wtd(c), -wtd(n)); //change it by the minimum of the water we're adding here or the water the new cell can accomodate underground. 
-
-//how do we know which depression this is directly a part of? We know the label, but the cell may still be part directly of a higher parent depression.
+          //final_label stores the specific depression label (even if not a leaf) so we only need to change wtd_vol in that depression. 
         }
 
         wtd(n) += wtd(c);  //Add water to downstream neighbour. This might result in filling up the groundwater table, which could have been negative
@@ -333,12 +346,6 @@ static void MoveWaterIntoPits(
 
   std::cerr<<"t FlowInDepressionHierarchy: Surface water = "<<timer.stop()<<" s"<<std::endl;
 }
-
-
-
-
-
-
 
 
 
@@ -386,6 +393,8 @@ static void MoveWaterInDepHier(
   DepressionHierarchy<elev_t>                &deps,
   const rd::Array2D<elev_t>    &topo,
   const rd::Array2D<int>       &label,
+  const rd::Array2D<int>       &final_label,
+
   const rd::Array2D<flowdir_t> &flowdirs,
   rd::Array2D<wtd_t>           &wtd,
 
@@ -400,15 +409,10 @@ static void MoveWaterInDepHier(
 
 
 
-
-
-
-
   //Visit child depressions. When these both overflow, then we spread water
   //across them by spreading water across their common metadepression
-  MoveWaterInDepHier(this_dep.lchild, deps, topo,label,flowdirs,wtd, jump_table);
-  MoveWaterInDepHier(this_dep.rchild, deps, topo,label,flowdirs,wtd, jump_table);
-
+  MoveWaterInDepHier(this_dep.lchild, deps, topo,label,final_label,flowdirs,wtd, jump_table);
+  MoveWaterInDepHier(this_dep.rchild, deps, topo,label,final_label,flowdirs,wtd, jump_table);
 
 
 
@@ -417,7 +421,7 @@ static void MoveWaterInDepHier(
   //depressions and the current depressions: they only flow into the current
   //depression
   for(const auto c: this_dep.ocean_linked)
-    MoveWaterInDepHier(c, deps, topo,label,flowdirs,wtd, jump_table);
+    MoveWaterInDepHier(c, deps, topo,label,final_label,flowdirs,wtd, jump_table);
 
   //If the current depression is the ocean then at this point we've visited all
   //of its ocean-linked depressions (the ocean has no children). Since we do not
@@ -483,8 +487,7 @@ static void MoveWaterInDepHier(
     //leaf depression via the geolink. If everything fills up, the water will
     //end up in this depression's parent. So at this point we don't have to
     //worry about the extra water here any more.
-    OverflowInto(this_dep.geolink, this_dep.dep_label, this_dep.parent, topo,label,flowdirs,wtd, deps, jump_table, extra_water);
-
+    OverflowInto(this_dep.geolink, this_dep.dep_label, this_dep.parent, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water);
 
 
     assert(
@@ -503,6 +506,132 @@ static void MoveWaterInDepHier(
   //to the ocean. We must now spread the water in the depressions by setting
   //appropriate values for wtd.
 }
+
+
+
+
+
+
+
+
+
+
+template<class elev_t,class wtd_t>
+static void MoveWaterInOverflow(
+  float                          extra_water,
+  const dh_label_t               current_dep,
+  const dh_label_t               previous_dep,
+
+  const rd::Array2D<elev_t>      &topo,
+  rd::Array2D<wtd_t>             &wtd,
+  const rd::Array2D<flowdir_t>   &flowdirs,
+    const rd::Array2D<int>       &final_label,
+
+  DepressionHierarchy<elev_t>                &deps
+
+
+
+  ){
+  auto &this_dep = deps.at(current_dep);
+  auto &last_dep = deps.at(previous_dep);
+  int move_to_cell;            //the cell that will be the next to receive the extra water
+
+           
+  if(extra_water <= -wtd(last_dep.out_cell)){                         //There is little enough extra water that it will all be used up on the out_cell's groundwater
+    wtd(last_dep.out_cell) += extra_water;
+    if(final_label(last_dep.out_cell) == this_dep.dep_label)                //if the out_cell is a labelled part of this depression, adjust the wtd_vol
+      this_dep.wtd_vol -= extra_water;
+    extra_water = 0;
+  } 
+  else{                               //There is enough extra water that some will need to be moved downslope.
+          
+
+    extra_water += wtd(last_dep.out_cell); //+= since wtd is either negative or zero. 
+    if(final_label(last_dep.out_cell) == this_dep.dep_label)  //if the out_cell is a labelled part of this depression, adjust the wtd_vol
+      this_dep.wtd_vol += wtd(last_dep.out_cell);
+
+    wtd(last_dep.out_cell) = 0; //since this amount has already been subtracted from extra_water
+      
+
+    if(extra_water > 0){           //Which it should be, due to if statement above, it must then move downslope but we must also check that it moves towards this_dep and doesn't flow back into last_dep
+      move_to_cell = last_dep.out_cell;   //I *think* this is an appropriate approach here. This being the outlet cell implies the cell water will flow to must be lower topographically than this cell. So setting this here, we can check for lower cells below. 
+      int x,y;
+      topo.iToxy(last_dep.out_cell,x,y);   //get the x,y coordinates of the out_cell, which currently contains the extra water
+      for(int n=1;n<=neighbours;n++){ //Check out our neighbours
+        //Use offset to get neighbour x coordinate
+        const int nx = x+dx[n];
+        //Use offset to get neighbour y coordinate
+        const int ny = y+dy[n];      
+        if(!topo.inGrid(nx,ny))  //Is cell outside grid (too far North/South)?
+          continue;              //Yup: skip it.
+        if(final_label(nx,ny)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(nx,ny)<topo(move_to_cell)))  //if the cell is part of my depression, and is lower than any previously checked neighbour cells
+          move_to_cell = topo.xyToI(nx,ny);
+      }  //so now we know which is the correct starting cell.
+
+    }
+
+
+
+
+    while(extra_water > 0){
+      //An alternative would be leaving all of the water in the move_to_cells for all depressions and just updating the wtd_vols, 
+      //then moving all water to the pits again afterwards in a priority queue similar to the initial way that we moved water. 
+      //Maybe that would be better? Not sure. In this case the while works pretty well, too, since we're 
+      //only moving a single pocket of water down through a single depression. 
+
+      const auto ndir = flowdirs(move_to_cell);
+
+      if(extra_water <= -wtd(move_to_cell)){    //this is the last cell that needs to receive water because this bit of infiltration will use up all the extra water
+        wtd(move_to_cell) += extra_water;
+        extra_water = 0;
+        break;
+      }
+      else{                               //there is still more extra water than will infiltrate in this cell. 
+        extra_water += wtd(move_to_cell);      
+        this_dep.wtd_vol += wtd(move_to_cell); //+= because wtd should always be negative or 0. 
+        assert(this_dep.wtd_vol >= this_dep.dep_vol);
+
+        wtd(move_to_cell) = 0;              //the cell we are in is now groundwater saturated. 
+          
+        if(ndir == NO_FLOW){                   //we've reached a pit cell, so we can stop. 
+          this_dep.water_vol += extra_water;   //add the extra water to the water_vol, so it's there when we later spread the water. 
+          extra_water = 0;
+        }
+        else{                                   //we need to keep moving downslope. 
+          int x1,y1;
+          topo.iToxy(move_to_cell,x1,y1);              //then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
+          const int nx = x1+dx[ndir];
+          const int ny = y1+dy[ndir];
+          move_to_cell = topo.xyToI(nx,ny);  //get the new move_to_cell
+          assert(move_to_cell>=0);
+        }
+
+      }
+
+    }
+
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -555,6 +684,8 @@ static dh_label_t OverflowInto(
   const dh_label_t                            stop_node,
   const rd::Array2D<elev_t>    &topo,
   const rd::Array2D<int>       &label,
+  const rd::Array2D<int>       &final_label,
+
   const rd::Array2D<flowdir_t> &flowdirs,
   rd::Array2D<wtd_t>           &wtd,
 
@@ -564,9 +695,6 @@ static dh_label_t OverflowInto(
 ){
   auto &this_dep = deps.at(root);
   auto &last_dep = deps.at(previous_dep);
-
-  //TODO: Could simulate water running down flowpath into depression so that wtd
-  //fills up more realistically
 
   if(root==OCEAN)                        //We've reached the ocean
     return OCEAN;                        //Time to stop: there's nowhere higher in the depression hierarchy
@@ -584,156 +712,30 @@ static dh_label_t OverflowInto(
   //But if the original depression is ocean_linked to this depression, then the overflow is happening from a certain location and we need to route that water.  	
   //in the case where the original depression was ocean_linked to this one, it won't be one of this depression's children. 
 
-        	  int move_to_cell;
-
+  	  
       if(this_dep.lchild==NO_VALUE || (this_dep.lchild != previous_dep && this_dep.rchild != previous_dep)){ //so either if this node has no children or if neither of its children was the previous depression - this implies the previous depression was ocean_linked. 
         //in this case, we should move water to the inlet of this depression and let it flow downslope. Although this is only necessary if there is groundwater space available...
         if(this_dep.wtd_vol > this_dep.dep_vol){ //okay, there is groundwater volume to fill, so we must move the water properly. 
-        	//the water must go to last_dep.out_cell
-        	if(extra_water <= -wtd(last_dep.out_cell)){
-        	  wtd(last_dep.out_cell) += extra_water;
-        	  if(label(last_dep.out_cell) == this_dep.dep_label)  //if the out_cell is a labelled part of this depression, adjust the wtd_vol
-                this_dep.wtd_vol -= extra_water;
- 
-        	  extra_water = 0;
-        	} else{
-
-           
-        	extra_water += wtd(last_dep.out_cell); //+= since wtd is either negative or zero. 
-        	if(label(last_dep.out_cell) == this_dep.dep_label)  //if the out_cell is a labelled part of this depression, adjust the wtd_vol
-        	  this_dep.wtd_vol += wtd(last_dep.out_cell);
-
-        	wtd(last_dep.out_cell) = 0; //since this amount has already been subtracted from extra_water
-        	if(extra_water > 0){    //Which is should be, due to if statement above, it must then move downslope but we must also check that it moves towards this_dep and doesn't flow back into last_dep
-         	  move_to_cell = NO_VALUE;
-         	  int x,y;
-         	  topo.iToxy(last_dep.out_cell,x,y);
-
-
-              for(int n=1;n<=neighbours;n++){ //Check out our neighbours
-      //Use offset to get neighbour x coordinate, wrapping as needed
-                const int nx = x+dx[n];
-      //Use offset to get neighbour y coordinate
-                const int ny = y+dy[n];      
-                if(!topo.inGrid(nx,ny))  //Is cell outside grid (too far North/South)?
-                  continue;             //Yup: skip it.
-                if(label(nx,ny)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(nx,ny)<topo(move_to_cell)))
-                	move_to_cell = topo.xyToI(nx,ny);
-               
-
-              }   //so now we know which is the correct starting cell.
-
-            while(extra_water > 0){
-              const auto ndir = flowdirs(move_to_cell); 
-
-            	if(extra_water <= -wtd(move_to_cell)){
-        	      wtd(move_to_cell) += extra_water;
-        	      extra_water = 0;
-            	} else{
-
-                  extra_water += wtd(move_to_cell);
-                  this_dep.wtd_vol += wtd(move_to_cell);
-                  assert(this_dep.wtd_vol >= this_dep.dep_vol);
-
-                  wtd(move_to_cell) = 0;
-          
-                  if(ndir == NO_FLOW){
-                 	this_dep.water_vol += extra_water;
-               	    extra_water = 0;
-                    }
-                  else{
-                    int x1,y1;
-                    topo.iToxy(move_to_cell,x1,y1);
-                    const int nx = x1+dx[ndir];
-                    const int ny = y1+dy[ndir];
-                    move_to_cell = topo.xyToI(nx,ny);
-                    assert(move_to_cell>=0);
-              }
-            }
-        	//then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
+                  
+          MoveWaterInOverflow(extra_water,this_dep.dep_label,last_dep.dep_label,topo,wtd,flowdirs,final_label,deps);
+                  
           }
-      }
-    }
-
-
-}
         else
           this_dep.water_vol += extra_water; //no groundwater volume to fill, so we can just give it the extra water. 
         }
       else
-        this_dep.water_vol += extra_water; //This node, the original node's parent, gets the extra water
+        this_dep.water_vol += extra_water; //This node, the original node's parent, gets the extra water. There is no need to route it, the depression fills from the bottom. 
   }
     return stop_node;
   }
 
-  if(this_dep.water_vol<this_dep.wtd_vol){                                              //Can this depression hold any water?
-    const double capacity = this_dep.wtd_vol - this_dep.water_vol;                      //Yes. How much can it hold?
-    if(extra_water<=capacity){                                                          //Is it enough to hold all the extra water?
-      if(this_dep.wtd_vol > this_dep.dep_vol){    //the depression has groundwater space. We need to move water properly from the outlet. 
-        if(extra_water <= -wtd(last_dep.out_cell)){
-          wtd(last_dep.out_cell) += extra_water;
-          if(label(last_dep.out_cell) == this_dep.dep_label)  //if the out_cell is a labelled part of this depression, adjust the wtd_vol
-            this_dep.wtd_vol -= extra_water;
-          extra_water = 0;
-        } else{
-        	extra_water += wtd(last_dep.out_cell);
-        	if(label(last_dep.out_cell) == this_dep.dep_label)  //if the out_cell is a labelled part of this depression, adjust the wtd_vol
-        	  this_dep.wtd_vol += wtd(last_dep.out_cell);
-         
-        	wtd(last_dep.out_cell) = 0; //since this amount has already been subtracted from extra_water
-        	if(extra_water > 0){    //Which is should be, due to if statement above, it must then move downslope but we must also check that it moves towards this_dep and doesn't flow back into last_dep
-         	  int move_to_cell;
+  if(this_dep.water_vol<this_dep.wtd_vol){                                  //Can this depression hold any water?
+    const double capacity = this_dep.wtd_vol - this_dep.water_vol;          //Yes. How much can it hold?
+    if(extra_water<=capacity){                                              //Is it enough to hold all the extra water?
+      if(this_dep.wtd_vol > this_dep.dep_vol){                              //the depression has groundwater space. We need to move water properly from the outlet. 
 
-         	  move_to_cell = NO_VALUE;
-         	  int x,y;
-         	  topo.iToxy(last_dep.out_cell,x,y);
-
-              for(int n=1;n<=neighbours;n++){ //Check out our neighbours
-      //Use offset to get neighbour x coordinate, wrapping as needed
-                const int nx = x+dx[n];
-      //Use offset to get neighbour y coordinate
-                const int ny = y+dy[n];      
-                if(!topo.inGrid(nx,ny))  //Is cell outside grid (too far North/South)?
-                  continue;             //Yup: skip it.
-                if(label(nx,ny)==this_dep.dep_label && (move_to_cell == NO_VALUE || topo(nx,ny)<topo(move_to_cell)))
-                	move_to_cell = topo.xyToI(nx,ny);
-               
-
-        }  //so now we know which is the correct starting cell.
-
-            while(extra_water > 0){
-              const auto ndir = flowdirs(move_to_cell); 
-
-            	if(extra_water <= -wtd(move_to_cell)){
-        	      wtd(move_to_cell) += extra_water;
-        	      extra_water = 0;
-            	} else{
-
-                  extra_water += wtd(move_to_cell);
-                  this_dep.wtd_vol += wtd(move_to_cell);
-                  assert(this_dep.wtd_vol >= this_dep.dep_vol);
-
-                  wtd(move_to_cell) = 0;
-          
-                  if(ndir == NO_FLOW){
-                 	this_dep.water_vol += extra_water;
-               	    extra_water = 0;
-                    }
-                  else{
-                    int x1,y1;
-                    topo.iToxy(move_to_cell,x1,y1);
-                    const int nx = x1+dx[ndir];
-                    const int ny = y1+dy[ndir];
-                    move_to_cell = topo.xyToI(nx,ny);
-                    assert(move_to_cell>=0);
-              }
-            }
-        	//then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
-          }
-      }
-    }
-
-
+        MoveWaterInOverflow(extra_water,this_dep.dep_label,last_dep.dep_label,topo,wtd,flowdirs,final_label,deps);
+      
 
       } else{   //there is no groundwater space, so no need to worry about flow routing, just add the water to the depression. 
       this_dep.water_vol  = std::min(this_dep.water_vol+extra_water,this_dep.wtd_vol);  //Yup. But let's be careful about floating-point stuff
@@ -764,7 +766,7 @@ static dh_label_t OverflowInto(
   if(this_dep.odep==NO_VALUE){      //Does the depression even have such a neighbour? 
     if(this_dep.parent!=OCEAN && pdep.water_vol==0) //At this point we're full and heading to our parent, so it needs to know that it contains our water
       pdep.water_vol += this_dep.water_vol;
-    return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node, topo,label,flowdirs,wtd, deps, jump_table, extra_water);  //Nope. Pass the water to the parent
+    return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water);  //Nope. Pass the water to the parent
   }
 
 
@@ -775,8 +777,11 @@ static dh_label_t OverflowInto(
     if(this_dep.parent!=OCEAN && pdep.water_vol==0 && odep.water_vol+extra_water>odep.wtd_vol) //It might take a while, but our neighbour will overflow, so our parent needs to know about our water volumes
       pdep.water_vol += this_dep.water_vol + odep.wtd_vol;           //Neighbour's water_vol will equal its dep_vol
   //is this right? Aren't we adding the odep.wtd_vol here AND then ading it again when we actually overflow into the parent?
-    return jump_table[root] = OverflowInto(this_dep.geolink, this_dep.dep_label, stop_node, topo,label,flowdirs,wtd, deps, jump_table, extra_water);
-  }
+    return jump_table[root] = OverflowInto(this_dep.geolink, this_dep.dep_label, stop_node, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water);
+  }  //I am concerned that using the geolink here may actually no longer be the best choice now that I've implemented downslope flow of water when overflowing. 
+     //Imagine the case where dep A is geolinked to dep B but dep B is a part of metadep C and A and B don't actually touch. During overflow, we 
+     //won't find any cells of B to flow into. So I think linking to C, i.e. the odep, will actually work best?
+     //Geolinks were needed when we were just tossing the water into the bottom of the depression but seem wrong with the new functionality. 
 
   //Okay, so the extra water didn't fit into this depression or its overflow
   //depression. That means we pass it to this depression's parent.
@@ -788,7 +793,7 @@ static dh_label_t OverflowInto(
     pdep.water_vol += this_dep.water_vol + odep.water_vol;
 
   //THIRD PLACE TO STASH WATER: IN THIS DEPRESSION'S PARENT
-  return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node,topo,label,flowdirs,wtd, deps, jump_table, extra_water);
+  return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node,topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water);
 }
 
 
