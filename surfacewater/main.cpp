@@ -9,21 +9,23 @@ namespace rd = richdem;
 namespace dh = richdem::dephier;
 
 int main(int argc, char **argv){
-  if(argc!=4){
-    std::cerr<<"Syntax: "<<argv[0]<<" <Input> <Output> <OutGraph>"<<std::endl;
+  if(argc!=5){
+    std::cerr<<"Syntax: "<<argv[0]<<" <Topo Input> <WTD Input> <Output> <OutGraph>"<<std::endl;
     return -1;
   }
 
   const std::string in_name   = argv[1];
-  const std::string out_name  = argv[2];
-  const std::string out_graph = argv[3];
+  const std::string wtd_name   = argv[2];
+
+  const std::string out_name  = argv[3];
+  const std::string out_graph = argv[4];
 
   rd::Timer timer_io;
   timer_io.start();
-  rd::Array2D<float> topo = LoadData<float>(in_name,std::string("value"));   //Recharge (Percipitation minus Evapotranspiration)
+  rd::Array2D<float> topo = LoadData<float>(in_name,std::string("value"));   //Load in the topography file
+  rd::Array2D<float> wtd = LoadData<float>(wtd_name,std::string("value"));   //Load in the wtd file
   timer_io.stop();
 
-  rd::Array2D<float>          wtd     (topo.width(), topo.height(), 1000       ); //All cells have some water
   rd::Array2D<dh::dh_label_t> label   (topo.width(), topo.height(), dh::NO_DEP ); //No cells are part of a depression
   rd::Array2D<dh::dh_label_t> final_label   (topo.width(), topo.height(), dh::NO_DEP ); //No cells are part of a depression
 
@@ -44,7 +46,7 @@ int main(int argc, char **argv){
 
   //Generate flow directions, label all the depressions, and get the hierarchy
   //connecting them
-  auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>(topo, label, final_label, flowdirs,wtd);
+  auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>(topo, label, final_label, flowdirs);
 
   dh::FillSpillMerge(topo, label, final_label, flowdirs, deps, wtd);
 

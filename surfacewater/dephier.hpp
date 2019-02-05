@@ -215,8 +215,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   const rd::Array2D<elev_t> &dem,
   rd::Array2D<int>          &label,
   rd::Array2D<int>          &final_label,
-  rd::Array2D<int8_t>       &flowdirs,
-  rd::Array2D<elev_t>          &wtd                  //HELP! I am very obviously using the wrong data type here. Can't get it to work using wtd_t! 
+  rd::Array2D<int8_t>       &flowdirs
 
 ){
   rd::ProgressBar progress;
@@ -679,8 +678,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
     depressions[clabel].cell_count++;
     depressions[clabel].total_elevation += dem(i);
-    if(wtd(i) < 0)                                //because we don't want to include positive wtds here. Wtd will be positive here when there is surface water. 
-      depressions[clabel].wtd_height -= wtd(i);  //negative because wtd will be negative when there is space. 
+ 
   }
   progress.stop();
 
@@ -737,8 +735,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //overflowing water. 
     }
 
-    dep.wtd_height = dep.wtd_height + dep.total_elevation; //so now the wtd height is the total of elevations AND the additional underground amount
-   
+  
     //This has to be after the foregoing because the cells added by the if-
     //clauses have additional volume above their spill elevations that cannot be
     //counted simply by adding their volumes to their parent depression.
@@ -757,7 +754,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //When we do overflow, we will also have to keep track of changes to the wtd
   //in the overflow depression, and associated changes in wtd_vol. When a depression
   //is completely saturated in groundwater, we will have wtd_vol == dep_vol.
-    dep.wtd_vol = dep.cell_count*static_cast<double>(dep.out_elev)-dep.wtd_height;  //and so now I think we have the true possible storage in a depression here. 
+
     //note that dep.wtd_height is the sum of dep.total_elevation and the additional elevations of groundwater storage available. 
 
 

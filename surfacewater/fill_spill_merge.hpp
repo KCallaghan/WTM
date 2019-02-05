@@ -61,6 +61,14 @@ static void MoveWaterIntoPits(
 );
 
 
+template<class elev_t, class wtd_t>
+static void CalculateWtdVol(
+  rd::Array2D<wtd_t>           &wtd,
+  const rd::Array2D<dh_label_t> &final_label,
+  DepressionHierarchy<elev_t>  &deps
+);
+
+
 template<class elev_t,class wtd_t>
 static void MoveWaterInDepHier(
   int                                         current_depression,
@@ -183,6 +191,15 @@ void FillSpillMerge(
     rd::Timer timer_overflow;
     timer_overflow.start();
     std::unordered_map<dh_label_t, dh_label_t> jump_table;
+
+  //calculate the wtd_vol of depressions, in order to be able to know which need to overflow and which can accommodate more water:
+  //the reason for only calculating it here is that it's better to do this after MoveWaterIntoPits, when a lot of the infiltration
+  //that would occur has already happened, so we didn't have to constantly update wtd_vol during MoveWaterIntoPits. 
+  CalculateWtdVol(wtd,final_label,deps);
+
+
+
+
     //Now that the water is in the pit cells, we move it around so that
     //depressions which contain too much water overflow into depressions that
     //have less water. If enough overflow happens, then the water is ultimately
@@ -351,6 +368,66 @@ static void MoveWaterIntoPits(
 
 
 
+template<class elev_t, class wtd_t>
+static void CalculateWtdVol(
+  rd::Array2D<wtd_t>           &wtd,
+  const rd::Array2D<dh_label_t> &final_label,
+  DepressionHierarchy<elev_t>  &deps
+){
+
+
+  for(unsigned int i=0;i<wtd.size();i++){
+
+    if(final_label(i)==OCEAN)
+      continue;
+
+    assert(wtd(i) <= 0);
+    deps[final_label(i)].wtd_height -= wtd(i);   //negative because wtd will be negative when there is space. 
+
+  }
+
+
+ for(int d=0;d<(int)deps.size();d++){
+
+
+
+    auto &dep = deps.at(d);
+
+
+    if(dep.dep_label==OCEAN)
+      continue;
+    if(dep.lchild!=NO_VALUE){
+      assert(dep.rchild!=NO_VALUE); //Either no children or two children
+      assert(dep.lchild<d);         //ID of child must be smaller than parent's
+      assert(dep.rchild<d);         //ID of child must be smaller than parent's
+      dep.wtd_height      += deps.at(dep.lchild).wtd_height;
+      dep.wtd_height      += deps.at(dep.rchild).wtd_height;
+
+    }
+
+
+  //We need to create yet another measure of volume which I 
+  //for now will call wtd_vol. This will be the dep_vol plus the additional
+  //volume allowed in the depression through storage as groundwater. 
+  //This is important because a depression may actually be able to store more 
+  //water than in its dep_vol. We may otherwise be overflowing a depression when it
+  //is not actually supposed to overflow! 
+  //When we do overflow, we will also have to keep track of changes to the wtd
+  //in the overflow depression, and associated changes in wtd_vol. When a depression
+  //is completely saturated in groundwater, we will have wtd_vol == dep_vol.
+    dep.wtd_vol = dep.cell_count*static_cast<double>(dep.out_elev)-(dep.wtd_height+dep.total_elevation);  //and so now I think we have the true possible storage in a depression here. 
+    //note that dep.wtd_height is the sum of dep.total_elevation and the additional elevations of groundwater storage available. 
+    assert(dep.wtd_vol >= 0);
+
+  }
+
+}
+
+
+
+
+
+
 
 
 ///At this point all the values of the water table `wtd`, which is not used by
@@ -440,6 +517,7 @@ static void MoveWaterInDepHier(
       && deps.at(rchild).water_vol==deps.at(rchild).wtd_vol
     )
     this_dep.water_vol += deps.at(lchild).water_vol + deps.at(rchild).water_vol;
+    assert(this_dep.water_vol >= 0);
   }
 
   //Each depression has an associated dep_vol. This is the TOTAL volume of the
@@ -489,7 +567,7 @@ static void MoveWaterInDepHier(
     //worry about the extra water here any more.
     OverflowInto(this_dep.geolink, this_dep.dep_label, this_dep.parent, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water);
 
-
+    assert(this_dep.water_vol >= 0);
     assert(
          this_dep.water_vol==0 
       || this_dep.water_vol<=this_dep.wtd_vol
@@ -506,9 +584,6 @@ static void MoveWaterInDepHier(
   //to the ocean. We must now spread the water in the depressions by setting
   //appropriate values for wtd.
 }
-
-
-
 
 
 
@@ -536,10 +611,14 @@ static void MoveWaterInOverflow(
   auto &last_dep = deps.at(previous_dep);
   int move_to_cell;            //the cell that will be the next to receive the extra water
 
+
            
   if(extra_water <= -wtd(last_dep.out_cell)){                         //There is little enough extra water that it will all be used up on the out_cell's groundwater
     wtd(last_dep.out_cell) += extra_water;
-    if(final_label(last_dep.out_cell) == this_dep.dep_label)                //if the out_cell is a labelled part of this depression, adjust the wtd_vol
+    if(final_label(last_dep.out_cell) == this_dep.dep_label)                //if the out_cell is a labelled part of this depression, adjust the wtd_vol. 
+      //The only potential labels at this point are of the overflowing dep or of this dep, so I think this is fine to leave like this, 
+      //no other deps would need to have their wtd_vol adjusted; however, I also think we need to make sure that this_dep is the overflowing
+      //dep's odep, not its geolink. 
       this_dep.wtd_vol -= extra_water;
     extra_water = 0;
   } 
@@ -580,21 +659,41 @@ static void MoveWaterInOverflow(
       //only moving a single pocket of water down through a single depression. 
 
       const auto ndir = flowdirs(move_to_cell);
+      auto my_dep = this_dep;
 
       if(extra_water <= -wtd(move_to_cell)){    //this is the last cell that needs to receive water because this bit of infiltration will use up all the extra water
         wtd(move_to_cell) += extra_water;
+        my_dep = this_dep;
+        while(my_dep.dep_label != OCEAN){
+          my_dep.wtd_vol -= extra_water;
+          my_dep = deps.at(my_dep.parent);
+        }
         extra_water = 0;
         break;
       }
       else{                               //there is still more extra water than will infiltrate in this cell. 
-        extra_water += wtd(move_to_cell);      
-        this_dep.wtd_vol += wtd(move_to_cell); //+= because wtd should always be negative or 0. 
+        extra_water += wtd(move_to_cell);  
+        assert(extra_water > 0);
+
+        my_dep = this_dep;
+        while(my_dep.dep_label != OCEAN){
+          my_dep.wtd_vol += wtd(move_to_cell);//+= because wtd should always be negative or 0. 
+          my_dep = deps.at(my_dep.parent);
+        }    
+
         assert(this_dep.wtd_vol >= this_dep.dep_vol);
 
         wtd(move_to_cell) = 0;              //the cell we are in is now groundwater saturated. 
           
         if(ndir == NO_FLOW){                   //we've reached a pit cell, so we can stop. 
-          this_dep.water_vol += extra_water;   //add the extra water to the water_vol, so it's there when we later spread the water. 
+
+          my_dep = this_dep;
+          while(my_dep.dep_label != OCEAN){
+            my_dep.water_vol += extra_water; //add the extra water to the water_vol, so it's there when we later spread the water. 
+            assert(my_dep.water_vol >= 0);
+            my_dep = deps.at(my_dep.parent);
+          }
+  
           extra_water = 0;
         }
         else{                                   //we need to keep moving downslope. 
@@ -612,20 +711,6 @@ static void MoveWaterInOverflow(
 
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
