@@ -342,10 +342,6 @@ static void MoveWaterIntoPits(
     } else {                               //not a pit cell
       //If we have water, pass it downstream.
       if(wtd(c)>0){ //Groundwater can go negative, so it's important to make sure that we are only passing positive water around
-        if(wtd(n)<0) {   //the neighbour can store some water underground. This means we need to update wtd_vol since we are using some of it up here.
-          deps[final_label(c)].wtd_vol -= std::min(wtd(c), -wtd(n)); //change it by the minimum of the water we're adding here or the water the new cell can accomodate underground. 
-          //final_label stores the specific depression label (even if not a leaf) so we only need to change wtd_vol in that depression. 
-        }
 
         wtd(n) += wtd(c);  //Add water to downstream neighbour. This might result in filling up the groundwater table, which could have been negative
         wtd(c)  = 0;       //Clean up as we go
@@ -377,22 +373,16 @@ static void CalculateWtdVol(
 
 
   for(unsigned int i=0;i<wtd.size();i++){
-
     if(final_label(i)==OCEAN)
       continue;
-
     assert(wtd(i) <= 0);
-    deps[final_label(i)].wtd_height -= wtd(i);   //negative because wtd will be negative when there is space. 
-
+    deps[final_label(i)].wtd_height += wtd(i);   //wtd_height will be a negative number. 
   }
 
 
  for(int d=0;d<(int)deps.size();d++){
 
-
-
     auto &dep = deps.at(d);
-
 
     if(dep.dep_label==OCEAN)
       continue;
@@ -418,6 +408,7 @@ static void CalculateWtdVol(
     dep.wtd_vol = dep.cell_count*static_cast<double>(dep.out_elev)-(dep.wtd_height+dep.total_elevation);  //and so now I think we have the true possible storage in a depression here. 
     //note that dep.wtd_height is the sum of dep.total_elevation and the additional elevations of groundwater storage available. 
     assert(dep.wtd_vol >= 0);
+    assert(dep.wtd_vol >= dep.dep_vol);
 
   }
 
@@ -600,27 +591,26 @@ static void MoveWaterInOverflow(
   const rd::Array2D<elev_t>      &topo,
   rd::Array2D<wtd_t>             &wtd,
   const rd::Array2D<flowdir_t>   &flowdirs,
-    const rd::Array2D<int>       &final_label,
-
-  DepressionHierarchy<elev_t>                &deps
-
-
+  const rd::Array2D<int>         &final_label,
+  DepressionHierarchy<elev_t>    &deps
 
   ){
+
   auto &this_dep = deps.at(current_dep);
   auto &last_dep = deps.at(previous_dep);
-  int move_to_cell;            //the cell that will be the next to receive the extra water
+  int move_to_cell;                                                   //the cell that will be the next to receive the extra water
 
-
+  assert(extra_water > 0);
            
   if(extra_water <= -wtd(last_dep.out_cell)){                         //There is little enough extra water that it will all be used up on the out_cell's groundwater
     wtd(last_dep.out_cell) += extra_water;
-    if(final_label(last_dep.out_cell) == this_dep.dep_label)                //if the out_cell is a labelled part of this depression, adjust the wtd_vol. 
+    if(final_label(last_dep.out_cell) == this_dep.dep_label)          //if the out_cell is a labelled part of this depression, adjust the wtd_vol. 
       //The only potential labels at this point are of the overflowing dep or of this dep, so I think this is fine to leave like this, 
       //no other deps would need to have their wtd_vol adjusted; however, I also think we need to make sure that this_dep is the overflowing
       //dep's odep, not its geolink. 
       this_dep.wtd_vol -= extra_water;
     extra_water = 0;
+    return;
   } 
   else{                               //There is enough extra water that some will need to be moved downslope.
           
@@ -650,6 +640,7 @@ static void MoveWaterInOverflow(
     }
 
 
+  assert(extra_water > 0);
 
 
     while(extra_water > 0){
@@ -666,7 +657,12 @@ static void MoveWaterInOverflow(
         my_dep = this_dep;
         while(my_dep.dep_label != OCEAN){
           my_dep.wtd_vol -= extra_water;
-          my_dep = deps.at(my_dep.parent);
+          assert(my_dep.wtd_vol>=my_dep.dep_vol);
+
+          if(my_dep.ocean_parent == false)
+            my_dep = deps.at(my_dep.parent);
+          else
+            break;
         }
         extra_water = 0;
         break;
@@ -678,7 +674,11 @@ static void MoveWaterInOverflow(
         my_dep = this_dep;
         while(my_dep.dep_label != OCEAN){
           my_dep.wtd_vol += wtd(move_to_cell);//+= because wtd should always be negative or 0. 
-          my_dep = deps.at(my_dep.parent);
+          assert(my_dep.wtd_vol >= my_dep.dep_vol);
+          if(my_dep.ocean_parent == false)
+            my_dep = deps.at(my_dep.parent);
+          else
+            break;
         }    
 
         assert(this_dep.wtd_vol >= this_dep.dep_vol);
@@ -691,7 +691,10 @@ static void MoveWaterInOverflow(
           while(my_dep.dep_label != OCEAN){
             my_dep.water_vol += extra_water; //add the extra water to the water_vol, so it's there when we later spread the water. 
             assert(my_dep.water_vol >= 0);
-            my_dep = deps.at(my_dep.parent);
+            if(my_dep.ocean_parent == false)
+              my_dep = deps.at(my_dep.parent);
+            else
+              break;
           }
   
           extra_water = 0;
@@ -990,8 +993,11 @@ static SubtreeDepressionInfo FindDepressionsToFill(
   //water will have been transferred into the parent and we don't want to pool
   //the parent's water with our own (it might be at the bottom of a cliff).
 
-  if(this_dep.water_vol<this_dep.dep_vol || this_dep.ocean_parent){
+  if(this_dep.water_vol<this_dep.wtd_vol || this_dep.ocean_parent){
     assert(this_dep.water_vol<=this_dep.wtd_vol);
+    assert(deps.at(this_dep.parent).water_vol == 0);
+
+    std::cerr<<"About to fill a depression "<<combined.leaf_label<<std::endl;
 
     //If both of a depression's children have already spread their water, we do not
     //want to attempt to do so again in an empty parent depression. 
@@ -1066,7 +1072,21 @@ static void FillDepressions(
   //arbitrarily reserve enough space in the hashset for a few thousand items.
   //This should be large than most depressions while still being small by the
   //computer's standards.
+
+  std::cerr<<"Water vol "<<water_vol<<std::endl;
+  std::cerr<<"leaf label "<<stdi.leaf_label<<std::endl;
+  std::cerr<<"top label "<<stdi.top_label<<std::endl;
+  std::cerr<<"dep vol "<<deps.at(stdi.top_label).dep_vol<<std::endl;
+  std::cerr<<"wtd vol "<<deps.at(stdi.top_label).wtd_vol<<std::endl;
+
+  //std::cout<<"Water vol "<<water_vol<<std::endl;
+  //std::cout<<"Water vol "<<water_vol<<std::endl;
+
+
+
   std::unordered_set<int> visited(2048);
+
+  std::cerr<<"created the visited set"<<std::endl;
  
   //Priority queue that sorts cells by lowest elevation first. If two cells are
   //of equal elevation the one added most recently is popped first. The ordering
@@ -1141,6 +1161,7 @@ static void FillDepressions(
     //   In this case, the cell's water table is left unaffected.
 
     if(water_vol<=current_volume-wtd(c.x,c.y)){
+   //   std::cout<<"We are going to spread water in this depression now "<<current_volume<<" "<<wtd(c.x,c.y)<<" "<<water_vol<<std::endl;
       //The current scope of the depression plus the water storage capacity of
       //this cell is sufficient to store all of the water. We'll stop adding
       //cells and fill things now.
@@ -1194,6 +1215,7 @@ static void FillDepressions(
       return;
       
     }  else {
+   //   std::cout<<"We don't have space to move the water here yet "<<current_volume<<" "<<wtd(c.x,c.y)<<" "<<water_vol<<std::endl;
       //We haven't found enough volume for the water yet.
 
       //During the adding of neighbours neighbours might get added that are
