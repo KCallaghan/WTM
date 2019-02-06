@@ -604,7 +604,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       dep.parent       = outlet.depb;        //Set Depression Meta(A) parent
       dep.out_elev     = outlet.out_elev;    //Set Depression Meta(A) outlet elevation                                     
       dep.out_cell     = outlet.out_cell;    //Set Depression Meta(A) outlet cell index
-      dep.odep         = outlet.depb;        //Depression Meta(A) overflows into Depression B
+      dep.odep         = depb_set;        //Depression Meta(A) overflows into Depression B
       dep.ocean_parent = true;
       dep.geolink      = outlet.depb;        //Metadepression(A) overflows, geographically, into Depression B
       depressions.at(outlet.depb).ocean_linked.emplace_back(depa_set);
@@ -667,11 +667,13 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     
     while(clabel!=OCEAN && my_elev>depressions.at(clabel).out_elev){
       clabel = depressions[clabel].parent;
+     
+    }
+
       final_label(i) = clabel; //Richard, does this make sense here? I want another layer that contains the labels of which depressions these 
       //immediately belong to, even when it is a parent depression. This is so that I can change the wtd_vol in the correct place
       //when we have infiltration and wtd_vol of a depression changes. 
-    }
-
+   // std::cout<<"labels "<<label(i)<<" "<<final_label(i)<<std::endl;
 
     if(clabel==OCEAN)
       continue;
