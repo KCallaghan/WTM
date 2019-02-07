@@ -673,7 +673,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       final_label(i) = clabel; //Richard, does this make sense here? I want another layer that contains the labels of which depressions these 
       //immediately belong to, even when it is a parent depression. This is so that I can change the wtd_vol in the correct place
       //when we have infiltration and wtd_vol of a depression changes. 
-   // std::cout<<"labels "<<label(i)<<" "<<final_label(i)<<std::endl;
 
     if(clabel==OCEAN)
       continue;
@@ -728,13 +727,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       dep.cell_count      += depressions.at(dep.rchild).cell_count;
       dep.total_elevation += depressions.at(dep.rchild).total_elevation;
 
-      //I did consider making wtd_vol total. While this would be a more satisfying solution, it leads to us
-      //having to adjust wtd_vol through the entire depression heirarchy every time there is some infiltration
-      //in a single cell. So for now I am going to try storing wtd_vol as (kind of) marginal. It will include the TOTAL dep_vol,
-      //and then the additional amount included will be the underground storage for ONLY that level of the depression. So it will be 
-      //the dep_vol, plus any amount that can be stored within that particular level of depression underground. Won't include what 
-      //can be stored in leaves. I think this is okay since with our geolink method, we still go down to the leaf level when 
-      //overflowing water. 
     }
 
   
@@ -743,21 +735,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     //counted simply by adding their volumes to their parent depression.
    
     dep.dep_vol = dep.cell_count*static_cast<double>(dep.out_elev)-dep.total_elevation;
-
-
-
-
-  //We need to create yet another measure of volume which I 
-  //for now will call wtd_vol. This will be the dep_vol plus the additional
-  //volume allowed in the depression through storage as groundwater. 
-  //This is important because a depression may actually be able to store more 
-  //water than in its dep_vol. We may otherwise be overflowing a depression when it
-  //is not actually supposed to overflow! 
-  //When we do overflow, we will also have to keep track of changes to the wtd
-  //in the overflow depression, and associated changes in wtd_vol. When a depression
-  //is completely saturated in groundwater, we will have wtd_vol == dep_vol.
-
-    //note that dep.wtd_height is the sum of dep.total_elevation and the additional elevations of groundwater storage available. 
 
 
 
