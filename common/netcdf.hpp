@@ -34,8 +34,10 @@ rd::Array2D<T> LoadNetCDF(const std::string filename, const std::string datavar)
 
   /* Open the file. NC_NOWRITE tells netCDF we want read-only access
    * to the file.*/
-  if ((retval = nc_open(filename.c_str(), NC_NOWRITE, &ncid)))
+  if ((retval = nc_open(filename.c_str(), NC_NOWRITE, &ncid))){
+    std::cerr<<nc_strerror(retval)<<std::endl;
     throw std::runtime_error("Failed to open file '" + filename + "'!");
+  }
 
   if ((retval = nc_inq_ndims(ncid, &dim_count)))
     throw std::runtime_error("Failed to get number of dimensions from file '" + filename + "'!");
