@@ -60,7 +60,7 @@ rd::Array2D<T> LoadNetCDF(const std::string filename, const std::string datavar)
 
   /* Read the data. */
   //TODO: Check data type
-  if ((retval = nc_get_var_float(ncid, varid, dem.getData())))
+  if ((retval = nc_get_var_float(ncid, varid, dem.data())))
     throw std::runtime_error("Failed to read data from '"+datavar+" from file '" + filename + "'! Error: " + nc_strerror(retval));
 
  // for(int i=0;i<mywidth*myheight;i++)
@@ -172,10 +172,10 @@ void SaveAsNetCDF(const rd::Array2D<T> &arr, const std::string filename, const s
   //writing subsets of data, in this case we write all the data in one
   //operation.
   if(std::is_same<T, int32_t>::value){
-    if ((retval = nc_put_var_int(ncid, varid, (const int*)arr.getData())))
+    if ((retval = nc_put_var_int(ncid, varid, (const int*)arr.data())))
       throw std::runtime_error("Failed to write data to file '" + filename + "'! Error: " + nc_strerror(retval));
   } else if(std::is_same<T, float>::value){
-    if ((retval = nc_put_var_float(ncid, varid, (const float*)arr.getData())))
+    if ((retval = nc_put_var_float(ncid, varid, (const float*)arr.data())))
       throw std::runtime_error("Failed to write data to file '" + filename + "'! Error: " + nc_strerror(retval));
   }
 
