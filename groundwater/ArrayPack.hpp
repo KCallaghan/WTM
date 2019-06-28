@@ -11,6 +11,10 @@ class ArrayPack {
  public:
   f2d ksat;   
   f2d wtd;
+  f2d kcell;
+  f2d head;
+
+
   f2d wtd_new;
 
   f2d topo_start;   

@@ -26,8 +26,10 @@ class Parameters {
   std::string time_end    = UNINIT_STR;
 
   const int    dltxy = 120; //There are 120 30 arc-second pieces in one degree
-  const double dy    = 6370000.*M_PI/(180.*dltxy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
+  const double dy    = 6370000.*6370000.*M_PI/(180.*dltxy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
   const double dx    = dy;
+  const double UNDEF  = -1.0e7;
+
 
   bool interpolated = false;
   

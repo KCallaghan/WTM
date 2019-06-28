@@ -43,10 +43,6 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
   auto deltat = params.deltat;
   auto alpha  = arp.alpha;
 
-  //I have switched to 30000 iterations before switching to monthly
-  //processing, because with 50000 it always seemed to be doing nothing for a
-  //long time.
-
   const int ADJ_COARSE = 1;
   const int ADJ_MEDIUM = 2;
   const int ADJ_FINE   = 3;
@@ -80,6 +76,10 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
   }
 
   //Do this at each iteration so we don't want to modify the parameter pack
+  //The selection of 30000 iterations is somewhat arbitrary: We want to do year-long iterations for as 
+  //long as this is useful, then switch to month-long to enable us to get close to equlibrium more 
+  //quickly. The best value to use likely depends on input data. Original global tests were done with 
+  //50000 iterations, and seemed to not do much for a long time, so I switched to 30000.
   if(iter>=30000){  //Here we automatically switch to monthly processing,
     std::cerr<<"30000 iterations: adjusting the values for monthly processing."<<std::endl;
     thres  = thres/12.;
