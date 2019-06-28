@@ -5,8 +5,8 @@ export CXXFLAGS=--std=c++17 -g -O3 -Wall -Wno-unknown-pragmas #-fsanitize=addres
 export LIBS=-lnetcdf
 
 
-a.out: ArrayPack.cpp  ArrayPack.hpp  groundwater.cpp parameters.cpp parameters.hpp Makefile ../common/netcdf.hpp
-	g++-7 $(CXXFLAGS) $(RD_CXX_FLAGS) groundwater.cpp parameters.cpp ArrayPack.cpp ../common/richdem/include/richdem/richdem.cpp $(LIBS)
+a.out: ArrayPack.cpp  ArrayPack.hpp  test_equilibrium_only.cpp parameters.cpp parameters.hpp Makefile ../common/netcdf.hpp
+	g++-7 $(CXXFLAGS) $(RD_CXX_FLAGS) test_equilibrium_only.cpp parameters.cpp ArrayPack.cpp ../common/richdem/include/richdem/richdem.cpp $(LIBS)
 
 clean:
 	rm a.out
