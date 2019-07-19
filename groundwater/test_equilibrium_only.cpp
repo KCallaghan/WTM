@@ -17,52 +17,49 @@ typedef std::vector<double> dvec;
 typedef rd::Array2D<float>  f2d;
 
 
-
 //Initialise all of the values for an equilibrium-style run:
 //Open data files, set the changing cellsize arrays, set appropriate fdepth, do any needed unit conversions. 
 void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
 
 
-  arp.ksat = LoadData<float>(params.surfdatadir                 + "_ksat.nc", "value");
-  arp.land = LoadData<float>(params.initdatadir + params.region + "_mask.nc", "value"); //for some reason land is loading in with 0s everywhere. Data has both 0s and 1s. Check data export?
+  arp.ksat = LoadData<float>(params.surfdatadir + params.region + "_ksat.nc", "value");
+  arp.land = LoadData<float>(params.initdatadir + params.region + "_mask.nc", "value"); //TODO: for some reason land is loading in with 0s everywhere. Data has both 0s and 1s. Check data export?
 
   params.width = arp.ksat.width();
   params.height = arp.ksat.height();
-
 
   //Determine area of cells at each latitude
   arp.xlat.resize      (params.height);     // the latitude of each row of cells
   arp.alpha.resize     (params.height);
   arp.alphamonth.resize(params.height);
 
+ const double dy    = 6370000.*6370000.*M_PI/(180.*params.dltxy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
+/ //The part of the area calculation that is constant ^
+ //dltxy is the number of cells per degree (e.g. for 30 arc-second cells, dltxy = 120). 
 
-  //Changing area of cell depending on its latitude. TODO: Not totally sure what each of the different variables here represents...
+
+  //Changing area of cell depending on its latitude. 
   for(unsigned int j=0;j<arp.xlat.size();j++){
     arp.xlat[j]       = (float(j)/params.dltxy+params.sedge)*M_PI/180.;
-    //dltxy = 120, there are this many 30 arc-second pieces in one degree. TODO: Change this so that the user can choose a value if they have a different cell size. 
-    // j/dltxy gives the number of degrees up from the southern edge, add sedge since the southern edge may not be at 0 latitude. *pi/180 to convert to radians. 
+    //dltxy represents the number of cells in one degree. For most of my runs, it is 120 since there are this many 30 arc-second pieces in one degree.
+    //j/dltxy gives the number of degrees up from the southern edge, add sedge since the southern edge may not be at 0 latitude. *pi/180 to convert to radians. 
     //xlat is now the latitude in radians. 
 
     const double xs   = (float(2*j-1)/(params.dltxy*2.)+params.sedge)*M_PI/180.; //Latitude number 1 - the southern edge of the cell
     const double xn   = (float(2*j+1)/(params.dltxy*2.)+params.sedge)*M_PI/180.; //latitude number 2 - the northern edge of the cell
-    const double area = params.dy*(std::sin(xn)-std::sin(xs));              //final cell area for that latitude
+    const double area = dy*(std::sin(xn)-std::sin(xs));              //final cell area for that latitude
 
-  // dy    = 6370000.*6370000.*M_PI/(180.*dltxy); //radius of the earth (metres) squared * pi / number of total cells around the world in the y-direction. The part of the area calculation that is constant
-  
-
-    arp.alpha[j]      = 0.5*params.deltat/area;    //deltat is the number of seconds per timestep. We assume an annual timestep here. 
+    arp.alpha[j]      = 0.5*params.deltat/area;    //deltat is the number of seconds per timestep. We assume an annual timestep here, although the user can select a different deltat value, we still /12 to convert to monthly at a set point. 
     arp.alphamonth[j] = 0.5*(params.deltat/12)/area;   //for when we switch to a monthly version. 
   }
 
 
 
-
-
-  arp.fdepth = LoadData<float>(params.surfdatadir + "_fslope_rotated.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
+  arp.fdepth = LoadData<float>(params.surfdatadir + params.region + "_fslope_rotated.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
   //TODO: Note the previsor that f>2.5 m! I don't think I have done this in the past, check! 
-  arp.rech   = LoadData<float>(params.surfdatadir + "_rech_rotated.nc",   "value");
-  arp.temp   = LoadData<float>(params.surfdatadir + "_temp_rotated.nc",   "value");
-  arp.topo_start   = LoadData<float>(params.surfdatadir + "_topo_rotated.nc",   "value");
+  arp.rech   = LoadData<float>(params.surfdatadir + params.region + "_rech_rotated.nc",   "value");
+  arp.temp   = LoadData<float>(params.surfdatadir + params.region + "_temp_rotated.nc",   "value");
+  arp.topo_start   = LoadData<float>(params.surfdatadir + params.region + "_topo_rotated.nc",   "value");
   arp.wtd    = rd::Array2D<float>(arp.topo_start,0);
   arp.head = rd::Array2D<float>(arp.topo_start,0);        //Just to initialise these - we'll add the appropriate values later. 
   arp.kcell = rd::Array2D<float>(arp.topo_start,0);
@@ -73,9 +70,7 @@ void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
   arp.done_old.resize(arp.topo_start.width(),arp.topo_start.height(),false); //Indicates which cells must still be processed
 
 
-
   std::cout<<"loaded all"<<std::endl;
-
 
 //fdepth = the efolding depth, rate of decay of hydraulic conductivity with depth. It differs depending on slope and temperature. 
   for(auto i=arp.fdepth.i0();i<arp.fdepth.size();i++){  //Equation S8 in the Fan paper
@@ -90,7 +85,7 @@ void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
       arp.fdepth(i) = arp.fdepth(i) * fT;
     }
 
-    if(arp.fdepth(i)<0.0001)      //I believe this shouldn't be necessary once I make the needed changes to the original in f array.
+    if(arp.fdepth(i)<0.0001)      //TODO: I believe this shouldn't be necessary once I make the needed changes to the original in f array.
       arp.fdepth(i) = 0.0001;
   }
 
@@ -100,10 +95,10 @@ void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
   for(auto i=arp.topo_start.i0();i<arp.topo_start.size();i++){
     if(arp.topo_start(i)<=params.UNDEF)
       arp.topo_start(i) = 0;
-    arp.rech(i) *= 1e-3;                    //Converting mm to m? Check in units to see if this is needed. 
+    arp.rech(i) *= 1e-3;                    //Converting mm to m?  TODO: Check in units to see if this is needed. 
     if(arp.rech(i) >=10000)                 //Impossible values
       arp.rech(i) = 0;
-    arp.rech(i) = std::max(arp.rech(i),(float)0.);   //Only positive recharge. 
+    arp.rech(i) = std::max(arp.rech(i),(float)0.);   //Only positive recharge. TODO: Is it best to keep it this way and handle lake evaporation as a completely separate thing? Or do we want all recharge but we only add it if it's positive?
   }
 
   std::cout<<"made adjustments to rech and topo"<<std::endl;
@@ -119,7 +114,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
   int cells_left = 0;
 
 
-  double d0 = 0.005;            //Consider whether these are the best values to use. Should we have more categories?
+  double d0 = 0.005;            //TODO: Consider whether these are the best values to use. Should we have more categories?
   double d1 = 0.02;
   double d2 = 0.1;
   double d3 = 0.25;
@@ -142,7 +137,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
   //The selection of 30000 iterations is somewhat arbitrary: We want to do year-long iterations for as 
   //long as this is useful, then switch to month-long to enable us to get close to equlibrium more 
   //quickly. The best value to use likely depends on input data. Original global tests were done with 
-  //50000 iterations, and seemed to not do much for a long time, so I switched to 30000.
+  //50000 iterations, and seemed to not do much for a long time, so I switched to 30000. The optimal number probably varies depending on input topography.
   if(iter>=30000){  //Here we automatically switch to monthly processing,
     std::cerr<<"30000 iterations: adjusting the values for monthly processing."<<std::endl;
     thres  = thres/12.;
@@ -156,8 +151,6 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
   //!######################################################################################################## change for lakes
 //  for(auto i=arp.wtd.i0();i<arp.wtd.size();i++)
 //    arp.wtd(i) = std::min(arp.wtd(i),(float)0); //Any water table above ground gets reset to 0 - this needs to be changed for lakes
-
-
 
 
 
@@ -186,7 +179,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 
   for(int y=1;y<params.height-1;y++)                           //TODO: how to process edge cells? We can't check all neighbours. Should we check just available neighbours?
   for(int x=1;x<params.width-1;x++){
-    if(arp.ksat(x,y)==0 || arp.done_old(x,y))    //not sure how to include the mask. Using ksat instead of land for now due to problems with land layer.
+    if(arp.ksat(x,y)==0 || arp.done_old(x,y))    //TODO: not sure how to include the mask. Using ksat instead of land for now due to problems with land layer.
       continue;                                   //Skip the cell if it's ocean, or if it's in equilibrium from the last iteration. 
 
    
@@ -228,7 +221,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
     const double total = arp.rech(x,y) + q;   //TODO: I wonder why we add rech here, as opposed to adding it to head and having it be part of the comparison above?
 
     if     (total<-1                                 ) arp.wtd(x,y) += -d3;  //Adjust the wtd in the cell according to how much it needs to change to get closer to equilibrium. 
-    else if(total<-0.25                              ) arp.wtd(x,y) += -d2;  //TODO: I wonder if it would help to have one still alrger adjustment? 
+    else if(total<-0.25                              ) arp.wtd(x,y) += -d2;  //TODO: I wonder if it would help to have one still larger adjustment? 
     else if(total<-0.05                              ) arp.wtd(x,y) += -d1;
     else if(total<-thres                             ) arp.wtd(x,y) += -d0;
     else if(total>1.    && arp.wtd(x,y)<params.wtdmax) arp.wtd(x,y) +=  d3;  //Here we are only changing them if the wtd is below the land surface. 
