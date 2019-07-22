@@ -22,6 +22,7 @@ Parameters::Parameters(const std::string config_file){
 
     if     (key=="")                   {}                 //Dummy key to make it easier to alphabetize list below
     else if(key=="deltat")             ss>>deltat;
+    else if(key=="dltxy")              ss>>dltxy;
     else if(key=="end_name")           ss>>end_name;
     else if(key=="HAD")                ss>>HAD;
     else if(key=="initdatadir")        ss>>initdatadir;
@@ -40,6 +41,8 @@ Parameters::Parameters(const std::string config_file){
     else
       throw std::runtime_error("Unrecognised key!");
   } 
+
+
 }
 
 void Parameters::print() const {
@@ -51,7 +54,7 @@ void Parameters::print() const {
   std::cout<<"c surfdatadir = "<<surfdatadir <<std::endl;
   std::cout<<"c initdatadir = "<<initdatadir <<std::endl;
   std::cout<<"c dltxy       = "<<dltxy       <<std::endl;
-  std::cout<<"c dy          = "<<dy          <<std::endl;
+//  std::cout<<"c dy          = "<<dy          <<std::endl;
   std::cout<<"c deltat      = "<<deltat      <<std::endl;
   //TODO: Synchronize with structure
 }
