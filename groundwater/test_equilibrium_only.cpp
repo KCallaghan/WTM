@@ -22,6 +22,21 @@ typedef rd::Array2D<float>  f2d;
 void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
 
 
+		//Parameters for evaporation. TODO: Move to parameter file. 
+  double a = 1.26;
+  double cp = 1.005; //specific heat of air at 300K. TODO: Should a different temperature be used? Units: kJ/kg.K
+  double Lv = 2260;  //latent heat of vapourisation of water. Unit: kJ/kg
+  double gamma = cp/Lv; //TODO: Or are we supposed to include pressure and molecular weight ratio as well?
+  double p = 1; //TODO: probably we should change the pressure with elevation? Or what?
+  double Rv = 461; //specific gas constant of water vapour. Units: J/kg/K
+  double S = 100; //Representative of area of water body. TODO: This value is a placeholder. How to do this?
+  double u = 1; //TODO: u should be the wind speed. This is a placeholder value; need to load in an array representing this. 
+  double f = pow((5 * pow(10.0,6.0) / S), 0.05) * (3.6 + 2.5*u); //Wind speed function
+  double RELHUM = 20; //TODO: Load in actual relative humidity arrays; this is a placeholder. 
+
+
+
+
   arp.ksat = LoadData<float>(params.surfdatadir + params.region + "_ksat.nc", "value");
   arp.land = LoadData<float>(params.initdatadir + params.region + "_mask.nc", "value"); //TODO: for some reason land is loading in with 0s everywhere. Data has both 0s and 1s. Check data export?
 
@@ -34,7 +49,7 @@ void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
   arp.alphamonth.resize(params.height);
 
  const double dy    = 6370000.*6370000.*M_PI/(180.*params.dltxy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
-/ //The part of the area calculation that is constant ^
+ //The part of the area calculation that is constant ^
  //dltxy is the number of cells per degree (e.g. for 30 arc-second cells, dltxy = 120). 
 
 
@@ -63,6 +78,14 @@ void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
   arp.wtd    = rd::Array2D<float>(arp.topo_start,0);
   arp.head = rd::Array2D<float>(arp.topo_start,0);        //Just to initialise these - we'll add the appropriate values later. 
   arp.kcell = rd::Array2D<float>(arp.topo_start,0);
+  arp.delta = rd::Array2D<float>(arp.topo_start,0);
+  arp.e_a = rd::Array2D<float>(arp.topo_start,0);
+  arp.e = rd::Array2D<float>(arp.topo_start,0);
+  arp.evap = rd::Array2D<float>(arp.topo_start,0);
+
+
+
+
 
 
 
@@ -103,7 +126,59 @@ void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
 
   std::cout<<"made adjustments to rech and topo"<<std::endl;
 
+//Get the delta values for the domain:
+    for(auto i=arp.delta.i0();i<arp.delta.size();i++){  
+    	arp.delta(i) = (p*Lv)/(arp.temp(i)*arp.temp(i)*Rv);
+    	arp.e_a(i) = 611 * exp((Lv/Rv) * ((1/273.15) - (1/arp.temp(i))));
+    	arp.e(i) = (RELHUM/100) * arp.e_a(i);
+    	arp.evap(i) = (a/(a-1)) * (gamma/(arp.delta(i) + gamma)) * f * (arp.e_a(i) - arp.e(i));
+
+    }
+
+
+
+
+
   arp.check();
+}
+
+
+
+
+void Evaporation(const Parameters &params, ArrayPack &arp){
+
+	//TODO: If we choose to ignore the lake area part in the wind function, then we can calculate evaporation fields ahead of time and just load in 
+  //an evaporation file, not needing this caluclation in the code and needing one less array loaded in as we don't need to load in the wind speed. 
+  //Would it be better to do it like this, or is it better having it in the code so the calculation can all be seen etc? 
+  //If we do want to neglect lake size, what should we use for the wind function?
+  //If we don't want to, does every cell in the lake see higher evap because of the lake size? That seems weird. 
+  //How do we deal with sinuousity of lake shapes if we do want to include it?
+
+
+//  double a = 1.26;
+//  double cp = 1.005; //specific heat of air at 300K. TODO: Should a different temperature be used? Units: kJ/kg.K
+//  double Lv = 2260;  //latent heat of vapourisation of water. Unit: kJ/kg
+//  double gamma = cp/Lv; //TODO: Or are we supposed to include pressure and molecular weight ratio as well?
+//  double p = 1; //TODO: probably we should change the pressure with elevation? Or what?
+//  double Rv = 461; //specific gas constant of water vapour. Units: J/kg/K
+
+
+
+
+  for(auto i=arp.wtd.i0();i<arp.wtd.size();i++){  
+  	if(arp.wtd(i) > 0){   //This is a lake cell, evaporation must happen. 
+  		std::cout<<"Evaporation of "<<arp.evap(i)<<" is going to happen on this cell of wtd "<<arp.wtd(i)<<std::endl;
+  		arp.wtd(i) = std::max(arp.wtd(i) - arp.evap(i),0.0f);                      
+  		std::cout<<"After evaportation, wtd is "<<arp.wtd(i)<<std::endl;
+
+
+
+
+
+  	}
+
+}
+
 }
 
 
@@ -119,6 +194,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
   double d2 = 0.1;
   double d3 = 0.25;
   double thres = 0.01;
+  
 
   //We're not allowed to change Parameters, so here we make some copies.
 
@@ -151,6 +227,15 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
   //!######################################################################################################## change for lakes
 //  for(auto i=arp.wtd.i0();i<arp.wtd.size();i++)
 //    arp.wtd(i) = std::min(arp.wtd(i),(float)0); //Any water table above ground gets reset to 0 - this needs to be changed for lakes
+
+
+//TODO: Is this a good spot to do evaporation from lakes?
+//TODO: Would it be better to have evaporation in the surface water part of code? Should it be in its own file?
+
+ Evaporation(params, arp);
+
+
+
 
 
 
