@@ -64,8 +64,8 @@ void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
     const double xn   = (float(2*j+1)/(params.dltxy*2.)+params.sedge)*M_PI/180.; //latitude number 2 - the northern edge of the cell
     const double area = dy*(std::sin(xn)-std::sin(xs));              //final cell area for that latitude
 
-    arp.alpha[j]      = 0.5*params.deltat/area;    //deltat is the number of seconds per timestep. We assume an annual timestep here, although the user can select a different deltat value, we still /12 to convert to monthly at a set point. 
-    arp.alphamonth[j] = 0.5*(params.deltat/12)/area;   //for when we switch to a monthly version. 
+    arp.alpha[j]      = params.deltat/area;    //deltat is the number of seconds per timestep. We assume an annual timestep here, although the user can select a different deltat value, we still /12 to convert to monthly at a set point. 
+    arp.alphamonth[j] = (params.deltat/12)/area;   //for when we switch to a monthly version. 
   }
 
 
@@ -154,6 +154,9 @@ void Evaporation(const Parameters &params, ArrayPack &arp){
   //If we don't want to, does every cell in the lake see higher evap because of the lake size? That seems weird. 
   //How do we deal with sinuousity of lake shapes if we do want to include it?
 
+//Move evaporation to the surface water. Run x years of groundwater, then move surface water, then allow evap to happen. 
+  //Use P-ET for cells with no lakes, P-lake evap for cells with lakes, for the next x years. 
+  //The first x years have P-ET everywhere. 
 
 //  double a = 1.26;
 //  double cp = 1.005; //specific heat of air at 300K. TODO: Should a different temperature be used? Units: kJ/kg.K
@@ -190,7 +193,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 
 
   double d0 = 0.005;            //TODO: Consider whether these are the best values to use. Should we have more categories?
-  double d1 = 0.02;
+  double d1 = 0.02;             //Test larger values for d4/d5  etc
   double d2 = 0.1;
   double d3 = 0.25;
   double thres = 0.01;
@@ -263,7 +266,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 }
 
   for(int y=1;y<params.height-1;y++)                           //TODO: how to process edge cells? We can't check all neighbours. Should we check just available neighbours?
-  for(int x=1;x<params.width-1;x++){
+  for(int x=1;x<params.width-1;x++){                           //TODO: will these work until the edges with a working land/ocean mask?
     if(arp.ksat(x,y)==0 || arp.done_old(x,y))    //TODO: not sure how to include the mask. Using ksat instead of land for now due to problems with land layer.
       continue;                                   //Skip the cell if it's ocean, or if it's in equilibrium from the last iteration. 
 
@@ -288,11 +291,11 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
     double q = 0;
     //Use equation S3 from the Fan paper. 
     //We get the q in each direction and then add them all together to get the total. This tells us a total of how much water wants to flow into/out of this cell. 
-    q += (kcellN+my_kcell)*(headN-my_head) * std::cos(arp.xlat[y]+M_PI/(180.*params.dltxy*2.)); //North   
-    q += (kcellS+my_kcell)*(headS-my_head) * std::cos(arp.xlat[y]-M_PI/(180.*params.dltxy*2.)); //South
+    q += ((kcellN+my_kcell)/2.)*(headN-my_head) * std::cos(arp.xlat[y]+M_PI/(180.*params.dltxy*2.)); //North   
+    q += ((kcellS+my_kcell)/2.)*(headS-my_head) * std::cos(arp.xlat[y]-M_PI/(180.*params.dltxy*2.)); //South
     //The extra part is to get to the northern and southern edges of the cell for the width of cell you're touching. 
-    q += (kcellW+my_kcell)*(headW-my_head) / std::cos(arp.xlat[y]);                             //West
-    q += (kcellE+my_kcell)*(headE-my_head) / std::cos(arp.xlat[y]);                             //East
+    q += ((kcellW+my_kcell)/2.)*(headW-my_head) / std::cos(arp.xlat[y]);                             //West
+    q += ((kcellE+my_kcell)/2.)*(headE-my_head) / std::cos(arp.xlat[y]);                             //East
     //No extra part needed as the distance doesn't change in this direction, and the length between cells is measured from the middle of the cell. 
 
     q *= arp.alpha[y];       // recall arp.alpha[j] = 0.5*deltat/area, where deltat is the number of seconds in a timestep. 
@@ -304,7 +307,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 
 
     const double total = arp.rech(x,y) + q;   //TODO: I wonder why we add rech here, as opposed to adding it to head and having it be part of the comparison above?
-
+//TODO: move recharge sum for the whole array at once to above q. 
     if     (total<-1                                 ) arp.wtd(x,y) += -d3;  //Adjust the wtd in the cell according to how much it needs to change to get closer to equilibrium. 
     else if(total<-0.25                              ) arp.wtd(x,y) += -d2;  //TODO: I wonder if it would help to have one still larger adjustment? 
     else if(total<-0.05                              ) arp.wtd(x,y) += -d1;
