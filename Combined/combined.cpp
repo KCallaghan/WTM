@@ -124,10 +124,8 @@ int main(int argc, char **argv){
   //connecting them
   int years_passed = 0;
 
-std::cerr<<"line 127"<<std::endl;
 
   auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>(arp.topo, label, final_label, flowdirs);
-std::cerr<<"line 130"<<std::endl;
   
 while(true){
 

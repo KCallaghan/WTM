@@ -21,80 +21,6 @@ typedef rd::Array2D<float>  f2d;
 //Open data files, set the changing cellsize arrays, set appropriate fdepth, do any needed unit conversions. 
 void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
 
-
-		//Parameters for evaporation. TODO: Move to parameter file. 
-  double a = 1.26;
-  double cp = 1.005; //specific heat of air at 300K. TODO: Should a different temperature be used? Units: kJ/kg.K
-  double Lv = 2260;  //latent heat of vapourisation of water. Unit: kJ/kg
-  double gamma = cp/Lv; //TODO: Or are we supposed to include pressure and molecular weight ratio as well?
-  double p = 1; //TODO: probably we should change the pressure with elevation? Or what?
-  double Rv = 461; //specific gas constant of water vapour. Units: J/kg/K
-  double S = 100; //Representative of area of water body. TODO: This value is a placeholder. How to do this?
-  double u = 1; //TODO: u should be the wind speed. This is a placeholder value; need to load in an array representing this. 
-  double f = pow((5 * pow(10.0,6.0) / S), 0.05) * (3.6 + 2.5*u); //Wind speed function
-  double RELHUM = 20; //TODO: Load in actual relative humidity arrays; this is a placeholder. 
-
-
-
-
-  arp.ksat = LoadData<float>(params.surfdatadir + params.region + "_ksat.nc", "value");
-  arp.land = LoadData<float>(params.initdatadir + params.region + "_mask.nc", "value"); //TODO: for some reason land is loading in with 0s everywhere. Data has both 0s and 1s. Check data export?
-
-  params.width = arp.ksat.width();
-  params.height = arp.ksat.height();
-
-  //Determine area of cells at each latitude
-  arp.xlat.resize      (params.height);     // the latitude of each row of cells
-  arp.alpha.resize     (params.height);
-  arp.alphamonth.resize(params.height);
-
- const double dy    = 6370000.*6370000.*M_PI/(180.*params.dltxy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
- //The part of the area calculation that is constant ^
- //dltxy is the number of cells per degree (e.g. for 30 arc-second cells, dltxy = 120). 
-
-
-  //Changing area of cell depending on its latitude. 
-  for(unsigned int j=0;j<arp.xlat.size();j++){
-    arp.xlat[j]       = (float(j)/params.dltxy+params.sedge)*M_PI/180.;
-    //dltxy represents the number of cells in one degree. For most of my runs, it is 120 since there are this many 30 arc-second pieces in one degree.
-    //j/dltxy gives the number of degrees up from the southern edge, add sedge since the southern edge may not be at 0 latitude. *pi/180 to convert to radians. 
-    //xlat is now the latitude in radians. 
-
-    const double xs   = (float(2*j-1)/(params.dltxy*2.)+params.sedge)*M_PI/180.; //Latitude number 1 - the southern edge of the cell
-    const double xn   = (float(2*j+1)/(params.dltxy*2.)+params.sedge)*M_PI/180.; //latitude number 2 - the northern edge of the cell
-    const double area = dy*(std::sin(xn)-std::sin(xs));              //final cell area for that latitude
-
-    arp.alpha[j]      = params.deltat/area;    //deltat is the number of seconds per timestep. We assume an annual timestep here, although the user can select a different deltat value, we still /12 to convert to monthly at a set point. 
-    arp.alphamonth[j] = (params.deltat/12)/area;   //for when we switch to a monthly version. 
-  }
-
-
-
-  arp.fdepth = LoadData<float>(params.surfdatadir + params.region + "_fslope_rotated.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
-  //TODO: Note the previsor that f>2.5 m! I don't think I have done this in the past, check! 
-  arp.rech   = LoadData<float>(params.surfdatadir + params.region + "_rech_rotated.nc",   "value");
-  arp.temp   = LoadData<float>(params.surfdatadir + params.region + "_temp_rotated.nc",   "value");
-  arp.topo   = LoadData<float>(params.surfdatadir + params.region + "_topo_rotated.nc",   "value");
-  arp.wtd    = rd::Array2D<float>(arp.topo,0);
-  arp.head = rd::Array2D<float>(arp.topo,0);        //Just to initialise these - we'll add the appropriate values later. 
-  arp.kcell = rd::Array2D<float>(arp.topo,0);
-  arp.delta = rd::Array2D<float>(arp.topo,0);
-  arp.e_a = rd::Array2D<float>(arp.topo,0);
-  arp.e = rd::Array2D<float>(arp.topo,0);
-  arp.evap = rd::Array2D<float>(arp.topo,0);
-
-
-
-
-
-
-
-  arp.done_new.resize(arp.topo.width(),arp.topo.height(),false); //Indicates which cells must still be processed
-  arp.done_old.resize(arp.topo.width(),arp.topo.height(),false); //Indicates which cells must still be processed
-
-
-  std::cout<<"loaded all"<<std::endl;
-
 //fdepth = the efolding depth, rate of decay of hydraulic conductivity with depth. It differs depending on slope and temperature. 
   for(auto i=arp.fdepth.i0();i<arp.fdepth.size();i++){  //Equation S8 in the Fan paper
     if(arp.temp(i)<-14) {
@@ -112,7 +38,7 @@ void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
       arp.fdepth(i) = 0.0001;
   }
 
-  std::cout<<"changed to final fdepths"<<std::endl;
+  std::cout<<"changed to the final fdepths"<<std::endl;
 
 
   for(auto i=arp.topo.i0();i<arp.topo.size();i++){
@@ -126,62 +52,8 @@ void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
 
   std::cout<<"made adjustments to rech and topo"<<std::endl;
 
-//Get the delta values for the domain:
-    for(auto i=arp.delta.i0();i<arp.delta.size();i++){  
-    	arp.delta(i) = (p*Lv)/(arp.temp(i)*arp.temp(i)*Rv);
-    	arp.e_a(i) = 611 * exp((Lv/Rv) * ((1/273.15) - (1/arp.temp(i))));
-    	arp.e(i) = (RELHUM/100) * arp.e_a(i);
-    	arp.evap(i) = (a/(a-1)) * (gamma/(arp.delta(i) + gamma)) * f * (arp.e_a(i) - arp.e(i));
-
-    }
-
-
-
-
 
   arp.check();
-}
-
-
-
-
-void Evaporation(const Parameters &params, ArrayPack &arp){
-
-	//TODO: If we choose to ignore the lake area part in the wind function, then we can calculate evaporation fields ahead of time and just load in 
-  //an evaporation file, not needing this caluclation in the code and needing one less array loaded in as we don't need to load in the wind speed. 
-  //Would it be better to do it like this, or is it better having it in the code so the calculation can all be seen etc? 
-  //If we do want to neglect lake size, what should we use for the wind function?
-  //If we don't want to, does every cell in the lake see higher evap because of the lake size? That seems weird. 
-  //How do we deal with sinuousity of lake shapes if we do want to include it?
-
-//Move evaporation to the surface water. Run x years of groundwater, then move surface water, then allow evap to happen. 
-  //Use P-ET for cells with no lakes, P-lake evap for cells with lakes, for the next x years. 
-  //The first x years have P-ET everywhere. 
-
-//  double a = 1.26;
-//  double cp = 1.005; //specific heat of air at 300K. TODO: Should a different temperature be used? Units: kJ/kg.K
-//  double Lv = 2260;  //latent heat of vapourisation of water. Unit: kJ/kg
-//  double gamma = cp/Lv; //TODO: Or are we supposed to include pressure and molecular weight ratio as well?
-//  double p = 1; //TODO: probably we should change the pressure with elevation? Or what?
-//  double Rv = 461; //specific gas constant of water vapour. Units: J/kg/K
-
-
-
-
-  for(auto i=arp.wtd.i0();i<arp.wtd.size();i++){  
-  	if(arp.wtd(i) > 0){   //This is a lake cell, evaporation must happen. 
-  		std::cout<<"Evaporation of "<<arp.evap(i)<<" is going to happen on this cell of wtd "<<arp.wtd(i)<<std::endl;
-  		arp.wtd(i) = std::max(arp.wtd(i) - arp.evap(i),0.0f);                      
-  		std::cout<<"After evaportation, wtd is "<<arp.wtd(i)<<std::endl;
-
-
-
-
-
-  	}
-
-}
-
 }
 
 
@@ -341,7 +213,10 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 
 
 
-f2d equilibrium(const Parameters &params, ArrayPack &arp){
+f2d equilibrium(Parameters &params, ArrayPack &arp){
+
+ InitialiseEquilibrium (params, arp);
+
 
   
   int iter = 0;
@@ -367,9 +242,7 @@ while(true){
 
 }
 
-  std::cout<<"done with processing"<<std::endl;  
-  SaveAsNetCDF(arp.wtd,"test-filled.nc","value");
-
+ 
   return arp.wtd;
 
 }
