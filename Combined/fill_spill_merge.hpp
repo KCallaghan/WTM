@@ -220,23 +220,6 @@ void FillSpillMerge(
  
     }
 
-    if(dep.water_vol !=0 && dep.water_vol > dep.wtd_vol){
-      std::cout<<"about to fail the assert, water vol is "<<dep.water_vol<<" and wtd vol is "<<dep.wtd_vol<<" for dep label "<<dep.dep_label<<std::endl;
-    }
-
-     if(dep.water_vol !=0 && dep.lchild!=NO_VALUE && deps.at(dep.lchild).water_vol>=dep.water_vol){
-
-      std::cout<<"about to fail the assert, water vol is "<<dep.water_vol<<" and wtd vol is "<<dep.wtd_vol<<" for dep label "<<dep.dep_label<<std::endl;
-      std::cout<<"lchild was label "<<dep.lchild<<" water vol "<<deps.at(dep.lchild).water_vol<<" rchild was label "<<dep.rchild<<" water vol "<<deps.at(dep.rchild).water_vol<<std::endl;
-    }
-if(dep.water_vol !=0 && dep.lchild!=NO_VALUE && deps.at(dep.rchild).water_vol>=dep.water_vol){
-
-      std::cout<<"about to fail the assert, water vol is "<<dep.water_vol<<" and wtd vol is "<<dep.wtd_vol<<" for dep label "<<dep.dep_label<<std::endl;
-      std::cout<<"lchild was label "<<dep.lchild<<" water vol "<<deps.at(dep.lchild).water_vol<<" rchild was label "<<dep.rchild<<" water vol "<<deps.at(dep.rchild).water_vol<<" wtd vol "<<deps.at(dep.rchild).wtd_vol<<std::endl;
-    }
-
-
-
     assert(dep.water_vol==0 || dep.water_vol<=dep.wtd_vol);
     assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) || (dep.lchild!=NO_VALUE && deps.at(dep.lchild).water_vol<dep.water_vol));
     assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) || (dep.rchild!=NO_VALUE && deps.at(dep.rchild).water_vol<dep.water_vol));
@@ -615,14 +598,6 @@ static void MoveWaterInDepHier(
   } else if(this_dep.water_vol>this_dep.wtd_vol) {
     //The neighbouring depression is not the ocean and this depression is
     //overflowing (therefore, all of its children are full)
-    if(this_dep.lchild != NO_VALUE){
-      if(deps.at(this_dep.lchild).water_vol != deps.at(this_dep.lchild).wtd_vol){
-        std::cout<<"there is a problem with the lchild's water vol. Lchild is labelled "<<this_dep.lchild<<std::endl;
-        std::cout<<"water vol is "<<deps.at(this_dep.lchild).water_vol<<" and wtd vol is "<<deps.at(this_dep.lchild).wtd_vol<<std::endl;
-        std::cout<<"rchild label "<<this_dep.rchild<<" water vol "<<deps.at(this_dep.rchild).water_vol<<" wtd vol "<<deps.at(this_dep.rchild).wtd_vol<<std::endl;
-        std::cout<<"meanwhile I have label "<<this_dep.dep_label<<" water vol "<<this_dep.water_vol<<" and wtd vol "<<this_dep.wtd_vol<<std::endl;
-      }
-    }
     assert(this_dep.lchild==NO_VALUE || deps.at(this_dep.lchild).water_vol==deps.at(this_dep.lchild).wtd_vol);
     assert(this_dep.rchild==NO_VALUE || deps.at(this_dep.rchild).water_vol==deps.at(this_dep.rchild).wtd_vol);
 
@@ -642,10 +617,7 @@ static void MoveWaterInDepHier(
     //leaf depression via the geolink. If everything fills up, the water will
     //end up in this depression's parent. So at this point we don't have to
     //worry about the extra water here any more.
-std::cout<<"calling OverflowInto line 623 with extra water "<<extra_water<<" water vol "<<this_dep.water_vol<<" wtd vol "<<this_dep.wtd_vol<<" label "<<this_dep.dep_label<<std::endl;
-std::cout<<" geolink water vol "<<deps.at(this_dep.geolink).water_vol<<" geolink wtd vol "<<deps.at(this_dep.geolink).wtd_vol<<" geolink label "<<deps.at(this_dep.geolink).dep_label<<std::endl;
     OverflowInto(this_dep.geolink, this_dep.dep_label, this_dep.parent, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water); //TODO: use odep or geolink here?
-               std::cout<<"line 625"<<std::endl;
 
     assert(this_dep.water_vol >= 0);
     assert(
@@ -716,7 +688,6 @@ static void MoveWaterInOverflow(
 
   assert(extra_water > 0);
 
-  std::cout<<"starting MoveWaterInOverflow with extra water "<<extra_water<<" water vol "<<this_dep.water_vol<<" and wtd vol "<<this_dep.wtd_vol<<std::endl;
            
   if(extra_water <= -wtd(last_dep.out_cell)){                         //There is little enough extra water that it will all be used up on the out_cell's groundwater
     this_dep.water_vol -= extra_water; 
@@ -748,7 +719,6 @@ static void MoveWaterInOverflow(
     if(deps.at(final_label(last_dep.out_cell)).dep_label == last_dep.dep_label)
       deps.at(final_label(last_dep.out_cell)).water_vol += wtd(last_dep.out_cell);
 
-    std::cout<<"wtd vol 734 "<<deps.at(final_label(last_dep.out_cell)).wtd_vol <<" label "<<deps.at(final_label(last_dep.out_cell)).dep_label<<std::endl;
     assert(deps.at(final_label(last_dep.out_cell)).wtd_vol >= deps.at(final_label(last_dep.out_cell)).dep_vol);
 
 
@@ -759,9 +729,6 @@ static void MoveWaterInOverflow(
    // }
 
     this_dep.water_vol += wtd(last_dep.out_cell);
-    if(this_dep.water_vol < 0){
-      std::cout<<"water vol too small "<<this_dep.water_vol<<" wtd was "<<wtd(last_dep.out_cell)<<" extra water was "<<extra_water<<std::endl;
-    }
     assert(this_dep.water_vol >= 0);
 //    if(this_dep.water_vol > this_dep.wtd_vol){
   //    std::cout<<"water vol is "<<this_dep.water_vol<<" and wtd vol is "<<this_dep.wtd_vol<<std::endl;
@@ -787,7 +754,6 @@ static void MoveWaterInOverflow(
     //  while(this_dep.rchild)
 
 
-std::cout<<"above to select a move_to_cell"<<std::endl;
       move_to_cell = NO_VALUE;   
       int x,y;
       topo.iToxy(last_dep.out_cell,x,y);   //get the x,y coordinates of the out_cell, which currently contains the extra water
@@ -816,7 +782,6 @@ std::cout<<"above to select a move_to_cell"<<std::endl;
        
       }  //so now we know which is the correct starting cell.
            assert(move_to_cell != NO_VALUE);
-           std::cout<<"we have successfully selected a move_to_cell"<<std::endl;
        
 
 
@@ -827,7 +792,6 @@ std::cout<<"above to select a move_to_cell"<<std::endl;
 
 
     while(extra_water > 0){
-      std::cout<<"line 803 extra water "<<extra_water<<std::endl;
       //An alternative would be leaving all of the water in the move_to_cells for all depressions and just updating the wtd_vols, 
       //then moving all water to the pits again afterwards in a priority queue similar to the initial way that we moved water. 
       //Maybe that would be better? Not sure. In this case the while works pretty well, too, since we're 
@@ -838,14 +802,12 @@ std::cout<<"above to select a move_to_cell"<<std::endl;
       int my_label = final_label(move_to_cell);
 
       if(extra_water <= -wtd(move_to_cell)){    //this is the last cell that needs to receive water because this bit of infiltration will use up all the extra water
-             std::cout<<"line 814 extra water "<<extra_water<<std::endl;
 
         this_dep.water_vol -= extra_water;  //TODO: fix to make more floating-point friendly. 
         assert(this_dep.water_vol >= 0);
         wtd(move_to_cell) += extra_water;
         while(deps.at(my_label).dep_label != OCEAN){   //adjust the wtd_vol of me and all my parents
           deps.at(my_label).wtd_vol -= extra_water;
-          std::cout<<"831 wtd vol "<<deps.at(my_label).wtd_vol<<" label "<<deps.at(my_label).dep_label<<std::endl;
           assert(deps.at(my_label).wtd_vol>=deps.at(my_label).dep_vol);
           my_label = deps.at(my_label).parent;
           if(deps.at(my_label).ocean_parent == true){
@@ -857,16 +819,13 @@ std::cout<<"above to select a move_to_cell"<<std::endl;
         break;
       }
       else{                               //there is still more extra water than will infiltrate in this cell. 
-              std::cout<<"line 832 extra water "<<extra_water<<std::endl;
 
         extra_water += wtd(move_to_cell);  
-                      std::cout<<"line 834 extra water "<<extra_water<<std::endl;
 
         assert(extra_water > 0);
         my_label = final_label(move_to_cell);
         while(deps.at(my_label).dep_label != OCEAN){ //adjust the wtd_vol of me and all my parents
           deps.at(my_label).wtd_vol += wtd(move_to_cell);//+= because wtd should always be negative or 0. 
-                    std::cout<<"852 wtd vol "<<deps.at(my_label).wtd_vol<<" label "<<deps.at(my_label).dep_label<<std::endl;
 
  
           assert(deps.at(my_label).wtd_vol - deps.at(my_label).dep_vol >= -0.00001);
@@ -886,10 +845,8 @@ std::cout<<"above to select a move_to_cell"<<std::endl;
         }
         wtd(move_to_cell) = 0;              //the cell we are in is now groundwater saturated. 
         if(ndir == NO_FLOW){                   //we've reached a pit cell, so we can stop.   
-                        std::cout<<"line 859 extra water "<<extra_water<<std::endl;
 
           extra_water = 0;
-                        std::cout<<"line 862 extra water "<<extra_water<<std::endl;
 
         }
         else{                                   //we need to keep moving downslope. 
@@ -904,7 +861,6 @@ std::cout<<"above to select a move_to_cell"<<std::endl;
       }
 
     }
-std::cout<<"out of the while loop, extra water "<<extra_water<<std::endl;
   }
 
 }
@@ -975,9 +931,7 @@ static dh_label_t OverflowInto(
 
   auto &this_dep = deps.at(root);
   auto &last_dep = deps.at(previous_dep);
-    std::cout<<"at the start of OverflowInto water vol "<<this_dep.water_vol<<" wtd vol "<<this_dep.wtd_vol<<" label "<<this_dep.dep_label<<std::endl;
-    std::cout<<"neighbour water vol "<<deps.at(this_dep.odep).water_vol<<" wtd vol "<<deps.at(this_dep.odep).wtd_vol<<" label "<<deps.at(this_dep.odep).dep_label<<std::endl;
-
+  
 
 
   if(root==OCEAN)                        //We've reached the ocean
@@ -989,9 +943,7 @@ static dh_label_t OverflowInto(
   //it's time to stop. (This may be the leaf node of another metadepression, the
   //ocean, or a standard node.)
   if(root==stop_node){                   //We've made a loop, so everything is full
- std::cout<<"line 949"<<std::endl;
     if(this_dep.parent==OCEAN){           //If our parent is the ocean
-      std::cout<<"ocean is the parent"<<std::endl;
       this_dep.water_vol = this_dep.wtd_vol;
       assert(this_dep.water_vol>=0);
           assert(this_dep.water_vol==0 || this_dep.water_vol<=this_dep.wtd_vol);
@@ -1001,10 +953,7 @@ static dh_label_t OverflowInto(
       return OCEAN;                      //Then the extra water just goes away
     }
     else  {                               //Otherwise
-      std::cout<<"else line 983"<<std::endl;
-      std::cout<<"label "<<this_dep.dep_label<<" lchild "<<this_dep.lchild<<" rchild "<<this_dep.rchild<<std::endl;
-      std::cout<<"last dep was "<<last_dep.dep_label<<" water vol "<<last_dep.water_vol<<" wtd vol "<<last_dep.wtd_vol<<std::endl;
-
+  
   //if this node is a normal parent, then I don't think it matters where in the depression the water goes, and it can just get added to this_dep.water_vol. 
   //But if the original depression is ocean_linked to this depression, then the overflow is happening from a certain location and we need to route that water.  	
   //in the case where the original depression was ocean_linked to this one, it won't be one of this depression's children. 
@@ -1015,9 +964,7 @@ static dh_label_t OverflowInto(
         //in this case, we should move water to the inlet of this depression and let it flow downslope. Although this is only necessary if there is groundwater space available...
         if(this_dep.wtd_vol > this_dep.dep_vol && this_dep.water_vol < this_dep.wtd_vol){ //okay, there is groundwater volume to fill, so we must move the water properly. 
                                                        //TODO: is the second part of that if correct?
-std::cout<<"going to move water line 1001, this dep is "<<this_dep.dep_label<<" and last dep was "<<last_dep.dep_label<<std::endl;
           MoveWaterInOverflow(extra_water,this_dep.dep_label,last_dep.dep_label,topo,wtd,flowdirs,final_label,label,deps);
-          std::cout<<"out of MoveWaterInOverflow, line 969"<<std::endl;
 
                     assert(this_dep.water_vol==0 || this_dep.water_vol<=this_dep.wtd_vol);
 
@@ -1031,7 +978,6 @@ std::cout<<"going to move water line 1001, this dep is "<<this_dep.dep_label<<" 
   }
 
   if(this_dep.water_vol<this_dep.wtd_vol){                                  //Can this depression hold any water?
-std::cout<<"line 986"<<std::endl;
  
     const double capacity = this_dep.wtd_vol - this_dep.water_vol;          //Yes. How much can it hold?
       if(this_dep.wtd_vol > this_dep.dep_vol){                              //the depression has groundwater space. We need to move water properly from the outlet. 
@@ -1041,15 +987,12 @@ std::cout<<"line 986"<<std::endl;
           deps.at(last_dep.geolink).water_vol +=extra_water;
       //  this_dep.water_vol += extra_water; //TODO: Is this right? Something is off about water vols and extra water but I am VERY unsure if this is right. 
           //NO - extra_water is based on what the water_vol already was!!!
-          std::cout<<"going to move water line 1027, this dep is "<<this_dep.dep_label<<" and last dep was "<<last_dep.dep_label<<std::endl;
 
         MoveWaterInOverflow(extra_water,this_dep.dep_label,last_dep.dep_label,topo,wtd,flowdirs,final_label,label,deps);
-                  std::cout<<"out of MoveWaterInOverflow, line 992"<<std::endl;
 
 
 
 if(this_dep.water_vol != 0 && this_dep.water_vol > this_dep.wtd_vol){
-  std::cout<<"the water vol is "<<this_dep.water_vol<<" and the wtd vol is "<<this_dep.wtd_vol<<" extra water after is "<<extra_water<<std::endl;
 }
                  // assert(this_dep.water_vol==0 || this_dep.water_vol<=this_dep.wtd_vol); TODO: Is this assert right? What assert would be appropriate here? What if thisone just needs to further overflow?
 
@@ -1057,14 +1000,12 @@ if(this_dep.water_vol != 0 && this_dep.water_vol > this_dep.wtd_vol){
 
       }
       }
-       std::cout<<"line 1004"<<std::endl;
 
       
 
       }   
 
       if(extra_water<=capacity){                                              //Is it enough to hold all the extra water?
-               std::cout<<"line 1011"<<std::endl;
 
 //there is no groundwater space, so no need to worry about flow routing, just add the water to the depression. 
       
@@ -1078,7 +1019,6 @@ if(this_dep.water_vol != 0 && this_dep.water_vol > this_dep.wtd_vol){
       
     } else {                                                                            //It wasn't enough to hold all the water, so it will be completely filled and there is no need to worry about flow routing. 
     
-                   std::cout<<"line 1023"<<std::endl;
 
       this_dep.water_vol = this_dep.wtd_vol;                                            //So we fill it all the way.
       assert(this_dep.water_vol>=0);
@@ -1092,7 +1032,6 @@ if(this_dep.water_vol != 0 && this_dep.water_vol > this_dep.wtd_vol){
   }
 
   if(extra_water==0)  {
-                   std::cout<<"line 1037"<<std::endl;
 
             assert(this_dep.water_vol==0 || this_dep.water_vol<=this_dep.wtd_vol);
 
@@ -1106,16 +1045,13 @@ if(this_dep.water_vol != 0 && this_dep.water_vol > this_dep.wtd_vol){
 
   //SECOND PLACE TO STASH WATER: IN THIS DEPRESSION'S NEIGHBOUR
   //Maybe we can fit it into this depression's overflow depression!
-               std::cout<<"line 1051"<<std::endl;
 
   auto &pdep = deps.at(this_dep.parent);
   if(this_dep.odep==NO_VALUE){      //Does the depression even have such a neighbour? 
-                   std::cout<<"line 1055"<<std::endl;
 
     if(this_dep.parent!=OCEAN && pdep.water_vol==0) //At this point we're full and heading to our parent, so it needs to know that it contains our water
       pdep.water_vol += this_dep.water_vol;
     this_dep.water_vol = this_dep.wtd_vol;
-    std::cout<<"calling OverflowInto line 1062  for the parent label "<<this_dep.parent<<" and my label "<<this_dep.dep_label<<std::endl;
     return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water);  //Nope. Pass the water to the parent
   }
 
@@ -1124,7 +1060,6 @@ if(this_dep.water_vol != 0 && this_dep.water_vol > this_dep.wtd_vol){
   //Can overflow depression hold more water?
   auto &odep = deps.at(this_dep.odep);
   if(odep.water_vol<odep.wtd_vol){  //Yes. Move the water geographically into that depression's leaf.
-                   std::cout<<"line 1067 odep label "<<odep.dep_label<<" water vol "<<odep.water_vol<<" wtd vol "<<odep.wtd_vol<<" extra water "<<extra_water<<std::endl;
 
     if(this_dep.parent!=OCEAN && pdep.water_vol==0 && odep.water_vol+extra_water>odep.wtd_vol) //It might take a while, but our neighbour will overflow, so our parent needs to know about our water volumes
       pdep.water_vol += this_dep.water_vol + odep.wtd_vol;           //Neighbour's water_vol will equal its dep_vol
@@ -1135,12 +1070,7 @@ if(this_dep.water_vol != 0 && this_dep.water_vol > this_dep.wtd_vol){
     //TODO: No I shouldn't, since it gets set equal to wtd vol before I call overflowinto. However, do I need to sometimes subtract it? Subtract it somewhere else?
    // this_dep.water_vol -= extra_water;
    // this_dep.water_vol = std::max(this_dep.water_vol,0.0);
-               std::cout<<"line 1075"<<std::endl;
-               std::cout<<"the geolink is "<<this_dep.geolink<<" and the odep is "<<this_dep.odep<<"; I am depression "<<this_dep.dep_label<<std::endl;
-               std::cout<<"my water vol "<<this_dep.water_vol<<" my wtd vol "<<this_dep.wtd_vol<<" odep water vol "<<odep.water_vol<<" odep wtd vol "<<odep.wtd_vol<<std::endl;
-    std::cout<<"calling OverflowInto line 1082 for the geolink label "<<this_dep.geolink<<" and this dep label "<<this_dep.dep_label<<std::endl;
     return jump_table[root] = OverflowInto(this_dep.geolink, this_dep.dep_label, stop_node, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water);
-    std::cout<<"line 1080"<<std::endl;
   }  //TODO: I am concerned that using the geolink here may actually no longer be the best choice now that I've implemented downslope flow of water when overflowing. 
      //Imagine the case where dep A is geolinked to dep B but dep B is a part of metadep C and A and B don't actually touch. During overflow, we 
      //won't find any cells of B to flow into. So I think linking to C, i.e. the odep, will actually work best?
@@ -1154,13 +1084,11 @@ if(this_dep.water_vol != 0 && this_dep.water_vol > this_dep.wtd_vol){
   //us.
   if(this_dep.parent!=OCEAN && pdep.water_vol==0)
     pdep.water_vol += this_dep.water_vol + odep.water_vol;
-                 std::cout<<"line 1090"<<std::endl;
                        this_dep.water_vol = this_dep.wtd_vol;
 
 
 
   //THIRD PLACE TO STASH WATER: IN THIS DEPRESSION'S PARENT
-                 std::cout<<"calling OverflowInto line 1103 for the parent label "<<this_dep.parent<<" and this dep label "<<this_dep.dep_label<<std::endl;
   return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node,topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water);
 }
 
