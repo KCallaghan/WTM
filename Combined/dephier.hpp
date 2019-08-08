@@ -76,6 +76,13 @@ class Depression {
   //are not subdepressions. That is, these ocean-linked depressions may be at
   //the top of high cliffs and spilling into this depression.
   std::vector<dh_label_t> ocean_linked;
+
+
+  //indicates everything that is a subdepression of this one:
+  
+  std::unordered_set<int> my_subdepressions;
+
+ // std::vector<dh_label_t> my_subdepressions;
   //the label of the depression, for calling it up again
   dh_label_t dep_label = 0;
   //Number of cells contained within the depression and its children
@@ -641,6 +648,14 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       newdep.rchild    = depb_set; 
       newdep.dep_label = newlabel;
       newdep.pit_cell  = depa_pitcell_temp;
+      newdep.my_subdepressions.emplace(depa_set);
+      newdep.my_subdepressions.emplace(depb_set);
+      newdep.my_subdepressions.insert(depressions.at(depa_set).my_subdepressions.begin(),depressions.at(depa_set).my_subdepressions.end());
+      newdep.my_subdepressions.insert(depressions.at(depb_set).my_subdepressions.begin(),depressions.at(depb_set).my_subdepressions.end());
+
+
+
+
 
       djset.mergeAintoB(depa_set, newlabel); //A has a parent now
       djset.mergeAintoB(depb_set, newlabel); //B has a parent now
@@ -766,7 +781,7 @@ void LastLayer(rd::Array2D<dh_label_t> &label, const rd::Array2D<float> &dem, co
         break;
       }
     }
-    label(x,y) = mylabel;
+    label(x,y) = mylabel;  //TODO: Is label now the same as final_label? Is one better to use than the other? Are both being used in later code?
   }
 }
 
