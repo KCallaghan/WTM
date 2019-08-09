@@ -59,7 +59,7 @@ void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
 
 
 
-int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
+int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int loops_passed){
 
   int cells_left = 0;
 
@@ -77,8 +77,8 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 
 
  //Do these only once, since we will affect the arrays in a lasting way
-  if(iter==30000){
-    std::cout<<"30000 iters"<<std::endl;
+  if(loops_passed==500){
+    std::cout<<"10 loops"<<std::endl;
     for(auto i=arp.rech.i0();i<arp.rech.size();i++)   //Convert the recharge to monthly. 
       arp.rech(i) /=12;
     arp.done_old.setAll(false); //We changed the threshold, so we want to recheck all the cells.
@@ -89,8 +89,8 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
   //long as this is useful, then switch to month-long to enable us to get close to equlibrium more 
   //quickly. The best value to use likely depends on input data. Original global tests were done with 
   //50000 iterations, and seemed to not do much for a long time, so I switched to 30000. The optimal number probably varies depending on input topography.
-  if(iter>=30000){  //Here we automatically switch to monthly processing,
-    std::cerr<<"30000 iterations: adjusting the values for monthly processing."<<std::endl;
+  if(loops_passed>=500){  //Here we automatically switch to monthly processing,
+    std::cerr<<"10 loops: adjusting the values for monthly processing."<<std::endl;
     thres  = thres/12.;
     d0     = d0/12.;
     d1     = d1/12.;
@@ -213,21 +213,17 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 
 
 
-f2d equilibrium(Parameters &params, ArrayPack &arp){
+f2d equilibrium(Parameters &params, ArrayPack &arp, int &cells_left, int &loops_passed){
 
  InitialiseEquilibrium (params, arp);
 
-
   
-  int iter = 0;
-
-
-  int cells_left = params.width*params.height;  //Cells left that need to be equilibriated
+  int iter = 0;  //TODO: iterations must be counted within combined, else it resets each time. 
 
 
 while(true){
 
-  cells_left = EquilibriumRun(params,arp,iter);
+  cells_left = EquilibriumRun(params,arp,loops_passed);  //TODO: how to get this value to combined, so it knows when to exit there?
 
 
   std::cerr<<"Iteration #: "<<iter<<" Cells left: "<<cells_left<<std::endl;
