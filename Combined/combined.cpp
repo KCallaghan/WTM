@@ -122,7 +122,7 @@ int main(int argc, char **argv){
 
   //Generate flow directions, label all the depressions, and get the hierarchy
   //connecting them
-  int years_passed = 0;
+  int loops_passed = 0;
   int cells_left = params.width*params.height;  //Cells left that need to be equilibriated
 
 
@@ -134,20 +134,20 @@ while(true){
 
 
 
-  arp.wtd = equilibrium(params,arp, cells_left, years_passed);
+  arp.wtd = equilibrium(params,arp, cells_left, loops_passed);
 
 
 
   dh::FillSpillMerge(arp.topo, label, final_label, flowdirs, deps, arp.wtd);
 
 
-  std::cerr<<"Years passed #: "<<years_passed<<std::endl;
+  std::cerr<<"Loops passed #: "<<loops_passed<<std::endl;
 
 
-  if(years_passed >= 500)
+  if(loops_passed >= 50)
     break;
 
-  years_passed++;
+  loops_passed++;
 
 }
 
