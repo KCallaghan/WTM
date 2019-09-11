@@ -44,10 +44,10 @@ void InitialiseEquilibrium (Parameters &params, ArrayPack &arp){
   for(auto i=arp.topo.i0();i<arp.topo.size();i++){
     if(arp.topo(i)<=params.UNDEF)
       arp.topo(i) = 0;
-    arp.rech(i) *= 1e-3;                    //Converting mm to m?  TODO: Check in units to see if this is needed. 
+ //   arp.rech(i) *= 1e-3;                    //Converting mm to m?  TODO: Check in units to see if this is needed. 
     if(arp.rech(i) >=10000)                 //Impossible values
       arp.rech(i) = 0;
-    arp.rech(i) = std::max(arp.rech(i),(float)0.);   //Only positive recharge. TODO: Is it best to keep it this way and handle lake evaporation as a completely separate thing? Or do we want all recharge but we only add it if it's positive?
+//    arp.rech(i) = std::max(arp.rech(i),(float)0.);   //Only positive recharge. TODO: Is it best to keep it this way and handle lake evaporation as a completely separate thing? Or do we want all recharge but we only add it if it's positive?
   }
 
   std::cout<<"made adjustments to rech and topo"<<std::endl;
@@ -78,8 +78,8 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int loops_pas
 
  //Do these only once, since we will affect the arrays in a lasting way
   if(loops_passed==500){
-    std::cout<<"10 loops"<<std::endl;
-    for(auto i=arp.rech.i0();i<arp.rech.size();i++)   //Convert the recharge to monthly. 
+    std::cout<<"500 loops"<<std::endl;
+    for(auto i=arp.rech.i0();i<arp.rech.size();i++)   //Convert the recharge to monthly. TODO: Should we move this to combined, or should we do it each time here, since we are now resetting rech each time in combined?
       arp.rech(i) /=12;
     arp.done_old.setAll(false); //We changed the threshold, so we want to recheck all the cells.
   }
@@ -98,21 +98,6 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int loops_pas
     d3     = d3/12.;
     alpha  = arp.alphamonth;
   }
-
-  //!######################################################################################################## change for lakes
-//  for(auto i=arp.wtd.i0();i<arp.wtd.size();i++)
-//    arp.wtd(i) = std::min(arp.wtd(i),(float)0); //Any water table above ground gets reset to 0 - this needs to be changed for lakes
-
-
-//TODO: Is this a good spot to do evaporation from lakes?
-//TODO: Would it be better to have evaporation in the surface water part of code? Should it be in its own file?
-
-// Evaporation(params, arp);
-
-
-
-
-
 
 
   for(int y=0;y<params.height;y++)                           
@@ -139,10 +124,9 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int loops_pas
 
   for(int y=1;y<params.height-1;y++)                           //TODO: how to process edge cells? We can't check all neighbours. Should we check just available neighbours?
   for(int x=1;x<params.width-1;x++){                           //TODO: will these work until the edges with a working land/ocean mask?
-    if(arp.ksat(x,y)==0 || arp.done_old(x,y))    //TODO: not sure how to include the mask. Using ksat instead of land for now due to problems with land layer.
+    if(arp.land(x,y)==0 || arp.done_old(x,y))    //TODO: not sure how to include the mask. Using ksat instead of land for now due to problems with land layer.
       continue;                                   //Skip the cell if it's ocean, or if it's in equilibrium from the last iteration. 
 
-   
 
     const auto my_head = arp.head(x,y);              //Get the head and hydraulic conductivity values for the target cell and its neighbours
     const auto headN   = arp.head(x,  y+1);

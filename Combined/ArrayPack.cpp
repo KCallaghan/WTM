@@ -10,7 +10,7 @@ void ArrayPack::check() const {
 //  assert( topo.width()==fslope_start. width() && topo.height()==fslope_start. height() );
 //  assert( topo.width()==temp_start.   width() && topo.height()==temp_start.   height() );
 //  assert( topo.width()==topo.         width() && topo.height()==topo.         height() );
-  assert( topo.width()==rech.         width() && topo.height()==rech.         height() );
+  assert( topo.width()==precip.         width() && topo.height()==precip.         height() );
   assert( topo.width()==fdepth.       width() && topo.height()==fdepth.       height() );
   assert( topo.width()==temp.         width() && topo.height()==temp.         height() );
  // assert( topo.width()==done_old.     width() && topo.height()==done_old.     height() );

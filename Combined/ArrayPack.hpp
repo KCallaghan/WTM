@@ -47,6 +47,9 @@ class ArrayPack {
   f2d e_a;
   f2d e;
   f2d evap;
+  f2d relhum;
+  f2d precip;
+  f2d land;
   dh_label_t label;
   dh_label_t final_label;
   dh_label_t flowdir_t;
@@ -55,7 +58,7 @@ class ArrayPack {
 
   richdem::Array2D<bool> done_new;   //Indicates which cells must still be processed
   richdem::Array2D<bool> done_old;   //Indicates which cells must still be processed
-  richdem::Array2D<bool> land;
+ // richdem::Array2D<int> land;
 
   dvec xlat;
   dvec alpha;

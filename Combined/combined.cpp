@@ -66,22 +66,28 @@ int main(int argc, char **argv){
 
   arp.fdepth = LoadData<float>(params.surfdatadir + params.region + "_fslope_rotated.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
   //TODO: Note the previsor that f>2.5 m! I don't think I have done this in the past, check! 
-  arp.rech   = LoadData<float>(params.surfdatadir + params.region + "_rech_rotated.nc",   "value");
+  arp.precip   = LoadData<float>(params.surfdatadir + params.region + "_rech_rotated.nc",   "value");
   arp.temp   = LoadData<float>(params.surfdatadir + params.region + "_temp_rotated.nc",   "value");
   arp.topo   = LoadData<float>(params.surfdatadir + params.region + "_topo_rotated.nc",   "value");
+  arp.relhum   = LoadData<float>(params.surfdatadir + params.region + "_test_relhum.nc",   "value");
+  arp.evap   = LoadData<float>(params.surfdatadir + params.region + "_pretend_evap.nc",   "value");
+
+
   arp.wtd    = rd::Array2D<float>(arp.topo,0.5);
+  arp.rech    = rd::Array2D<float>(arp.topo,0);
+
   arp.head = rd::Array2D<float>(arp.topo,0);        //Just to initialise these - we'll add the appropriate values later. 
   arp.kcell = rd::Array2D<float>(arp.topo,0);
   arp.delta = rd::Array2D<float>(arp.topo,0);
   arp.e_a = rd::Array2D<float>(arp.topo,0);
   arp.e = rd::Array2D<float>(arp.topo,0);
-  arp.evap = rd::Array2D<float>(arp.topo,0);
 
 
 //TODO: Why can't I get these to work in the arraypack?
   rd::Array2D<dh::dh_label_t> label   (arp.topo.width(), arp.topo.height(), dh::NO_DEP ); 
   rd::Array2D<dh::dh_label_t> final_label   (arp.topo.width(), arp.topo.height(), dh::NO_DEP ); 
   rd::Array2D<rd::flowdir_t> flowdirs   (arp.topo.width(), arp.topo.height(), rd::NO_FLOW ); 
+
 
 
   
@@ -109,6 +115,15 @@ int main(int argc, char **argv){
 
 
 
+  #pragma omp parallel for
+  for(unsigned int i=0;i<label.size();i++){
+    arp.evap(i) = arp.evap(i)/100.0f;
+    arp.rech(i) = arp.precip(i) - arp.evap(i);
+    arp.rech(i) = std::max(arp.rech(i),0.0f);
+
+  }
+
+
 //Label the ocean cells. This is a precondition for using
   //`GetDepressionHierarchy()`.
   #pragma omp parallel for
@@ -125,6 +140,15 @@ int main(int argc, char **argv){
   int loops_passed = 0;
   int cells_left = params.width*params.height;  //Cells left that need to be equilibriated
 
+  float latent_heat = 2260;
+  float Rv = 0.461;
+
+  #pragma omp parallel for
+  for(unsigned int i=0;i<label.size();i++){
+    arp.e_a(i) = 611*exp((latent_heat/Rv)*((1/273.15) - (1/arp.temp(i))));
+    arp.e(i) = arp.relhum(i) * arp.e_a(i) ;
+  }
+
 
 
   auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>(arp.topo, label, final_label, flowdirs);
@@ -140,11 +164,29 @@ while(true){
 
   dh::FillSpillMerge(arp.topo, label, final_label, flowdirs, deps, arp.wtd);
 
+  //each time after doing FSM, we will update the evaporation layer to reflect evaporation over surface water. 
+
+  #pragma omp parallel for
+  for(unsigned int i=0;i<label.size();i++){
+    arp.rech(i) = arp.precip(i) - arp.evap(i);
+    arp.rech(i) = std::max(arp.rech(i),0.0f);
+    if(arp.wtd(i)>0){
+ //     std::cout<<"we are going to do lake evap. Evap before was "<<arp.rech(i)<<std::endl;
+      arp.rech(i) = arp.precip(i) - (arp.e_a(i) - arp.e(i));
+   //   std::cout<<"and evap after is "<<arp.rech(i)<<std::endl;
+    }
+  }
+  //now I need to make sure that it never evaporates more than is available in the individual cell on the surface. 
+
+
+
+
+
 
   std::cerr<<"Loops passed #: "<<loops_passed<<std::endl;
 
 
-  if(loops_passed >= 50)
+  if(loops_passed >= 5000)
     break;
 
   loops_passed++;

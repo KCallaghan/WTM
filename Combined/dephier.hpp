@@ -781,7 +781,7 @@ void LastLayer(rd::Array2D<dh_label_t> &label, const rd::Array2D<float> &dem, co
         break;
       }
     }
-    label(x,y) = mylabel;  //TODO: Is label now the same as final_label? Is one better to use than the other? Are both being used in later code?
+    label(x,y) = mylabel;  //TODO: Is label now the same as final_label? Is one better to use than the other? Are both being used in later code? They appear to be the same thing - possibly can remove final_label. 
   }
 }
 
@@ -790,4 +790,5 @@ void LastLayer(rd::Array2D<dh_label_t> &label, const rd::Array2D<float> &dem, co
 }
 
 #endif
+
 
