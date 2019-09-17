@@ -5,8 +5,8 @@ export CXXFLAGS=--std=c++17 -g -Wall -Wno-unknown-pragmas #-fsanitize=address
 export LIBS=-lnetcdf
 
 
-a.out: DisjointDenseIntSet.hpp dephier.hpp ArrayPack.cpp  ArrayPack.hpp  fill_spill_merge.hpp test_equilibrium_only.hpp combined.cpp parameters.cpp parameters.hpp Makefile ../common/netcdf.hpp
-	g++-7 $(CXXFLAGS) $(RD_CXX_FLAGS) combined.cpp parameters.cpp ArrayPack.cpp ../common/richdem/include/richdem/richdem.cpp $(LIBS)
+a.out: DisjointDenseIntSet.hpp dephier.hpp ArrayPack.cpp  ArrayPack.hpp test_equilibrium_only_test_all_at_once_binned.hpp run_equilibrium_only.cpp parameters.cpp parameters.hpp Makefile ../common/netcdf.hpp
+	g++-7 $(CXXFLAGS) $(RD_CXX_FLAGS) run_equilibrium_only.cpp parameters.cpp ArrayPack.cpp ../common/richdem/include/richdem/richdem.cpp $(LIBS)
 
 clean:
 	rm a.out
