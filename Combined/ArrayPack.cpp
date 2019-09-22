@@ -3,7 +3,7 @@
 
 void ArrayPack::check() const {
   assert( topo.width()==ksat.         width() && topo.height()==ksat.         height() );
-  assert( topo.width()==land.         width() && topo.height()==land.         height() );
+  assert( topo.width()==land_mask.         width() && topo.height()==land_mask.         height() );
   assert( topo.width()==wtd.          width() && topo.height()==wtd.          height() );
 //  assert( topo.width()==topo.   width() && topo.height()==topo.   height() );
 //  assert( topo.width()==rech_start.   width() && topo.height()==rech_start.   height() );

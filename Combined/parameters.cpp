@@ -22,7 +22,7 @@ Parameters::Parameters(const std::string config_file){
 
     if     (key=="")                   {}                 //Dummy key to make it easier to alphabetize list below
     else if(key=="deltat")             ss>>deltat;
-    else if(key=="dltxy")              ss>>dltxy;
+    else if(key=="cells_per_degree")   ss>>cells_per_degree;
     else if(key=="end_name")           ss>>end_name;
     else if(key=="HAD")                ss>>HAD;
     else if(key=="initdatadir")        ss>>initdatadir;
@@ -32,7 +32,7 @@ Parameters::Parameters(const std::string config_file){
     else if(key=="name")               ss>>name;
     else if(key=="region")             ss>>region;
     else if(key=="run_type")           ss>>run_type;
-    else if(key=="sedge")              ss>>sedge;
+    else if(key=="southern_edge")      ss>>southern_edge;
     else if(key=="start_name")         ss>>start_name;
     else if(key=="surfdatadir")        ss>>surfdatadir;
     else if(key=="time_start")         ss>>time_start;
@@ -53,7 +53,7 @@ void Parameters::print() const {
   std::cout<<"c end_name    = "<<end_name    <<std::endl;
   std::cout<<"c surfdatadir = "<<surfdatadir <<std::endl;
   std::cout<<"c initdatadir = "<<initdatadir <<std::endl;
-  std::cout<<"c dltxy       = "<<dltxy       <<std::endl;
+  std::cout<<"c cells_per_degree       = "<<cells_per_degree       <<std::endl;
 //  std::cout<<"c dy          = "<<dy          <<std::endl;
   std::cout<<"c deltat      = "<<deltat      <<std::endl;
   //TODO: Synchronize with structure

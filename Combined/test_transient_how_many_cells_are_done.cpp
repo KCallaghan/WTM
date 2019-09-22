@@ -33,18 +33,19 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   params.ncells_x  = arp.ksat.width();  //width and height in number of cells in the array
   params.ncells_y = arp.ksat.height();
 
+//Load in data arrays
   arp.land_mask = LoadData<float>(params.initdatadir + params.region + "_mask.nc", "value"); 
-  arp.fdepth   = LoadData<float>(params.surfdatadir + params.time_start   + "_fslope_rotated.nc", "value");
-  arp.precip     = LoadData<float>(params.surfdatadir + params.time_start   + "_rech_rotated.nc",   "value");
-  arp.temp     = LoadData<float>(params.surfdatadir + params.time_start   + "_temp_rotated.nc",   "value");
-  arp.topo     = LoadData<float>(params.surfdatadir + params.time_start   + "_topo_rotated.nc",   "value");
-  arp.evap   = LoadData<float>(params.surfdatadir + params.region + "_pretend_evap.nc",   "value");
-  arp.wtd    = rd::Array2D<float>(arp.topo,0.0f);  //TODO: load in an actual wtd array
+  arp.fdepth    = LoadData<float>(params.surfdatadir + params.time_start   + "_fslope_rotated.nc", "value");
+  arp.precip    = LoadData<float>(params.surfdatadir + params.time_start   + "_rech_rotated.nc",   "value");
+  arp.temp      = LoadData<float>(params.surfdatadir + params.time_start   + "_temp_rotated.nc",   "value");
+  arp.topo      = LoadData<float>(params.surfdatadir + params.time_start   + "_topo_rotated.nc",   "value");
+  arp.evap      = LoadData<float>(params.surfdatadir + params.region + "_pretend_evap.nc",   "value");
+  arp.wtd       = rd::Array2D<float>(arp.topo,0.0f);  //TODO: load in an actual wtd array
 
 
   //initialise arrays that start out empty:
   arp.rech    = rd::Array2D<float>(arp.topo,0);
-  arp.qtotal    = rd::Array2D<float>(arp.topo,0);
+  arp.wtd_change_total    = rd::Array2D<float>(arp.topo,0);
 
 
   //compute changing cell size and distances between cells as these change with latitude:
@@ -53,11 +54,11 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   cellsize_n_s_metres = (earth_radius*(M_PI/180.))/params.cells_per_degree; //distance between lines of latitude is a constant. 
 
 
-  arp.latitude_radians.resize      (params.ncells_y);   // the latitude of each row of cells
-  arp.cellsize_e_w_metres.resize  (params.ncells_y);
-  arp.cellsize_e_w_metres_N.resize  (params.ncells_y);
-  arp.cellsize_e_w_metres_S.resize  (params.ncells_y);
-  arp.cell_area.resize (params.ncells_y);
+  arp.latitude_radians.resize       (params.ncells_y);   // the latitude of each row of cells
+  arp.cellsize_e_w_metres.resize    (params.ncells_y);   //size of a cell in the east-west direction at the centre of the cell (metres)
+  arp.cellsize_e_w_metres_N.resize  (params.ncells_y);   //size of a cell in the east-west direction at the northern edge of the cell (metres)
+  arp.cellsize_e_w_metres_S.resize  (params.ncells_y);   //size of a cell in the east-west direction at the southern edge of the cell (metres)
+  arp.cell_area.resize              (params.ncells_y);   //cell area (metres squared)
 
 
   for(unsigned int j=0;j<arp.latitude_radians.size();j++){
@@ -86,6 +87,8 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 
   }
 
+  std::cout<<"computed distances, areas, and latitudes"<<std::endl;
+
 
   //Change undefined cells to 0
   for(unsigned int i=0;i<arp.topo.size();i++){
@@ -103,6 +106,8 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 
 
 //get the starting recharge using precip and evap inputs:
+  //TODO: USe actual evap layers to get the appropriate precip, this is a placeholder. 
+
     #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
     arp.evap(i) = arp.evap(i)/100.0f;
@@ -142,6 +147,10 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
   float max_total = 0.0;
   float min_total = 0.0;
 
+  int thres_001 = 0;
+  int thres_01 = 0;
+  int thres_1 = 0;
+
 
 //cycle through the entire array, calculating how much the water table changes in each cell per iteration. 
   for(int y=1;y<params.ncells_y-1;y++)
@@ -163,11 +172,18 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
     const auto kcellE   = kcell(x+1,y,   arp);
 
 
-    double qN = 0;
-    double qS = 0;
-    double qE = 0;
-    double qW = 0;
-    arp.qtotal(x,y) = 0;
+    double QN = 0;
+    double QS = 0;
+    double QE = 0;
+    double QW = 0;
+
+    double wtd_change_N = 0;
+    double wtd_change_S = 0;
+    double wtd_change_E = 0;
+    double wtd_change_W = 0;
+
+
+    arp.wtd_change_total(x,y) = 0;
 
 
 
@@ -175,20 +191,19 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
 
 
 //discharge per unit area in each direction:
-    qN = ((kcellN+my_kcell)/2.)*(headN-my_head);// * arp.temp_north[y] * arp.alpha[y]; //North
-    qS = ((kcellS+my_kcell)/2.)*(headS-my_head);// * arp.temp_south[y] * arp.alpha[y]; //South
-    qE = ((kcellW+my_kcell)/2.)*(headW-my_head);// / arp.temp_east_west[y] * arp.alpha[y];                             //West
-    qW = ((kcellE+my_kcell)/2.)*(headE-my_head);// / arp.temp_east_west[y] * arp.alpha[y];                             //East
+    QN = ((kcellN+my_kcell)/2.)*(headN-my_head)*params.deltat/cellsize_n_s_metres;
+    QS = ((kcellS+my_kcell)/2.)*(headS-my_head)*params.deltat/cellsize_n_s_metres ;
+    QE = ((kcellW+my_kcell)/2.)*(headW-my_head)*params.deltat/arp.cellsize_e_w_metres[y];
+    QW = ((kcellE+my_kcell)/2.)*(headE-my_head)*params.deltat/arp.cellsize_e_w_metres[y] ;
 
 //multiply by number of seconds we are moving water for, divide by distance water is travelling, divide by area of cell into which it is flowing: 
-    qN  = qN*params.deltat/cellsize_n_s_metres / arp.cell_area[y+1];
-    qS  = qS*params.deltat/cellsize_n_s_metres / arp.cell_area[y-1];
-    qE  = qE*params.deltat/arp.cellsize_e_w_metres[y] / arp.cell_area[y];
-    qW  = qW*params.deltat/arp.cellsize_e_w_metres[y] / arp.cell_area[y];
+    wtd_change_N  = QN / arp.cell_area[y+1];
+    wtd_change_S  = QS / arp.cell_area[y-1];
+    wtd_change_E  = QE / arp.cell_area[y];
+    wtd_change_W  = QW / arp.cell_area[y];
 
-//TODO: call this dh or something other than q once we multiply by alpha. 
  
-    arp.qtotal(x,y) = (qN + qS + qE + qW);
+    arp.wtd_change_total(x,y) = (wtd_change_N + wtd_change_S + wtd_change_E + wtd_change_W);
 
 //    std::cout<<"x "<<x<<" y "<<y<<" qtotal "<<arp.qtotal(x,y)<<std::endl;
    // std::cout<<"x "<<x<<" y "<<y<<" temp_north "<<arp.temp_north[y]<<" cellsize e w "<<arp.cellsize_e_w_metres[y]<<std::endl;
@@ -200,6 +215,14 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
     else if(arp.wtd(x,y)< min_total)
       min_total =arp.wtd(x,y);
 
+    if(abs(arp.wtd_change_total(x,y)) > 0.001)
+      thres_001 +=1;
+    if(abs(arp.wtd_change_total(x,y)) > 0.01)
+      thres_01 +=1;
+    if(abs(arp.wtd_change_total(x,y)) > 0.1)
+      thres_1 +=1;
+
+
   }
 
 
@@ -208,14 +231,16 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
     if(arp.ksat(x,y) == 0)
       continue;
 
-    arp.wtd(x,y) = arp.wtd(x,y) + arp.qtotal(x,y);   
+    arp.wtd(x,y) = arp.wtd(x,y) + arp.wtd_change_total(x,y);   
  
-    total_changes += arp.qtotal(x,y);
+    total_changes += arp.wtd_change_total(x,y);
 
   }
 
 std::cout<<"total changes were "<<total_changes<<std::endl;
 std::cout<<"max wtd was "<<max_total<<" and min wtd was "<<min_total<<std::endl;
+std::cout<<"cells out at 0.001 "<<thres_001<<" and at 0.01 "<<thres_01<<" and at 0.1 "<<thres_1<<std::endl;
+
 
   return 1;
 }
@@ -253,7 +278,7 @@ int main(int argc, char **argv){
 
     if((iter % 10000) == 0){
       std::cerr<<"Saving a part-way output"<<std::endl;
-      SaveAsNetCDF(arp.wtd,"test-filled-transient.nc","value");
+      SaveAsNetCDF(arp.wtd,"test-filled-transient-cells-done.nc","value");
 
     }
 
@@ -268,7 +293,7 @@ int main(int argc, char **argv){
   }
 
   std::cout<<"done with processing"<<std::endl;  
-  SaveAsNetCDF(arp.wtd,"test-filled-transient.nc","value");
+  SaveAsNetCDF(arp.wtd,"test-filled-transient-cells-done.nc","value");
 
 
   return 0;

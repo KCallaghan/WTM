@@ -26,7 +26,7 @@ class Parameters {
   std::string time_end    = UNINIT_STR;
 
  //const int    dltxy = 120; //There are 120 30 arc-second pieces in one degree
-  int dltxy = -1;//120;
+  int cells_per_degree = -1;//120;
 
  // const double dx    = dy;
   const double UNDEF  = -1.0e7;
@@ -34,13 +34,16 @@ class Parameters {
 
   bool interpolated = false;
   
-  double sedge  = std::numeric_limits<double>::signaling_NaN();
-  double deltat = std::numeric_limits<double>::signaling_NaN();
-  double wtdmax = std::numeric_limits<double>::signaling_NaN();
+  double southern_edge  = std::numeric_limits<double>::signaling_NaN();
+  double deltat         = std::numeric_limits<double>::signaling_NaN();
+  double wtdmax         = std::numeric_limits<double>::signaling_NaN();
+  double cellsize_n_s_metres         = std::numeric_limits<double>::signaling_NaN();
+
+
 
   //Set for convenience within the code
-  int width  = -1;
-  int height = -1;
+  int ncells_x  = -1;
+  int ncells_y = -1;
 
   void print() const;
 };

@@ -49,7 +49,11 @@ class ArrayPack {
   f2d evap;
   f2d relhum;
   f2d precip;
-  f2d land;
+  f2d land_mask;
+  f2d total;
+  f2d wtd_change_total;
+
+
   dh_label_t label;
   dh_label_t final_label;
   dh_label_t flowdir_t;
@@ -60,7 +64,15 @@ class ArrayPack {
   richdem::Array2D<bool> done_old;   //Indicates which cells must still be processed
  // richdem::Array2D<int> land;
 
-  dvec xlat;
+  dvec latitude_radians;
+  dvec cell_area;
+  dvec cellsize_e_w_metres;
+  dvec cellsize_e_w_metres_N;
+  dvec cellsize_e_w_metres_S;
+
+  dvec temp_east_west;
+  dvec temp_north;
+  dvec temp_south;
   dvec alpha;
   dvec alphamonth;
 

@@ -180,7 +180,7 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter){
 
 //TODO: consider creating staggered grid with head gradients & kcell averages, and then doing cell-by-cell q discharges. May be faster as we don't calculate each gradient twice. 
 
-
+//TODO: Separate cell size into a separate calculation. Array of different cell sizes? Similar to the area array
 
     q += ((kcellN+my_kcell)/2.)*(headN-my_head) * std::cos(arp.xlat[y]+M_PI/(180.*params.dltxy*2.)); //North
     q += ((kcellS+my_kcell)/2.)*(headS-my_head) * std::cos(arp.xlat[y]-M_PI/(180.*params.dltxy*2.)); //South

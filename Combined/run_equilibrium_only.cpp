@@ -18,7 +18,7 @@
 #include <vector>
 
 namespace rd = richdem;
-namespace dh = richdem::dephier;
+//namespace dh = richdem::dephier;
 
 
 
@@ -30,54 +30,13 @@ int main(int argc, char **argv){
   Parameters params(argv[1]);
 
 
-
   arp.ksat = LoadData<float>(params.surfdatadir + params.region + "_ksat.nc", "value");
-  arp.land = LoadData<float>(params.initdatadir + params.region + "_mask.nc", "value"); //TODO: for some reason land is loading in with 0s everywhere. Data has both 0s and 1s. Check data export?
+  arp.land_mask = LoadData<float>(params.initdatadir + params.region + "_mask.nc", "value"); 
 
-  params.width = arp.ksat.width();
-  params.height = arp.ksat.height();
+  params.ncells_x = arp.ksat.width();
+  params.ncells_y = arp.ksat.height();
 
-  //Determine area of cells at each latitude
-  arp.xlat.resize      (params.height);     // the latitude of each row of cells
-  arp.alpha.resize     (params.height);
-  arp.alphamonth.resize(params.height);
-  arp.temp_east_west.resize(params.height);
-  arp.temp_north.resize(params.height);
-  arp.temp_south.resize(params.height);
-
-
- const double dy    = 6370000.*6370000.*M_PI/(180.*params.dltxy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
- //The part of the area calculation that is constant ^
- //dltxy is the number of cells per degree (e.g. for 30 arc-second cells, dltxy = 120). 
-
-
-  //Changing area of cell depending on its latitude. 
-  for(unsigned int j=0;j<arp.xlat.size();j++){
-    arp.xlat[j]       = (float(j)/params.dltxy+params.sedge)*M_PI/180.;
-    //dltxy represents the number of cells in one degree. For most of my runs, it is 120 since there are this many 30 arc-second pieces in one degree.
-    //j/dltxy gives the number of degrees up from the southern edge, add sedge since the southern edge may not be at 0 latitude. *pi/180 to convert to radians. 
-    //xlat is now the latitude in radians. 
-
-    const double xs   = (float(2*j-1)/(params.dltxy*2.)+params.sedge)*M_PI/180.; //Latitude number 1 - the southern edge of the cell
-    const double xn   = (float(2*j+1)/(params.dltxy*2.)+params.sedge)*M_PI/180.; //latitude number 2 - the northern edge of the cell
-    const double area = dy*(std::sin(xn)-std::sin(xs));              //final cell area for that latitude
-
-
-
-    arp.alpha[j]      = params.deltat/area;    //deltat is the number of seconds per timestep. We assume an annual timestep here, although the user can select a different deltat value, we still /12 to convert to monthly at a set point. 
-    arp.alphamonth[j] = (params.deltat/12)/area;   //for when we switch to a monthly version. 
-  }
-
-
-  for(int y=1;y<params.height-1;y++)     {                      //TODO: how to process edge cells? We can't check all neighbours. Should we check just available neighbours?
-    arp.temp_east_west[y] = std::cos(arp.xlat[y]);  
-    arp.temp_north[y] = std::cos(arp.xlat[y]+M_PI/(180.*params.dltxy*2.));
-    arp.temp_south[y] = std::cos(arp.xlat[y]-M_PI/(180.*params.dltxy*2.));
-}
-
-
-
-
+  //Load in data arrays:
   arp.fdepth = LoadData<float>(params.surfdatadir + params.region + "_fslope_rotated.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
   //TODO: Note the previsor that f>2.5 m! I don't think I have done this in the past, check! 
   arp.precip   = LoadData<float>(params.surfdatadir + params.region + "_rech_rotated.nc",   "value");
@@ -92,12 +51,7 @@ int main(int argc, char **argv){
   arp.head = rd::Array2D<float>(arp.topo,0);        //Just to initialise these - we'll add the appropriate values later. 
   arp.kcell = rd::Array2D<float>(arp.topo,0);
 
-   arp.total = rd::Array2D<float>(arp.topo,0);
-
-
-//TODO: Why can't I get these to work in the arraypack?
-  rd::Array2D<dh::dh_label_t> label   (arp.topo.width(), arp.topo.height(), dh::NO_DEP ); 
-
+  arp.wtd_change_total = rd::Array2D<float>(arp.topo,0);
 
 
   arp.done_new.resize(arp.topo.width(),arp.topo.height(),false); //Indicates which cells must still be processed
@@ -106,12 +60,55 @@ int main(int argc, char **argv){
 
   std::cout<<"loaded all"<<std::endl;
 
+  //Determine area of cells at each latitude
+
+  const float earth_radius = 6371000.; //metres
+
+  params.cellsize_n_s_metres = (earth_radius*(M_PI/180.))/params.cells_per_degree; //distance between lines of latitude is a constant. 
+
+//initialise some arrays
+  arp.latitude_radians.resize      (params.ncells_y);   // the latitude of each row of cells
+  arp.cellsize_e_w_metres.resize  (params.ncells_y);    //size of a cell in the east-west direction at the centre of the cell (metres)
+  arp.cellsize_e_w_metres_N.resize  (params.ncells_y);  //size of a cell in the east-west direction at the northern edge of the cell (metres)
+  arp.cellsize_e_w_metres_S.resize  (params.ncells_y);  //size of a cell in the east-west direction at the southern edge of the cell (metres)
+  arp.cell_area.resize (params.ncells_y);               //cell area (metres squared)
+
+
+  for(unsigned int j=0;j<arp.latitude_radians.size();j++){
+    //latitude at the centre of a cell:
+    arp.latitude_radians[j]       = (float(j)/params.cells_per_degree+params.southern_edge)*(M_PI/180.); //southern edge of the domain in degrees, plus the number of cells up from this location/the number of cells per degree, converted to radians.
+
+    //cells_per_degree = 120, there are this many 30 arc-second pieces in one degree. 
+    //j/cells_per_degree gives the number  of degrees up from the southern edge, add southern_edge since the southern edge may not be at 0 latitude. *pi/180 to convert to radians. 
+    //latitude_radians is now the latitude in radians. 
+
+    //latitude at the southern edge of a cell (subtract half a cell):
+    double latitude_radians_S = ((float(j) - 0.5)/params.cells_per_degree+params.southern_edge)*(M_PI/180.); 
+    //latitude at the northern edge of a cell (add half a cell):
+    double latitude_radians_N = ((float(j) + 0.5)/params.cells_per_degree+params.southern_edge)*(M_PI/180.); 
+
+    //distance between lines of longitude varies with latitude. This is the distance at the centre of a cell for a given latitude:
+    arp.cellsize_e_w_metres[j] = earth_radius*std::cos(arp.latitude_radians[j])*(M_PI/180.)/params.cells_per_degree;
+
+    //distance at the northern edge of the cell for the given latitude:
+    arp.cellsize_e_w_metres_N[j] = earth_radius*std::cos(latitude_radians_N)*(M_PI/180.)/params.cells_per_degree;
+    //distance at the southern edge of the cell for the given latitude:
+    arp.cellsize_e_w_metres_S[j] = earth_radius*std::cos(latitude_radians_S)*(M_PI/180.)/params.cells_per_degree;
+
+    //cell area computed as a trapezoid, using unchanging north-south distance, and east-west distances at the northern and southern edges of the cell:
+    arp.cell_area[j] = params.cellsize_n_s_metres* (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j])/2;
+
+  }
+
+  std::cout<<"computed distances, areas, and latitudes"<<std::endl;
+
 
   arp.check();
 
 
+//TODO: USe actual evap layers to get the appropriate precip, this is a placeholder. 
   #pragma omp parallel for
-  for(unsigned int i=0;i<label.size();i++){
+  for(unsigned int i=0;i<arp.topo.size();i++){
     arp.evap(i) = arp.evap(i)/100.0f;
     arp.rech(i) = arp.precip(i) - arp.evap(i);
     arp.rech(i) = std::max(arp.rech(i),0.0f);
@@ -119,23 +116,21 @@ int main(int argc, char **argv){
   }
 
 
-//Label the ocean cells. This is a precondition for using
-  //`GetDepressionHierarchy()`.
+//Wtd is 0 in the ocean:
   #pragma omp parallel for
-  for(unsigned int i=0;i<label.size();i++){
-    if(arp.topo.isNoData(i) || arp.topo(i)==dh::OCEAN_LEVEL){ //Ocean Level is assumed to be lower than any other cells (even Death Valley)
+  for(unsigned int i=0;i<arp.topo.size();i++){
+    if(arp.topo.isNoData(i)){//} || arp.topo(i)==dh::OCEAN_LEVEL){ //Ocean Level is assumed to be lower than any other cells (even Death Valley)
       arp.wtd  (i) = 0;
     }
   }
 
-  //Generate flow directions, label all the depressions, and get the hierarchy
-  //connecting them
-  int cells_left = params.width*params.height;  //Cells left that need to be equilibriated
-
  
+  int cells_left = params.ncells_x*params.ncells_y;  //Cells left that need to be equilibriated
+
+ //Run the equilibrium code to move water
   arp.wtd = equilibrium(params,arp, cells_left);
 
-
+//We are at equilibrium, save the result. 
   
   std::cout<<"done with processing"<<std::endl;  
   SaveAsNetCDF(arp.wtd,"test-filled-like-original-more-bins.nc","value");
