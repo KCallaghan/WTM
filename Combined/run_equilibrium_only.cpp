@@ -130,8 +130,7 @@ int main(int argc, char **argv){
  //Run the equilibrium code to move water
   arp.wtd = equilibrium(params,arp, cells_left);
 
-//We are at equilibrium, save the result. 
-  
+//We are at equilibrium, save the result.   
   std::cout<<"done with processing"<<std::endl;  
   SaveAsNetCDF(arp.wtd,"test-filled-like-original-more-bins.nc","value");
 

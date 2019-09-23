@@ -62,31 +62,26 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 
   int cells_left = 0;
 
-  double d0 = 0.0005;            //TODO: Consider whether these are the best values to use. Should we have more categories?
-  double d1 = 0.001;
-  double d2 = 0.002;             //Test larger values for d4/d5  etc
-  double d3 = 0.005;
-  double d4 = 0.01;
-  double d5 = 0.02;
-  double d6 = 0.1;
-  double d7 = 0.2;
-  double d8 = 1.0;
-  double d9 = 5.0;
+  double d0 = 0.0005;             //Test larger values for d4/d5  etc
+  double d1 = 0.0008;
+  double d2 = 0.001;
+  double d3 = 0.0015;
+  double d4 = 0.002;
+  double d5 = 0.003;
+  double d6 = 0.005;
   double thres = 0.001;
-  int d2_thres = 0;
-  int d5_thres = 0;
   
 
 
  //Do these only once, since we will affect the arrays in a lasting way
-  if(iter==100){  //TODO: What is a good number of iterations to use here? Is it better to just do monthly from the beginning?
+  if(iter==10000){  //TODO: What is a good number of iterations to use here? Is it better to just do monthly from the beginning?
     for(auto i=arp.rech.i0();i<arp.rech.size();i++)   //Convert the recharge to monthly. TODO: Should we move this to combined, or should we do it each time here, since we are now resetting rech each time in combined?
       arp.rech(i) /=12;
     arp.done_old.setAll(false); //We changed the threshold, so we want to recheck all the cells.
   }
 
   //Do this at each iteration so we don't want to modify the parameter pack. TODO: Or is it better to just do the smaller values from the beginning?
-  if(iter>=100){  //Here we automatically switch to monthly processing,
+  if(iter>=10000){  //Here we automatically switch to monthly processing,
     thres  = thres/12.;
     d0     = d0/12.;
     d1     = d1/12.;
@@ -95,9 +90,6 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
     d4     = d4/12.;
     d5     = d5/12.;
     d6     = d6/12.;
-    d7     = d7/12.;
-    d8     = d8/12.;
-    d9     = d9/12.;
 
   
   }
@@ -174,6 +166,14 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 
   }
 
+int d6_total = 0;
+int d5_total = 0;
+int d4_total = 0;
+int d3_total = 0;
+int d2_total = 0;
+int d1_total = 0;
+int d0_total = 0;
+
   for(int y=1;y<params.ncells_y-1;y++)                           //TODO: how to process edge cells? We can't check all neighbours. Should we check just available neighbours?
   for(int x=1;x<params.ncells_x-1;x++){                           //TODO: will these work until the edges with a working land/ocean mask?
     if(arp.land_mask(x,y)==0 || arp.done_old(x,y))    
@@ -183,27 +183,64 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 
 //TODO: Check these bins to see if we get something that works better. Although, it probably varies depending on topography - what is the best way to handle this?
 
-    if     (arp.wtd_change_total(x,y)<-20.0   ) arp.wtd(x,y) += -d9;  //Adjust the wtd in the cell according to how much it needs to change to get closer to equilibrium. 
-    else if(arp.wtd_change_total(x,y)<-5.0    ) arp.wtd(x,y) += -d8;  //TODO: I wonder if it would help to have one still larger adjustment? 
-    else if(arp.wtd_change_total(x,y)<-1.5    ) arp.wtd(x,y) += -d7;
-    else if(arp.wtd_change_total(x,y)<-0.5    ) arp.wtd(x,y) += -d6;
-    else if(arp.wtd_change_total(x,y)<-0.1    ) arp.wtd(x,y) += -d5;
-    else if(arp.wtd_change_total(x,y)<-0.05   ) arp.wtd(x,y) += -d4;
-    else if(arp.wtd_change_total(x,y)<-0.02   ) arp.wtd(x,y) += -d3;
-    else if(arp.wtd_change_total(x,y)<-0.01   ) arp.wtd(x,y) += -d2;
-    else if(arp.wtd_change_total(x,y)<-0.005  ) arp.wtd(x,y) += -d1;
-    else if(arp.wtd_change_total(x,y)<-thres  ) arp.wtd(x,y) += -d0;
-    else if(arp.wtd_change_total(x,y)>20.0    ) arp.wtd(x,y) +=  d9;  
-    else if(arp.wtd_change_total(x,y)>5.0     ) arp.wtd(x,y) +=  d8;  
-    else if(arp.wtd_change_total(x,y)>1.5     ) arp.wtd(x,y) +=  d7;  
-    else if(arp.wtd_change_total(x,y)>0.5     ) arp.wtd(x,y) +=  d6;
-    else if(arp.wtd_change_total(x,y)>0.1     ) arp.wtd(x,y) +=  d5;
-    else if(arp.wtd_change_total(x,y)>0.05    ) arp.wtd(x,y) +=  d4;
-    else if(arp.wtd_change_total(x,y)>0.02    ) arp.wtd(x,y) +=  d3;
-    else if(arp.wtd_change_total(x,y)>0.01    ) arp.wtd(x,y) +=  d2;
-    else if(arp.wtd_change_total(x,y)>0.005   ) arp.wtd(x,y) +=  d1;
-    else if(arp.wtd_change_total(x,y)>thres   ) arp.wtd(x,y) +=  d0;
-
+  if(arp.wtd_change_total(x,y)<-0.05    ){ 
+      arp.wtd(x,y) += -d6;
+d6_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)<-0.02    ){ 
+      arp.wtd(x,y) += -d5;
+d5_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)<-0.01   ){
+     arp.wtd(x,y) += -d4;
+d4_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)<-0.007  ){ 
+      arp.wtd(x,y) += -d3;
+d3_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)<-0.004  ){
+      arp.wtd(x,y) += -d2;
+d2_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)<-0.002  ){
+     arp.wtd(x,y) += -d1;
+d1_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)<-thres  ){
+      arp.wtd(x,y) += -d0;
+d0_total +=1;
+   }
+  
+    
+    else if(arp.wtd_change_total(x,y)>0.05     ){ 
+      arp.wtd(x,y) +=  d6;
+d6_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)>0.02     ){ 
+      arp.wtd(x,y) +=  d5;
+d5_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)>0.01    ){ 
+      arp.wtd(x,y) +=  d4;
+d4_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)>0.007    ){ 
+      arp.wtd(x,y) +=  d3;
+d3_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)>0.004    ){ 
+      arp.wtd(x,y) +=  d2;
+d2_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)>0.002   ){ 
+      arp.wtd(x,y) +=  d1;
+d1_total +=1;
+   }
+    else if(arp.wtd_change_total(x,y)>thres   ){ 
+      arp.wtd(x,y) +=  d0;
+d0_total +=1;
+ }
 
 
     if(arp.wtd_change_total(x,y) >=thres || arp.wtd_change_total(x,y) <= -thres){
@@ -215,24 +252,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
       arp.done_new(x,  y-1) = false;
 
     }
-
-
-//This is just temporary for me to see how far cells are from equilibrium. 
-    if(arp.wtd_change_total(x,y) <- d2){
-      d2_thres += 1;
-    }
-    else if(arp.wtd_change_total(x,y)>d2){
-      d2_thres += 1;
-          }
-
-
-   if(arp.wtd_change_total(x,y) <- d5){
-      d5_thres += 1;
-    }
-    else if(arp.wtd_change_total(x,y)>d5){
-      d5_thres += 1;
-          }
-  
+   
 
     if(arp.wtd_change_total(x,y) > maxtotal)
       maxtotal = arp.wtd_change_total(x,y);
@@ -246,7 +266,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int iter){
 
   //TODO: Move print statements to output to a text file. 
   std::cout<<"the highest total value was "<<maxtotal<<" and the lowest was "<<mintotal<<std::endl;
-  std::cout<<"cells out of eq at d2 level: "<<d2_thres<<" and at d5 level "<<d5_thres<<std::endl;
+  std::cout<<"d6 "<<d6_total<<" d5 "<<d5_total<<" d4 "<<d4_total<<" d3 "<<d3_total<<" d2 "<<d2_total<<" d1 "<<d1_total<<" d0 "<<d0_total<<std::endl;
 
   return cells_left;
 
@@ -267,23 +287,23 @@ while(true){
 
   std::cerr<<"Iteration #: "<<iter<<" Cells left: "<<cells_left<<std::endl;
 
-  if(cells_left <= 0.2*params.ncells_x*params.ncells_y){
-    std::cout<<"Achieved 98 percent equilibrium"<<std::endl;
-      SaveAsNetCDF(arp.wtd,"test-filled-like-original-more-bins.nc","value");
+  if(cells_left <= 0.05*params.ncells_x*params.ncells_y){
+    std::cout<<"Achieved 99.5 percent equilibrium"<<std::endl;
+      SaveAsNetCDF(arp.wtd,"test-filled-like-original-more-bins-new.nc","value");
 
     break;
   }
 
   if(iter >= params.maxiter){
     std::cout<<"reached max iters"<<std::endl;
-      SaveAsNetCDF(arp.wtd,"test-filled-like-original-more-bins.nc","value");
+      SaveAsNetCDF(arp.wtd,"test-filled-like-original-more-bins-new.nc","value");
 
     break;
   }
 
      if((iter % 10000) == 0){
       std::cerr<<"Saving a part-way output"<<std::endl;
-      SaveAsNetCDF(arp.wtd,"test-filled-like-original-more-bins.nc","value");
+      SaveAsNetCDF(arp.wtd,"test-filled-like-original-more-bins-new.nc","value");
 
     }
 
