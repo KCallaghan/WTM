@@ -46,6 +46,7 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   //initialise arrays that start out empty:
   arp.rech    = rd::Array2D<float>(arp.topo,0);
   arp.wtd_change_total    = rd::Array2D<float>(arp.topo,0);
+  arp.stability_time_seconds = rd::Array2D<float>(arp.topo,0);
 
 
   //compute changing cell size and distances between cells as these change with latitude:
@@ -94,6 +95,9 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   for(unsigned int i=0;i<arp.topo.size();i++){
     if(arp.topo(i)<=UNDEF){
       arp.topo(i) = 0;
+    }
+    if(arp.ksat(i)<=0){
+      arp.ksat(i) = 0.00001; //TODO:What is an appropriate minimum value?
     }
     //Converting to monthly
     arp.rech(i) /= 12;           //TODO: This should be converted to whatever the timestep is, not necessarily monthly. 
@@ -146,10 +150,16 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
   total_changes = 0.0;
   float max_total = 0.0;
   float min_total = 0.0;
+  float local_fdepth = 0.0;
+  float local_kcell = 0.0;
+  float local_wtd = 0.0;
 
   int thres_001 = 0;
   int thres_01 = 0;
   int thres_1 = 0;
+
+  float stability_min = 100000000000.0;
+  float stability_max = 0.0;
 
 
 //cycle through the entire array, calculating how much the water table changes in each cell per iteration. 
@@ -170,6 +180,23 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
     const auto kcellS   = kcell(x,  y-1, arp);
     const auto kcellW   = kcell(x-1,y,   arp);
     const auto kcellE   = kcell(x+1,y,   arp);
+
+if(my_kcell == 0)
+  std::cout<<"0 kcell with fdepth "<<arp.fdepth(x,y)<<" ksat "<<arp.ksat(x,y)<<" wtd "<<arp.wtd(x,y)<<std::endl;
+
+    arp.stability_time_seconds(x,y) = (my_kcell/2.0) * (arp.cell_area[y]*arp.cell_area[y]);  //Von Neumann stability analysis to get stable timestep
+    //TODO: implement stable timestep
+
+
+    if(arp.stability_time_seconds(x,y)<stability_min){
+      stability_min = arp.stability_time_seconds(x,y);
+      local_fdepth = arp.fdepth(x,y);
+      local_kcell = my_kcell;
+      local_wtd = arp.wtd(x,y);
+    }
+    if(arp.stability_time_seconds(x,y)>stability_max)
+      stability_max = arp.stability_time_seconds(x,y);
+
 
 
     double QN = 0;
@@ -239,6 +266,9 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
 
 std::cout<<"total changes were "<<total_changes<<std::endl;
 std::cout<<"max wtd was "<<max_total<<" and min wtd was "<<min_total<<std::endl;
+std::cout<<"stability_min "<<stability_min<<" stability_max "<<stability_max<<std::endl;
+std::cout<<"min kcell "<<local_kcell<<" min wtd "<<local_wtd<<" min fdepth "<<local_fdepth<<std::endl;
+
 std::cout<<"cells out at 0.001 "<<thres_001<<" and at 0.01 "<<thres_01<<" and at 0.1 "<<thres_1<<std::endl;
 
 
