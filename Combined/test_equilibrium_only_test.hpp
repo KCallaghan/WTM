@@ -197,7 +197,7 @@ int EquilibriumRun(const Parameters &params, ArrayPack &arp, const int loops_pas
 
 
 
-f2d equilibrium(Parameters &params, ArrayPack &arp, int &cells_left, int &loops_passed){
+f2d equilibrium(Parameters &params, ArrayPack &arp, int &cells_left){
 
  InitialiseEquilibrium (params, arp);
 
@@ -207,12 +207,12 @@ f2d equilibrium(Parameters &params, ArrayPack &arp, int &cells_left, int &loops_
 
 while(true){
 
-  cells_left = EquilibriumRun(params,arp,loops_passed);  //TODO: how to get this value to combined, so it knows when to exit there?
+  cells_left = EquilibriumRun(params,arp,iter);  //TODO: how to get this value to combined, so it knows when to exit there?
 
 
   std::cerr<<"Iteration #: "<<iter<<" Cells left: "<<cells_left<<std::endl;
 
-  if(cells_left <= 0.01*params.width*params.height)
+  if(cells_left <= 0.5*params.width*params.height)
     break;
 
   if(iter >= params.maxiter)

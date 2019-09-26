@@ -43,6 +43,24 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   arp.wtd       = rd::Array2D<float>(arp.topo,0.0f);  //TODO: load in an actual wtd array
 
 
+  for(auto i=arp.fdepth.i0();i<arp.fdepth.size();i++){  //Equation S8 in the Fan paper
+    if(arp.temp(i)<-14) {
+      auto fT = (0.17 + 0.005*arp.temp(i));
+      fT = std::max(fT,0.05);                       //The equation specifies fT>=0.05.
+      arp.fdepth(i) = arp.fdepth(i) * fT;
+    }
+    else if (arp.temp(i) <= -5){
+      auto fT = (1.5 + 0.1*arp.temp(i));
+      fT = std::min(fT,1.);                       //The equation specifies fT<=1.
+      arp.fdepth(i) = arp.fdepth(i) * fT;
+    }
+
+    if(arp.fdepth(i)<0.0001)      //TODO: I believe this shouldn't be necessary once I make the needed changes to the original in f array.
+      arp.fdepth(i) = 0.0001;
+  }
+
+
+
   //initialise arrays that start out empty:
   arp.rech    = rd::Array2D<float>(arp.topo,0);
   arp.wtd_change_total    = rd::Array2D<float>(arp.topo,0);
@@ -90,17 +108,16 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 
   std::cout<<"computed distances, areas, and latitudes"<<std::endl;
 
-
   //Change undefined cells to 0
   for(unsigned int i=0;i<arp.topo.size();i++){
     if(arp.topo(i)<=UNDEF){
       arp.topo(i) = 0;
     }
     if(arp.ksat(i)<=0){
-      arp.ksat(i) = 0.00001; //TODO:What is an appropriate minimum value?
+      arp.ksat(i) = 1E-10; //TODO:What is an appropriate minimum value?
     }
     //Converting to monthly
-    arp.rech(i) /= 12;           //TODO: This should be converted to whatever the timestep is, not necessarily monthly. 
+    arp.rech(i) *= 100;           //TODO: This should be converted to whatever the timestep is, not necessarily monthly. 
     
     //do we need to do a unit conversion (m -> mm) for rech? For equilibrium we set values >10000 to 0, do we need to do this?
 
@@ -153,12 +170,13 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
   float local_fdepth = 0.0;
   float local_kcell = 0.0;
   float local_wtd = 0.0;
+  float max_change = 0.0;
 
   int thres_001 = 0;
   int thres_01 = 0;
   int thres_1 = 0;
 
-  float stability_min = 100000000000.0;
+  float stability_min = 100000000000000000000.0;
   float stability_max = 0.0;
 
 
@@ -184,7 +202,7 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
 if(my_kcell == 0)
   std::cout<<"0 kcell with fdepth "<<arp.fdepth(x,y)<<" ksat "<<arp.ksat(x,y)<<" wtd "<<arp.wtd(x,y)<<std::endl;
 
-    arp.stability_time_seconds(x,y) = (my_kcell/2.0) * (arp.cell_area[y]*arp.cell_area[y]);  //Von Neumann stability analysis to get stable timestep
+    arp.stability_time_seconds(x,y) = 0.5 * (arp.cell_area[y]*arp.cell_area[y]) / my_kcell;  //Von Neumann stability analysis to get stable timestep
     //TODO: implement stable timestep
 
 
@@ -242,12 +260,9 @@ if(my_kcell == 0)
     else if(arp.wtd(x,y)< min_total)
       min_total =arp.wtd(x,y);
 
-    if(abs(arp.wtd_change_total(x,y)) > 0.001)
-      thres_001 +=1;
-    if(abs(arp.wtd_change_total(x,y)) > 0.01)
-      thres_01 +=1;
-    if(abs(arp.wtd_change_total(x,y)) > 0.1)
-      thres_1 +=1;
+    if(abs(arp.wtd_change_total(x,y)) > max_change)
+      max_change =abs(arp.wtd_change_total(x,y));
+  
 
 
   }
@@ -269,7 +284,7 @@ std::cout<<"max wtd was "<<max_total<<" and min wtd was "<<min_total<<std::endl;
 std::cout<<"stability_min "<<stability_min<<" stability_max "<<stability_max<<std::endl;
 std::cout<<"min kcell "<<local_kcell<<" min wtd "<<local_wtd<<" min fdepth "<<local_fdepth<<std::endl;
 
-std::cout<<"cells out at 0.001 "<<thres_001<<" and at 0.01 "<<thres_01<<" and at 0.1 "<<thres_1<<std::endl;
+std::cout<<"max change was "<< max_change<<std::endl;
 
 
   return 1;
@@ -306,9 +321,9 @@ int main(int argc, char **argv){
   while(true){
     int cells_left;
 
-    if((iter % 10000) == 0){
+    if((iter % 100) == 0){
       std::cerr<<"Saving a part-way output"<<std::endl;
-      SaveAsNetCDF(arp.wtd,"test-filled-transient-cells-done.nc","value");
+      SaveAsNetCDF(arp.wtd,"test-filled-transient-cells-done-100-year.nc","value");
 
     }
 
@@ -323,7 +338,7 @@ int main(int argc, char **argv){
   }
 
   std::cout<<"done with processing"<<std::endl;  
-  SaveAsNetCDF(arp.wtd,"test-filled-transient-cells-done.nc","value");
+  SaveAsNetCDF(arp.wtd,"test-filled-transient-cells-done-100-year.nc","value");
 
 
   return 0;
