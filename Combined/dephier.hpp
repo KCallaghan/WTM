@@ -21,6 +21,9 @@
 #include <unordered_map>
 #include <utility>
 
+const double FP_ERROR = 1e-4;
+
+
 namespace richdem {
 
 namespace dephier {
@@ -79,10 +82,10 @@ class Depression {
 
 
   //indicates everything that is a subdepression of this one:
-  
+
   std::unordered_set<int> my_subdepressions;
 
- // std::vector<dh_label_t> my_subdepressions;
+  std::vector<dh_label_t> my_subdepressions_vec;
   //the label of the depression, for calling it up again
   dh_label_t dep_label = 0;
   //Number of cells contained within the depression and its children
@@ -310,7 +313,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   int pit_cell_count = 0;
   progress.start(dem.size());
   #pragma omp parallel for collapse(2) reduction(+:pit_cell_count)
-  for(int y=0;y<dem.height();y++)  //Look at all the cells
+  for(int y=0;y<dem.height();y++){  //Look at all the cells
   for(int x=0;x<dem.width() ;x++){ //Yes, all of them
     ++progress;
     const auto my_elev = dem(x,y); //Focal cell's elevation
@@ -334,6 +337,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       pq.emplace(x,y,dem(x,y)); //Add cell to pq
     }
   }
+}
   progress.stop();
 
 
@@ -381,6 +385,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     ++progress;
 
     const auto c = pq.top();               //Copy cell with lowest elevation from priority queue
+
     pq.pop();                              //Remove the copied cell from the priority queue
     const auto celev = c.z;                //Elevation of focal cell
     const auto ci    = dem.xyToI(c.x,c.y); //Flat-index of focal cell
@@ -561,9 +566,11 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   progress.start(outlets.size());
   for(auto &outlet: outlets){
     ++progress;
+
     auto depa_set = djset.findSet(outlet.depa); //Find the ultimate parent of Depression A
     auto depb_set = djset.findSet(outlet.depb); //Find the ultimate parent of Depression B
     
+
     //If the depressions are already part of the same meta-depression, then
     //nothing needs to be done.
     if(depa_set==depb_set)
@@ -648,11 +655,25 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       newdep.rchild    = depb_set; 
       newdep.dep_label = newlabel;
       newdep.pit_cell  = depa_pitcell_temp;
+
+
+
       newdep.my_subdepressions.emplace(depa_set);
       newdep.my_subdepressions.emplace(depb_set);
       newdep.my_subdepressions.insert(depressions.at(depa_set).my_subdepressions.begin(),depressions.at(depa_set).my_subdepressions.end());
       newdep.my_subdepressions.insert(depressions.at(depb_set).my_subdepressions.begin(),depressions.at(depb_set).my_subdepressions.end());
 
+      
+      newdep.my_subdepressions_vec.resize(newdep.my_subdepressions.size());
+      std::copy(newdep.my_subdepressions.begin(),newdep.my_subdepressions.end(),newdep.my_subdepressions_vec.begin());
+      newdep.my_subdepressions.erase(newdep.my_subdepressions.begin(),newdep.my_subdepressions.end());
+  //    newdep.my_subdepressions.emplace_back(depa_set);
+  //    newdep.my_subdepressions.emplace_back(depb_set);
+  //    newdep.my_subdepressions.insert(newdep.my_subdepressions.end(),depressions.at(depa_set).my_subdepressions.begin(),depressions.at(depa_set).my_subdepressions.end());
+  //    newdep.my_subdepressions.insert(newdep.my_subdepressions.end(),depressions.at(depb_set).my_subdepressions.begin(),depressions.at(depb_set).my_subdepressions.end());
+
+  //    sort(newdep.my_subdepressions.begin(),newdep.my_subdepressions.end());
+  //    newdep.my_subdepressions.erase(unique(newdep.my_subdepressions.begin(),newdep.my_subdepressions.end()), newdep.my_subdepressions.end());
 
 
 
@@ -677,6 +698,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   progress.start(dem.size());
   for(unsigned int i=0;i<dem.size();i++){
     ++progress;
+
     const auto my_elev = dem(i);
     auto clabel        = label(i);
     
@@ -732,6 +754,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   for(int d=0;d<(int)depressions.size();d++){
     ++progress;
 
+
     auto &dep = depressions.at(d);
     if(dep.lchild!=NO_VALUE){
       assert(dep.rchild!=NO_VALUE); //Either no children or two children
@@ -753,7 +776,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
 
 
-    assert(dep.lchild==NO_VALUE || depressions.at(dep.lchild).dep_vol+depressions.at(dep.rchild).dep_vol<=dep.dep_vol);
+    assert(dep.lchild==NO_VALUE || (depressions.at(dep.lchild).dep_vol+depressions.at(dep.rchild).dep_vol) - dep.dep_vol <= FP_ERROR);
   }
   progress.stop();
 

@@ -11,8 +11,8 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-
+#include <fstream>
+using namespace std;
 
 typedef std::vector<double> dvec;
 typedef rd::Array2D<float>  f2d;
@@ -35,7 +35,11 @@ double kcell(const int x, const int y, const ArrayPack &arp){
 
 int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, double total_changes){
 
-  std::cout<<"TransientRun"<<std::endl;
+  ofstream textfile;
+
+  textfile.open ("text_coupled_transient.txt", std::ios_base::app);
+
+  textfile<<"TransientRun"<<std::endl;
  
   total_changes = 0.0;
   float max_total = 0.0;
@@ -55,12 +59,36 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
     if(arp.land_mask(x,y) == 0)
       continue;
 
+    //TODO: Does this make sense? The water table itself needs to increase by the amount of recharge, then we can get to calculating head etc. 
+    //I have done this in its own for loop so that we get the new wtd everywhere first. 
+    //is this also the best way to avoid recharge that is negative from evaporating too much water?
 
-    const auto my_head = arp.topo(x,y) + arp.wtd(x,y) + arp.rech(x,y);                    
-    const auto headN   = arp.topo(x,y+1) + arp.wtd(x,y+1) + arp.rech(x,y+1);              
-    const auto headS   = arp.topo(x,y-1) + arp.wtd(x,y-1) + arp.rech(x,y-1);              
-    const auto headW   = arp.topo(x-1,y) + arp.wtd(x-1,y) + arp.rech(x-1,y);              
-    const auto headE   = arp.topo(x+1,y) + arp.wtd(x+1,y) + arp.rech(x+1,y);              
+    if(arp.rech(x,y)>=0)
+      arp.wtd(x,y) += arp.rech(x,y);
+    else{
+      if(arp.wtd(x,y)+arp.rech(x,y)>0)
+        arp.wtd(x,y) += arp.rech(x,y);
+      else{
+        arp.wtd(x,y) = 0;
+        arp.rech(x,y) = arp.precip(x,y) - arp.starting_evap(x,y); //wtd has dipped down to the surface, no more surface water in this cell. Thoughts on updating this vs leaving it until the next evaporation update time?
+      }
+
+
+    }
+
+}
+
+
+  for(int y=1;y<params.ncells_y-1;y++)
+  for(int x=1;x<params.ncells_x-1; x++){
+    if(arp.land_mask(x,y) == 0)
+      continue;
+
+    const auto my_head = arp.topo(x,y) + arp.wtd(x,y);                    
+    const auto headN   = arp.topo(x,y+1) + arp.wtd(x,y+1);              
+    const auto headS   = arp.topo(x,y-1) + arp.wtd(x,y-1);              
+    const auto headW   = arp.topo(x-1,y) + arp.wtd(x-1,y);              
+    const auto headE   = arp.topo(x+1,y) + arp.wtd(x+1,y);              
 
     const auto my_kcell = kcell(x,  y,   arp);
     const auto kcellN   = kcell(x,  y+1, arp);
@@ -143,12 +171,13 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
 
   }
 
-std::cout<<"total changes were "<<total_changes<<std::endl;
-std::cout<<"max wtd was "<<max_total<<" and min wtd was "<<min_total<<std::endl;
-std::cout<<"stability_min "<<stability_min<<" stability_max "<<stability_max<<std::endl;
+textfile<<"total changes were "<<total_changes<<std::endl;
+textfile<<"max wtd was "<<max_total<<" and min wtd was "<<min_total<<std::endl;
+textfile<<"stability_min "<<stability_min<<" stability_max "<<stability_max<<std::endl;
 //std::cout<<"min kcell "<<local_kcell<<" min wtd "<<local_wtd<<" min fdepth "<<local_fdepth<<std::endl;
 
-std::cout<<"max change was "<< max_change<< std::endl;
+textfile<<"max change was "<< max_change<< std::endl;
+  textfile.close();
 
 
   return 1;
@@ -158,6 +187,7 @@ std::cout<<"max change was "<< max_change<< std::endl;
 
 f2d transient(Parameters &params, ArrayPack &arp){
   richdem::Timer timer_io;
+
 
 
 
@@ -172,7 +202,13 @@ f2d transient(Parameters &params, ArrayPack &arp){
     if(iter>=params.maxiter)// || abs(total_changes) < 20000.0)
       break;
 
-    std::cerr<<"Iteration #: "<<iter<<std::endl;
+  std::ofstream textfile;
+  textfile.open ("text_coupled_transient.txt", std::ios_base::app);
+
+    textfile<<"Iteration #: "<<iter<<std::endl;
+
+  textfile.close();
+
 
     TransientRun(params, arp, iter,total_changes);
  

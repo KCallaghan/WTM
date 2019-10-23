@@ -44,9 +44,10 @@ class ArrayPack {
   f2d fdepth;
   f2d temp;
   f2d delta;
+  f2d e_sat;
   f2d e_a;
-  f2d e;
   f2d evap;
+  f2d starting_evap;
   f2d relhum;
   f2d precip;
   f2d land_mask;
