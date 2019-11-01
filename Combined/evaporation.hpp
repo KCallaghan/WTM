@@ -17,23 +17,24 @@ typedef std::vector<double> dvec;
 typedef rd::Array2D<float>  f2d;
 
 
-const float R_v = 461.0;
-const float lambda = 2.5*10E6;
+void evaporation_update(Parameters &params, ArrayPack &arp){
+  richdem::Timer timer_io;
 
 
-int calculate_new_recharge(const Parameters &params, ArrayPack &arp){
+  const float R_v = 461.0;
+  const float lambda = 2.5*10E6;
+
 
   ofstream textfile;
 
-  textfile.open ("text_coupled_transient.txt", std::ios_base::app);
+  textfile.open (params.textfilename, std::ios_base::app);
 
-  textfile<<"this is where we will calculate the new recharge array"<<std::endl;
+  textfile<<"Calculating the new recharge array..."<<std::endl;
 
   for(unsigned int i=0;i<arp.topo.size();i++){
 
-
     arp.e_sat(i) = 611 * std::exp((lambda/R_v)*((1/273.15) - (1/arp.temp(i)) ));
-    arp.e_a(i) = (arp.relhum(i)/100)*arp.e_sat(i);
+    arp.e_a(i) = arp.relhum(i)*arp.e_sat(i);
     if(arp.wtd(i)>0)  //if there is surface water present
       arp.evap(i) = arp.e_sat(i) - arp.e_a(i);        //TODO: get full/proper equation in here
     else              //water table is below the surface
@@ -55,19 +56,5 @@ int calculate_new_recharge(const Parameters &params, ArrayPack &arp){
   //How to do this, particularly with long time steps where we may have e.g. 5 m water at one iteration and -5 m at the next?
 
 textfile.close();
-  return 1;
-}
 
-
-
-f2d evaporation_update(Parameters &params, ArrayPack &arp){
-  richdem::Timer timer_io;
-
-
-
-    calculate_new_recharge(params, arp);
- 
-
-
-  return arp.wtd;
 }
