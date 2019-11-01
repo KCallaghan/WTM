@@ -46,7 +46,8 @@ void FillSpillMerge(
   const rd::Array2D<dh_label_t> &final_label,
   const rd::Array2D<flowdir_t>  &flowdirs,
   DepressionHierarchy<elev_t>   &deps,
-  rd::Array2D<wtd_t>            &wtd
+  rd::Array2D<wtd_t>            &wtd,
+  ArrayPack                     &arp
 );
 
 template<class elev_t, class wtd_t>
@@ -134,7 +135,8 @@ static SubtreeDepressionInfo FindDepressionsToFill(
   const DepressionHierarchy<elev_t> &deps,               
   const rd::Array2D<float>          &topo,               
   const rd::Array2D<dh_label_t>     &label,              
-  rd::Array2D<float>                &wtd                 
+  rd::Array2D<float>                &wtd,           
+  ArrayPack                         &arp     
 );
 
 template<class elev_t, class wtd_t>
@@ -144,7 +146,8 @@ static void FillDepressions(
   const DepressionHierarchy<elev_t> &deps,      
   const rd::Array2D<float>          &topo,      
   const rd::Array2D<dh_label_t>     &label,     
-  rd::Array2D<wtd_t>                &wtd        
+  rd::Array2D<wtd_t>                &wtd,   
+  ArrayPack                         &arp     
 );
 
 
@@ -181,13 +184,22 @@ void FillSpillMerge(
   const rd::Array2D<dh_label_t> &final_label,
   const rd::Array2D<flowdir_t>  &flowdirs,
   DepressionHierarchy<elev_t>   &deps,
-  rd::Array2D<wtd_t>            &wtd
+  rd::Array2D<wtd_t>            &wtd,
+  ArrayPack                     &arp
 ){
   rd::Timer timer_overall;
   timer_overall.start();
   
   //We move standing water downhill to the pit cells of each depression
   MoveWaterIntoPits(topo, label,final_label, flowdirs, deps, wtd);
+
+  for(int y=0;y<topo.height();y++)
+  for(int x=0;x<topo.width(); x++){
+    if(wtd(x,y)>0)
+      std::cout<<"wtd greater than 0 "<<wtd(x,y)<<" label "<<label(x,y)<<std::endl;
+
+      }
+
 
   { 
     //Scope to limit `timer_overflow` and `jump_table`. Also ensures
@@ -232,7 +244,7 @@ void FillSpillMerge(
   //determine which depressions or metadepressions contain standing water. We
   //then modify `wtd` in order to distribute this water across the cells of the
   //depression which will lie below its surface.
-  FindDepressionsToFill(OCEAN,deps,topo,label,wtd);                              
+  FindDepressionsToFill(OCEAN,deps,topo,label,wtd,arp);                              
   std::cerr<<"t FlowInDepressionHierarchy: Fill time = "<<timer_filled.stop()<<" s"<<std::endl;
 
 
@@ -287,6 +299,10 @@ static void MoveWaterIntoPits(
 
   std::cerr<<"p Moving surface water downstream..."<<std::endl;
 
+
+ 
+
+
   //Calculate how many upstream cells flow into each cell
   rd::Array2D<char>  dependencies(topo.width(),topo.height(),0);
   #pragma omp parallel for collapse(2)
@@ -309,12 +325,13 @@ static void MoveWaterIntoPits(
   std::queue<int> q;
   for(unsigned int i=0;i<topo.size();i++){
     if(dependencies(i)==0)// && flowdirs(i)!=NO_FLOW)  //Is it a peak?
-      q.emplace(i);       
+      q.emplace(i); 
   }  //Yes.
 
    for(int d=0;d<(int)deps.size();d++){   //reset all of the water volumes to 0 for each time we iterate through the surface water. 
     auto &dep = deps.at(d);                
     dep.water_vol = 0;
+
 
   }
 
@@ -343,7 +360,7 @@ static void MoveWaterIntoPits(
      if(label(c) == OCEAN){    //If downstream neighbour is the ocean, we drop our water into it and the ocean is unaffected. 
       if(wtd(c) > 0){          //only if there is surface water in this cell, it goes to the ocean and reduces to 0. 
         wtd(c) = 0;
-        continue;
+  //      continue;
       }
      }
   
@@ -372,6 +389,9 @@ static void MoveWaterIntoPits(
       }
     }
   }
+
+
+
   progress.stop();
 
   std::cerr<<"t FlowInDepressionHierarchy: Surface water = "<<timer.stop()<<" s"<<std::endl;
@@ -1199,7 +1219,8 @@ static SubtreeDepressionInfo FindDepressionsToFill(
   const DepressionHierarchy<elev_t> &deps,                  //Depression hierarchy
   const rd::Array2D<float>          &topo,                  //Topographic data (used for determinining volumes as we're spreading stuff)
   const rd::Array2D<dh_label_t>     &label,                 //Array indicating which leaf depressions each cell belongs to
-  rd::Array2D<float>                &wtd                    //Water table depth
+  rd::Array2D<float>                &wtd,                    //Water table depth
+  ArrayPack                         &arp
 ){
   //Stop when we reach one level below the leaves
   if(current_depression==NO_VALUE)
@@ -1212,7 +1233,7 @@ static SubtreeDepressionInfo FindDepressionsToFill(
   //metadepression tree by MoveWaterInDepHier(). Similarly, it doesn't matter what their leaf
   //labels are since we will never spread water into them.
   for(const auto c: this_dep.ocean_linked)
-    FindDepressionsToFill(c, deps, topo, label, wtd);
+    FindDepressionsToFill(c, deps, topo, label, wtd,arp);
 
   //At this point we've visited all of the ocean-linked depressions. Since all
   //depressions link to the ocean and the ocean has no children, this means we
@@ -1223,8 +1244,8 @@ static SubtreeDepressionInfo FindDepressionsToFill(
 
   //We visit both of the children. We need to keep track of info from these
   //because we may spread water across them.
-  SubtreeDepressionInfo left_info  = FindDepressionsToFill(this_dep.lchild, deps, topo, label, wtd);
-  SubtreeDepressionInfo right_info = FindDepressionsToFill(this_dep.rchild, deps, topo, label, wtd);   
+  SubtreeDepressionInfo left_info  = FindDepressionsToFill(this_dep.lchild, deps, topo, label, wtd,arp);
+  SubtreeDepressionInfo right_info = FindDepressionsToFill(this_dep.rchild, deps, topo, label, wtd,arp );   
 
   SubtreeDepressionInfo combined;
   combined.my_labels.emplace(current_depression);
@@ -1263,7 +1284,7 @@ static SubtreeDepressionInfo FindDepressionsToFill(
     //If both of a depression's children have already spread their water, we do not
     //want to attempt to do so again in an empty parent depression. 
     //We check to see if both children have finished spreading water. 
-    FillDepressions(combined, this_dep.water_vol, deps, topo, label, wtd);
+    FillDepressions(combined, this_dep.water_vol, deps, topo, label, wtd,arp);
 
     //At this point there should be no more water all the way up the tree until
     //we pass through an ocean link, so we pass this up as a kind of null value.
@@ -1320,7 +1341,8 @@ static void FillDepressions(
   const DepressionHierarchy<elev_t> &deps,      //Depression hierarchy
   const rd::Array2D<float>          &topo,      //Topographic data for calculating marginal volumes as we attempt to spread water
   const rd::Array2D<dh_label_t>     &label,     //2D array in which each cell is labeled with the leaf depression it belongs to
-  rd::Array2D<wtd_t>                &wtd        //Water table depth: we transfer water into this
+  rd::Array2D<wtd_t>                &wtd,        //Water table depth: we transfer water into this
+  ArrayPack                         &arp
 ){
   //Nothing to do if we have no water
   if(water_vol==0)
@@ -1375,9 +1397,13 @@ static void FillDepressions(
   //dephier.hpp TODO)
   double total_elevation = 0;
 
+  double current_volume = 0;
+
+//std::cout<<"entering the while loop "<<std::endl;
   while(!flood_q.empty()){
     const auto c = flood_q.top();
     flood_q.pop();
+  //  std::cout<<"flood q c "<<label(c.x,c.y)<<std::endl;
 
     //We keep track of the current volume of the depression by noting the total
     //elevation of the cells we've seen as well as the number of cells we've
@@ -1393,7 +1419,7 @@ static void FillDepressions(
     //Current volume of this subset of the metadepression. Since we might climb
     //over a saddle point, this value can occasionally be negative. It will be
     //positive by the time we need to spread the water around.
-    const double current_volume = cells_affected.size()*static_cast<double>(topo(c.x,c.y)) - total_elevation; 
+    current_volume = cells_affected.size()*static_cast<double>(topo(c.x,c.y)) - total_elevation; 
 
     assert(water_vol >= - FP_ERROR);
     if(water_vol < 0)
@@ -1415,7 +1441,7 @@ static void FillDepressions(
     //   In this case, the cell's water table is left unaffected.
 
     if(water_vol<=current_volume-wtd(c.x,c.y)){
-  //    std::cerr<<"all of the water can be held in this depression"<<std::endl;
+   //   std::cerr<<"all of the water can be held in this depression"<<std::endl;
       //The current scope of the depression plus the water storage capacity of
       //this cell is sufficient to store all of the water. We'll stop adding
       //cells and fill things now.
@@ -1476,12 +1502,17 @@ static void FillDepressions(
         assert(wtd(c)>= -FP_ERROR);
         if(wtd(c) < 0)
           wtd(c) = 0;
+
       }
+
+ 
+
 
       //We've spread the water, so we're done        
       return;
       
     }  else {
+  //    std::cout<<"not yet enough volume for the water "<<std::endl;
       //We haven't found enough volume for the water yet.
 
       //During the adding of neighbours neighbours might get added that are
@@ -1490,7 +1521,8 @@ static void FillDepressions(
       //be popped and could be processed inappropriately. To prevent this, we
       //skip them here.
       if(stdi.my_labels.count(label(c.x,c.y))==0){  //CHECK. This was preventing cells that flowed to the ocean from allowing my depression volume to update. Is this way ok? Is this even needed?
-        continue;
+        //std::cout<<"line 1530"<<std::endl;
+   //     continue;
       }
     
       //Okay, we're allow to add this cell's neighbours since this cell is part
@@ -1512,6 +1544,7 @@ static void FillDepressions(
       total_elevation += topo(c.x,c.y);
 
       for(int n=1;n<=neighbours;n++){
+   //     std::cout<<"line 1553"<<std::endl;
         const int nx = c.x + dx[n]; //TODO ModFloor(x+dx[n],topo.width()); //Get neighbour's x-coordinate using an offset and wrapping
         const int ny = c.y + dy[n];                     //Get neighbour's y-coordinate using an offset
         if(!topo.inGrid(nx,ny))                         //Is this cell in the grid?
@@ -1529,8 +1562,11 @@ static void FillDepressions(
         //We must use the ocean level rather than the ocean label, or we will
         //mistakenly miss adding higher cells which belong to the ocean's depression
         //e.g. an escarpment before the ocean. 
+    //    std::cout<<"my label "<<label(c.x,c.y)<<std::endl;
+    //    std::cout<<"label "<<label(nx,ny)<<" land mask "<<arp.land_mask(nx,ny)<<" visited "<<visited.count(ni)<<std::endl;
 
-        if(visited.count(ni)==0 && (label(nx,ny)!=OCEAN || topo(nx,ny)>OCEAN_LEVEL)){
+        if(visited.count(ni)==0){ //&& ((label(nx,ny)!=OCEAN) || arp.land_mask(nx,ny)>0.0f)){
+    //      std::cout<<"line 1573"<<std::endl;
           if(stdi.my_labels.count(label(nx,ny))==0)  //CHECK. This was preventing cells that flowed to the ocean from allowing my depression volume to update. Is this way ok? Is this even needed?
             neighbour_q.emplace(nx,ny,topo(nx,ny));
           else
@@ -1543,6 +1579,7 @@ static void FillDepressions(
 
 
     if(flood_q.empty() && !neighbour_q.empty()){
+   //   std::cout<<"line 1586"<<std::endl;
       const auto c = neighbour_q.top();
       neighbour_q.pop();    
       flood_q.emplace(c.x,c.y,topo(c.x,c.y));
@@ -1555,8 +1592,9 @@ static void FillDepressions(
   //somewhere. :-(
 
   std::cerr<<"E PQ loop exited without filling a depression!"<<std::endl;
-  assert(!flood_q.empty());
+    std::cerr<<"water vol "<<water_vol<<" current vol "<<current_volume<<std::endl;
 
+  assert(!flood_q.empty());
   throw std::runtime_error("PQ loop exited without filling a depression!");
 }
 
