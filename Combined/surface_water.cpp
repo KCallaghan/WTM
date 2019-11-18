@@ -26,6 +26,11 @@ int main(int argc, char **argv){
   rd::Array2D<float> wtd = LoadData<float>(wtd_name,std::string("value"));   //Load in the wtd file
   timer_io.stop();
 
+  std::cout<<"m Data width  = "<<topo.width ()<<std::endl;
+  std::cout<<"m Data height = "<<topo.height()<<std::endl;
+  std::cout<<"m Data cells  = "<<topo.numDataCells()<<std::endl;
+
+  rd::Array2D<float>          wtd     (topo.width(), topo.height(), 1000       ); //All cells have some water
   rd::Array2D<dh::dh_label_t> label   (topo.width(), topo.height(), dh::NO_DEP ); //No cells are part of a depression
   rd::Array2D<dh::dh_label_t> final_label   (topo.width(), topo.height(), dh::NO_DEP ); //No cells are part of a depression
 
@@ -37,7 +42,7 @@ int main(int argc, char **argv){
   //`GetDepressionHierarchy()`.
   #pragma omp parallel for
   for(unsigned int i=0;i<label.size();i++){
-    if(topo.isNoData(i) || topo(i)==dh::OCEAN_LEVEL){ //Ocean Level is assumed to be lower than any other cells (even Death Valley)
+    if(topo.isNoData(i) || topo(i)==ocean_level){ //Ocean Level is assumed to be lower than any other cells (even Death Valley)
       label(i) = dh::OCEAN;
       final_label(i) = dh::OCEAN;
       wtd  (i) = 0;
@@ -50,12 +55,13 @@ int main(int argc, char **argv){
 
   dh::FillSpillMerge(topo, label, final_label, flowdirs, deps, wtd);
 
+
   //TODO: Remove. For viewing test cases.
   if(label.width()<1000){
     //GraphViz dot-style output for drawing depression hierarchy graphs.
     std::ofstream fgraph(out_graph);
     fgraph<<"digraph {\n";
-    for(int i=0;i<(int)deps.size();i++){
+    for(unsigned int i=0;i<deps.size();i++){
       fgraph<<i<<" -> "<<deps[i].parent;
       if(deps[i].parent!=dh::NO_VALUE && (deps[i].parent==dh::OCEAN || !(deps[deps[i].parent].lchild==i || deps[deps[i].parent].rchild==i)))
         fgraph<<" [color=\"blue\"]";
@@ -78,8 +84,8 @@ int main(int argc, char **argv){
     diff(i) = wtd(i)-topo(i);
   SaveAsNetCDF(diff,out_name+"-diff.nc","value");
 
-  std::cerr<<"Finished"<<std::endl;
-  std::cerr<<"IO time   = "<<timer_io.accumulated()<<" s"<<std::endl;
+  std::cout<<"Finished"<<std::endl;
+  std::cout<<"IO time   = "<<timer_io.accumulated()<<" s"<<std::endl;
 
   return 0;
 }
