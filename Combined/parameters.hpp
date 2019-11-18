@@ -24,20 +24,30 @@ class Parameters {
   std::string run_type    = UNINIT_STR;
   std::string time_start  = UNINIT_STR;
   std::string time_end    = UNINIT_STR;
+  std::string textfilename    = UNINIT_STR;
 
-  const int    dltxy = 120; //There are 120 30 arc-second pieces in one degree
-  const double dy    = 6370000.*M_PI/(180.*dltxy); //radius of the earth * pi / number of possible cells in the y-direction. This should equal the height of each cell in the N-S direction.
-  const double dx    = dy;
+  std::string outfilename    = UNINIT_STR;
+
+
+ //const int    dltxy = 120; //There are 120 30 arc-second pieces in one degree
+  int cells_per_degree = -1;//120;
+
+ // const double dx    = dy;
+  const double UNDEF  = -1.0e7;
+
 
   bool interpolated = false;
   
-  double sedge  = std::numeric_limits<double>::signaling_NaN();
-  double deltat = std::numeric_limits<double>::signaling_NaN();
-  double wtdmax = std::numeric_limits<double>::signaling_NaN();
+  double southern_edge  = std::numeric_limits<double>::signaling_NaN();
+  double deltat         = std::numeric_limits<double>::signaling_NaN();
+  double wtdmax         = std::numeric_limits<double>::signaling_NaN();
+  double cellsize_n_s_metres         = std::numeric_limits<double>::signaling_NaN();
+
+
 
   //Set for convenience within the code
-  int width  = -1;
-  int height = -1;
+  int ncells_x  = -1;
+  int ncells_y = -1;
 
   void print() const;
 };
