@@ -38,6 +38,10 @@ Parameters::Parameters(const std::string config_file){
     else if(key=="time_start")         ss>>time_start;
     else if(key=="time_end")           ss>>time_end;
     else if(key=="wtdmax")             ss>>wtdmax;
+        else if(key=="textfilename")             ss>>textfilename;
+    else if(key=="outfilename")             ss>>outfilename;
+
+
     else
       throw std::runtime_error("Unrecognised key!");
   } 

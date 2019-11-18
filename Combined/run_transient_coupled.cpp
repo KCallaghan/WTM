@@ -123,6 +123,10 @@ int main(int argc, char **argv){
     //cell area computed as a trapezoid, using unchanging north-south distance, and east-west distances at the northern and southern edges of the cell:
     arp.cell_area[j] = params.cellsize_n_s_metres* (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j])/2;
 
+
+    delete[] arp.cellsize_e_w_metres_S;
+    delete[] arp.cellsize_e_w_metres_N;
+    delete[] arp.latitude_radians;
 //TODO: see which, if any, arrays can be cleared after use to free up memory. How to do this?
 
 

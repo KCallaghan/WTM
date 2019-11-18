@@ -24,6 +24,10 @@ class Parameters {
   std::string run_type    = UNINIT_STR;
   std::string time_start  = UNINIT_STR;
   std::string time_end    = UNINIT_STR;
+  std::string textfilename    = UNINIT_STR;
+
+  std::string outfilename    = UNINIT_STR;
+
 
  //const int    dltxy = 120; //There are 120 30 arc-second pieces in one degree
   int cells_per_degree = -1;//120;
