@@ -62,7 +62,7 @@ int main(int argc, char **argv){
   params.ncells_y = arp.ksat.height();
 
   arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
-  arp.fdepth        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
+  arp.fdepth        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_fdepth_calibrated_1000.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
   arp.precip        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_precip.nc",   "value");  //Units: m/yr. 
   arp.temp          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_temp.nc",   "value");  //Units: degress Celsius
   arp.topo          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_topo.nc",   "value");  //Units: metres
@@ -72,6 +72,8 @@ int main(int argc, char **argv){
   //Initialise arrays that start out empty:
 
   arp.wtd    = rd::Array2D<float>(arp.topo,0.0f);  //TODO: load in an actual wtd array. This should come from previous model runs and not start out as 0.
+  arp.wtd_old = arp.wtd;
+  arp.wtd_mid = arp.wtd;
   arp.rech   = rd::Array2D<float>(arp.topo,0);  //We have to calculate recharge within the code since we will change the way evaporation works depending on whether or not there is surface water present. 
   arp.head   = rd::Array2D<float>(arp.topo,0);        //Just to initialise these - we'll add the appropriate values later. 
   arp.kcell  = rd::Array2D<float>(arp.topo,0);
@@ -141,7 +143,7 @@ int main(int argc, char **argv){
     }
 
     //Converting to appropriate time step
-    arp.precip(i)        *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
+    arp.precip(i)        *= (params.deltat/(60*60*24*365)) / 10.0;                  //convert to appropriate units for the time step. 
     arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
     
   } 
@@ -197,6 +199,17 @@ int main(int argc, char **argv){
 
  float max_total = 0.0;
  float min_total = 0.0;
+ float total_wtd_change = 0.0;
+ arp.threshold_array.resize (1000);               //cell area (metres squared)
+ for(int i=0;i<1000;i++)
+   arp.threshold_array[i] = 100.0;
+ int location_in_threshold_array = 0;
+
+  float first_half_thresh = 0.0;
+  float second_half_thresh = 0.0;
+  float threshold_change = 100.0;
+  float wtd_mid_change = 0.0;
+  float GW_wtd_change = 0.0;
 
 while(true){
 
@@ -210,18 +223,58 @@ while(true){
 
   }
 
- //Run the groundwater code to move water
 
+  arp.wtd_old = arp.wtd;
+  arp.wtd_mid = arp.wtd;
+ //Run the groundwater code to move water
 
 //TODO: Update data arrays every x number of years so they change from starting to end values through time, if we are doing a transient run
   transient(params,arp);
 
+arp.wtd_mid = arp.wtd;
 
 //Move surface water.
   dh::FillSpillMerge(arp.topo, label, final_label, flowdirs, deps, arp.wtd,arp);
 
 //check to see where there is surface water, and adjust how evaporation works at these locations. 
   evaporation_update(params,arp);
+
+
+  total_wtd_change = 0.0;
+  wtd_mid_change = 0.0;
+  GW_wtd_change = 0.0;
+  for(int y=1;y<params.ncells_y-1;y++)
+  for(int x=1;x<params.ncells_x-1; x++){
+    total_wtd_change += fabs(arp.wtd(x,y) - arp.wtd_old(x,y));
+    wtd_mid_change += fabs(arp.wtd(x,y) - arp.wtd_mid(x,y));
+    GW_wtd_change += fabs(arp.wtd_mid(x,y) - arp.wtd_old(x,y));
+   // std::cout<<"total wtd change was "<<total_wtd_change<<" with wtd "<<arp.wtd(x,y)<<" and wtd_old "<<arp.wtd_old(x,y)<<std::endl;
+  }
+
+  arp.threshold_array[location_in_threshold_array] = total_wtd_change;
+  location_in_threshold_array++;
+
+  if(location_in_threshold_array % 1000 == 0)
+    location_in_threshold_array = 0;
+
+
+  first_half_thresh = 0.0;
+  second_half_thresh = 0.0;
+  for(int i=0;i<500;i++)
+     first_half_thresh += arp.threshold_array[i];
+  for(int i=500;i<1000;i++)
+    second_half_thresh += arp.threshold_array[i];
+
+  threshold_change = second_half_thresh - first_half_thresh;
+
+    textfile<<"cycles_done "<<cycles_done<<" threshold_change "<<threshold_change<<std::endl;
+    textfile<<"first half thresh "<<first_half_thresh<<" second half thresh "<<second_half_thresh<<std::endl;
+    textfile<<"total wtd change was "<<total_wtd_change<<" change in GW only was "<<GW_wtd_change<<" and change in SW only was "<<wtd_mid_change<<std::endl;
+
+
+
+
+  arp.wtd_old = arp.wtd;
 
 
   cycles_done += 1;

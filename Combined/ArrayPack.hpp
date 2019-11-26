@@ -23,8 +23,10 @@ class ArrayPack {
  public:
   f2d ksat;   
   f2d wtd;
+  f2d wtd_old;
   f2d kcell;
   f2d head;
+  f2d wtd_mid;
 
 
   f2d wtd_new;
@@ -71,6 +73,7 @@ class ArrayPack {
   dvec cellsize_e_w_metres;
   dvec cellsize_e_w_metres_N;
   dvec cellsize_e_w_metres_S;
+  dvec threshold_array;
 
   dvec temp_east_west;
   dvec temp_north;

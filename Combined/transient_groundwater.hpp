@@ -155,10 +155,10 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
   }
 
 
-  textfile<<"total changes were "<<total_changes<<std::endl;
+  textfile<<"total GW changes were "<<total_changes<<std::endl;
   textfile<<"max wtd was "<<max_total<<" and min wtd was "<<min_total<<std::endl;
-  textfile<<"stability_min "<<stability_min<<" stability_max "<<stability_max<<std::endl;
-  textfile<<"max change was "<< max_change<< std::endl;
+//  textfile<<"stability_min "<<stability_min<<" stability_max "<<stability_max<<std::endl;
+  textfile<<"max GW change was "<< max_change<< std::endl;
   textfile.close();
 
 
@@ -183,7 +183,7 @@ void transient(Parameters &params, ArrayPack &arp){
 
     std::ofstream textfile;
     textfile.open (params.textfilename, std::ios_base::app);
-    textfile<<"Iteration #: "<<iter<<std::endl;
+  //  textfile<<"Iteration #: "<<iter<<std::endl;
     textfile.close();
 
     TransientRun(params, arp, iter,total_changes);
