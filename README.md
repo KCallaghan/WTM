@@ -6,11 +6,11 @@ The model is intended for determining the depth or elevation of the water table,
 
 The model works by coupling groundwater and surface water components. The groundwater component is based on the methods used by Fan et al in their paper:
 
-**Fan, Y, Li, H, and Miguez-Macho, G, (2013),[Global Patterns of Groundwater Table Depth](https://science.sciencemag.org/content/339/6122/940.abstract),*Science*, doi:10.1126/science.1229881**
+**Fan, Y, Li, H, and Miguez-Macho, G, (2013), [Global Patterns of Groundwater Table Depth](https://science.sciencemag.org/content/339/6122/940.abstract), *Science*, doi:10.1126/science.1229881**
 
 The surface-water component was collaboratively written by R Barnes and KL Callaghan. It works by creating a hierarchy of depressions for the topography, and then allowing water to move across the land surface, filling depressions and spilling from one depression into another. For more details on the depression hierarchy, see:
 
-**Barnes, R, Callaghan, KL, and Wickert, AD, (2019), [Computing water flow through complex landscapes, Part 2: Finding hierarchies in depressions and morphological segmentations](https://www.earth-surf-dynam-discuss.net/esurf-2019-34/),*Earth Surf. Dynam. Discuss.*, doi:10.5194/esurf-2019-34**
+**Barnes, R, Callaghan, KL, and Wickert, AD, (2019), [Computing water flow through complex landscapes, Part 2: Finding hierarchies in depressions and morphological segmentations](https://www.earth-surf-dynam-discuss.net/esurf-2019-34/), *Earth Surf. Dynam. Discuss.*, doi:10.5194/esurf-2019-34**
 
 More details on the working of surface-water movement across the land surface will be added soon. 
 
