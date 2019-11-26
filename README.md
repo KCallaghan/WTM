@@ -1,6 +1,6 @@
 # Coupled_SW_GW
 
-*** This model combines groundwater and surface water flow to output the elevation of the water table relative to the land surface at a given time. ***
+***This model combines groundwater and surface water flow to output the elevation of the water table relative to the land surface at a given time.***
 
 The model is intended for determining the depth or elevation of the water table, given a certain topography and set of climate inputs. Water table can be below ground (groundwater) or above ground (lake surfaces). 
 
