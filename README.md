@@ -45,9 +45,9 @@ Use the supplied Makefile. Open a terminal in the folder containing the makefile
 ## Running the code
 Ensure that all of the data files are located appropriately in a folder together. Edit the global.cfg configuration file as appropriate. The configuration file contains the following variables:
 
-textfilename       {The name of your output text file.txt}
-outfilename        {The name of your output depth-to-water-table file in NetCDF format.nc}
-cells_per_degree   {How many cells per degree in your data. E.g. One-degree resolution will be 1. 5 arcsecond resolution will be 12.}
+* textfilename       {The name of your output text file.txt}
+* outfilename        {The name of your output depth-to-water-table file in NetCDF format.nc}
+* cells_per_degree   {How many cells per degree in your data. E.g. One-degree resolution will be 1. 5 arcsecond resolution will be 12.}
 
 time_start, surfdatadir, and region are all to help you name your input files or place them in a specific folder. The code will look for data files in the following format:
 surfdatadir + region + time_start + "\_suffix.nc",
@@ -55,15 +55,15 @@ where the suffix refers to the specific file (topo, mask, precip, evap, relhum, 
 An example of a file path would be: "surfdata/North_America_10000_topo.nc".
 In this case, you would set:
 
-surfdatadir        surfdata/
-region             North_America_
-time_start         10000
+* surfdatadir        surfdata/
+* region             North_America_
+* time_start         10000
 
 time_end and run_type will become relevant in a future release, for now leave these as they are. 
 
-deltat             {Number of seconds per time step, e.g. 315360000 for a 10-year time step}
-southern_edge      {Southern-most latitude of your domain in decimal degrees, e.g. 5}
-maxiter            {How many iterations groundwater should run before running surface water. If in doubt, leave this as 1 at first.}
+* deltat             {Number of seconds per time step, e.g. 315360000 for a 10-year time step}
+* southern_edge      {Southern-most latitude of your domain in decimal degrees, e.g. 5}
+* maxiter            {How many iterations groundwater should run before running surface water. If in doubt, leave this as 1 at first.}
 
 Once the configuration file has been set up appropriately, simply open a terminal and type 
 ```
