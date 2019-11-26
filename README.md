@@ -23,14 +23,14 @@ Please contact us if you have questions or suggestions!
 Data inputs are all in a .nc (NetCDF) format. The NetCDF files should have 3 variables: 'lat' for latitude, 'lon' for longitude, and 'value' for the value of interest (e.g. elevation, precipitation, etc). 
 
 The following files are required:
-Topography - elevation in metres
-Mask - indicating the location of land (1) and ocean (0)
-Precipitation - in metres per year
-Evaporation - in metres per year
-Relative humidity - as a proportion from 0 to 1
-Winter temperature - in degrees Celsius
-E-folding depth - see the Fan et al paper linked above for details on how this is computed using slope and temperature
-Hydraulic conductivity - in metres per second
+* Topography - elevation in metres
+* Mask - indicating the location of land (1) and ocean (0)
+* Precipitation - in metres per year
+* Evaporation - in metres per year
+* Relative humidity - as a proportion from 0 to 1
+* Winter temperature - in degrees Celsius
+* E-folding depth - see the Fan et al paper linked above for details on how this is computed using slope and temperature
+* Hydraulic conductivity - in metres per second
 
 ##Dependencies
 
