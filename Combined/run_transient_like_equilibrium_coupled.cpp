@@ -56,18 +56,18 @@ int main(int argc, char **argv){
 
 
 //TODO: Load in 'end' values for each parameter, for transient runs
-  arp.ksat = LoadData<float>(params.surfdatadir + params.region + "coarser_ksat.nc", "value");   //Units of ksat are m/s. 
+  arp.ksat = LoadData<float>(params.surfdatadir + params.region + "ksat.nc", "value");   //Units of ksat are m/s. 
 
   params.ncells_x = arp.ksat.width();  //width and height in number of cells in the array
   params.ncells_y = arp.ksat.height();
 
-  arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
-  arp.fdepth        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_fdepth_calibrated_1000.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
-  arp.precip        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_precip.nc",   "value");  //Units: m/yr. 
-  arp.temp          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_temp.nc",   "value");  //Units: degress Celsius
-  arp.topo          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_topo.nc",   "value");  //Units: metres
-  arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_evap.nc",   "value");  //Units: m/yr
-  arp.relhum        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc",   "value");  //Units: proportion from 0 to 1.
+  arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
+  arp.fdepth        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_fdepth_calibrated_1000.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
+  arp.precip        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_precip.nc",   "value");  //Units: m/yr. 
+  arp.temp          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_temp.nc",   "value");  //Units: degress Celsius
+  arp.topo          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_topo.nc",   "value");  //Units: metres
+  arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_evap.nc",   "value");  //Units: m/yr
+  arp.relhum        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_relhum.nc",   "value");  //Units: proportion from 0 to 1.
 
   //Initialise arrays that start out empty:
 

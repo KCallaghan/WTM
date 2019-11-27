@@ -1,7 +1,7 @@
 #ifndef _df_flow_hpp_
 #define _df_flow_hpp_
 
-#include "dephier_nesting.hpp"
+#include "dephier.hpp"
 #include "DisjointDenseIntSet.hpp"
 #include "../common/netcdf.hpp"
 #include <algorithm>
