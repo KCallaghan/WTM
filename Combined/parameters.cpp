@@ -25,7 +25,7 @@ Parameters::Parameters(const std::string config_file){
     else if(key=="cells_per_degree")   ss>>cells_per_degree;
     else if(key=="end_name")           ss>>end_name;
     else if(key=="HAD")                ss>>HAD;
-    else if(key=="initdatadir")        ss>>initdatadir;
+    else if(key=="total_cycles")       ss>>total_cycles;
     else if(key=="interpolated")       ss>>interpolated;
     else if(key=="iterations")         ss>>iterations;
     else if(key=="maxiter")            ss>>maxiter;
@@ -56,7 +56,6 @@ void Parameters::print() const {
   std::cout<<"c start_name  = "<<start_name  <<std::endl;
   std::cout<<"c end_name    = "<<end_name    <<std::endl;
   std::cout<<"c surfdatadir = "<<surfdatadir <<std::endl;
-  std::cout<<"c initdatadir = "<<initdatadir <<std::endl;
   std::cout<<"c cells_per_degree       = "<<cells_per_degree       <<std::endl;
 //  std::cout<<"c dy          = "<<dy          <<std::endl;
   std::cout<<"c deltat      = "<<deltat      <<std::endl;

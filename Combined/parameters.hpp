@@ -18,7 +18,6 @@ class Parameters {
   std::string start_name  = UNINIT_STR;
   std::string end_name    = UNINIT_STR;
   std::string surfdatadir = UNINIT_STR;
-  std::string initdatadir = UNINIT_STR;
   std::string region      = UNINIT_STR;
   std::string HAD         = UNINIT_STR;
   std::string run_type    = UNINIT_STR;
@@ -42,6 +41,9 @@ class Parameters {
   double deltat         = std::numeric_limits<double>::signaling_NaN();
   double wtdmax         = std::numeric_limits<double>::signaling_NaN();
   double cellsize_n_s_metres         = std::numeric_limits<double>::signaling_NaN();
+  
+
+  int total_cycles         = -1;
 
 
 

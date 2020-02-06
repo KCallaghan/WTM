@@ -23,21 +23,29 @@ class ArrayPack {
  public:
   f2d ksat;   
   f2d wtd;
+  f2d wtd_old;
   f2d kcell;
   f2d head;
+  f2d wtd_mid;
 
 
   f2d wtd_new;
 
   f2d topo_start;   
   f2d rech_start;   
-  f2d fslope_start; 
-  f2d temp_start;   
+  f2d fdepth_start; 
+  f2d temp_start; 
+  f2d precip_start; 
+  f2d starting_evap_start; 
+  f2d relhum_start; 
 
   f2d topo_end;
   f2d rech_end;
-  f2d fslope_end;
+  f2d fdepth_end;
   f2d temp_end;
+  f2d precip_end;
+  f2d starting_evap_end;
+  f2d relhum_end;
 
   f2d topo;
   f2d rech;
@@ -71,6 +79,7 @@ class ArrayPack {
   dvec cellsize_e_w_metres;
   dvec cellsize_e_w_metres_N;
   dvec cellsize_e_w_metres_S;
+  dvec threshold_array;
 
   dvec temp_east_west;
   dvec temp_north;
