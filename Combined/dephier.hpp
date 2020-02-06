@@ -1,7 +1,6 @@
 #ifndef _dephier_hpp_
 #define _dephier_hpp_
 
-#include "radix_heap.hpp"
 #include <richdem/common/Array2D.hpp>
 #include <richdem/common/timer.hpp>
 #include <richdem/common/ProgressBar.hpp>
@@ -19,10 +18,8 @@
 #include <queue>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
-// #include <unordered_map>
-#include <parallel_hashmap/phmap.h>
-#include <parallel_hashmap/phmap_utils.h>
 
 const double FP_ERROR = 1e-4;
 
@@ -33,12 +30,11 @@ namespace dephier {
 
 //We use a 32-bit integer for labeling depressions. This allows for a maximum of
 //2,147,483,647 depressions. This should be enough for most practical purposes.
-typedef uint32_t dh_label_t;
-typedef uint32_t flat_c_idx;
+typedef int32_t dh_label_t;
 
 //Some special valuess
-const dh_label_t NO_PARENT = std::numeric_limits<dh_label_t>::max();
-const dh_label_t NO_VALUE  = std::numeric_limits<dh_label_t>::max();
+const dh_label_t NO_PARENT = -1;
+const dh_label_t NO_VALUE  = -1;
 
 //This class holds information about a depression. Its pit cell and outlet cell
 //(in flat-index form) as well as the elevations of these cells. It also notes                                                   //what is flat-index form?
@@ -51,10 +47,10 @@ class Depression {
  public:
   //Flat index of the pit cell, the lowest cell in the depression. If more than
   //one cell shares this lowest elevation, then one is arbitrarily chosen.
-  flat_c_idx pit_cell = NO_VALUE;
+  dh_label_t pit_cell = NO_VALUE;
   //Flat index of the outlet cell. If there is more than one outlet cell at this
   //cell's elevation, then one is arbitrarily chosen.
-  flat_c_idx out_cell = NO_VALUE;
+  dh_label_t out_cell = NO_VALUE;
   //Parent depression. If both this depression and its neighbour fill up, this
   //parent depression is the one which will contain the overflow.
   dh_label_t parent   = NO_PARENT;
@@ -65,7 +61,7 @@ class Depression {
   //by `odep`. However, odep must flood from the bottom up. Therefore, we keep
   //track of the `geolink`, which indicates what leaf depression the overflow is
   //initially routed into.
-  flat_c_idx geolink  = NO_VALUE;
+  dh_label_t geolink  = NO_VALUE;
   //Elevation of the pit cell. Since the pit cell has the lowest elevation of
   //any cell in the depression, we initialize this to infinity.
   elev_t  pit_elev = std::numeric_limits<elev_t>::infinity();
@@ -132,7 +128,7 @@ class OutletLink {
   //This is used to compare two outlets. The outlets are the same regardless of
   //the order in which they store depressions
   bool operator==(const OutletLink &o) const {
-    return depa==o.depa && depb==o.depb;
+    return (depa==o.depa && depb==o.depb) || (depa==o.depb && depb==o.depa);
   }
 };
 
@@ -143,18 +139,16 @@ class Outlet {
  public:
   dh_label_t depa;                //Depression A
   dh_label_t depb;                //Depression B
-  flat_c_idx out_cell = NO_VALUE; //Flat-index of cell at which A and B meet.
+  dh_label_t out_cell = NO_VALUE; //Flat-index of cell at which A and B meet.
   //Elevation of the cell linking A and B
   elev_t  out_elev = std::numeric_limits<elev_t>::infinity();
 
   Outlet() = default;
 
   //Standard issue constructor
-  Outlet(dh_label_t depa0, dh_label_t depb0, flat_c_idx out_cell0, elev_t out_elev0){
+  Outlet(dh_label_t depa0, dh_label_t depb0, dh_label_t out_cell0, elev_t out_elev0){
     depa       = depa0;
     depb       = depb0;
-    if(depa>depb)           //Create a preferred ordering so that comparisons and hashing are faster
-      std::swap(depa,depb);
     out_cell   = out_cell0;
     out_elev   = out_elev0;
   }
@@ -167,7 +161,7 @@ class Outlet {
   bool operator==(const Outlet &o) const {                                                                                              //so beyond just checking, is this somehow preventing it from being recorded if one already exists? How does this work?
     //Outlets are the same if they link two depressions, regardless of the
     //depressions' labels storage order within this class.
-    return depa==o.depa && depb==o.depb;
+    return (depa==o.depa && depb==o.depb) || (depa==o.depb && depb==o.depa);
   }
 };
 
@@ -177,12 +171,10 @@ class Outlet {
 template<class elev_t>
 struct OutletHash {
   std::size_t operator()(const OutletLink &out) const {
-    //Since depa and depb are sorted on construction, we don't have to worry
-    //about which order the invoking code called them in and our hash function
-    //doesn't need to be symmetric with respect to depa and depb.
-    return phmap::HashState().combine(0, out.depa, out.depb);
-    //Hash function from: https://stackoverflow.com/a/27952689/752843
-    // return out.depa^(out.depb + 0x9e3779b9 + (out.depa << 6) + (out.depa >> 2));    
+    //XOR may not be the most robust key, but it is commutative, which means
+    //that the order in which the depressions are stored in the outlet doesn't
+    //affect the hash. (TODO: Use bit shifting to make a better hash)
+    return out.depa ^ out.depb;
   }
 };
 
@@ -196,27 +188,17 @@ int ModFloor(int a, int n) {
 }
 
 
-template<class elev_t>
-using PriorityQueue = radix_heap::pair_radix_heap<elev_t,uint64_t>;
-// using PriorityQueue = GridCellZk_high_pq<elev_t> pq;
-
 
 //Cell is not part of a depression
-const dh_label_t NO_DEP = std::numeric_limits<dh_label_t>::max(); 
+const dh_label_t NO_DEP = -1; 
 //Cell is part of the ocean and a place from which we begin searching for
 //depressions.
 const dh_label_t OCEAN  = 0;
 
+
+
 template<typename elev_t>
 using DepressionHierarchy = std::vector<Depression<elev_t>>;
-
-template<class elev_t>
-void CalculateMarginalVolumes(DepressionHierarchy<elev_t> &deps, const Array2D<elev_t> &dem, const Array2D<dh_label_t> &label);
-
-template<class elev_t>
-void CalculateTotalVolumes(DepressionHierarchy<elev_t> &deps);
-
-
 
 //Calculate the hierarchy of depressions. Takes as input a digital elevation
 //model and a set of labels. The labels should have `OCEAN` for cells
@@ -246,12 +228,9 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   rd::Array2D<int8_t>       &flowdirs
 
 ){
-  ProgressBar progress;
-  Timer timer_overall;
-  Timer timer_dephier;
+  rd::ProgressBar progress;
+  rd::Timer timer_overall;
   timer_overall.start();
-
-  timer_dephier.start();
 
   std::cerr<<"\033[91m##########Getting depression hierarchy\033[39m"<<std::endl;
 
@@ -281,39 +260,30 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //This keeps track of the outlets we find. Each pair of depressions can only
   //be linked once and the lowest link found between them is the one which is
   //retained.
-  typedef phmap::flat_hash_map<OutletLink, Outlet<elev_t>, OutletHash<elev_t>> outletdb_t;
-  // typedef std::unordered_map<OutletLink, Outlet<elev_t>, OutletHash<elev_t>> outletdb_t;
+  typedef std::unordered_map<OutletLink, Outlet<elev_t>, OutletHash<elev_t>> outletdb_t;
   outletdb_t outlet_database;
 
   //The priority queue ensures that cells are visited in order from lowest to
   //highest. If two or more cells are of equal elevation then the one added last
   //(most recently) is returned from the queue first. This ensures that a single
   //depression gets all the cells within a flat area.
-  PriorityQueue<elev_t> pq;
+  rd::GridCellZk_high_pq<elev_t> pq;
 
   std::cerr<<"p Adding ocean cells to priority-queue..."<<std::endl;
   //We assume the user has already specified a few ocean cells from which to
   //begin looking for depressions. We add all of these ocean cells to the
   //priority queue now.
+
+  std::cerr<<"label"<<label(5,5)<<std::endl;
   int ocean_cells = 0;
-  #pragma omp parallel for collapse(2) reduction(+:ocean_cells)
   for(int y=0;y<dem.height();y++)
   for(int x=0;x<dem.width();x++){
-    if(label(x,y)!=OCEAN)
-      continue;
-    bool has_non_ocean = false;
-    for(int n=1;n<=neighbours;n++){
-      if(label.inGrid(x+dx[n],y+dy[n]) && label(x+dx[n],y+dy[n])!=OCEAN){
-        has_non_ocean = true;
-        break;
-      }
-    }
-    if(has_non_ocean){       //If they are ocean cells, put them in the priority queue
-      #pragma omp critical
-      pq.emplace(dem(x,y), dem.xyToI(x,y));
+    if(label(x,y)==OCEAN){       //If they are ocean cells, put them in the priority queue
+      pq.emplace(x,y,dem(x,y));
       ocean_cells++;
     }
   }
+  std::cerr<<"line 284"<<std::endl;
 
   //But maybe the user didn't specify any cells! We'll assume this was mistake
   //and throw an exception. The user can always catch it if they want to.
@@ -349,8 +319,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   for(int y=0;y<dem.height();y++){  //Look at all the cells
   for(int x=0;x<dem.width() ;x++){ //Yes, all of them
     ++progress;
-    if(label(x,y)==OCEAN)          //Already in priority queue
-      continue;
     const auto my_elev = dem(x,y); //Focal cell's elevation
     bool has_lower     = false;    //Pretend we have no lower neighbours
     for(int n=1;n<=neighbours;n++){ //Check out our neighbours
@@ -369,12 +337,11 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     if(!has_lower){           //The cell can't drain, so it is a pit cell
       pit_cell_count++;       //Add to pit cell count. Parallel safe because of reduction.
       #pragma omp critical    //Only one thread can safely access pq at a time
-      pq.emplace(dem(x,y), dem.xyToI(x,y)); //Add cell to pq
+      pq.emplace(x,y,dem(x,y)); //Add cell to pq
     }
   }
 }
   progress.stop();
-  std::cerr<<"t Pit cells found in = "<<progress.time_it_took()<<" s"<<std::endl;
 
 
 
@@ -420,14 +387,12 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   while(!pq.empty()){
     ++progress;
 
-
-    const auto ci    = pq.top_value();     //Copy cell with lowest elevation from priority queue
-    const auto celev = pq.top_key();       //Elevation of focal cell
+    const auto c = pq.top();               //Copy cell with lowest elevation from priority queue
 
     pq.pop();                              //Remove the copied cell from the priority queue
-    auto clabel = label(ci);               //Nominal label of cell
-    int cx,cy;
-    dem.iToxy(ci,cx,cy);
+    const auto celev = c.z;                //Elevation of focal cell
+    const auto ci    = dem.xyToI(c.x,c.y); //Flat-index of focal cell
+    auto clabel      = label(ci);          //Nominal label of cell
 
     if(clabel==OCEAN){
       //This cell is an ocean cell or a cell that flows into the ocean without
@@ -443,7 +408,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //cell found in a flat determines the label for the entirety of that flat.
       clabel            = depressions.size();         //In a 0-based indexing system, size is equal to the id of the next flat
       auto &newdep      = depressions.emplace_back(); //Add the next flat (increases size by 1)
-      newdep.pit_cell   = dem.xyToI(cx,cy);           //Make a note of the pit cell's location
+      newdep.pit_cell   = dem.xyToI(c.x,c.y);         //Make a note of the pit cell's location
       newdep.pit_elev   = celev;                      //Make a note of the pit cell's elevation
       newdep.dep_label  = clabel;                     //I am storing the label in the object so that I can find it later and call up the number of cells and volume (better way of doing this?) -- I have since realised I can use the index in the depressions array. So perhaps the label is no longer needed?
       label(ci)         = clabel;                     //Update cell with new label                                                           
@@ -463,9 +428,9 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
     //Consider the cell's neighbours
     for(int n=1;n<=neighbours;n++){
-      // const int nx = ModFloor(cx+dx[n],dem.width()); //Get neighbour's x-coordinate using an offset and wrapping
-      const int nx = cx + dx[n];                      //Get neighbour's y-coordinate using an offset
-      const int ny = cy + dy[n];                      //Get neighbour's y-coordinate using an offset
+      // const int nx = ModFloor(c.x+dx[n],dem.width()); //Get neighbour's x-coordinate using an offset and wrapping
+      const int nx = c.x + dx[n];                     //Get neighbour's y-coordinate using an offset
+      const int ny = c.y + dy[n];                     //Get neighbour's y-coordinate using an offset
       if(!dem.inGrid(nx,ny))                          //Is this cell in the grid?
         continue;                                     //Nope: out of bounds.
       const auto ni     = dem.xyToI(nx,ny);           //Flat index of neighbour
@@ -473,7 +438,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
       if(nlabel==NO_DEP){                             //Neighbour has not been visited yet 
         label(ni) = clabel;                           //Give the neighbour my label
-        pq.emplace(dem(ni), dem.xyToI(nx,ny));        //Add the neighbour to the priority queue
+        pq.emplace(nx,ny,dem(ni));                    //Add the neighbour to the priority queue
         flowdirs(nx,ny) = dinverse[n];                //Neighbour flows in the direction of this cell
       } else if (nlabel==clabel) {
         //Skip because we are not interested in ourself. That would be vain.
@@ -529,7 +494,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     }
   }
   progress.stop();
-  std::cerr<<"t Outlets found in = "<<progress.time_it_took()<<" s"<<std::endl;
 
   //At this point every cell is associated with the label of a depression. Each
   //depression contains the cells lower than its outlet elevation as well as all
@@ -650,7 +614,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
         // continue;
 
       //Ensure we don't modify depressions that have already found their paths
-      assert(dep.out_cell==NO_VALUE);
+      assert(dep.out_cell==-1);
       assert(dep.odep==NO_VALUE);            
 
       //Point this depression to the ocean through Depression B Label
@@ -723,8 +687,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   }
   progress.stop();
 
-  std::cerr<<"t Time to construct Depression Hierarchy = "<<timer_dephier.stop()<<" s"<<std::endl;
-
 
   //At this point we have a 2D array in which each cell is labeled. This label
   //corresponds to either the root node (the ocean) or a leaf node of a binary
@@ -733,13 +695,36 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //The labels array has been modified in place. The depression hierarchy is
   //returned.
 
-  Timer timer_volumes;
-  timer_volumes.start();
+  std::cerr<<"p Calculating depression marginal volumes..."<<std::endl;
 
-  CalculateMarginalVolumes(depressions, dem, label);
+  //Get the marginal depression cell counts and total elevations
+  progress.start(dem.size());
+  for(unsigned int i=0;i<dem.size();i++){
+    ++progress;
+
+    const auto my_elev = dem(i);
+    auto clabel        = label(i);
+    
+    while(clabel!=OCEAN && my_elev>depressions.at(clabel).out_elev){
+      clabel = depressions[clabel].parent;
+     
+    }
+
+      final_label(i) = clabel; //Richard, does this make sense here? I want another layer that contains the labels of which depressions these 
+      //immediately belong to, even when it is a parent depression. This is so that I can change the wtd_vol in the correct place
+      //when we have infiltration and wtd_vol of a depression changes. 
+
+    if(clabel==OCEAN)
+      continue;
+
+    depressions[clabel].cell_count++;
+    depressions[clabel].total_elevation += dem(i);
+ 
+  }
+  progress.stop();
 
   // { //Depression filling code
-  //   Array2D<elev_t> dhfilled(dem);
+  //   rd::Array2D<elev_t> dhfilled(dem);
   //   for(int i=0;i<(int)dem.size();i++)
   //     dhfilled(i) = dem(i);
 
@@ -763,90 +748,26 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //   SaveAsNetCDF(dhfilled,"/z/out-dhfilled.nc","value");
   // }
 
-  CalculateTotalVolumes(depressions);
-
-  std::cerr<<"t Time to calculate volumes = "<<timer_volumes.stop()<<" s"<<std::endl;
-  std::cerr<<"t Total time in depression hierarchy calculations = "<<timer_overall.stop()<<" s"<<std::endl;
-
-  return depressions;
-}
 
 
-
-template<class elev_t>
-void CalculateMarginalVolumes(
-  DepressionHierarchy<elev_t> &deps,
-  const Array2D<elev_t>       &dem,
-  const Array2D<dh_label_t>   &label
-){
-  ProgressBar progress;
-
-  std::cerr<<"p Calculating depression marginal volumes..."<<std::endl;
-
-  //Get the marginal depression cell counts and total elevations
-  progress.start(dem.size());
-  #pragma omp parallel default(none) shared(progress,deps,dem,label)
-  {
-    std::vector<uint32_t> cell_counts     (deps.size(), 0);
-    std::vector<double>   total_elevations(deps.size(), 0);
-
-    #pragma omp for
-    for(unsigned int i=0;i<dem.size();i++){
-      ++progress;
-      const auto my_elev = dem(i);
-      auto clabel        = label(i);
-      
-      while(clabel!=OCEAN && my_elev>deps.at(clabel).out_elev)
-        clabel = deps[clabel].parent;
-
-      final_label(i) = clabel; //Does this make sense here? I want another layer that contains the labels of which depressions these 
-      //immediately belong to, even when it is a parent depression. This is so that I can change the wtd_vol in the correct place
-      //when we have infiltration and wtd_vol of a depression changes. 
-
-
-
-
-      if(clabel==OCEAN)
-        continue;
-
-      cell_counts[clabel]++;
-      total_elevations[clabel] += dem(i);
-    }
-
-    #pragma omp critical
-    for(unsigned int i=0;i<deps.size();i++){
-      deps[i].cell_count      += cell_counts[i];
-      deps[i].total_elevation += total_elevations[i];
-    }
-  }
-  progress.stop();
-}
-
-
-
-template<class elev_t>
-void CalculateTotalVolumes(
-  DepressionHierarchy<elev_t> &deps
-){
-  ProgressBar progress;
 
   std::cerr<<"p Calculating depression total volumes..."<<std::endl;
   //Calculate total depression volumes and cell counts
-  progress.start(deps.size());
-  for(unsigned int d=0;d<deps.size();d++){
+  progress.start(depressions.size());
+  for(int d=0;d<(int)depressions.size();d++){
     ++progress;
 
-    auto &dep = deps.at(d);
 
+    auto &dep = depressions.at(d);
     if(dep.lchild!=NO_VALUE){
       assert(dep.rchild!=NO_VALUE); //Either no children or two children
       assert(dep.lchild<d);         //ID of child must be smaller than parent's
       assert(dep.rchild<d);         //ID of child must be smaller than parent's
+      dep.cell_count      += depressions.at(dep.lchild).cell_count;
+      dep.total_elevation += depressions.at(dep.lchild).total_elevation;
+      dep.cell_count      += depressions.at(dep.rchild).cell_count;
+      dep.total_elevation += depressions.at(dep.rchild).total_elevation;
 
-      dep.cell_count      += deps.at(dep.lchild).cell_count;
-      dep.total_elevation += deps.at(dep.lchild).total_elevation;
-      dep.cell_count      += deps.at(dep.rchild).cell_count;
-      dep.total_elevation += deps.at(dep.rchild).total_elevation;
     }
 
   
@@ -858,9 +779,13 @@ void CalculateTotalVolumes(
 
 
 
-    assert(dep.lchild==NO_VALUE || (deps.at(dep.lchild).dep_vol+deps.at(dep.rchild).dep_vol) - dep.dep_vol <= FP_ERROR);
+    assert(dep.lchild==NO_VALUE || (depressions.at(dep.lchild).dep_vol+depressions.at(dep.rchild).dep_vol) - dep.dep_vol <= FP_ERROR);
   }
   progress.stop();
+
+  std::cerr<<"t Depression Hierarchy Wall-Time = "<<timer_overall.stop()<<" s"<<std::endl;
+
+  return depressions;
 }
 
 
@@ -868,7 +793,7 @@ void CalculateTotalVolumes(
 //Utility function for doing various relabelings based on the depression
 //hierarchy.
 template<class elev_t>
-void LastLayer(Array2D<dh_label_t> &label, const Array2D<float> &dem, const DepressionHierarchy<elev_t> &depressions){
+void LastLayer(rd::Array2D<dh_label_t> &label, const rd::Array2D<float> &dem, const DepressionHierarchy<elev_t> &depressions){
   #pragma omp parallel for collapse(2)
   for(int y=0;y<label.height();y++)
   for(int x=0;x<label.width();x++){
@@ -884,6 +809,8 @@ void LastLayer(Array2D<dh_label_t> &label, const Array2D<float> &dem, const Depr
     }
     label(x,y) = mylabel;  //TODO: Is label now the same as final_label? Is one better to use than the other? Are both being used in later code? They appear to be the same thing - possibly can remove final_label. 
   }
+}
+
 }
 
 }

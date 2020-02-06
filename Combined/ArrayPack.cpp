@@ -19,10 +19,10 @@ void ArrayPack::check() const {
  // assert( topo.width()==kcell.        width() && topo.height()==kcell.        height() );
 
 
-  if(fslope_end.size()>0){
-    assert( topo.width()==fslope_end.width()   && topo.height()==fslope_end.height()   );
+  if(fdepth_end.size()>0){
+    assert( topo.width()==fdepth_end.width()   && topo.height()==fdepth_end.height()   );
     assert( topo.width()==topo_end.  width()   && topo.height()==topo_end.  height()   );
     assert( topo.width()==temp_end.  width()   && topo.height()==temp_end.  height()   );
-    assert( topo.width()==rech_end.  width()   && topo.height()==rech_end.  height()   );
+    assert( topo.width()==precip_end.  width()   && topo.height()==precip_end.  height()   );
   }
 }

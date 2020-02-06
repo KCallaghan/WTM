@@ -62,7 +62,7 @@ int main(int argc, char **argv){
   params.ncells_y = arp.ksat.height();
 
   arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
-  arp.fdepth        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_fdepth_calibrated_1000.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
+  arp.fdepth        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
   arp.precip        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_precip.nc",   "value");  //Units: m/yr. 
   arp.temp          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_temp.nc",   "value");  //Units: degress Celsius
   arp.topo          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_topo.nc",   "value");  //Units: metres
@@ -143,7 +143,7 @@ int main(int argc, char **argv){
     }
 
     //Converting to appropriate time step
-    arp.precip(i)        *= (params.deltat/(60*60*24*365)) / 10.0;                  //convert to appropriate units for the time step. 
+    arp.precip(i)        *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
     arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
     
   } 
