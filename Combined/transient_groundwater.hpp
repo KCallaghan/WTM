@@ -24,7 +24,7 @@ double kcell(const int x, const int y, const ArrayPack &arp){
     if(arp.wtd(x,y)<-1.5)            //Work out hydraulic conductivity for each cell
       return arp.fdepth(x,y) * arp.ksat(x,y) * std::exp((arp.wtd(x,y)+1.5)/arp.fdepth(x,y)); //Equation S6 from the Fan paper
     else if(arp.wtd(x,y) > 0)
-      return arp.ksat(x,y) * (0+1.5+arp.fdepth(x,y));                                        //If wtd is greater than 0, max out rate of groundwawter movement as though wtd were 0. The surface water will get to move in FillSpillMerge.
+      return arp.ksat(x,y) * (0+1.5+arp.fdepth(x,y));                                        //If wtd is greater than 0, max out rate of groundwater movement as though wtd were 0. The surface water will get to move in FillSpillMerge.
     else
       return arp.ksat(x,y) * (arp.wtd(x,y)+1.5+arp.fdepth(x,y));                             //Equation S4 from the Fan paper
   }else
@@ -167,7 +167,7 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
 
 
 
-void transient(Parameters &params, ArrayPack &arp){
+void groundwater(Parameters &params, ArrayPack &arp){
   richdem::Timer timer_io;
 
   ///////////////////////////////
