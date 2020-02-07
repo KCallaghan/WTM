@@ -35,28 +35,20 @@ int main(int argc, char **argv){
   }
 
 
-
   ArrayPack arp;
   std::cerr<<"Argv"<<argv<<std::endl;
   Parameters params(argv[1]);
-
-
-//Initialise all of the values for an equilibrium or a transient-style run:
-//Open data files, set the changing cellsize arrays, do any needed unit conversions. 
-//TODO: add flag for transient style along with additional arrays to be opened  
 
   ofstream textfile;
   textfile.open (params.textfilename, std::ios_base::app);  //Text file to save outputs of how much is changing and min and max wtd at various times
 
 
 
+//Initialise all of the values for an equilibrium or a transient-style run:
+//Open data files, set the changing cellsize arrays, do any needed unit conversions. 
+//load in the data files: ksat, mask, e-folding depth, precipitation, topography, and evaporation files. 
 
 
-  
- //load in the data files: ksat, mask, e-folding depth, precipitation, topography, and evaporation files. 
-
-
-//TODO: Load in 'end' values for each parameter, for transient runs
   arp.ksat = LoadData<float>(params.surfdatadir + params.region + "coarser_ksat.nc", "value");   //Units of ksat are m/s. 
 
   params.ncells_x = arp.ksat.width();  //width and height in number of cells in the array
@@ -72,7 +64,6 @@ int main(int argc, char **argv){
     arp.starting_evap_start = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_evap.nc",   "value");  //Units: m/yr
     arp.relhum_start        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc",   "value");  //Units: proportion from 0 to 1.
 
-//********************************* for transient version only
     arp.land_mask         = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
     arp.fdepth_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
     arp.precip_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_precip.nc",   "value");  //Units: m/yr. 
@@ -97,7 +88,7 @@ int main(int argc, char **argv){
   else if(params.run_type == "equilibrium"){
     textfile<<"Initialise equilibrium"<<std::endl;
 
-    arp.land_mask         = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
+    arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
     arp.fdepth        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
     arp.precip        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_precip.nc",   "value");  //Units: m/yr. 
     arp.temp          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_temp.nc",   "value");  //Units: degress Celsius
@@ -108,13 +99,11 @@ int main(int argc, char **argv){
   }
   else{
     throw std::runtime_error("That was not a recognised run type! Please choose transient or equilibrium.");
-
   }
 
 
   //Initialise arrays that start out empty:
 
- // arp.wtd    = rd::Array2D<float>(arp.topo,0.0f);  //TODO: load in an actual wtd array. This should come from previous model runs and not start out as 0.
   arp.wtd_old = arp.wtd;
   arp.wtd_mid = arp.wtd;
   arp.rech   = rd::Array2D<float>(arp.topo,0);  //We have to calculate recharge within the code since we will change the way evaporation works depending on whether or not there is surface water present. 
@@ -125,11 +114,10 @@ int main(int argc, char **argv){
   arp.e_a    = rd::Array2D<float>(arp.topo,0);  
 
   arp.wtd_change_total = rd::Array2D<float>(arp.topo,0.0f);   //This array is used to store the values of how much the water table will change in one iteration, then adding it to wtd gets the new wtd.
-  arp.stability_time_seconds = rd::Array2D<float>(arp.topo,0);  //This is used to check whether the calculation is stable for the selected time step. TODO: Should I just remove this array if we're not going to do adaptive time-stepping?
-
 
   textfile<<"loaded all"<<std::endl;
 
+//**************************************************************************************************************************************************************
   //compute changing cell size and distances between cells as these change with latitude:
 
   const float earth_radius = 6371000.; //metres
@@ -137,8 +125,8 @@ int main(int argc, char **argv){
   params.cellsize_n_s_metres = (earth_radius*(M_PI/180.))/params.cells_per_degree; //distance between lines of latitude is a constant. 
 
 //initialise some arrays
-  arp.latitude_radians.resize      (params.ncells_y);   // the latitude of each row of cells
-  arp.cellsize_e_w_metres.resize  (params.ncells_y);    //size of a cell in the east-west direction at the centre of the cell (metres)
+  arp.latitude_radians.resize       (params.ncells_y);  // the latitude of each row of cells
+  arp.cellsize_e_w_metres.resize    (params.ncells_y);  //size of a cell in the east-west direction at the centre of the cell (metres)
   arp.cellsize_e_w_metres_N.resize  (params.ncells_y);  //size of a cell in the east-west direction at the northern edge of the cell (metres)
   arp.cellsize_e_w_metres_S.resize  (params.ncells_y);  //size of a cell in the east-west direction at the southern edge of the cell (metres)
   arp.cell_area.resize (params.ncells_y);               //cell area (metres squared)
@@ -250,7 +238,6 @@ while(true){
 
 
   if(params.run_type == "transient"){
-  //********************************* for transient version only
   //I am going to do this just as if the iterations are set to 10 years and I want to update the data files every 10 years here, but probably there should be an option 
   //for how often you want to do the update. Perhaps every x amount of iterations as a user input. TODO
 
@@ -266,15 +253,13 @@ while(true){
 
 
       //Converting to appropriate time step
-      arp.precip(i)        *= (params.deltat/(60*60*24*365)) /10.0;                  //convert to appropriate units for the time step. 
+      arp.precip(i)        *= (params.deltat/(60*60*24*365)); ///10.0;                  //convert to appropriate units for the time step. 
+      //TODO: infiltration/runoff partitioning
       arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
     
       label(i)        = dh::NO_DEP; //No cells are part of a depression
       final_label(i)  = dh::NO_DEP; //No cells are part of a depression
       flowdirs(i)     = rd::NO_FLOW; //No cells flow anywhere
-
-
-
     } 
 
     #pragma omp parallel for
@@ -286,7 +271,6 @@ while(true){
     }
 
     auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>(arp.topo, label, final_label, flowdirs);
-  //********************************* end of for transient version only
   }
 
 
