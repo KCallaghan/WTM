@@ -1273,6 +1273,24 @@ static SubtreeDepressionInfo FindDepressionsToFill(
   //water will have been transferred into the parent and we don't want to pool
   //the parent's water with our own (it might be at the bottom of a cliff).
 
+  if(this_dep.water_vol==this_dep.dep_vol && deps.at(this_dep.parent).water_vol==0){
+    for(int y=0;y<label.height();y++)
+      for(int x=0;x<label.width();x++){
+        if(label(x,y)==this_dep.dep_label){   //TODO: Will this catch everything that is part of this depression?
+          if(topo(x,y)<this_dep.out_elev){
+            assert(wtd(x,y)==0);
+            wtd(x,y) = this_dep.out_elev - topo(x,y);
+          }
+          }
+        }
+
+    }
+
+
+
+
+
+
   if(this_dep.water_vol<this_dep.wtd_vol || this_dep.ocean_parent){  //TODO: Should there also be an OR if this dep's parent is the ocean?
     assert(this_dep.water_vol - this_dep.wtd_vol <= FP_ERROR);
  //   if(this_dep.water_vol > this_dep.wtd_vol)
