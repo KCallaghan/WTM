@@ -27,6 +27,7 @@ class ArrayPack {
   f2d kcell;
   f2d head;
   f2d wtd_mid;
+  f2d surface_water;
 
 
   f2d wtd_new;

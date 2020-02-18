@@ -96,6 +96,7 @@ int main(int argc, char **argv){
     arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_evap.nc",   "value");  //Units: m/yr
     arp.relhum        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc",   "value");  //Units: proportion from 0 to 1.
     arp.wtd           = rd::Array2D<float>(arp.topo,0);
+
   }
   else{
     throw std::runtime_error("That was not a recognised run type! Please choose transient or equilibrium.");
@@ -112,6 +113,8 @@ int main(int argc, char **argv){
   arp.evap   = rd::Array2D<float>(arp.topo,0);  
   arp.e_sat  = rd::Array2D<float>(arp.topo,0);  
   arp.e_a    = rd::Array2D<float>(arp.topo,0);  
+  arp.surface_water           = rd::Array2D<float>(arp.topo,0);
+
 
   arp.wtd_change_total = rd::Array2D<float>(arp.topo,0.0f);   //This array is used to store the values of how much the water table will change in one iteration, then adding it to wtd gets the new wtd.
 

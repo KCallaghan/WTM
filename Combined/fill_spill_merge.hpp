@@ -54,12 +54,14 @@ void FillSpillMerge(
 template<class elev_t, class wtd_t>
 static void MoveWaterIntoPits(
   const rd::Array2D<elev_t>    &topo,
-  rd::Array2D<wtd_t>           &wtd,
   const rd::Array2D<int>       &label,
   const rd::Array2D<dh_label_t> &final_label,
+  const rd::Array2D<flowdir_t> &flowdirs,
 
   DepressionHierarchy<elev_t>  &deps,
-  const rd::Array2D<flowdir_t> &flowdirs
+  rd::Array2D<wtd_t>           &wtd,
+  ArrayPack                    &arp
+
 );
 
 
@@ -192,7 +194,7 @@ void FillSpillMerge(
   timer_overall.start();
   
   //We move standing water downhill to the pit cells of each depression
-  MoveWaterIntoPits(topo, label,final_label, flowdirs, deps, wtd);
+  MoveWaterIntoPits(topo, label,final_label, flowdirs, deps, wtd,arp);
 
   for(int y=0;y<topo.height();y++)
   for(int x=0;x<topo.width(); x++){
@@ -288,7 +290,9 @@ static void MoveWaterIntoPits(
 
   const rd::Array2D<flowdir_t> &flowdirs,
   DepressionHierarchy<elev_t>  &deps,
-  rd::Array2D<wtd_t>           &wtd
+  rd::Array2D<wtd_t>           &wtd,
+  ArrayPack                    &arp
+
 ){
   rd::Timer timer;
   rd::ProgressBar progress;
@@ -300,7 +304,13 @@ static void MoveWaterIntoPits(
 
   std::cerr<<"p Moving surface water downstream..."<<std::endl;
 
-
+  #pragma omp parallel for 
+  for(unsigned int i=0;i<topo.size();i++){
+    if(wtd(i)>0){
+      arp.surface_water(i) = wtd(i);
+      wtd(i) = 0;
+    }
+  }
  
 
 
@@ -359,27 +369,40 @@ static void MoveWaterIntoPits(
 
 
      if(label(c) == OCEAN){    //If downstream neighbour is the ocean, we drop our water into it and the ocean is unaffected. 
-      if(wtd(c) > 0){          //only if there is surface water in this cell, it goes to the ocean and reduces to 0. 
-        wtd(c) = 0;
+      if(arp.surface_water(c) > 0){          //only if there is surface water in this cell, it goes to the ocean and reduces to 0. 
+        arp.surface_water(c) = 0;
   //      continue;
       }
      }
   
 
     if (n == NO_FLOW){    //if this is a pit cell, move the water to the appropriate depression's water_vol.    
-      if(wtd(c)>0){
-        deps[label(c)].water_vol += wtd(c);
+      if(arp.surface_water(c)>0){
+        deps[label(c)].water_vol += arp.surface_water(c);
         assert(deps[label(c)].water_vol >= -FP_ERROR);
         if(deps[label(c)].water_vol < 0)
           deps[label(c)].water_vol = 0.0;
-        wtd(c) = 0; //Clean up as we go
+        arp.surface_water(c) = 0; //Clean up as we go
       }
     } else {                               //not a pit cell
       //If we have water, pass it downstream.
-      if(wtd(c)>0){ //Groundwater can go negative, so it's important to make sure that we are only passing positive water around
+      if(arp.surface_water(c)>0){ //Groundwater can go negative, so it's important to make sure that we are only passing positive water around
 
-        wtd(n) += wtd(c);  //Add water to downstream neighbour. This might result in filling up the groundwater table, which could have been negative
-        wtd(c)  = 0;       //Clean up as we go
+        arp.surface_water(n) += arp.surface_water(c);  //Add water to downstream neighbour. This might result in filling up the groundwater table, which could have been negative
+        arp.surface_water(c)  = 0;       //Clean up as we go
+
+        if(wtd(n)<0){  //This is where we allow water to infiltrate, but not all of it. Only some proportion, dictated by the value of infiltration_FSM. 
+          float infiltration_amount = arp.surface_water(n)*infiltration_FSM;
+          if((wtd(n) + infiltration_amount) <= 0){
+            wtd(n) += infiltration_amount;
+            arp.surface_water(n) = 0; 
+          }
+          else{
+            wtd(n) = 0;
+            arp.surface_water(n) -= infiltration_amount;
+          }
+        }
+
       }
   
       //Decrement the neighbour's dependencies. If there are no more dependencies,
