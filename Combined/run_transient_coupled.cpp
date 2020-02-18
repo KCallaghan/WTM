@@ -294,14 +294,17 @@ while(true){
  //Run the groundwater code to move water
 
   groundwater(params,arp);
+  textfile<<"after GW"<<std::endl;
 
   arp.wtd_mid = arp.wtd;
 
   //Move surface water.
   dh::FillSpillMerge(arp.topo, label, final_label, flowdirs, deps, arp.wtd,arp);
+  textfile<<"after FSM"<<std::endl;
 
   //check to see where there is surface water, and adjust how evaporation works at these locations. 
   evaporation_update(params,arp);
+  textfile<<"after evaporation"<<std::endl;
 
 
   total_wtd_change = 0.0;

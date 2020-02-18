@@ -33,6 +33,7 @@ const double FP_ERROR = 1e-4;
 
 const float  OCEAN_LEVEL = -9999;  //ocean_level in the topo file must be lower than any non-ocean cell. 
 
+const double infiltration_FSM = 0.1;
 
 
 ///////////////////////////////////
@@ -728,7 +729,7 @@ static void MoveWaterInOverflow(
   auto &last_dep = deps.at(previous_dep);
   int move_to_cell;                                                   //the cell that will be the next to receive the extra water
 
-
+//std::cerr<<"infiltration is "<<infiltration_FSM<<std::endl;
   assert(extra_water > 0);
 
            
@@ -1273,25 +1274,27 @@ static SubtreeDepressionInfo FindDepressionsToFill(
   //water will have been transferred into the parent and we don't want to pool
   //the parent's water with our own (it might be at the bottom of a cliff).
 
-  if(this_dep.water_vol==this_dep.dep_vol && deps.at(this_dep.parent).water_vol==0){
-    for(int y=0;y<label.height();y++)
-      for(int x=0;x<label.width();x++){
-        if(label(x,y)==this_dep.dep_label){   //TODO: Will this catch everything that is part of this depression?
-          if(topo(x,y)<this_dep.out_elev){
-            assert(wtd(x,y)==0);
-            wtd(x,y) = this_dep.out_elev - topo(x,y);
-          }
-          }
-        }
+//  if(this_dep.water_vol==this_dep.dep_vol && deps.at(this_dep.parent).water_vol==0){
+  //  std::cout<<"here is an exact equal depression"<<this_dep.dep_label<<std::endl;
+  //  for(int y=0;y<label.height();y++)
+    //  for(int x=0;x<label.width();x++){
+      //  if(label(x,y)==this_dep.dep_label){   //TODO: Will this catch everything that is part of this depression?
+        //  if(topo(x,y)<this_dep.out_elev){
+          //  assert(wtd(x,y)==0);
+       //     wtd(x,y) = this_dep.out_elev - topo(x,y);
+      //    }
+      //    }
+      //  }
+   // return SubtreeDepressionInfo();
 
-    }
-
-
-
-
+   // }
 
 
-  if(this_dep.water_vol<this_dep.wtd_vol || this_dep.ocean_parent){  //TODO: Should there also be an OR if this dep's parent is the ocean?
+
+
+
+
+  if(this_dep.water_vol<this_dep.wtd_vol || this_dep.ocean_parent || (this_dep.water_vol==this_dep.dep_vol && deps.at(this_dep.parent).water_vol==0)){  //TODO: Should there also be an OR if this dep's parent is the ocean?
     assert(this_dep.water_vol - this_dep.wtd_vol <= FP_ERROR);
  //   if(this_dep.water_vol > this_dep.wtd_vol)
    //   this_dep.water_vol = this_dep.wtd_vol;

@@ -43,12 +43,12 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
   total_changes = 0.0;                 //set values to 0
   float max_total = 0.0;
   float min_total = 0.0;
-  float local_fdepth = 0.0;
-  float local_kcell = 0.0;
-  float local_wtd = 0.0;
+ // float local_fdepth = 0.0;
+ // float local_kcell = 0.0;
+ // float local_wtd = 0.0;
   float max_change = 0.0f;
-  float stability_min = 100000000000000000000.0;
-  float stability_max = 0.0;
+ // float stability_min = 100000000000000000000.0;
+ // float stability_max = 0.0;
 
 //Cycle through the entire array, adding recharge to each cell. 
   for(int y=1;y<params.ncells_y-1;y++)
@@ -91,17 +91,17 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
     const auto kcellE   = kcell(x+1,y,   arp);
 
 
-    arp.stability_time_seconds(x,y) = 0.5 * (arp.cell_area[y]*arp.cell_area[y]) / my_kcell;  //Von Neumann stability analysis to get stable timestep
+  //  arp.stability_time_seconds(x,y) = 0.5 * (arp.cell_area[y]*arp.cell_area[y]) / my_kcell;  //Von Neumann stability analysis to get stable timestep
     //TODO: implement stable timestep, or remove this. 
 
-    if(arp.stability_time_seconds(x,y)<stability_min){
-      stability_min = arp.stability_time_seconds(x,y);
-      local_fdepth = arp.fdepth(x,y);
-      local_kcell = my_kcell;
-      local_wtd = arp.wtd(x,y);
-    }
-    if(arp.stability_time_seconds(x,y)>stability_max)
-      stability_max = arp.stability_time_seconds(x,y);
+  //  if(arp.stability_time_seconds(x,y)<stability_min){
+  //    stability_min = arp.stability_time_seconds(x,y);
+  //    local_fdepth = arp.fdepth(x,y);
+  //    local_kcell = my_kcell;
+  //    local_wtd = arp.wtd(x,y);
+  //  }
+  //  if(arp.stability_time_seconds(x,y)>stability_max)
+  //    stability_max = arp.stability_time_seconds(x,y);
 
 
     double QN = 0;             //reset all of these values to 0 before doing the calculation
@@ -181,10 +181,6 @@ void groundwater(Parameters &params, ArrayPack &arp){
     if(iter>=params.maxiter)// || abs(total_changes) < 20000.0)
       break;
 
-    std::ofstream textfile;
-    textfile.open (params.textfilename, std::ios_base::app);
-  //  textfile<<"Iteration #: "<<iter<<std::endl;
-    textfile.close();
 
     TransientRun(params, arp, iter,total_changes);
  
