@@ -393,13 +393,15 @@ static void MoveWaterIntoPits(
 
         if(wtd(n)<0){  //This is where we allow water to infiltrate, but not all of it. Only some proportion, dictated by the value of infiltration_FSM. 
           float infiltration_amount = arp.surface_water(n)*infiltration_FSM;
+          if(arp.surface_water(n)<=0.001)
+            infiltration_amount = arp.surface_water(n);     //If there is a mm or less of surface water, just let it all infiltrate. Else we end up with super small bits of water still moving around and it's just silly later on. 
           if((wtd(n) + infiltration_amount) <= 0){
             wtd(n) += infiltration_amount;
-            arp.surface_water(n) = 0; 
+            arp.surface_water(n) -= infiltration_amount; 
           }
           else{
+            arp.surface_water(n) += wtd(n); //plus because wtd is negative. 
             wtd(n) = 0;
-            arp.surface_water(n) -= infiltration_amount;
           }
         }
 
@@ -748,45 +750,45 @@ static void MoveWaterInOverflow(
 
   ){
 
+  //TODO: The amount of fiddling with water_vol and wtd_vol in this function is so ridiculously much, I wonder if it wouldn't be better
+  //to rather just recalculate all of the water_vol and wtd_vol at the end?
+  //Like maybe move all water from water_vol into its pit cell, then do movewaterinoverflow for everything at once rather than one depression
+  //at a time, and then recalculate all volumes at the same time as well. 
+  //Although maybe that would actually become slower? Hard to say with all of the many, many if statements here. But this function is just 
+  //really long and messy. 
+
   auto &this_dep = deps.at(current_dep);
   auto &last_dep = deps.at(previous_dep);
   int move_to_cell;                                                   //the cell that will be the next to receive the extra water
 
-//std::cerr<<"infiltration is "<<infiltration_FSM<<std::endl;
   assert(extra_water > 0);
-
+  float infiltration_amount = extra_water*infiltration_FSM;
+  if(extra_water <= 0.001)
+    infiltration_amount = extra_water;
            
-  if(extra_water <= -wtd(last_dep.out_cell)){                         //There is little enough extra water that it will all be used up on the out_cell's groundwater
-    this_dep.water_vol -= extra_water; 
-    assert(this_dep.water_vol >= -FP_ERROR);
-    if(this_dep.water_vol < 0)
-      this_dep.water_vol = 0.0;
+  if(infiltration_amount <= -wtd(last_dep.out_cell)){  //so the whole infiltration amount can infiltrate in this cell (but there is potentially still more water to flow downslope)
+    extra_water -= infiltration_amount; //+= since wtd is either negative or zero. 
 
-    wtd(last_dep.out_cell) += extra_water;
-    //TODO: so the amount of water_vol of this_dep decreased, and the amount of wtd vol of a different dep decreased. But not necessarily of its water vol? Is it right to decrease its wtd vol? Ahhhh
+    deps.at(final_label(last_dep.out_cell)).wtd_vol -= infiltration_amount;
+    if(deps.at(final_label(last_dep.out_cell)).dep_label == last_dep.dep_label)
+      deps.at(final_label(last_dep.out_cell)).water_vol -= infiltration_amount;
 
-//    deps.at(final_label(last_dep.out_cell)).wtd_vol -= extra_water;  TODO: Seems like this needs to be done, but how to change the water vol of this dep?
     assert(deps.at(final_label(last_dep.out_cell)).wtd_vol -  deps.at(final_label(last_dep.out_cell)).dep_vol >= -FP_ERROR);
     if(deps.at(final_label(last_dep.out_cell)).wtd_vol < deps.at(final_label(last_dep.out_cell)).dep_vol)
       deps.at(final_label(last_dep.out_cell)).wtd_vol = deps.at(final_label(last_dep.out_cell)).dep_vol;
-    assert(deps.at(final_label(last_dep.out_cell)).water_vol -  deps.at(final_label(last_dep.out_cell)).wtd_vol <= FP_ERROR);
-    if(deps.at(final_label(last_dep.out_cell)).water_vol > deps.at(final_label(last_dep.out_cell)).wtd_vol)
-      deps.at(final_label(last_dep.out_cell)).water_vol = deps.at(final_label(last_dep.out_cell)).wtd_vol;
 
+    this_dep.water_vol -= infiltration_amount;
+    assert(this_dep.water_vol >= -FP_ERROR);
+    if(this_dep.water_vol < 0)
+      this_dep.water_vol = 0.0;
+   
+    wtd(last_dep.out_cell) += infiltration_amount; //since this amount has already been subtracted from extra_water.
+    //infiltration_amount was less than the available wtd space so wtd should still be negative now. 
+    assert(wtd(last_dep.out_cell)<= 0);
+     
+  }
+  else{                //Not the whole infiltration amount can infiltrate; wtd will be filled up to the level of 0 and more water will be left over. 
 
-   // if(final_label(last_dep.out_cell) == this_dep.dep_label) {         //if the out_cell is a labelled part of this depression, adjust the wtd_vol. 
-//TODO: change this to my_labels. The label here may be that of a child of this_dep. 
-      //TODO: what if the label is of the other depression? its wtd_vol should also be updated in that case. 
-     // this_dep.wtd_vol -= extra_water;
-     // assert(this_dep.wtd_vol >= this_dep.dep_vol);
-   // }
-
-    extra_water = 0;
-    return;
-  } 
-
-  else{                               //There is enough extra water that some will need to be moved downslope.
-          
     extra_water += wtd(last_dep.out_cell); //+= since wtd is either negative or zero. 
 
     deps.at(final_label(last_dep.out_cell)).wtd_vol += wtd(last_dep.out_cell);
@@ -797,41 +799,21 @@ static void MoveWaterInOverflow(
     if(deps.at(final_label(last_dep.out_cell)).wtd_vol < deps.at(final_label(last_dep.out_cell)).dep_vol)
       deps.at(final_label(last_dep.out_cell)).wtd_vol = deps.at(final_label(last_dep.out_cell)).dep_vol;
 
-
-  //  if(final_label(last_dep.out_cell) == this_dep.dep_label) { //if the out_cell is a labelled part of this depression, adjust the wtd_vol
-    //  this_dep.wtd_vol += wtd(last_dep.out_cell);              //TODO: here as well, what if the out_cell has the other label?
-
-   //   assert(this_dep.wtd_vol - this_dep.dep_vol >= -0.00001); //TODO: check the right way to do with floating point
-   // }
-
     this_dep.water_vol += wtd(last_dep.out_cell);
     assert(this_dep.water_vol >= -FP_ERROR);
     if(this_dep.water_vol < 0)
       this_dep.water_vol = 0.0;
-//    if(this_dep.water_vol > this_dep.wtd_vol){
-  //    std::cout<<"water vol is "<<this_dep.water_vol<<" and wtd vol is "<<this_dep.wtd_vol<<std::endl;
-    //  std::cout<<"wtd vol we added was "<<wtd(last_dep.out_cell)<<std::endl;
-   // }
-   // assert(this_dep.water_vol <= this_dep.wtd_vol);
    
     wtd(last_dep.out_cell) = 0.0; //since this amount has already been subtracted from extra_water
-      
+ 
+    //we don't need to adjust the actual infiltration_amount since that is just an indication of a portion of extra_water. We are adjusting extra_water; 
+    //in the next cell we will calculate a new infiltration_amount. There is little enough space that not the whole infiltration_amount infiltrates. 
+   }
+    
+    if(extra_water <= 0) //this would happen if above, infiltration_amount was = extra_water. 
+      return;    
 
     if(extra_water > 0){           //Which it should be, due to if statement above, it must then move downslope but we must also check that it moves towards this_dep and doesn't flow back into last_dep
-     
-
- //     std::unordered_set<int> label_list;
-   //   current_label = this_dep.dep_label;
-
-     // label_list.emplace(current_label);
-   //   while(this_dep.lchild != NO_VALUE){
-     //   current_label = deps.at(this_dep.lchild);
-       // label_list.emplace(current_label);
-    //  }
-    //  current_label = this_dep.dep_label;
-    //  while(this_dep.rchild)
-
-
       move_to_cell = NO_VALUE;   
       int x,y;
       topo.iToxy(last_dep.out_cell,x,y);   //get the x,y coordinates of the out_cell, which currently contains the extra water
@@ -843,106 +825,117 @@ static void MoveWaterInOverflow(
         if(!topo.inGrid(nx,ny))  //Is cell outside grid (too far North/South)?
           continue;              //Yup: skip it.
 
-
-        if((this_dep.my_subdepressions.count(label(nx,ny))!=0 || this_dep.dep_label == label(nx,ny)) && (move_to_cell == NO_VALUE || topo(nx,ny)<topo(move_to_cell))){  //CHECK. This was preventing cells that flowed to the ocean from allowing my depression volume to update. Is this way ok? Is this even needed?
-
+        if((this_dep.my_subdepressions.count(label(nx,ny))!=0 || this_dep.dep_label == label(nx,ny)) && (move_to_cell == NO_VALUE || topo(nx,ny)<topo(move_to_cell)))  //CHECK. This was preventing cells that flowed to the ocean from allowing my depression volume to update. Is this way ok? Is this even needed?
           move_to_cell = topo.xyToI(nx,ny);
-        }
-       
+               
       }  //so now we know which is the correct starting cell.
-           assert(move_to_cell != NO_VALUE);
-       
-
-
+           assert(move_to_cell != NO_VALUE);       
     }
-
 
   assert(extra_water > 0);
 
+  while(extra_water > 0){
+    //An alternative would be leaving all of the water in the move_to_cells for all depressions and just updating the wtd_vols, 
+    //then moving all water to the pits again afterwards in a priority queue similar to the initial way that we moved water. 
+    //Maybe that would be better? Not sure. In this case the while works pretty well, too, since we're 
+    //only moving a single pocket of water down through a single depression. 
 
-    while(extra_water > 0){
-      //An alternative would be leaving all of the water in the move_to_cells for all depressions and just updating the wtd_vols, 
-      //then moving all water to the pits again afterwards in a priority queue similar to the initial way that we moved water. 
-      //Maybe that would be better? Not sure. In this case the while works pretty well, too, since we're 
-      //only moving a single pocket of water down through a single depression. 
+    infiltration_amount = extra_water*infiltration_FSM;
+    if(extra_water <= 0.001)
+      infiltration_amount = extra_water;
 
+    const auto ndir = flowdirs(move_to_cell);
+    int my_label = final_label(move_to_cell);
 
-      const auto ndir = flowdirs(move_to_cell);
-      int my_label = final_label(move_to_cell);
+    if(infiltration_amount <= -wtd(move_to_cell)){  //so the whole infiltration amount can infiltrate in this cell (but there is still more water to flow downslope)
+      extra_water -= infiltration_amount;  //the whole infiltration_amount infiltrates, but there is still extra_water left over. 
 
-      if(extra_water <= -wtd(move_to_cell)){    //this is the last cell that needs to receive water because this bit of infiltration will use up all the extra water
+      my_label = final_label(move_to_cell);
+      
+      while(deps.at(my_label).dep_label != OCEAN){ //adjust the wtd_vol of me and all my parents
+        deps.at(my_label).wtd_vol -= infiltration_amount;//+= because wtd should always be negative or 0. 
+        assert(deps.at(my_label).wtd_vol - deps.at(my_label).dep_vol >= -FP_ERROR);
+        if(deps.at(my_label).wtd_vol < deps.at(my_label).dep_vol)
+          deps.at(my_label).wtd_vol = deps.at(my_label).dep_vol;
 
-        this_dep.water_vol -= extra_water;  //TODO: fix to make more floating-point friendly. 
-        assert(this_dep.water_vol >= -FP_ERROR);
-        if(this_dep.water_vol <0)
-          this_dep.water_vol = 0.0;
-
-        wtd(move_to_cell) += extra_water;
-        while(deps.at(my_label).dep_label != OCEAN){   //adjust the wtd_vol of me and all my parents
-          deps.at(my_label).wtd_vol -= extra_water;
-          assert(deps.at(my_label).wtd_vol - deps.at(my_label).dep_vol >= -FP_ERROR);
-          if(deps.at(my_label).wtd_vol < deps.at(my_label).dep_vol)
-            deps.at(my_label).wtd_vol = deps.at(my_label).dep_vol;
-
-          my_label = deps.at(my_label).parent;
-          if(deps.at(my_label).ocean_parent == true){
-            my_label = 0;
-          }
-        }
-        this_dep = deps.at(current_dep);
-        extra_water = 0;
-        break;
+        my_label = deps.at(my_label).parent;      
+        if(deps.at(my_label).ocean_parent == true)
+          my_label = 0;
       }
-      else{                               //there is still more extra water than will infiltrate in this cell. 
-
-        extra_water += wtd(move_to_cell);  
-
-        assert(extra_water > 0);
-        my_label = final_label(move_to_cell);
-        while(deps.at(my_label).dep_label != OCEAN){ //adjust the wtd_vol of me and all my parents
-          deps.at(my_label).wtd_vol += wtd(move_to_cell);//+= because wtd should always be negative or 0. 
-
- 
-          assert(deps.at(my_label).wtd_vol - deps.at(my_label).dep_vol >= -FP_ERROR);
-          if(deps.at(my_label).wtd_vol < deps.at(my_label).dep_vol)
-            deps.at(my_label).wtd_vol = deps.at(my_label).dep_vol;
-
-          my_label = deps.at(my_label).parent;      
-          if(deps.at(my_label).ocean_parent == true)
-            my_label = 0;
-        }
-        this_dep = deps.at(current_dep);  //I needed to reset this because seemingly the above while loops could mess it up somehow?
+      this_dep = deps.at(current_dep);  //I needed to reset this because seemingly the above while loops could mess it up somehow?
     
+      assert(this_dep.wtd_vol - this_dep.dep_vol >= -FP_ERROR);
+      if(this_dep.wtd_vol < this_dep.dep_vol)
+        this_dep.wtd_vol = this_dep.dep_vol;
 
-        assert(this_dep.wtd_vol - this_dep.dep_vol >= -FP_ERROR);
-        if(this_dep.wtd_vol < this_dep.dep_vol)
-          this_dep.wtd_vol = this_dep.dep_vol;
+      this_dep.water_vol -= infiltration_amount;
+      assert(this_dep.water_vol >= -FP_ERROR); 
+      if(this_dep.water_vol < 0) 
+        this_dep.water_vol = 0.0;
+        
+      wtd(move_to_cell) += infiltration_amount;              //the cell we are in is not fully groundwater saturated. 
+      assert(wtd(move_to_cell<= 0));
 
-        this_dep.water_vol += wtd(move_to_cell);
-        assert(this_dep.water_vol >= -FP_ERROR); 
-        if(this_dep.water_vol < 0){ 
-          this_dep.water_vol = 0.0;
-        }
-        wtd(move_to_cell) = 0;              //the cell we are in is now groundwater saturated. 
-        if(ndir == NO_FLOW){                   //we've reached a pit cell, so we can stop.   
+      if(extra_water<=0)
+        break;
 
-          extra_water = 0;
+      assert(extra_water > 0);
 
-        }
-        else{                                   //we need to keep moving downslope. 
-          int x1,y1;
-          topo.iToxy(move_to_cell,x1,y1);              //then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
-          const int nx = x1+dx[ndir];
-          const int ny = y1+dy[ndir];
-          move_to_cell = topo.xyToI(nx,ny);  //get the new move_to_cell
-          assert(move_to_cell>=0);
-        }
-
+      if(ndir == NO_FLOW)                   //we've reached a pit cell, so we can stop.   
+        extra_water = 0;   //TODO: check that I can still just do it this way. Infiltration in this cell should still happen when I go to spread water? (check that we do infiltrate in the starting cell!)
+        //TODO: confirm whether the water_vol for this depression knows about the remaining extra_water. 
+        
+      else{                                   //we need to keep moving downslope. 
+        int x1,y1;
+        topo.iToxy(move_to_cell,x1,y1);              //then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
+        const int nx = x1+dx[ndir];
+        const int ny = y1+dy[ndir];
+        move_to_cell = topo.xyToI(nx,ny);  //get the new move_to_cell
+        assert(move_to_cell>=0);
       }
+    }
 
+    else{                               //there is still more infiltration_amount than will infiltrate in this cell. The wtd will become fully saturated. 
+      extra_water += wtd(move_to_cell);  
+
+      assert(extra_water > 0);
+      my_label = final_label(move_to_cell);
+      while(deps.at(my_label).dep_label != OCEAN){ //adjust the wtd_vol of me and all my parents
+        deps.at(my_label).wtd_vol += wtd(move_to_cell);//+= because wtd should always be negative or 0. 
+
+        assert(deps.at(my_label).wtd_vol - deps.at(my_label).dep_vol >= -FP_ERROR);
+        if(deps.at(my_label).wtd_vol < deps.at(my_label).dep_vol)
+          deps.at(my_label).wtd_vol = deps.at(my_label).dep_vol;
+
+        my_label = deps.at(my_label).parent;      
+        if(deps.at(my_label).ocean_parent == true)
+          my_label = 0;
+      }
+      this_dep = deps.at(current_dep);  //I needed to reset this because seemingly the above while loops could mess it up somehow?
+    
+      assert(this_dep.wtd_vol - this_dep.dep_vol >= -FP_ERROR);
+      if(this_dep.wtd_vol < this_dep.dep_vol)
+        this_dep.wtd_vol = this_dep.dep_vol;
+
+      this_dep.water_vol += wtd(move_to_cell);
+      assert(this_dep.water_vol >= -FP_ERROR); 
+      if(this_dep.water_vol < 0) 
+        this_dep.water_vol = 0.0;
+        
+      wtd(move_to_cell) = 0;              //the cell we are in is now groundwater saturated. 
+      if(ndir == NO_FLOW)                   //we've reached a pit cell, so we can stop.   
+        extra_water = 0;
+
+      else{                                   //we need to keep moving downslope. 
+        int x1,y1;
+        topo.iToxy(move_to_cell,x1,y1);              //then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
+        const int nx = x1+dx[ndir];
+        const int ny = y1+dy[ndir];
+        move_to_cell = topo.xyToI(nx,ny);  //get the new move_to_cell
+        assert(move_to_cell>=0);
+      }
     }
   }
-
 }
 
 
