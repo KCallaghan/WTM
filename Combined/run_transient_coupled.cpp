@@ -96,7 +96,7 @@ int main(int argc, char **argv){
     arp.topo          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_topo.nc",   "value");  //Units: metres
     arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_evap.nc",   "value");  //Units: m/yr
     arp.relhum        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc",   "value");  //Units: proportion from 0 to 1.
-    arp.wtd           = rd::Array2D<float>(arp.topo,-100.0);
+    arp.wtd           = rd::Array2D<float>(arp.topo,-300.0);
 
   }
   else{
@@ -293,6 +293,8 @@ while(true){
   if((cycles_done % 10) == 0){
     textfile<<"saving partway result"<<std::endl;  
     SaveAsNetCDF(arp.wtd,params.outfilename,"value");
+    //SaveAsNetCDF(arp.rech,params.outfilename,"value");
+
 
   }
 
@@ -309,7 +311,7 @@ while(true){
   for(int x=1;x<params.ncells_x-1; x++){
     if(arp.land_mask(x,y) == 0)      //skip ocean cells
       continue;
-    arp.wtd(x,y) += arp.runoff(x,y);
+    arp.surface_water(x,y) = arp.runoff(x,y);
   }
   
   //Move surface water.

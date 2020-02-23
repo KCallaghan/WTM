@@ -215,7 +215,14 @@ void FillSpillMerge(
   //Sanity checks
   for(int d=1;d<(int)deps.size();d++){
     const auto &dep = deps.at(d);
-    assert(dep.water_vol==0 || dep.water_vol<=dep.wtd_vol);
+    if(dep.water_vol > dep.wtd_vol){
+      std::cout<<"water vol "<<dep.water_vol<<std::endl;
+      std::cout<<"wtd vol "<<dep.wtd_vol<<std::endl;
+      std::cout<<"dep vol "<<dep.dep_vol<<std::endl;
+      std::cout<<"dep label "<<dep.dep_label<<std::endl;
+    }
+        assert(dep.water_vol==0 || dep.water_vol<=dep.wtd_vol);
+
     assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) || (dep.lchild!=NO_VALUE && deps.at(dep.lchild).water_vol<dep.water_vol));
     assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) || (dep.rchild!=NO_VALUE && deps.at(dep.rchild).water_vol<dep.water_vol));
   }
@@ -286,9 +293,9 @@ static void MoveWaterIntoPits(
 
 
   #pragma omp parallel for 
-  for(unsigned int i=0;i<topo.size();i++){
+  for(unsigned int i=0;i<topo.size();i++){   //TODO: add infiltration for the *current* cell
     if(wtd(i)>0){
-      arp.surface_water(i) = wtd(i);
+      arp.surface_water(i) += wtd(i);
       wtd(i) = 0;
     }
   }
@@ -326,6 +333,7 @@ static void MoveWaterIntoPits(
   for(int d=0;d<(int)deps.size();d++){   //reset all of the water volumes to 0 for each time we iterate through the surface water. 
     auto &dep = deps.at(d);                
     dep.water_vol = 0;
+    dep.wtd_vol = 0;
   }
 
   
@@ -646,7 +654,10 @@ static void MoveWaterInDepHier(
     //leaf depression via the geolink. If everything fills up, the water will
     //end up in this depression's parent. So at this point we don't have to
     //worry about the extra water here any more.
+
+    
     OverflowInto(this_dep.geolink, this_dep.dep_label, this_dep.parent, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water); //TODO: use odep or geolink here?
+
 
     assert(this_dep.water_vol >= -FP_ERROR);
     if(this_dep.water_vol < 0)
@@ -732,7 +743,26 @@ static void MoveWaterInOverflow(
 
     deps.at(final_label(last_dep.out_cell)).wtd_vol -= infiltration_amount;
     if(deps.at(final_label(last_dep.out_cell)).dep_label == last_dep.dep_label)
-      deps.at(final_label(last_dep.out_cell)).water_vol -= infiltration_amount;
+      deps.at(final_label(last_dep.out_cell)).water_vol -= infiltration_amount;  //TODO: I am confused about this. It seems like I am potentially changing the water_vol in two different depressions, here and below? Check which it needs to be changed in, surely not both?
+       std::cout<<"747 "<<deps.at(20992).dep_vol<<" "<<deps.at(20992).wtd_vol<<" "<<deps.at(20992).water_vol<<std::endl;
+//It looks like what I am trying to do here is change the topmost wtd_vol and topmost water_vol, but I can only
+       //change the topmost water vol if that is my current depression - otherwise it may not have any water vol. 
+       //However, I'm not sure why I am only going for the topmost one? Surely I would have to change the wtd_vols for this and all ancestor depressions?
+       //Same goes for the water vol - this and all ancestors that have nonzero water_vols would surely have to be changed. 
+       //I am reinforcing my impression that it may be better to simply recalculate all water_vols and wtd_vols at the end of this function. 
+       //Should be very easy to recalculate wtd_vols since it is just dependent on the level of wtd. 
+       //For water_vol, perhaps store the extra_water again in the pit cells
+       //And then at the end add pit cell water back into water_vols?
+       //This will require some more thought and investigation. Where/when is extra_water subtracted from one water_vol and added to another?
+       //I think we may be calling this function sometimes with more extra_water than this depression can hold. What if we rather maximise the extra_water at 
+       //how much can be accommodated, and then just set the new water_vols prior to calling this function?
+       //The new water_vol should be maximised as the wtd_vol of the depression. Some infiltration may occur, and then wtd_vol and water_vol will both decrease. 
+       //But probably no need to decrement them both as every cell receives water - just recalculate total wtd_vol at the end, and then set water_vol to be a max
+       //of equal to that new wtd_vol? 
+
+
+
+
 
     assert(deps.at(final_label(last_dep.out_cell)).wtd_vol -  deps.at(final_label(last_dep.out_cell)).dep_vol >= -FP_ERROR);
     if(deps.at(final_label(last_dep.out_cell)).wtd_vol < deps.at(final_label(last_dep.out_cell)).dep_vol)
@@ -742,7 +772,8 @@ static void MoveWaterInOverflow(
     assert(this_dep.water_vol >= -FP_ERROR);
     if(this_dep.water_vol < 0)
       this_dep.water_vol = 0.0;
-   
+          std::cout<<"757 "<<deps.at(20992).dep_vol<<" "<<deps.at(20992).wtd_vol<<" "<<deps.at(20992).water_vol<<std::endl;
+
     wtd(last_dep.out_cell) += infiltration_amount; //since this amount has already been subtracted from extra_water.
     //infiltration_amount was less than the available wtd space so wtd should still be negative now. 
     assert(wtd(last_dep.out_cell)<= 0);
@@ -766,7 +797,8 @@ static void MoveWaterInOverflow(
       this_dep.water_vol = 0.0;
    
     wtd(last_dep.out_cell) = 0.0; //since this amount has already been subtracted from extra_water
- 
+        std::cout<<"782 "<<deps.at(20992).dep_vol<<" "<<deps.at(20992).wtd_vol<<" "<<deps.at(20992).water_vol<<std::endl;
+
     //we don't need to adjust the actual infiltration_amount since that is just an indication of a portion of extra_water. We are adjusting extra_water; 
     //in the next cell we will calculate a new infiltration_amount. There is little enough space that not the whole infiltration_amount infiltrates. 
    }
@@ -823,6 +855,10 @@ static void MoveWaterInOverflow(
         if(deps.at(my_label).ocean_parent == true)
           my_label = 0;
       }
+
+       std::cout<<"841 "<<deps.at(20992).dep_vol<<" "<<deps.at(20992).wtd_vol<<" "<<deps.at(20992).water_vol<<std::endl;
+
+
       this_dep = deps.at(current_dep);  //I needed to reset this because seemingly the above while loops could mess it up somehow?
     
       assert(this_dep.wtd_vol - this_dep.dep_vol >= -FP_ERROR);
@@ -839,6 +875,7 @@ static void MoveWaterInOverflow(
       if(wtd(move_to_cell)>=FP_ERROR)
         wtd(move_to_cell) = 0;
       
+       std::cout<<"860 "<<deps.at(20992).dep_vol<<" "<<deps.at(20992).wtd_vol<<" "<<deps.at(20992).water_vol<<std::endl;
 
       if(extra_water<=0)
         break;
@@ -874,6 +911,8 @@ static void MoveWaterInOverflow(
         if(deps.at(my_label).ocean_parent == true)
           my_label = 0;
       }
+             std::cout<<"896 "<<deps.at(20992).dep_vol<<" "<<deps.at(20992).wtd_vol<<" "<<deps.at(20992).water_vol<<std::endl;
+
       this_dep = deps.at(current_dep);  //I needed to reset this because seemingly the above while loops could mess it up somehow?
     
       assert(this_dep.wtd_vol - this_dep.dep_vol >= -FP_ERROR);
@@ -884,7 +923,9 @@ static void MoveWaterInOverflow(
       assert(this_dep.water_vol >= -FP_ERROR); 
       if(this_dep.water_vol < 0) 
         this_dep.water_vol = 0.0;
-        
+
+      std::cout<<"909 "<<deps.at(20992).dep_vol<<" "<<deps.at(20992).wtd_vol<<" "<<deps.at(20992).water_vol<<std::endl;
+     
       wtd(move_to_cell) = 0;              //the cell we are in is now groundwater saturated. 
       if(ndir == NO_FLOW)                   //we've reached a pit cell, so we can stop.   
         extra_water = 0;
@@ -992,14 +1033,13 @@ static dh_label_t OverflowInto(
       if(this_dep.water_vol < 0){
         this_dep.water_vol = 0.0;
       }
-
       if(this_dep.lchild==NO_VALUE || (this_dep.lchild != previous_dep && this_dep.rchild != previous_dep)){ //so either if this node has no children or if neither of its children was the previous depression - this implies the previous depression was ocean_linked. 
         //in this case, we should move water to the inlet of this depression and let it flow downslope. Although this is only necessary if there is groundwater space available...
         if(this_dep.wtd_vol > this_dep.dep_vol && this_dep.water_vol < this_dep.wtd_vol){ //okay, there is groundwater volume to fill, so we must move the water properly.                                                        //TODO: is the second part of that if correct?
           MoveWaterInOverflow(extra_water,this_dep.dep_label,last_dep.dep_label,topo,wtd,flowdirs,final_label,label,deps);
           assert(this_dep.water_vol==0 || this_dep.water_vol - this_dep.wtd_vol <= FP_ERROR);                  
         } 
-      }    
+      }  
     }
     return stop_node;
   }
@@ -1008,17 +1048,21 @@ static dh_label_t OverflowInto(
     const double capacity = this_dep.wtd_vol - this_dep.water_vol;          //Yes. How much can it hold?
     if(this_dep.wtd_vol > this_dep.dep_vol){                              //the depression has groundwater space. We need to move water properly from the outlet. 
       if((last_dep.parent == this_dep.dep_label && last_dep.ocean_parent == true) || last_dep.parent != this_dep.dep_label){  //but only if either I'm not the last dep's parent, or I am the parent but I'm an ocean-linking parent - though these should have been handled in the above section. 
+       std::cout<<"before 2 "<<deps.at(20992).dep_vol<<" "<<deps.at(20992).wtd_vol<<" "<<deps.at(20992).water_vol<<std::endl;
         if(this_dep.water_vol != 0){ //TODO: adding this as a test since it was sometimes trying to move water when none was available? Feel like I need to check for this earlier on?
       
           deps.at(last_dep.geolink).water_vol +=extra_water;
+                 std::cout<<"mid 2 "<<deps.at(20992).dep_vol<<" "<<deps.at(20992).wtd_vol<<" "<<deps.at(20992).water_vol<<std::endl;
+
       //  this_dep.water_vol += extra_water; //TODO: Is this right? Something is off about water vols and extra water but I am VERY unsure if this is right. 
           //NO - extra_water is based on what the water_vol already was!!!
         MoveWaterInOverflow(extra_water,this_dep.dep_label,last_dep.dep_label,topo,wtd,flowdirs,final_label,label,deps);
 
 //if(this_dep.water_vol != 0 && this_dep.water_vol > this_dep.wtd_vol){
 //}
-                 // assert(this_dep.water_vol==0 || this_dep.water_vol<=this_dep.wtd_vol); TODO: Is this assert right? What assert would be appropriate here? What if thisone just needs to further overflow?
+               //   assert(this_dep.water_vol==0 || this_dep.water_vol<=this_dep.wtd_vol); //TODO: Is this assert right? What assert would be appropriate here? What if thisone just needs to further overflow?
         }
+        std::cout<<"after 2 "<<deps.at(20992).dep_vol<<" "<<deps.at(20992).wtd_vol<<" "<<deps.at(20992).water_vol<<std::endl;
       }   
     }   
 
