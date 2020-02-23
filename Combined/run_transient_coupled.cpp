@@ -27,6 +27,7 @@ namespace dh = richdem::dephier;
 const double UNDEF  = -1.0e7;
 
 
+
 int main(int argc, char **argv){
 
   if(argc!=2){                               //Make sure that the user is running the code with a configuration file. 
@@ -95,7 +96,7 @@ int main(int argc, char **argv){
     arp.topo          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_topo.nc",   "value");  //Units: metres
     arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_evap.nc",   "value");  //Units: m/yr
     arp.relhum        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc",   "value");  //Units: proportion from 0 to 1.
-    arp.wtd           = rd::Array2D<float>(arp.topo,0);
+    arp.wtd           = rd::Array2D<float>(arp.topo,-100.0);
 
   }
   else{
@@ -108,6 +109,7 @@ int main(int argc, char **argv){
   arp.wtd_old = arp.wtd;
   arp.wtd_mid = arp.wtd;
   arp.rech   = rd::Array2D<float>(arp.topo,0);  //We have to calculate recharge within the code since we will change the way evaporation works depending on whether or not there is surface water present. 
+  arp.runoff   = rd::Array2D<float>(arp.topo,0);
   arp.head   = rd::Array2D<float>(arp.topo,0);        //Just to initialise these - we'll add the appropriate values later. 
   arp.kcell  = rd::Array2D<float>(arp.topo,0);
   arp.evap   = rd::Array2D<float>(arp.topo,0);  
@@ -191,8 +193,11 @@ int main(int argc, char **argv){
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
     arp.evap(i) = arp.starting_evap(i);               //Use a different array for evaporation here because we want to be able to switch back to the original evaporation in cases where there is surface water for a while, but it goes away.
-    arp.rech(i) = arp.precip(i) - arp.evap(i);
+    arp.rech(i) = (arp.precip(i) - arp.evap(i))*params.infiltration;
     arp.rech(i) = std::max(arp.rech(i),0.0f);         //Recharge is always positive in locations where there is no surface water. 
+    arp.runoff(i) = (arp.precip(i)-arp.evap(i))*(1-params.infiltration);
+    arp.runoff(i) = std::max(arp.runoff(i),0.0f);         //Runoff is always positive. 
+
   }
 
 
@@ -297,18 +302,21 @@ while(true){
  //Run the groundwater code to move water
 
   groundwater(params,arp);
-  textfile<<"after GW"<<std::endl;
 
   arp.wtd_mid = arp.wtd;
 
+  for(int y=1;y<params.ncells_y-1;y++)
+  for(int x=1;x<params.ncells_x-1; x++){
+    if(arp.land_mask(x,y) == 0)      //skip ocean cells
+      continue;
+    arp.wtd(x,y) += arp.runoff(x,y);
+  }
+  
   //Move surface water.
   dh::FillSpillMerge(arp.topo, label, final_label, flowdirs, deps, arp.wtd,arp);
-  textfile<<"after FSM"<<std::endl;
-
+  
   //check to see where there is surface water, and adjust how evaporation works at these locations. 
   evaporation_update(params,arp);
-  textfile<<"after evaporation"<<std::endl;
-
 
   total_wtd_change = 0.0;
   wtd_mid_change = 0.0;

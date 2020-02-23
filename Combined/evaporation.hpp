@@ -44,9 +44,13 @@ void evaporation_update(Parameters &params, ArrayPack &arp){
   }
 
   for(unsigned int i=0;i<arp.topo.size();i++){
-    arp.rech(i) = arp.precip(i) - arp.evap(i);  //update recharge array with new evaporation. 
+    arp.rech(i) = (arp.precip(i) - arp.evap(i))*params.infiltration;  //update recharge array with new evaporation. 
     if(arp.wtd(i)<=0)
       arp.rech(i) = std::max(arp.rech(i),0.0f);  //recharge is positive if there is no surface water
+    arp.runoff(i) = (arp.precip(i)-arp.evap(i))*(1-params.infiltration);
+          arp.runoff(i) = std::max(arp.runoff(i),0.0f);  //recharge is positive if there is no surface water
+
+
 
 
   }

@@ -50,6 +50,7 @@ class ArrayPack {
 
   f2d topo;
   f2d rech;
+  f2d runoff;
   f2d fdepth;
   f2d temp;
   f2d delta;

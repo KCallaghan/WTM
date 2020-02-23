@@ -26,7 +26,7 @@ Parameters::Parameters(const std::string config_file){
     else if(key=="end_name")           ss>>end_name;
     else if(key=="HAD")                ss>>HAD;
     else if(key=="total_cycles")       ss>>total_cycles;
-    else if(key=="interpolated")       ss>>interpolated;
+    else if(key=="infiltration")       ss>>infiltration;
     else if(key=="iterations")         ss>>iterations;
     else if(key=="maxiter")            ss>>maxiter;
     else if(key=="name")               ss>>name;

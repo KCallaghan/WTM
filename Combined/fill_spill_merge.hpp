@@ -82,7 +82,6 @@ static void MoveWaterInDepHier(
   const rd::Array2D<flowdir_t>               &flowdirs,
   rd::Array2D<wtd_t>                         &wtd,
   std::unordered_map<dh_label_t, dh_label_t> &jump_table
-
 );
 
 
@@ -96,7 +95,7 @@ static void MoveWaterInOverflow(
   const rd::Array2D<flowdir_t>   &flowdirs,
   const rd::Array2D<int>         &final_label,
   const rd::Array2D<int>         &label,
-  DepressionHierarchy<elev_t>                &deps
+  DepressionHierarchy<elev_t>    &deps
   );
 
 template<class elev_t, class wtd_t>
@@ -198,11 +197,17 @@ void FillSpillMerge(
     //that would occur has already happened, so we didn't have to constantly update wtd_vol during MoveWaterIntoPits. 
     CalculateWtdVol(wtd,topo,label,deps);
 
+
+
+  
     //Now that the water is in the pit cells, we move it around so that
     //depressions which contain too much water overflow into depressions that
     //have less water. If enough overflow happens, then the water is ultimately
     //routed to the ocean.
     MoveWaterInDepHier(OCEAN, deps, topo,label,final_label,flowdirs,wtd,jump_table);
+
+  
+
 
     std::cerr<<"t FlowInDepressionHierarchy: Overflow time = "<<timer_overflow.stop()<<std::endl;
   }
@@ -224,6 +229,9 @@ void FillSpillMerge(
   //depression which will lie below its surface.
   FindDepressionsToFill(OCEAN,deps,topo,label,wtd,arp);                              
   std::cerr<<"t FlowInDepressionHierarchy: Fill time = "<<timer_filled.stop()<<" s"<<std::endl;
+
+
+  
 
   //TODO
   // std::cerr<<"m Checking against master..."<<std::endl;
@@ -276,6 +284,7 @@ static void MoveWaterIntoPits(
 
   std::cerr<<"p Moving surface water downstream..."<<std::endl;
 
+
   #pragma omp parallel for 
   for(unsigned int i=0;i<topo.size();i++){
     if(wtd(i)>0){
@@ -283,8 +292,9 @@ static void MoveWaterIntoPits(
       wtd(i) = 0;
     }
   }
- 
 
+
+ 
 
   //Calculate how many upstream cells flow into each cell
   rd::Array2D<char>  dependencies(topo.width(),topo.height(),0);
@@ -300,6 +310,8 @@ static void MoveWaterIntoPits(
       dependencies(x,y)++;            //Increment my dependencies
   }
 
+
+  
   //Find the peaks. These are the cells into which no other cells pass flow (i.e. 0 dependencies). We
   //know the flow accumulation of the peaks without having to perform any
   //recursive calculations; they just pass flow downstream. From the peaks, we
@@ -316,6 +328,7 @@ static void MoveWaterIntoPits(
     dep.water_vol = 0;
   }
 
+  
   //Starting with the peaks, pass flow downstream
   progress.start(topo.size());
   while(!q.empty()){
@@ -822,7 +835,10 @@ static void MoveWaterInOverflow(
         this_dep.water_vol = 0.0;
         
       wtd(move_to_cell) += infiltration_amount;              //the cell we are in is not fully groundwater saturated. 
-      assert(wtd(move_to_cell<= 0));
+      assert(wtd(move_to_cell)<= FP_ERROR);
+      if(wtd(move_to_cell)>=FP_ERROR)
+        wtd(move_to_cell) = 0;
+      
 
       if(extra_water<=0)
         break;
