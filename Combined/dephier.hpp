@@ -92,8 +92,13 @@ class Depression {
   uint32_t cell_count = 0;
   //Total of elevations within the depression, used in the WLE. Because I think I need to start adding up total elevations before I know the outlet of the depression. 
   //double dep_sum_elevations = 0;
+  //Total area of the cells in the depression. 
+  double dep_area = 0;
   //Volume of the depression and its children. Used in the Water Level Equation (see below).
   double   dep_vol    = 0;
+
+    double   dep_vol_old    = 0;
+
   //Water currently contained within the depression. Used in the Water Level
   //Equation (see below).
   double   water_vol  = 0;
@@ -103,10 +108,13 @@ class Depression {
   double wtd_vol = 0;
 
   //extra parameter used to help calculate wtd_vol. 
-  double wtd_height = 0;
+  double wtd_only = 0;
 
   //Total elevation of cells contained with the depression and its children
   double total_elevation = 0;
+
+  //Area available to store water aboveground
+ // double total_aboveground_area = 0;
 };
 
 
@@ -222,7 +230,7 @@ using DepressionHierarchy = std::vector<Depression<elev_t>>;
 
 template<class elev_t,  Topology topo>                                                     
 DepressionHierarchy<elev_t> GetDepressionHierarchy(
-  const rd::Array2D<elev_t> &dem,
+  const ArrayPack &arp,
   rd::Array2D<int>          &label,
   rd::Array2D<int>          &final_label,
   rd::Array2D<int8_t>       &flowdirs
@@ -276,10 +284,10 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
   std::cerr<<"label"<<label(5,5)<<std::endl;
   int ocean_cells = 0;
-  for(int y=0;y<dem.height();y++)
-  for(int x=0;x<dem.width();x++){
+  for(int y=0;y<arp.topo.height();y++)
+  for(int x=0;x<arp.topo.width();x++){
     if(label(x,y)==OCEAN){       //If they are ocean cells, put them in the priority queue
-      pq.emplace(x,y,dem(x,y));
+      pq.emplace(x,y,arp.topo(x,y));
       ocean_cells++;
     }
   }
@@ -314,12 +322,12 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //flat cells. Regardless, the algorithm will deal gracefully with the flats it
   //finds and this shouldn't slow things down too much!
   int pit_cell_count = 0;
-  progress.start(dem.size());
+  progress.start(arp.topo.size());
   #pragma omp parallel for collapse(2) reduction(+:pit_cell_count)
-  for(int y=0;y<dem.height();y++){  //Look at all the cells
-  for(int x=0;x<dem.width() ;x++){ //Yes, all of them
+  for(int y=0;y<arp.topo.height();y++){  //Look at all the cells
+  for(int x=0;x<arp.topo.width() ;x++){ //Yes, all of them
     ++progress;
-    const auto my_elev = dem(x,y); //Focal cell's elevation
+    const auto my_elev = arp.topo(x,y); //Focal cell's elevation
     bool has_lower     = false;    //Pretend we have no lower neighbours
     for(int n=1;n<=neighbours;n++){ //Check out our neighbours
       //Use offset to get neighbour x coordinate, wrapping as needed
@@ -327,9 +335,9 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       const int nx = x+dx[n];
       //Use offset to get neighbour y coordinate
       const int ny = y+dy[n];      
-      if(!dem.inGrid(nx,ny))  //Is cell outside grid (too far North/South)?
+      if(!arp.topo.inGrid(nx,ny))  //Is cell outside grid (too far North/South)?
         continue;             //Yup: skip it.
-      if(dem(nx,ny)<my_elev){ //Is this neighbour lower than focal cell?
+      if(arp.topo(nx,ny)<my_elev){ //Is this neighbour lower than focal cell?
         has_lower = true;     //Make a note of it
         break;                //Don't need to look at additional neighbours
       }
@@ -337,7 +345,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     if(!has_lower){           //The cell can't drain, so it is a pit cell
       pit_cell_count++;       //Add to pit cell count. Parallel safe because of reduction.
       #pragma omp critical    //Only one thread can safely access pq at a time
-      pq.emplace(x,y,dem(x,y)); //Add cell to pq
+      pq.emplace(x,y,arp.topo(x,y)); //Add cell to pq
     }
   }
 }
@@ -383,7 +391,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
   std::cerr<<"p Searching for outlets..."<<std::endl;
 
-  progress.start(dem.size());
+  progress.start(arp.topo.size());
   while(!pq.empty()){
     ++progress;
 
@@ -391,7 +399,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
     pq.pop();                              //Remove the copied cell from the priority queue
     const auto celev = c.z;                //Elevation of focal cell
-    const auto ci    = dem.xyToI(c.x,c.y); //Flat-index of focal cell
+    const auto ci    = arp.topo.xyToI(c.x,c.y); //Flat-index of focal cell
     auto clabel      = label(ci);          //Nominal label of cell
 
     if(clabel==OCEAN){
@@ -408,7 +416,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //cell found in a flat determines the label for the entirety of that flat.
       clabel            = depressions.size();         //In a 0-based indexing system, size is equal to the id of the next flat
       auto &newdep      = depressions.emplace_back(); //Add the next flat (increases size by 1)
-      newdep.pit_cell   = dem.xyToI(c.x,c.y);         //Make a note of the pit cell's location
+      newdep.pit_cell   = arp.topo.xyToI(c.x,c.y);         //Make a note of the pit cell's location
       newdep.pit_elev   = celev;                      //Make a note of the pit cell's elevation
       newdep.dep_label  = clabel;                     //I am storing the label in the object so that I can find it later and call up the number of cells and volume (better way of doing this?) -- I have since realised I can use the index in the depressions array. So perhaps the label is no longer needed?
       label(ci)         = clabel;                     //Update cell with new label                                                           
@@ -431,14 +439,14 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       // const int nx = ModFloor(c.x+dx[n],dem.width()); //Get neighbour's x-coordinate using an offset and wrapping
       const int nx = c.x + dx[n];                     //Get neighbour's y-coordinate using an offset
       const int ny = c.y + dy[n];                     //Get neighbour's y-coordinate using an offset
-      if(!dem.inGrid(nx,ny))                          //Is this cell in the grid?
+      if(!arp.topo.inGrid(nx,ny))                          //Is this cell in the grid?
         continue;                                     //Nope: out of bounds.
-      const auto ni     = dem.xyToI(nx,ny);           //Flat index of neighbour
+      const auto ni     = arp.topo.xyToI(nx,ny);           //Flat index of neighbour
       const auto nlabel = label(ni);                  //Label of neighbour
 
       if(nlabel==NO_DEP){                             //Neighbour has not been visited yet 
         label(ni) = clabel;                           //Give the neighbour my label
-        pq.emplace(nx,ny,dem(ni));                    //Add the neighbour to the priority queue
+        pq.emplace(nx,ny,arp.topo(ni));                    //Add the neighbour to the priority queue
         flowdirs(nx,ny) = dinverse[n];                //Neighbour flows in the direction of this cell
       } else if (nlabel==clabel) {
         //Skip because we are not interested in ourself. That would be vain.
@@ -455,9 +463,9 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
         auto out_cell = ci;    //Pretend focal cell is the outlet
         auto out_elev = celev; //Note its height
 
-        if(dem(ni)>out_elev){  //Check to see if we were wrong and the neighbour cell is higher.
+        if(arp.topo(ni)>out_elev){  //Check to see if we were wrong and the neighbour cell is higher.
           out_cell = ni;       //Neighbour cell was higher. Note it.
-          out_elev = dem(ni);  //Note neighbour's elevation
+          out_elev = arp.topo(ni);  //Note neighbour's elevation
         }
 
         //We've found an outlet between two depressions. Now we need to
@@ -698,19 +706,18 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   std::cerr<<"p Calculating depression marginal volumes..."<<std::endl;
 
   //Get the marginal depression cell counts and total elevations
-  progress.start(dem.size());
-  for(unsigned int i=0;i<dem.size();i++){
-    ++progress;
-
-    const auto my_elev = dem(i);
-    auto clabel        = label(i);
+  
+  for(int y=0;y<label.height();y++)
+  for(int x=0;x<label.width();x++){
+    const auto my_elev = arp.topo(x,y);
+    auto clabel        = label(x,y);
     
     while(clabel!=OCEAN && my_elev>depressions.at(clabel).out_elev){
       clabel = depressions[clabel].parent;
      
     }
 
-      final_label(i) = clabel; //Richard, does this make sense here? I want another layer that contains the labels of which depressions these 
+      final_label(x,y) = clabel; //Richard, does this make sense here? I want another layer that contains the labels of which depressions these 
       //immediately belong to, even when it is a parent depression. This is so that I can change the wtd_vol in the correct place
       //when we have infiltration and wtd_vol of a depression changes. 
 
@@ -718,10 +725,13 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       continue;
 
     depressions[clabel].cell_count++;
-    depressions[clabel].total_elevation += dem(i);
+    depressions[clabel].total_elevation += arp.topo(x,y);
+    depressions[clabel].dep_area += arp.cell_area[y];
+    depressions[clabel].dep_vol += (static_cast<double>(depressions[clabel].out_elev)-arp.topo(x,y))*arp.cell_area[y];
+
+
  
   }
-  progress.stop();
 
   // { //Depression filling code
   //   rd::Array2D<elev_t> dhfilled(dem);
@@ -765,17 +775,29 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       assert(dep.rchild<d);         //ID of child must be smaller than parent's
       dep.cell_count      += depressions.at(dep.lchild).cell_count;
       dep.total_elevation += depressions.at(dep.lchild).total_elevation;
+      dep.dep_vol += depressions.at(dep.lchild).dep_vol;
+
+      dep.dep_vol += (dep.out_elev - depressions.at(dep.lchild).out_elev)* depressions.at(dep.lchild).dep_area; //adding the water volume higher than the child depression, but on the same cells
+
+
       dep.cell_count      += depressions.at(dep.rchild).cell_count;
       dep.total_elevation += depressions.at(dep.rchild).total_elevation;
+      dep.dep_vol += depressions.at(dep.rchild).dep_vol;
+      dep.dep_vol += (dep.out_elev - depressions.at(dep.rchild).out_elev)* depressions.at(dep.rchild).dep_area;
+      
+      dep.dep_area += depressions.at(dep.lchild).dep_area;
+      dep.dep_area += depressions.at(dep.rchild).dep_area;
 
     }
 
-  
+
+
     //This has to be after the foregoing because the cells added by the if-
     //clauses have additional volume above their spill elevations that cannot be
     //counted simply by adding their volumes to their parent depression.
    
-    dep.dep_vol = dep.cell_count*static_cast<double>(dep.out_elev)-dep.total_elevation;
+  //  dep.dep_vol = dep.cell_count*static_cast<double>(dep.out_elev)-dep.total_elevation;
+ //   dep.dep_vol = dep.cell_count*static_cast<double>(dep.out_elev)-dep.total_elevation_area;
 
 
 

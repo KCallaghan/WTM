@@ -41,7 +41,7 @@ class Parameters {
   double deltat         = std::numeric_limits<double>::signaling_NaN();
   double wtdmax         = std::numeric_limits<double>::signaling_NaN();
   double cellsize_n_s_metres         = std::numeric_limits<double>::signaling_NaN();
- double infiltration = 0.1;
+ double infiltration = 0.02;
   
 
   int total_cycles         = -1;
