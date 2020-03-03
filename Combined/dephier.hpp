@@ -80,24 +80,19 @@ class Depression {
   //the top of high cliffs and spilling into this depression.
   std::vector<dh_label_t> ocean_linked;
 
-
   //indicates everything that is a subdepression of this one:
-
   std::unordered_set<int> my_subdepressions;
 
   std::vector<dh_label_t> my_subdepressions_vec;
   //the label of the depression, for calling it up again
   dh_label_t dep_label = 0;
-  //Number of cells contained within the depression and its children
-  uint32_t cell_count = 0;
-  //Total of elevations within the depression, used in the WLE. Because I think I need to start adding up total elevations before I know the outlet of the depression. 
+ 
+   //Total of elevations within the depression, used in the WLE. Because I think I need to start adding up total elevations before I know the outlet of the depression. 
   //double dep_sum_elevations = 0;
-  //Total area of the cells in the depression. 
+  //Total area of the cells in the depression. Used to help keep track of total dep_vols. 
   double dep_area = 0;
   //Volume of the depression and its children. Used in the Water Level Equation (see below).
   double   dep_vol    = 0;
-
-    double   dep_vol_old    = 0;
 
   //Water currently contained within the depression. Used in the Water Level
   //Equation (see below).
@@ -110,11 +105,6 @@ class Depression {
   //extra parameter used to help calculate wtd_vol. 
   double wtd_only = 0;
 
-  //Total elevation of cells contained with the depression and its children
-  double total_elevation = 0;
-
-  //Area available to store water aboveground
- // double total_aboveground_area = 0;
 };
 
 
@@ -222,12 +212,6 @@ using DepressionHierarchy = std::vector<Depression<elev_t>>;
 //        flowdirs - A value [0,7] indicated which direction water from the cell
 //                   flows in order to go "downhill". All cells have a flow
 //                   direction (even flats) except for pit cells.
-
-
-
- 
-
-
 template<class elev_t,  Topology topo>                                                     
 DepressionHierarchy<elev_t> GetDepressionHierarchy(
   const ArrayPack &arp,
@@ -291,7 +275,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       ocean_cells++;
     }
   }
-  std::cerr<<"line 284"<<std::endl;
 
   //But maybe the user didn't specify any cells! We'll assume this was mistake
   //and throw an exception. The user can always catch it if they want to.
@@ -431,9 +414,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //However, it is harmless to check on them again.
     }
 
-    //TODO: Update the appropriate depression's cell_count and dep_vol variables                        I did this in the else if above, and then in the if and the else below. I add a cell to the count whenever it is added to the depression and add its elevation to the total elevations.
-    //here.                                                                                             Then I calculate the total volume only when we find an outlet (Good way to test this? Print values of volumes only of those that make the outlet queue? I get some negative values sometimes so I may have done something wrong, but what if it's an 'outlet' at the highest point of the depression?)
-
+  
     //Consider the cell's neighbours
     for(int n=1;n<=neighbours;n++){
       // const int nx = ModFloor(c.x+dx[n],dem.width()); //Get neighbour's x-coordinate using an offset and wrapping
@@ -678,16 +659,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       newdep.my_subdepressions_vec.resize(newdep.my_subdepressions.size());
       std::copy(newdep.my_subdepressions.begin(),newdep.my_subdepressions.end(),newdep.my_subdepressions_vec.begin());
       newdep.my_subdepressions.erase(newdep.my_subdepressions.begin(),newdep.my_subdepressions.end());
-  //    newdep.my_subdepressions.emplace_back(depa_set);
-  //    newdep.my_subdepressions.emplace_back(depb_set);
-  //    newdep.my_subdepressions.insert(newdep.my_subdepressions.end(),depressions.at(depa_set).my_subdepressions.begin(),depressions.at(depa_set).my_subdepressions.end());
-  //    newdep.my_subdepressions.insert(newdep.my_subdepressions.end(),depressions.at(depb_set).my_subdepressions.begin(),depressions.at(depb_set).my_subdepressions.end());
-
-  //    sort(newdep.my_subdepressions.begin(),newdep.my_subdepressions.end());
-  //    newdep.my_subdepressions.erase(unique(newdep.my_subdepressions.begin(),newdep.my_subdepressions.end()), newdep.my_subdepressions.end());
-
-
-
+ 
 
       djset.mergeAintoB(depa_set, newlabel); //A has a parent now
       djset.mergeAintoB(depb_set, newlabel); //B has a parent now
@@ -712,93 +684,45 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     const auto my_elev = arp.topo(x,y);
     auto clabel        = label(x,y);
     
-    while(clabel!=OCEAN && my_elev>depressions.at(clabel).out_elev){
+    while(clabel!=OCEAN && my_elev>depressions.at(clabel).out_elev)
       clabel = depressions[clabel].parent;
      
-    }
 
-      final_label(x,y) = clabel; //Richard, does this make sense here? I want another layer that contains the labels of which depressions these 
-      //immediately belong to, even when it is a parent depression. This is so that I can change the wtd_vol in the correct place
-      //when we have infiltration and wtd_vol of a depression changes. 
+    final_label(x,y) = clabel; //Richard, does this make sense here? I want another layer that contains the labels of which depressions these 
+    //immediately belong to, even when it is a parent depression. This is so that I can change the wtd_vol in the correct place
+    //when we have infiltration and wtd_vol of a depression changes. 
 
     if(clabel==OCEAN)
       continue;
 
-    depressions[clabel].cell_count++;
-    depressions[clabel].total_elevation += arp.topo(x,y);
-    depressions[clabel].dep_area += arp.cell_area[y];
-    depressions[clabel].dep_vol += (static_cast<double>(depressions[clabel].out_elev)-arp.topo(x,y))*arp.cell_area[y];
-
-
+    depressions[clabel].dep_area += arp.cell_area[y];          //We need to know the area of our child depressions when getting the total depression volumes below.
+    depressions[clabel].dep_vol += (static_cast<double>(depressions[clabel].out_elev)-arp.topo(x,y))*arp.cell_area[y];  //Add the area of one cell at a time - elevation difference between the outlet of this depression and the current cell, multiplied by the area of the current cell. 
  
   }
 
-  // { //Depression filling code
-  //   rd::Array2D<elev_t> dhfilled(dem);
-  //   for(int i=0;i<(int)dem.size();i++)
-  //     dhfilled(i) = dem(i);
-
-  //   //Get the marginal depression cell counts and total elevations
-  //   progress.start(dem.size());
-  //   for(unsigned int i=0;i<dem.size();i++){
-  //     ++progress;
-  //     auto clabel        = label(i);
-      
-  //     if(clabel==OCEAN)
-  //       continue;
-
-  //     while(depressions[clabel].parent!=OCEAN && !depressions[clabel].ocean_parent)
-  //       clabel = depressions[clabel].parent;
-
-  //     if(dem(i)<depressions[clabel].out_elev)
-  //       dhfilled(i) = depressions[clabel].out_elev;
-  //   }
-  //   progress.stop();
-
-  //   SaveAsNetCDF(dhfilled,"/z/out-dhfilled.nc","value");
-  // }
-
-
-
-
+  
   std::cerr<<"p Calculating depression total volumes..."<<std::endl;
-  //Calculate total depression volumes and cell counts
+  //Calculate total depression volumes and areas
   progress.start(depressions.size());
   for(int d=0;d<(int)depressions.size();d++){
     ++progress;
-
 
     auto &dep = depressions.at(d);
     if(dep.lchild!=NO_VALUE){
       assert(dep.rchild!=NO_VALUE); //Either no children or two children
       assert(dep.lchild<d);         //ID of child must be smaller than parent's
       assert(dep.rchild<d);         //ID of child must be smaller than parent's
-      dep.cell_count      += depressions.at(dep.lchild).cell_count;
-      dep.total_elevation += depressions.at(dep.lchild).total_elevation;
-      dep.dep_vol += depressions.at(dep.lchild).dep_vol;
 
-      dep.dep_vol += (dep.out_elev - depressions.at(dep.lchild).out_elev)* depressions.at(dep.lchild).dep_area; //adding the water volume higher than the child depression, but on the same cells
+      dep.dep_vol += depressions.at(dep.lchild).dep_vol;  //Add the actual dep volume of the child
+      dep.dep_vol += (dep.out_elev - depressions.at(dep.lchild).out_elev)* depressions.at(dep.lchild).dep_area; //add the water volume higher than the child depression's outlet, but on the same cells
 
 
-      dep.cell_count      += depressions.at(dep.rchild).cell_count;
-      dep.total_elevation += depressions.at(dep.rchild).total_elevation;
       dep.dep_vol += depressions.at(dep.rchild).dep_vol;
       dep.dep_vol += (dep.out_elev - depressions.at(dep.rchild).out_elev)* depressions.at(dep.rchild).dep_area;
       
-      dep.dep_area += depressions.at(dep.lchild).dep_area;
+      dep.dep_area += depressions.at(dep.lchild).dep_area;  //remember to add the area covered by child depression cells, so that our parent can also get the correct total dep_vol. 
       dep.dep_area += depressions.at(dep.rchild).dep_area;
-
     }
-
-
-
-    //This has to be after the foregoing because the cells added by the if-
-    //clauses have additional volume above their spill elevations that cannot be
-    //counted simply by adding their volumes to their parent depression.
-   
-  //  dep.dep_vol = dep.cell_count*static_cast<double>(dep.out_elev)-dep.total_elevation;
- //   dep.dep_vol = dep.cell_count*static_cast<double>(dep.out_elev)-dep.total_elevation_area;
-
 
 
     assert(dep.lchild==NO_VALUE || (depressions.at(dep.lchild).dep_vol+depressions.at(dep.rchild).dep_vol) - dep.dep_vol <= FP_ERROR);
