@@ -57,6 +57,7 @@ class ArrayPack {
   f2d e_sat;
   f2d e_a;
   f2d evap;
+  f2d surface_evap;
   f2d starting_evap;
   f2d relhum;
   f2d precip;

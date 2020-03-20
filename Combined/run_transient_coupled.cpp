@@ -96,7 +96,7 @@ int main(int argc, char **argv){
     arp.topo          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_topo.nc",   "value");  //Units: metres
     arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_evap.nc",   "value");  //Units: m/yr
     arp.relhum        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc",   "value");  //Units: proportion from 0 to 1.
-    arp.wtd           = rd::Array2D<float>(arp.topo,-100.0);
+    arp.wtd           = rd::Array2D<float>(arp.topo,0.0);
 
   }
   else{

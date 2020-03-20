@@ -35,8 +35,9 @@ void evaporation_update(Parameters &params, ArrayPack &arp){
 
     arp.e_sat(i) = 611 * std::exp((lambda/R_v)*((1/273.15) - (1/(arp.temp(i)+273.15)) ));
     arp.e_a(i) = arp.relhum(i)*arp.e_sat(i);
+    arp.surface_evap(i) = (arp.e_sat(i) - arp.e_a(i));        //TODO: get full/proper equation in here
+
     if(arp.wtd(i)>0)  //if there is surface water present
-  //    arp.evap(i) = 1000000000.0;
       arp.evap(i) = (arp.e_sat(i) - arp.e_a(i))*10.0;        //TODO: get full/proper equation in here
     else              //water table is below the surface
       arp.evap(i) = arp.starting_evap(i);  //we have to reset it to not surface water conditions, else a cell that used to have surface water would still be considered that way

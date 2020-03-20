@@ -30,7 +30,8 @@ const int *const dinverse   = d8_inverse;
 const int        neighbours = 8;
 
 const double FP_ERROR = 1e-4;
-const double infiltration_FSM = 0.1;
+const double infiltration_FSM = 0.5;
+//const double evaporation_FSM = 0.5; //TODO - obviously this should be based on actual surface evap rates. This is just for testing purposes quickly.
 
 
 ///////////////////////////////////
@@ -346,7 +347,13 @@ static void MoveWaterIntoPits(
         arp.surface_water(c) = 0; //Clean up as we go
       }
     }else {                               //not a pit cell
-      //If we have water, pass it downstream.
+
+//let some evaporation happen
+      if(arp.surface_water(c)>0){
+        arp.surface_water(c) = arp.surface_water(c)*(1-surface_evap(c));
+      }
+
+      //If we still have water, pass it downstream.
       if(arp.surface_water(c)>0){ 
         //We use cell areas because the depth will change if we are moving to a cell on a different latitude. 
         arp.surface_water(n) += arp.surface_water(c)*arp.cell_area[y]/arp.cell_area[ny];  //Add water to downstream neighbour. This might result in filling up the groundwater table, which could have been negative
@@ -365,8 +372,11 @@ static void MoveWaterIntoPits(
             wtd(n) = 0;
           }
         }
+
       }
-  
+
+
+
       //Decrement the neighbour's dependencies. If there are no more dependencies,
       //we can process the neighbour.
       if(--dependencies(n)==0){                            
@@ -797,7 +807,10 @@ static void MoveWaterInOverflow(
   assert(extra_water > 0);
 
   while(extra_water > 0){
-  
+    //first let some of it evaporate for each cell it goes over. 
+    extra_water = extra_water*(1-surface_evap(c));
+
+
     infiltration_amount = extra_water*infiltration_FSM;
     if(extra_water <= 0.001)
       infiltration_amount = extra_water;
@@ -1420,14 +1433,14 @@ static void FillDepressions(
         //We have that Volume = (Water Level)*(Cell Count)-(Total Elevation)
         //rearranging this gives us:
    //     water_level = (water_vol+total_elevation)/cells_affected.size();//TODO
-          water_level = (water_vol/current_area)+total_elevation/cells_affected.size();
-         // water_level = topo(c.x,c.y);  //TODO: THIS IS INCORRECT! The real value should be something less than topo(c.x,c.y) but more than the topo of the previous cell. Not sure how to calculate it now that water_vol is an actual volume...
+   //       water_level = (water_vol/current_area)+total_elevation/cells_affected.size();
+          water_level = topo(c.x,c.y);  //TODO: THIS IS INCORRECT! The real value should be something less than topo(c.x,c.y) but more than the topo of the previous cell. Not sure how to calculate it now that water_vol is an actual volume...
 
       }
       //Water level must be higher than (or equal to) the previous cell we looked at, but lower than (or equal to) the current cell
-      std::cout<<"topo "<<current_elevation<<" "<<previous_elevation<<std::endl;
-      std::cout<<" water level "<<water_level<<std::endl;
-      std::cout<<"current area "<<current_area<<" water vol "<<water_vol<<" total elevation "<<total_elevation<<" cells affected size "<<cells_affected.size()<<std::endl;
+     // std::cout<<"topo "<<current_elevation<<" "<<previous_elevation<<std::endl;
+     // std::cout<<" water level "<<water_level<<std::endl;
+     // std::cout<<"current area "<<current_area<<" water vol "<<water_vol<<" total elevation "<<total_elevation<<" cells affected size "<<cells_affected.size()<<std::endl;
       assert(cells_affected.size()==0 || topo(cells_affected.back()) - water_level <= FP_ERROR); 
       assert(topo(c.x,c.y)-water_level >= -FP_ERROR);
 
