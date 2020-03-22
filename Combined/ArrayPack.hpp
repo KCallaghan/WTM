@@ -39,6 +39,7 @@ class ArrayPack {
   f2d precip_start; 
   f2d starting_evap_start; 
   f2d relhum_start; 
+  f2d slope_start;
 
   f2d topo_end;
   f2d rech_end;
@@ -47,6 +48,7 @@ class ArrayPack {
   f2d precip_end;
   f2d starting_evap_end;
   f2d relhum_end;
+  f2d slope_end;
 
   f2d topo;
   f2d rech;
@@ -65,6 +67,7 @@ class ArrayPack {
   f2d total;
   f2d wtd_change_total;
   f2d stability_time_seconds;
+  f2d slope;
 
 
   dh_label_t label;

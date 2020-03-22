@@ -31,7 +31,6 @@ const int        neighbours = 8;
 
 const double FP_ERROR = 1e-4;
 const double infiltration_FSM = 0.5;
-//const double evaporation_FSM = 0.5; //TODO - obviously this should be based on actual surface evap rates. This is just for testing purposes quickly.
 
 
 ///////////////////////////////////
@@ -40,6 +39,7 @@ const double infiltration_FSM = 0.5;
 
 template<class elev_t, class wtd_t>
 void FillSpillMerge(
+  const Parameters              &params,
   const rd::Array2D<elev_t>     &topo,
   const rd::Array2D<dh_label_t> &label,
   const rd::Array2D<dh_label_t> &final_label,
@@ -57,6 +57,8 @@ static void MoveWaterIntoPits(
   const rd::Array2D<flowdir_t>  &flowdirs,
   DepressionHierarchy<elev_t>   &deps,
   rd::Array2D<wtd_t>            &wtd,
+  const Parameters              &params,
+
   ArrayPack                     &arp
 );
 
@@ -67,6 +69,14 @@ static void CalculateWtdVol(
   const rd::Array2D<elev_t>     &topo,
   const rd::Array2D<dh_label_t> &final_label,
   DepressionHierarchy<elev_t>   &deps
+);
+
+static double CalculateDeltaT(
+  int                           cell,
+  int                           direction,
+  double                        h_0,
+  const Parameters              &params,
+  ArrayPack                     &arp
 );
 
 
@@ -80,6 +90,7 @@ static void MoveWaterInDepHier(
   const rd::Array2D<flowdir_t>               &flowdirs,
   rd::Array2D<wtd_t>                         &wtd,
   std::unordered_map<dh_label_t, dh_label_t> &jump_table,
+  const Parameters                           &params,
   ArrayPack                                  &arp
 );
 
@@ -95,6 +106,7 @@ static void MoveWaterInOverflow(
   const rd::Array2D<int>         &final_label,
   const rd::Array2D<int>         &label,
   DepressionHierarchy<elev_t>    &deps,
+  const Parameters               &params,
   ArrayPack                      &arp
   );
 
@@ -111,6 +123,7 @@ static dh_label_t OverflowInto(
   DepressionHierarchy<elev_t>                &deps,
   std::unordered_map<dh_label_t, dh_label_t> &jump_table,
   double                                     extra_water,
+  const Parameters                           &params,
   ArrayPack                                  &arp
 );
 
@@ -165,6 +178,7 @@ static void FillDepressions(
 ///        saturated a cell is or how much standing surface water it has.
 template<class elev_t, class wtd_t>
 void FillSpillMerge(
+  const Parameters              &params,
   const rd::Array2D<elev_t>     &topo,
   const rd::Array2D<dh_label_t> &label,
   const rd::Array2D<dh_label_t> &final_label,
@@ -177,7 +191,7 @@ void FillSpillMerge(
   timer_overall.start();
   
   //We move standing water downhill to the pit cells of each depression
-  MoveWaterIntoPits(topo, label,final_label, flowdirs, deps, wtd,arp);
+  MoveWaterIntoPits(topo, label,final_label, flowdirs, deps, wtd,params,arp);
 
   { 
     //Scope to limit `timer_overflow` and `jump_table`. Also ensures
@@ -195,7 +209,7 @@ void FillSpillMerge(
     //depressions which contain too much water overflow into depressions that
     //have less water. If enough overflow happens, then the water is ultimately
     //routed to the ocean.
-    MoveWaterInDepHier(OCEAN, deps, topo,label,final_label,flowdirs,wtd,jump_table,arp);
+    MoveWaterInDepHier(OCEAN, deps, topo,label,final_label,flowdirs,wtd,jump_table,params,arp);
 
     std::cerr<<"t FlowInDepressionHierarchy: Overflow time = "<<timer_overflow.stop()<<std::endl;
   }
@@ -256,6 +270,8 @@ static void MoveWaterIntoPits(
   const rd::Array2D<flowdir_t> &flowdirs,
   DepressionHierarchy<elev_t>  &deps,
   rd::Array2D<wtd_t>           &wtd,
+  const Parameters             &params,
+
   ArrayPack                    &arp
 ){
   rd::Timer timer;
@@ -350,7 +366,13 @@ static void MoveWaterIntoPits(
 
 //let some evaporation happen
       if(arp.surface_water(c)>0){
-        arp.surface_water(c) = arp.surface_water(c)*(1-surface_evap(c));
+        int direction = 0;
+        if(arp.cellsize_e_w_metres[c] == arp.cellsize_e_w_metres[n])  //the two cells have the same e-w cellsize, therefore they are on the same e-w row, so we should use the e-w distance in calculating delta_t
+          direction = 1; //using an int to indicate which it is
+        double evap_amount = arp.surface_evap(c) * CalculateDeltaT(c,direction,arp.surface_water(c),params,arp);
+        if(evap_amount > arp.surface_water(c))
+          evap_amount = arp.surface_water(c);
+        arp.surface_water(c) = arp.surface_water(c)-evap_amount;
       }
 
       //If we still have water, pass it downstream.
@@ -493,6 +515,40 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
 
 
 
+
+
+
+static double CalculateDeltaT(
+  int                           cell,
+  int                           direction,
+  double                        h_0,
+  const Parameters              &params,
+  ArrayPack                     &arp
+){
+  float mannings_n = 0.05; //TODO: is this the best value?
+  if(direction == 0)
+    return (h_0 - std::pow( (std::pow(h_0,(5.0/3.0)) - (5.0/3.0) * (mannings_n/(std::pow(arp.slope(cell), 0.5) )) * (arp.ksat(cell) + arp.surface_evap(cell))) * params.cellsize_n_s_metres ,(3.0/5.0))) / (arp.ksat(cell) + arp.surface_evap(cell));
+  return (h_0 - std::pow( (std::pow(h_0,(5.0/3.0)) - (5.0/3.0) * (mannings_n/(std::pow(arp.slope(cell), 0.5) )) * (arp.ksat(cell) + arp.surface_evap(cell))) * arp.cellsize_e_w_metres[cell] ,(3.0/5.0))) / (arp.ksat(cell) + arp.surface_evap(cell));
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ///At this point all the values of the water table `wtd`, which is not used by
 ///this function, are <=0. The excess water, which will eventually become
 ///standing surface water, is stored in the DepressionHierarchy itself in the
@@ -537,6 +593,7 @@ static void MoveWaterInDepHier(
   const rd::Array2D<flowdir_t>               &flowdirs,
   rd::Array2D<wtd_t>                         &wtd,
   std::unordered_map<dh_label_t, dh_label_t> &jump_table,
+  const Parameters                           &params,
   ArrayPack                                  &arp
 ){
  
@@ -547,15 +604,15 @@ static void MoveWaterInDepHier(
 
   //Visit child depressions. When these both overflow, then we spread water
   //across them by spreading water across their common metadepression
-  MoveWaterInDepHier(this_dep.lchild, deps, topo,label,final_label,flowdirs,wtd, jump_table,arp);
-  MoveWaterInDepHier(this_dep.rchild, deps, topo,label,final_label,flowdirs,wtd, jump_table,arp);
+  MoveWaterInDepHier(this_dep.lchild, deps, topo,label,final_label,flowdirs,wtd, jump_table,params,arp);
+  MoveWaterInDepHier(this_dep.rchild, deps, topo,label,final_label,flowdirs,wtd, jump_table,params,arp);
 
   //Catch depressions that link to the ocean through this one. These are special
   //cases because we will never spread water across the union of these
   //depressions and the current depressions: they only flow into the current
   //depression
   for(const auto c: this_dep.ocean_linked)
-    MoveWaterInDepHier(c, deps, topo,label,final_label,flowdirs,wtd, jump_table,arp);
+    MoveWaterInDepHier(c, deps, topo,label,final_label,flowdirs,wtd, jump_table,params,arp);
 
   //If the current depression is the ocean then at this point we've visited all
   //of its ocean-linked depressions (the ocean has no children). Since we do not
@@ -644,7 +701,7 @@ static void MoveWaterInDepHier(
     //end up in this depression's parent. So at this point we don't have to
     //worry about the extra water here any more.
 
-    OverflowInto(this_dep.geolink, this_dep.dep_label, this_dep.parent, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water,arp); //TODO: use odep or geolink here?
+    OverflowInto(this_dep.geolink, this_dep.dep_label, this_dep.parent, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water,params,arp); //TODO: use odep or geolink here?
 
 
     assert(this_dep.water_vol >= -FP_ERROR);
@@ -707,6 +764,7 @@ static void MoveWaterInOverflow(
   const rd::Array2D<int>         &final_label,
   const rd::Array2D<int>         &label,
   DepressionHierarchy<elev_t>    &deps,
+  const Parameters               &params,
   ArrayPack                      &arp
 
   ){
@@ -717,6 +775,7 @@ static void MoveWaterInOverflow(
   int my_label = label(last_dep.out_cell);                                               //the cell that will be the next to receive the extra water
   int x,y;
   topo.iToxy(last_dep.out_cell,x,y);  
+  int current_cell = last_dep.out_cell;
 
   assert(extra_water > 0);
   float infiltration_amount = extra_water*infiltration_FSM;  //Note that extra_water is a volume, so in this context infiltration_FSM is also a volume. TODO: at some locations in the code, it is a height. Standardise?
@@ -808,7 +867,20 @@ static void MoveWaterInOverflow(
 
   while(extra_water > 0){
     //first let some of it evaporate for each cell it goes over. 
-    extra_water = extra_water*(1-surface_evap(c));
+
+    int direction = 0;
+    if(arp.cellsize_e_w_metres[current_cell] == arp.cellsize_e_w_metres[move_to_cell])  //the two cells have the same e-w cellsize, therefore they are on the same e-w row, so we should use the e-w distance in calculating delta_t
+      direction = 1; //using an int to indicate which it is
+
+    double evap_amount = arp.surface_evap(move_to_cell) * CalculateDeltaT(move_to_cell,direction,extra_water,params,arp);
+
+    if(evap_amount > extra_water)
+      evap_amount = extra_water;
+    extra_water = extra_water - evap_amount;
+
+    if(extra_water == 0)
+      break;
+
 
 
     infiltration_amount = extra_water*infiltration_FSM;
@@ -855,6 +927,7 @@ static void MoveWaterInOverflow(
         //TODO: confirm whether the water_vol for this depression knows about the remaining extra_water. 
         
       else{                                   //we need to keep moving downslope. 
+        current_cell = move_to_cell;
         int x1,y1;
         topo.iToxy(move_to_cell,x1,y1);              //then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
         nx = x1+dx[ndir];
@@ -893,6 +966,8 @@ static void MoveWaterInOverflow(
         extra_water = 0;
 
       else{                                   //we need to keep moving downslope. 
+
+        current_cell = move_to_cell;
         int x1,y1;
         topo.iToxy(move_to_cell,x1,y1);              //then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
         nx = x1+dx[ndir];
@@ -901,6 +976,7 @@ static void MoveWaterInOverflow(
         assert(move_to_cell>=0);
       }
     }
+
   }
 }
 
@@ -962,6 +1038,7 @@ static dh_label_t OverflowInto(
   DepressionHierarchy<elev_t>                &deps,
   std::unordered_map<dh_label_t, dh_label_t> &jump_table,  //Shortcut from one depression to its next known empty neighbour
   double                                     extra_water,
+  const Parameters                           &params,
   ArrayPack                                  &arp 
 ){
 
@@ -1001,7 +1078,7 @@ static dh_label_t OverflowInto(
         //in this case, we should move water to the inlet of this depression and let it flow downslope. Although this is only necessary if there is groundwater space available...
 
         if(this_dep.wtd_vol > this_dep.dep_vol && this_dep.water_vol < this_dep.wtd_vol){ //okay, there is groundwater volume to fill, so we must move the water properly.                                                        //TODO: is the second part of that if correct?
-          MoveWaterInOverflow(extra_water,this_dep.dep_label,last_dep.dep_label,topo,wtd,flowdirs,final_label,label,deps,arp);
+          MoveWaterInOverflow(extra_water,this_dep.dep_label,last_dep.dep_label,topo,wtd,flowdirs,final_label,label,deps,params,arp);
           assert(this_dep.water_vol==0 || this_dep.water_vol - this_dep.wtd_vol <= FP_ERROR);                  
         } 
 
@@ -1031,7 +1108,7 @@ static dh_label_t OverflowInto(
   
         this_dep.water_vol  = std::min(this_dep.water_vol+extra_water,this_dep.wtd_vol);      //  this_dep.water_vol += extra_water; //TODO: Is this right? Something is off about water vols and extra water but I am VERY unsure if this is right. 
         //NO - extra_water is based on what the water_vol already was!!!
-        MoveWaterInOverflow(extra_water,this_dep.dep_label,last_dep.dep_label,topo,wtd,flowdirs,final_label,label,deps,arp);
+        MoveWaterInOverflow(extra_water,this_dep.dep_label,last_dep.dep_label,topo,wtd,flowdirs,final_label,label,deps,params,arp);
         extra_water = 0;
         assert(this_dep.water_vol==0 || this_dep.water_vol - this_dep.wtd_vol <= FP_ERROR);        //TODO: Is this assert right? What assert would be appropriate here? What if thisone just needs to further overflow?
       }    
@@ -1066,7 +1143,7 @@ static dh_label_t OverflowInto(
     if(this_dep.parent!=OCEAN && pdep.water_vol==0) //At this point we're full and heading to our parent, so it needs to know that it contains our water
       pdep.water_vol += this_dep.water_vol;
     this_dep.water_vol = this_dep.wtd_vol;
-    return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water,arp);  //Nope. Pass the water to the parent
+    return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water,params,arp);  //Nope. Pass the water to the parent
   }
 
   //Can overflow depression hold more water?
@@ -1082,7 +1159,7 @@ static dh_label_t OverflowInto(
     //TODO: No I shouldn't, since it gets set equal to wtd vol before I call overflowinto. However, do I need to sometimes subtract it? Subtract it somewhere else?
    // this_dep.water_vol -= extra_water;
    // this_dep.water_vol = std::max(this_dep.water_vol,0.0);
-    return jump_table[root] = OverflowInto(this_dep.geolink, this_dep.dep_label, stop_node, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water,arp);
+    return jump_table[root] = OverflowInto(this_dep.geolink, this_dep.dep_label, stop_node, topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water,params,arp);
   }  //TODO: I am concerned that using the geolink here may actually no longer be the best choice now that I've implemented downslope flow of water when overflowing. 
      //Imagine the case where dep A is geolinked to dep B but dep B is a part of metadep C and A and B don't actually touch. During overflow, we 
      //won't find any cells of B to flow into. So I think linking to C, i.e. the odep, will actually work best?
@@ -1100,7 +1177,7 @@ static dh_label_t OverflowInto(
   this_dep.water_vol = this_dep.wtd_vol;
 
   //THIRD PLACE TO STASH WATER: IN THIS DEPRESSION'S PARENT
-  return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node,topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water,arp);
+  return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node,topo,label,final_label,flowdirs,wtd, deps, jump_table, extra_water,params,arp);
 }
 
 

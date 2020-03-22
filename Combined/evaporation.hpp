@@ -35,7 +35,7 @@ void evaporation_update(Parameters &params, ArrayPack &arp){
 
     arp.e_sat(i) = 611 * std::exp((lambda/R_v)*((1/273.15) - (1/(arp.temp(i)+273.15)) ));
     arp.e_a(i) = arp.relhum(i)*arp.e_sat(i);
-    arp.surface_evap(i) = (arp.e_sat(i) - arp.e_a(i));        //TODO: get full/proper equation in here
+    arp.surface_evap(i) = 0.1;//(arp.e_sat(i) - arp.e_a(i));        //TODO: get full/proper equation in here
 
     if(arp.wtd(i)>0)  //if there is surface water present
       arp.evap(i) = (arp.e_sat(i) - arp.e_a(i))*10.0;        //TODO: get full/proper equation in here
