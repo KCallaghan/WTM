@@ -39,7 +39,7 @@ const double infiltration_FSM = 0.5;
 
 template<class elev_t, class wtd_t>
 void FillSpillMerge(
-   Parameters              &params,
+  Parameters                    &params,
   const rd::Array2D<elev_t>     &topo,
   const rd::Array2D<dh_label_t> &label,
   const rd::Array2D<dh_label_t> &final_label,
@@ -57,8 +57,7 @@ static void MoveWaterIntoPits(
   const rd::Array2D<flowdir_t>  &flowdirs,
   DepressionHierarchy<elev_t>   &deps,
   rd::Array2D<wtd_t>            &wtd,
-   Parameters              &params,
-
+  Parameters                    &params,
   ArrayPack                     &arp
 );
 
@@ -73,9 +72,9 @@ static void CalculateWtdVol(
 
  void CalculateEvaporationAndInfiltration(
   int                           cell,
-  double                           distance,
+  double                        distance,
   double                        h_0,
-   Parameters              &params,
+  Parameters                    &params,
   ArrayPack                     &arp
 );
 
@@ -90,7 +89,7 @@ static void MoveWaterInDepHier(
   const rd::Array2D<flowdir_t>               &flowdirs,
   rd::Array2D<wtd_t>                         &wtd,
   std::unordered_map<dh_label_t, dh_label_t> &jump_table,
-   Parameters                           &params,
+  Parameters                                 &params,
   ArrayPack                                  &arp
 );
 
@@ -106,7 +105,7 @@ static void MoveWaterInOverflow(
   const rd::Array2D<int>         &final_label,
   const rd::Array2D<int>         &label,
   DepressionHierarchy<elev_t>    &deps,
-   Parameters               &params,
+  Parameters                     &params,
   ArrayPack                      &arp
   );
 
@@ -1441,7 +1440,7 @@ static void FillDepressions(
   //for calculating the volume we've seen so far. (See explanation above or in
   //dephier.hpp TODO)
   double total_elevation = 0;
-
+  double area_times_elevation_total = 0;
   double current_volume = 0;
   double current_area = 0;
 
@@ -1517,11 +1516,12 @@ static void FillDepressions(
       } else if (current_volume==water_vol)   //The volume of water is exactly equal to the above ground volume so we set the water level equal to this cell's elevation
           water_level = topo(c.x,c.y);
       else {  //The water volume is less than this cell's elevation, so we calculate what the water level should be.
-        //We have that Volume = (Water Level)*(Cell Count)-(Total Elevation)
+        //Volume of water = sum(current_area*(water_level - cell_elevation))
+        //                = sum(current_area * water_level) - sum(current_area * cell_elevation)
+        //                = water_level * sum(current_area) - sum(current_area * cell_elevation)
         //rearranging this gives us:
-   //     water_level = (water_vol+total_elevation)/cells_affected.size();//TODO
-   //       water_level = (water_vol/current_area)+total_elevation/cells_affected.size();
-          water_level = topo(c.x,c.y);  //TODO: THIS IS INCORRECT! The real value should be something less than topo(c.x,c.y) but more than the topo of the previous cell. Not sure how to calculate it now that water_vol is an actual volume...
+  
+        water_level = (water_vol / current_area) + (area_times_elevation_total / current_area);
 
       }
       //Water level must be higher than (or equal to) the previous cell we looked at, but lower than (or equal to) the current cell
@@ -1580,7 +1580,7 @@ static void FillDepressions(
            //Add the current cell's information to the running total
       total_elevation += topo(c.x,c.y);
       current_area += arp.cell_area[c.y];  //adding to the area after the volume because when there is only 1 cell, the answer for volume should be 0, etc. Don't want to include the area of the target cell. 
-
+      area_times_elevation_total += topo(c.x,c.y)*arp.cell_area[c.y];
 
       
  
