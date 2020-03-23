@@ -370,18 +370,12 @@ static void MoveWaterIntoPits(
 
 //let some evaporation happen
 
-      //TODO: I have evap happening in cell c but infiltration in cell n. Which cell should it be in?
       if(arp.surface_water(c)>0){
         direction = 0;
         if(arp.cellsize_e_w_metres[c] == arp.cellsize_e_w_metres[n])  //the two cells have the same e-w cellsize, therefore they are on the same e-w row, so we should use the e-w distance in calculating delta_t
           direction = 1; //using an int to indicate which it is
-       // float evap_amount = arp.surface_evap(c) * CalculateEvaporationAndInfiltration(c,direction,arp.surface_water(c),params,arp);
-       // if(evap_amount > arp.surface_water(c))
-       //   evap_amount = arp.surface_water(c);
        
         CalculateEvaporationAndInfiltration(c,direction,arp.surface_water(c),params,arp);
-     //   std::cout<<"c "<<c<<" direction "<<direction<<" surface water "<<arp.surface_water(c)<<" wtd "<<wtd(c)<<std::endl;
-      //  std::cout<<"infiltration "<<params.infiltration<<" evaporation "<<params.evaporation<<std::endl;
         arp.surface_water(c) = arp.surface_water(c)-params.evaporation;
         wtd(c) += params.infiltration;
         arp.surface_water(c) -= params.infiltration;
@@ -395,23 +389,7 @@ static void MoveWaterIntoPits(
         arp.surface_water(n) += arp.surface_water(c)*arp.cell_area[y]/arp.cell_area[ny];  //Add water to downstream neighbour. This might result in filling up the groundwater table, which could have been negative
         arp.surface_water(c)  = 0;       //Clean up as we go
 
- //       if(wtd(n)<0){  //This is where we allow water to infiltrate, but not all of it. Only some proportion, dictated by the value of infiltration_FSM. 
- //         float infiltration_amount = arp.ksat(n) * CalculateEvaporationAndInfiltration(n,direction,arp.surface_water(n),params,arp);
-  //        if(infiltration_amount > arp.surface_water(n))
-    //        infiltration_amount = arp.surface_water(n);     //If there is a mm or less of surface water, just let it all infiltrate. Else we end up with super small bits of water still moving around and it's just silly later on. 
-      //    if((wtd(n) + infiltration_amount) <= 0){
-        //    wtd(n) += infiltration_amount;
-          //  arp.surface_water(n) -= infiltration_amount; 
-   //       }
-     //     else{
-       //     arp.surface_water(n) += wtd(n); //plus because wtd is negative. 
-         //   wtd(n) = 0;
-         // }
-      //  }
-
       }
-
-
 
       //Decrement the neighbour's dependencies. If there are no more dependencies,
       //we can process the neighbour.
@@ -556,17 +534,7 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
   double numerator = h_0 - bracket_pow;
 
   double delta_t = numerator/denominator;
- // std::cout<<"times_dx "<<times_dx<<std::endl;
- // std::cout<<"slope "<<slope<<std::endl;
- // std::cout<<"slope_pow "<<slope_pow<<std::endl;
- // std::cout<<"times_fractions "<<times_fractions<<std::endl;
-  //  std::cout<<"h0 "<<h_0<<std::endl;
-
- // std::cout<<"h0_pow "<<h0_pow<<std::endl;
- // std::cout<<"bracket "<<bracket<<std::endl;
-  //  std::cout<<"bracket pow "<<bracket_pow<<std::endl;
-
- // std::cout<<"what is going wrong? "<<numerator<<" "<<denominator<<std::endl;
+ 
 
 //it's a normal case, the water is not running out and the cell is not becoming saturated. 
     params.infiltration = arp.ksat(cell)*(delta_t);
@@ -574,12 +542,10 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
 
 
   if(h0_pow < times_fractions){  //all of the water is getting used up. We have to limit the sum of infiltration and evaporation to be equal to the available water, h0.
-   // std::cout<<"used up "<<std::endl;
     params.infiltration =  h_0/(arp.ksat(cell)+arp.surface_evap(cell)) * arp.ksat(cell);
     params.evaporation = h_0/(arp.ksat(cell)+arp.surface_evap(cell)) * arp.surface_evap(cell);
   }
    if(arp.wtd(cell) > -params.infiltration){  //the cell is getting saturated partway. We must recalculate the amount of evaporation that will happen since there is still more water available at that stage.
-     //   std::cout<<"saturated "<<std::endl;
 
     params.infiltration = std::min(params.infiltration,-arp.wtd(cell));  //The cell becomes saturated. 
 
@@ -588,18 +554,12 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
     bracket = std::pow(h_0,(5.0/3.0)) - std::pow((h_0 - (denominator*(params.infiltration/arp.ksat(cell)))),(5.0/3.0));
     double delta_x = (3.0/5.0) * (std::pow(slope,0.5) /(mannings_n*denominator) );  //so this is how far it would travel across the cell before the cell got saturated. 
 
-//std::cout<<"**********************************************************************"<<std::endl;
 
-//std::cout<<"delta x "<<delta_x<<std::endl;
 
   times_dx = denominator * delta_x;
- //std::cout<<"times dx "<<times_dx<<std::endl;
   times_fractions = times_dx * (mannings_n/slope_pow) * (5/3);
-//std::cout<<"times fractions "<<times_fractions<<std::endl;
   bracket = h0_pow - times_fractions;
- // std::cout<<"bracket "<<bracket<<std::endl;
   bracket_pow = std::pow(bracket,(3.0/5.0));
- // std::cout<<"bracket pow "<<bracket_pow<<std::endl;
   numerator = h_0 - bracket_pow;
 
   delta_t = numerator/denominator;
@@ -609,74 +569,37 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
   else
     params.evaporation = 0.0;
 
-//std::cout<<"evap part one "<<params.evaporation<<std::endl;
 h_0 = h_0 - params.evaporation - params.infiltration;
 h0_pow = std::pow(h_0,(5.0/3.0));
-
-//std::cout<<"h0 "<<h_0<<std::endl;
-
 
 
    denominator = 0 + arp.surface_evap(cell);
  
-
-//std::cout<<"denominator "<<denominator<<std::endl;
-
-
 
 
    times_dx = denominator * (params.cellsize_n_s_metres - delta_x);
   if(direction == 1)
     times_dx = denominator * (arp.cellsize_e_w_metres[cell] - delta_x);
 
-//std::cout<<"times dx "<<times_dx<<std::endl;
 
    times_fractions = times_dx * (mannings_n/slope_pow) * (5/3);
-//std::cout<<"times fractions "<<times_fractions<<std::endl;
 
    bracket = h0_pow - times_fractions;
-  // std::cout<<"bracket "<<bracket<<std::endl;
 
    bracket_pow = std::pow(bracket,(3.0/5.0));
    numerator = h_0 - bracket_pow;
-//std::cout<<"numerator "<<numerator<<std::endl;
-//std::cout<<"denominator "<<denominator<<std::endl;
 
    delta_t = numerator/denominator;
-//std::cout<<"delta t "<<delta_t<<std::endl;
 
   if((h0_pow > times_fractions) && !isnan(delta_t) &&!isinf(delta_t))
      params.evaporation += arp.surface_evap(cell)*(delta_t);
 
- //  std::cout<<"evap part two "<<params.evaporation<<std::endl;
 
 
 }
-  //  params.evaporation = 0.0;
   }
- // if(arp.slope(cell)==0){
- //   std::cout<<"zero slope"<<std::endl;
- //   params.infiltration = -arp.wtd(cell);
- //   params.evaporation = h_0 - params.infiltration;
- // }
-  
-//std::cout<<"infiltration was "<<params.infiltration<<" and evaporation was "<<params.evaporation<<std::endl;
-//  if(direction == 0)    
-//    return (h_0 - std::pow( (std::pow(h_0,(5.0/3.0)) - (5.0/3.0) * (mannings_n/(std::pow(arp.slope(cell), 0.5) )) * (arp.ksat(cell) + arp.surface_evap(cell))) * params.cellsize_n_s_metres ,(3.0/5.0))) / (arp.ksat(cell) + arp.surface_evap(cell));
-//  return (h_0 - std::pow( (std::pow(h_0,(5.0/3.0)) - (5.0/3.0) * (mannings_n/(std::pow(arp.slope(cell), 0.5) )) * (arp.ksat(cell) + arp.surface_evap(cell))) * arp.cellsize_e_w_metres[cell] ,(3.0/5.0))) / (arp.ksat(cell) + arp.surface_evap(cell));
-//params.infiltration = 0.0;
-//params.evaporation = 0.0;
+ 
 }
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -912,262 +835,110 @@ static void MoveWaterInOverflow(
   int x,y;
   topo.iToxy(last_dep.out_cell,x,y);  
   int current_cell = last_dep.out_cell;
+  int previous_cell;
   int direction = 0;
 
 //convert extra water to a height
-  extra_water = extra_water/arp.cell_area[y];
+  extra_water = extra_water/arp.cell_area[y];  //it was easier to have extra_water as a volume when calling this function, since it was calculated from the volumes of the depressions and the water.
+  //however, inside this function it is easier to have as a height, since evaporation and infilatration are happening and will be calculated as heights. 
 
   assert(extra_water > 0);
 
+  int nx;
+  int ny;
+  //The water must move downslope but we must also check that it moves towards this_dep and doesn't flow back into last_dep
+  move_to_cell = NO_VALUE;   
+  previous_cell = NO_VALUE;
+  for(int n=1;n<=neighbours;n++){ //Check out our neighbours
+    //Use offset to get neighbour x coordinate
+    nx = x+dx[n];
+    //Use offset to get neighbour y coordinate
+    ny = y+dy[n];      
+    if(!topo.inGrid(nx,ny))  //Is cell outside grid (too far North/South)?
+      continue;              //Yup: skip it.
 
- 
-       CalculateEvaporationAndInfiltration(last_dep.out_cell,0,extra_water,params,arp);
-       std::cout<<"extra water "<<extra_water<<" evap "<<params.evaporation<<" inf "<<params.infiltration<<" cell area "<<arp.cell_area[y]<<" wtd "<<wtd(last_dep.out_cell)<<std::endl;
-        extra_water -= params.evaporation;
-        wtd(last_dep.out_cell) += params.infiltration;
-        extra_water -= params.infiltration;
-        assert(wtd(last_dep.out_cell)<=FP_ERROR);
-        assert(extra_water>=-FP_ERROR);
-  
+    if((this_dep.my_subdepressions.count(label(nx,ny))!=0 || this_dep.dep_label == label(nx,ny)) && (move_to_cell == NO_VALUE || topo(nx,ny)<topo(move_to_cell)))  
+      move_to_cell = topo.xyToI(nx,ny);
 
- // float infiltration_amount = arp.ksat(last_dep.out_cell) * CalculateEvaporationAndInfiltration(last_dep.out_cell,0,extra_water/arp.cell_area[y],params,arp);
-  //if(infiltration_amount > extra_water/arp.cell_area[y])
-  //  infiltration_amount = extra_water/arp.cell_area[y];     //Note that extra_water is a volume, so in this context infiltration_FSM is also a volume. TODO: at some locations in the code, it is a height. Standardise?
-
-
- // if(infiltration_amount <= -wtd(last_dep.out_cell)){  //so the whole infiltration amount can infiltrate in this cell (but there is potentially still more water to flow downslope)
- //   extra_water -= infiltration_amount*arp.cell_area[y]; 
-
-    my_label = label(last_dep.out_cell);
-      
-      while(my_label != final_label(last_dep.out_cell)){ //adjust the wtd_vol of me and all my parents
-        if(topo(last_dep.out_cell)<deps.at(my_label).out_elev){
-          deps.at(my_label).wtd_vol -= params.infiltration*arp.cell_area[y];       
-          deps.at(my_label).water_vol -= params.infiltration*arp.cell_area[y];
-        }
-
-        assert(deps.at(my_label).wtd_vol - deps.at(my_label).dep_vol >= -FP_ERROR);
-        if(deps.at(my_label).wtd_vol < deps.at(my_label).dep_vol)
-          deps.at(my_label).wtd_vol = deps.at(my_label).dep_vol;
-
-        if(deps.at(my_label).water_vol < 0)
-          deps.at(my_label).water_vol = 0; //because we might be adjusting a water_vol of a higher depression that doesn't yet have water (because we only record the water in a parent depression after the child moves its water up), so we have to switch that back to 0. 
-
-        my_label = deps.at(my_label).parent;      
-
-      }
-
-      this_dep = deps.at(current_dep);
-
-    //  wtd(last_dep.out_cell) += infiltration_amount; //since this amount has already been subtracted from extra_water.
-      //infiltration_amount was less than the available wtd space so wtd should still be negative now. 
-    //  assert(wtd(last_dep.out_cell)<= 0);
-
-
-
-     
- // }
- // else{                //Not the whole infiltration amount can infiltrate; wtd will be filled up to the level of 0 and more water will be left over. 
-
- //   extra_water += wtd(last_dep.out_cell)*arp.cell_area[y]; //+= since wtd is either negative or zero. 
-   
-//    my_label = label(last_dep.out_cell);
-      
-//      while(my_label != final_label(last_dep.out_cell)){ //adjust the wtd_vol of me and all my parents
- //       if(topo(last_dep.out_cell)<deps.at(my_label).out_elev){
- //         deps.at(my_label).wtd_vol += wtd(last_dep.out_cell)*arp.cell_area[y];
- //         deps.at(my_label).water_vol += wtd(last_dep.out_cell)*arp.cell_area[y];
- //       }
-
-  //      assert(deps.at(my_label).wtd_vol - deps.at(my_label).dep_vol >= -FP_ERROR);
-  //      if(deps.at(my_label).wtd_vol < deps.at(my_label).dep_vol)
-  //        deps.at(my_label).wtd_vol = deps.at(my_label).dep_vol;
-
- //       if(deps.at(my_label).water_vol < 0)
- //         deps.at(my_label).water_vol = 0; //because we might be adjusting a water_vol of a higher depression that doesn't yet have water, so we have to switch that back to 0. 
-
- //       my_label = deps.at(my_label).parent;      
- //     }
- //    this_dep = deps.at(current_dep);
-
-//    wtd(last_dep.out_cell) = 0.0; //water table is now saturated in this cell. 
-
-    //we don't need to adjust the actual infiltration_amount since that is just an indication of a portion of extra_water. We are adjusting extra_water; 
-    //in the next cell we will calculate a new infiltration_amount. There is little enough space that not the whole infiltration_amount infiltrates. 
-  
-
- //  }
-    
-    if(extra_water <= 0) //this would happen if above, infiltration_amount was = extra_water. 
-      return;    
-
-
-    int nx;
-    int ny;
-    if(extra_water > 0){           //Which it should be, due to if statement above, it must then move downslope but we must also check that it moves towards this_dep and doesn't flow back into last_dep
-      move_to_cell = NO_VALUE;   
-      for(int n=1;n<=neighbours;n++){ //Check out our neighbours
-        //Use offset to get neighbour x coordinate
-        nx = x+dx[n];
-        //Use offset to get neighbour y coordinate
-        ny = y+dy[n];      
-        if(!topo.inGrid(nx,ny))  //Is cell outside grid (too far North/South)?
-          continue;              //Yup: skip it.
-
-        if((this_dep.my_subdepressions.count(label(nx,ny))!=0 || this_dep.dep_label == label(nx,ny)) && (move_to_cell == NO_VALUE || topo(nx,ny)<topo(move_to_cell)))  
-          move_to_cell = topo.xyToI(nx,ny);
+    if((last_dep.my_subdepressions.count(label(nx,ny))!=0 || last_dep.dep_label == label(nx,ny)) && (previous_cell == NO_VALUE || topo(nx,ny)<topo(previous_cell)))
+      previous_cell = topo.xyToI(nx,ny);
                
-      }  //so now we know which is the correct starting cell.
-           assert(move_to_cell != NO_VALUE);       
-    }
-
-  assert(extra_water > 0);
+  }  //so now we know which is the correct starting cell.
+  assert(move_to_cell != NO_VALUE);       
+    
 
   while(extra_water > 0){
-   // std::cout<<"line 955 "<<extra_water<<std::endl;
-   // std::cout<<"ndir "<<(flowdirs(move_to_cell) == NO_FLOW)<<" c "<<move_to_cell<<" topo "<<arp.topo(move_to_cell)<<std::endl;
-    //first let some of it evaporate for each cell it goes over. 
-
-
+ 
     direction = 0;
     if(arp.cellsize_e_w_metres[current_cell] == arp.cellsize_e_w_metres[move_to_cell])  //the two cells have the same e-w cellsize, therefore they are on the same e-w row, so we should use the e-w distance in calculating delta_t
       direction = 1; //using an int to indicate which it is
 
-
-
-    CalculateEvaporationAndInfiltration(move_to_cell,direction,extra_water,params,arp);
+    CalculateEvaporationAndInfiltration(current_cell,direction,extra_water,params,arp);
     extra_water -= params.evaporation;
-    wtd(move_to_cell) += params.infiltration;
+    wtd(current_cell) += params.infiltration;
     extra_water -= params.infiltration;
-    assert(wtd(move_to_cell)<=FP_ERROR);
+    assert(wtd(current_cell)<=FP_ERROR);
     assert(extra_water>=-FP_ERROR);
-
-
-
-
-
- //   float evap_amount = arp.surface_evap(move_to_cell) * CalculateEvaporationAndInfiltration(move_to_cell,direction,extra_water/arp.cell_area[y],params,arp);
-
- //   if(evap_amount > extra_water/arp.cell_area[y])
- //     evap_amount = extra_water/arp.cell_area[y];
-  //  extra_water = extra_water - evap_amount*arp.cell_area[y];    //todo: change extra_water to a height to make this all easier/neater?
 
     if(extra_water <= 0)
       break;
 
 
-
-
-
-//TODO: when to use just y vs ny? And for evap vs for infiltration?
-//   infiltration_amount = arp.ksat(move_to_cell) * CalculateEvaporationAndInfiltration(move_to_cell,direction,extra_water/arp.cell_area[ny],params,arp);
- //  if(infiltration_amount > (extra_water/arp.cell_area[ny]))
-//     infiltration_amount = (extra_water/arp.cell_area[ny]);     //Note that extra_water is a volume, so in this context infiltration_FSM is also a volume. TODO: at some locations in the code, it is a height. Standardise?
- 
- 
-  //  if(infiltration_amount <= -wtd(move_to_cell)){  //so the whole infiltration amount can infiltrate in this cell (but there is still more water to flow downslope)
- //     extra_water -= infiltration_amount*arp.cell_area[ny];  //the whole infiltration_amount infiltrates, but there is still extra_water left over. 
-
-
-      my_label = label(move_to_cell);
+    my_label = label(move_to_cell);
       
-      while(my_label != final_label(move_to_cell)){ //adjust the wtd_vol of me and all my parents
-        if(topo(last_dep.out_cell)<deps.at(my_label).out_elev){
-          deps.at(my_label).wtd_vol -= params.infiltration*arp.cell_area[ny];
-          deps.at(my_label).water_vol -= params.infiltration*arp.cell_area[ny];
-        }
-
-        assert(deps.at(my_label).wtd_vol - deps.at(my_label).dep_vol >= -FP_ERROR);
-        if(deps.at(my_label).wtd_vol < deps.at(my_label).dep_vol)
-          deps.at(my_label).wtd_vol = deps.at(my_label).dep_vol;
-
-        if(deps.at(my_label).water_vol < 0)
-          deps.at(my_label).water_vol = 0; //because we might be adjusting a water_vol of a higher depression that doesn't yet have water, so we have to switch that back to 0. 
-
-        my_label = deps.at(my_label).parent;      
+    while(my_label != final_label(move_to_cell)){ //adjust the wtd_vol of me and all my parents
+      if(topo(last_dep.out_cell)<deps.at(my_label).out_elev){
+        deps.at(my_label).wtd_vol -= params.infiltration*arp.cell_area[ny];
+        deps.at(my_label).water_vol -= params.infiltration*arp.cell_area[ny];
       }
-     this_dep = deps.at(current_dep);  //I needed to reset this because seemingly the above while loops could mess it up somehow?
-        
- //     wtd(move_to_cell) += infiltration_amount;              //the cell we are in is not fully groundwater saturated. 
-      assert(wtd(move_to_cell)<= FP_ERROR);
-      if(wtd(move_to_cell)>=0)
-        wtd(move_to_cell) = 0;
-      
-      if(extra_water<=0)
-        break;
 
-      assert(extra_water > 0);
+      assert(deps.at(my_label).wtd_vol - deps.at(my_label).dep_vol >= -FP_ERROR);
+      if(deps.at(my_label).wtd_vol < deps.at(my_label).dep_vol)
+        deps.at(my_label).wtd_vol = deps.at(my_label).dep_vol;
+
+      if(deps.at(my_label).water_vol < 0)
+        deps.at(my_label).water_vol = 0; //because we might be adjusting a water_vol of a higher depression that doesn't yet have water, so we have to switch that back to 0. 
+
+      my_label = deps.at(my_label).parent;      
+    }
+    
+    this_dep = deps.at(current_dep);  //I needed to reset this because seemingly the above while loops could mess it up somehow?
+        
+    assert(wtd(move_to_cell)<= FP_ERROR);
+    if(wtd(move_to_cell)>=0)
+      wtd(move_to_cell) = 0;
+      
+    if(extra_water<=0)
+      break;
+
+    assert(extra_water > 0);
 
     const auto ndir = flowdirs(move_to_cell);
 
-//std::cout<<"line 1030 "<< (ndir == NO_FLOW) <<std::endl;
-      if(ndir == NO_FLOW)                   //we've reached a pit cell, so we can stop.   
-        extra_water = 0;   //TODO: check that I can still just do it this way. Infiltration in this cell should still happen when I go to spread water? (check that we do infiltrate in the starting cell!)
-        //TODO: confirm whether the water_vol for this depression knows about the remaining extra_water. 
+
+    if(ndir == NO_FLOW)                   //we've reached a pit cell, so we can stop.   
+      extra_water = 0;   //TODO: check that I can still just do it this way. Infiltration in this cell should still happen when I go to spread water? (check that we do infiltrate in the starting cell!)
+      //TODO: confirm whether the water_vol for this depression knows about the remaining extra_water. 
         
-      else{                                   //we need to keep moving downslope. 
-        current_cell = move_to_cell;
-        int x1,y1;
-        topo.iToxy(move_to_cell,x1,y1);              //then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
-        nx = x1+dx[ndir];
-        ny = y1+dy[ndir];
-        move_to_cell = topo.xyToI(nx,ny);  //get the new move_to_cell
-        assert(move_to_cell>=0);
-      }
+    else{                                   //we need to keep moving downslope. 
+      previous_cell = current_cell;
+      current_cell = move_to_cell;
+      int x1,y1;
+      topo.iToxy(move_to_cell,x1,y1);              //then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
+      nx = x1+dx[ndir];
+      ny = y1+dy[ndir];
+      move_to_cell = topo.xyToI(nx,ny);  //get the new move_to_cell
+      assert(move_to_cell>=0);
+    }
 
-  //    std::cout<<"topo move "<<arp.topo(move_to_cell)<<" topo current "<<arp.topo(current_cell)<<std::endl;
 
-      if(arp.topo(move_to_cell)>arp.topo(current_cell))
-        extra_water = 0;
-  //  }
+    if(arp.topo(move_to_cell)>arp.topo(current_cell))
+      extra_water = 0;
 
- //   else{                               //there is still more infiltration_amount than will infiltrate in this cell. The wtd will become fully saturated. 
- //     extra_water += wtd(move_to_cell)*arp.cell_area[ny];  
- //     if(extra_water <= - FP_ERROR){
 
-//      }
-
-      assert(extra_water > - FP_ERROR);
+    assert(extra_water > - FP_ERROR);
     
-
-  //  my_label = label(move_to_cell);
-
- //     while(my_label != final_label(move_to_cell)){ //adjust the wtd_vol of me and all my parents
- //       if(topo(last_dep.out_cell)<deps.at(my_label).out_elev){
-  //        deps.at(my_label).wtd_vol += wtd(move_to_cell)*arp.cell_area[ny];
-  //        deps.at(my_label).water_vol += wtd(move_to_cell)*arp.cell_area[ny];
-  //      }
-
- //       assert(deps.at(my_label).wtd_vol - deps.at(my_label).dep_vol >= -FP_ERROR);
-  //      if(deps.at(my_label).wtd_vol < deps.at(my_label).dep_vol)
- //         deps.at(my_label).wtd_vol = deps.at(my_label).dep_vol;
- //       if(deps.at(my_label).water_vol < 0)
-   //       deps.at(my_label).water_vol = 0; //because we might be adjusting a water_vol of a higher depression that doesn't yet have water, so we have to switch that back to 0. 
-//
-   //     my_label = deps.at(my_label).parent;      
-        //}
-
- //    this_dep = deps.at(current_dep);  //I needed to reset this because seemingly the above while loops could mess it up somehow?
-
- //     wtd(move_to_cell) = 0;              //the cell we are in is now groundwater saturated. 
-  //    if(ndir == NO_FLOW)                   //we've reached a pit cell, so we can stop.   
-  //      extra_water = 0;
-
-  //    else{                                   //we need to keep moving downslope. 
-
-  //      current_cell = move_to_cell;
-  //      int x1,y1;
-  //      topo.iToxy(move_to_cell,x1,y1);              //then we can use flowdirs to move the water all the way down to this_dep's pit cell. 
-  //      nx = x1+dx[ndir];
-  //      ny = y1+dy[ndir];
-   //     move_to_cell = topo.xyToI(nx,ny);  //get the new move_to_cell
-  //      assert(move_to_cell>=0);
-  //    }
-   // }
-
   }
-
-//std::cout<<"line 1090"<<std::endl;
 }
 
 
