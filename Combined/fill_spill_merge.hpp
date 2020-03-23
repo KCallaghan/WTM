@@ -73,7 +73,7 @@ static void CalculateWtdVol(
 
  void CalculateEvaporationAndInfiltration(
   int                           cell,
-  int                           direction,
+  double                           distance,
   double                        h_0,
    Parameters              &params,
   ArrayPack                     &arp
@@ -279,7 +279,7 @@ static void MoveWaterIntoPits(
   rd::ProgressBar progress;
   timer.start();
 
-  int direction = 0;
+  double distance = 0;
 
   //Our first step is to move all of the water downstream into pit cells. To do
   //so, we use the steepest-descent flow directions provided by the depression
@@ -371,16 +371,45 @@ static void MoveWaterIntoPits(
 //let some evaporation happen
 
       if(arp.surface_water(c)>0){
-        direction = 0;
-        if(arp.cellsize_e_w_metres[c] == arp.cellsize_e_w_metres[n])  //the two cells have the same e-w cellsize, therefore they are on the same e-w row, so we should use the e-w distance in calculating delta_t
-          direction = 1; //using an int to indicate which it is
-       
-        CalculateEvaporationAndInfiltration(c,direction,arp.surface_water(c),params,arp);
+        
+
+    distance = 0;
+   
+    //same x means use e-w direction       
+
+    if(x == nx)
+      distance += arp.cellsize_e_w_metres[ny]/2.0;
+    else if(y == ny) //this means use n-s direction
+      distance += params.cellsize_n_s_metres/2.0;
+    else    
+      distance += (std::pow( (std::pow(arp.cellsize_e_w_metres[ny], 2.0) + std::pow(params.cellsize_n_s_metres,2.0)), 0.5))/2.0;
+   
+
+        CalculateEvaporationAndInfiltration(c,distance,arp.surface_water(c),params,arp);
         arp.surface_water(c) = arp.surface_water(c)-params.evaporation;
         wtd(c) += params.infiltration;
         arp.surface_water(c) -= params.infiltration;
         assert(wtd(c)<=FP_ERROR);
         assert(arp.surface_water(c)>=-FP_ERROR);
+        if(wtd(c) > 0 )
+          wtd(c) = 0;
+        if(arp.surface_water(c)<0)
+          arp.surface_water(c) = 0;
+
+       if(arp.surface_water(c) > 0){
+        CalculateEvaporationAndInfiltration(n,distance,arp.surface_water(c),params,arp);
+        arp.surface_water(c) = arp.surface_water(c)-params.evaporation;
+        wtd(n) += params.infiltration;
+        arp.surface_water(c) -= params.infiltration;
+}
+        assert(wtd(n)<=FP_ERROR);
+        assert(arp.surface_water(c)>=-FP_ERROR);
+                if(wtd(n) > 0 )
+          wtd(n) = 0;
+        if(arp.surface_water(c)<0)
+          arp.surface_water(c) = 0;
+
+ 
       }
 
       //If we still have water, pass it downstream.
@@ -512,17 +541,18 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
 
  void CalculateEvaporationAndInfiltration(
   int                           cell,
-  int                           direction,
+  double                           distance,
   double                        h_0,
   Parameters              &params,
   ArrayPack                     &arp
 ){
   float mannings_n = 0.05; //TODO: is this the best value?
+  params.infiltration = 0.0;
+  params.evaporation = 0.0;
 
   double denominator = arp.ksat(cell) + arp.surface_evap(cell);
-  double times_dx = denominator * params.cellsize_n_s_metres;
-  if(direction == 1)
-    times_dx = denominator * arp.cellsize_e_w_metres[cell];
+  double times_dx = denominator * distance;
+  
 
    double slope = std::max(arp.slope(cell), 0.000001f);
   double slope_pow = std::pow(slope,0.5);
@@ -534,16 +564,30 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
   double numerator = h_0 - bracket_pow;
 
   double delta_t = numerator/denominator;
+
+//  std::cout<<"denominator "<<denominator<<std::endl;
+ // std::cout<<"times dx "<<times_dx<<std::endl;
+//  std::cout<<"slope pow "<<slope_pow<<std::endl;
+//  std::cout<<"times fractions "<<times_fractions<<std::endl;
+ //   std::cout<<"h0  "<<h_0<<std::endl;
+
+//  std::cout<<"h0 pow "<<h0_pow<<std::endl;
+//  std::cout<<"bracket "<<bracket<<std::endl;
+//  std::cout<<"bracket_pow "<<bracket_pow<<std::endl;
+ // std::cout<<"numerator "<<numerator<<std::endl;
+ // std::cout<<"delta_t "<<delta_t<<std::endl;
  
 
 //it's a normal case, the water is not running out and the cell is not becoming saturated. 
+
     params.infiltration = arp.ksat(cell)*(delta_t);
     params.evaporation = arp.surface_evap(cell)*(delta_t);
-
+//std::cout<<"normal,  infiltration "<<params.infiltration<<" evap "<<params.evaporation<<std::endl;
 
   if(h0_pow < times_fractions){  //all of the water is getting used up. We have to limit the sum of infiltration and evaporation to be equal to the available water, h0.
     params.infiltration =  h_0/(arp.ksat(cell)+arp.surface_evap(cell)) * arp.ksat(cell);
     params.evaporation = h_0/(arp.ksat(cell)+arp.surface_evap(cell)) * arp.surface_evap(cell);
+ //   std::cout<<"water used,  infiltration "<<params.infiltration<<" evap "<<params.evaporation<<std::endl;
   }
    if(arp.wtd(cell) > -params.infiltration){  //the cell is getting saturated partway. We must recalculate the amount of evaporation that will happen since there is still more water available at that stage.
 
@@ -553,8 +597,6 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
     //we must calculate how far it went before it got saturated. 
     bracket = std::pow(h_0,(5.0/3.0)) - std::pow((h_0 - (denominator*(params.infiltration/arp.ksat(cell)))),(5.0/3.0));
     double delta_x = (3.0/5.0) * (std::pow(slope,0.5) /(mannings_n*denominator) );  //so this is how far it would travel across the cell before the cell got saturated. 
-
-
 
   times_dx = denominator * delta_x;
   times_fractions = times_dx * (mannings_n/slope_pow) * (5/3);
@@ -572,20 +614,10 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
 h_0 = h_0 - params.evaporation - params.infiltration;
 h0_pow = std::pow(h_0,(5.0/3.0));
 
-
    denominator = 0 + arp.surface_evap(cell);
- 
-
-
-   times_dx = denominator * (params.cellsize_n_s_metres - delta_x);
-  if(direction == 1)
-    times_dx = denominator * (arp.cellsize_e_w_metres[cell] - delta_x);
-
-
+   times_dx = denominator * (distance - delta_x);
    times_fractions = times_dx * (mannings_n/slope_pow) * (5/3);
-
    bracket = h0_pow - times_fractions;
-
    bracket_pow = std::pow(bracket,(3.0/5.0));
    numerator = h_0 - bracket_pow;
 
@@ -594,9 +626,9 @@ h0_pow = std::pow(h_0,(5.0/3.0));
   if((h0_pow > times_fractions) && !isnan(delta_t) &&!isinf(delta_t))
      params.evaporation += arp.surface_evap(cell)*(delta_t);
 
-
-
 }
+
+//std::cout<<"saturated,  infiltration "<<params.infiltration<<" evap "<<params.evaporation<<std::endl;
   }
  
 }
@@ -836,7 +868,7 @@ static void MoveWaterInOverflow(
   topo.iToxy(last_dep.out_cell,x,y);  
   int current_cell = last_dep.out_cell;
   int previous_cell;
-  int direction = 0;
+  double distance = 0;
 
 //convert extra water to a height
   extra_water = extra_water/arp.cell_area[y];  //it was easier to have extra_water as a volume when calling this function, since it was calculated from the volumes of the depressions and the water.
@@ -869,11 +901,28 @@ static void MoveWaterInOverflow(
 
   while(extra_water > 0){
  
-    direction = 0;
-    if(arp.cellsize_e_w_metres[current_cell] == arp.cellsize_e_w_metres[move_to_cell])  //the two cells have the same e-w cellsize, therefore they are on the same e-w row, so we should use the e-w distance in calculating delta_t
-      direction = 1; //using an int to indicate which it is
 
-    CalculateEvaporationAndInfiltration(current_cell,direction,extra_water,params,arp);
+    distance = 0;
+    int p_x,p_y;
+    topo.iToxy(previous_cell,p_x,p_y);              
+    //same x means use e-w direction
+    if(p_x == x)
+      distance += arp.cellsize_e_w_metres[y]/2.0;
+    else if(p_y == y) //this means use n-s direction
+      distance += params.cellsize_n_s_metres/2.0;
+    else    
+      distance += (std::pow( (std::pow(arp.cellsize_e_w_metres[y], 2.0) + std::pow(params.cellsize_n_s_metres,2.0)), 0.5))/2.0;
+          
+
+    if(x == nx)
+      distance += arp.cellsize_e_w_metres[ny]/2.0;
+    else if(y == ny) //this means use n-s direction
+      distance += params.cellsize_n_s_metres/2.0;
+    else    
+      distance += (std::pow( (std::pow(arp.cellsize_e_w_metres[ny], 2.0) + std::pow(params.cellsize_n_s_metres,2.0)), 0.5))/2.0;
+     
+
+    CalculateEvaporationAndInfiltration(current_cell,distance,extra_water,params,arp);
     extra_water -= params.evaporation;
     wtd(current_cell) += params.infiltration;
     extra_water -= params.infiltration;
