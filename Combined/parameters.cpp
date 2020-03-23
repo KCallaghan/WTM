@@ -27,8 +27,7 @@ Parameters::Parameters(const std::string config_file){
     else if(key=="HAD")                ss>>HAD;
     else if(key=="total_cycles")       ss>>total_cycles;
     else if(key=="infiltration")       ss>>infiltration;
-        else if(key=="evaporation")       ss>>evaporation;
-
+    else if(key=="evaporation")        ss>>evaporation;
     else if(key=="iterations")         ss>>iterations;
     else if(key=="maxiter")            ss>>maxiter;
     else if(key=="name")               ss>>name;
@@ -40,26 +39,22 @@ Parameters::Parameters(const std::string config_file){
     else if(key=="time_start")         ss>>time_start;
     else if(key=="time_end")           ss>>time_end;
     else if(key=="wtdmax")             ss>>wtdmax;
-        else if(key=="textfilename")             ss>>textfilename;
-    else if(key=="outfilename")             ss>>outfilename;
-
+    else if(key=="textfilename")       ss>>textfilename;
+    else if(key=="outfilename")        ss>>outfilename;
 
     else
       throw std::runtime_error("Unrecognised key!");
   } 
-
-
 }
 
 void Parameters::print() const {
-  std::cout<<"c name        = "<<name        <<std::endl;
-  std::cout<<"c iterations  = "<<iterations  <<std::endl;
-  std::cout<<"c maxiter     = "<<maxiter     <<std::endl;
-  std::cout<<"c start_name  = "<<start_name  <<std::endl;
-  std::cout<<"c end_name    = "<<end_name    <<std::endl;
-  std::cout<<"c surfdatadir = "<<surfdatadir <<std::endl;
-  std::cout<<"c cells_per_degree       = "<<cells_per_degree       <<std::endl;
-//  std::cout<<"c dy          = "<<dy          <<std::endl;
-  std::cout<<"c deltat      = "<<deltat      <<std::endl;
+  std::cout<<"c name              = "<<name              <<std::endl;
+  std::cout<<"c iterations        = "<<iterations        <<std::endl;
+  std::cout<<"c maxiter           = "<<maxiter           <<std::endl;
+  std::cout<<"c start_name        = "<<start_name        <<std::endl;
+  std::cout<<"c end_name          = "<<end_name          <<std::endl;
+  std::cout<<"c surfdatadir       = "<<surfdatadir       <<std::endl;
+  std::cout<<"c cells_per_degree  = "<<cells_per_degree  <<std::endl;
+  std::cout<<"c deltat            = "<<deltat            <<std::endl;
   //TODO: Synchronize with structure
 }
