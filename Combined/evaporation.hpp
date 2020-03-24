@@ -55,8 +55,6 @@ void evaporation_update(Parameters &params, ArrayPack &arp){
 
 
   }
- // textfile<<"we have the new recharge array"<<std::endl;
-
 
 //TODO: how to ensure that evaporation does not decrease the surface water to below land surface? The moment wtd dips below 0, we should turn off SW evap.
   //How to do this, particularly with long time steps where we may have e.g. 5 m water at one iteration and -5 m at the next?

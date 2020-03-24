@@ -60,7 +60,7 @@ int main(int argc, char **argv){
 
 
     arp.slope_start         = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_slope.nc", "value");  //TODO: remove fdepth input and calculate internally using slope. 
-    arp.fdepth_start        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
+  //  arp.fdepth_start        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
     arp.precip_start        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_precip.nc",   "value");  //Units: m/yr. 
     arp.temp_start          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_temp.nc",   "value");  //Units: degress Celsius
     arp.topo_start          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_topo.nc",   "value");  //Units: metres
@@ -69,7 +69,7 @@ int main(int argc, char **argv){
 
     arp.slope_end         = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_slope.nc", "value");  //TODO: remove fdepth input and calculate internally using slope. 
     arp.land_mask         = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
-    arp.fdepth_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
+  //  arp.fdepth_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
     arp.precip_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_precip.nc",   "value");  //Units: m/yr. 
     arp.temp_end          = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_temp.nc",   "value");  //Units: degress Celsius
     arp.topo_end          = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_topo.nc",   "value");  //Units: metres
@@ -81,7 +81,8 @@ int main(int argc, char **argv){
 
 
 //calculate the fdepth arrays:
-
+arp.fdepth_start   = rd::Array2D<float>(arp.topo,0); 
+arp.fdepth_end   = rd::Array2D<float>(arp.topo,0); 
     for(unsigned int i=0;i<arp.topo_start.size();i++){
       if(arp.temp_start(i) > -5)  //then fdepth = f from Ying's equation S7. 
         arp.fdepth_start(i) = std::max(1000/(1+150*arp.slope_start(i)),25.0f);  //TODO: allow user to vary these calibration constants depending on their input cellsize? Or do some kind of auto variation of them? 
@@ -121,7 +122,7 @@ int main(int argc, char **argv){
 
     arp.slope         = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_slope.nc", "value");  //TODO: remove fdepth input and calculate internally using slope. 
     arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
-    arp.fdepth        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
+   // arp.fdepth        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
     arp.precip        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_precip.nc",   "value");  //Units: m/yr. 
     arp.temp          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_temp.nc",   "value");  //Units: degress Celsius
     arp.topo          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_topo.nc",   "value");  //Units: metres
@@ -129,7 +130,21 @@ int main(int argc, char **argv){
     arp.relhum        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc",   "value");  //Units: proportion from 0 to 1.
     arp.wtd           = rd::Array2D<float>(arp.topo,0.0);
 
+
+arp.fdepth   = rd::Array2D<float>(arp.topo,0); 
+for(unsigned int i=0;i<arp.topo.size();i++){
+      if(arp.temp(i) > -5)  //then fdepth = f from Ying's equation S7. 
+        arp.fdepth(i) = std::max(1000/(1+150*arp.slope(i)),25.0f);  //TODO: allow user to vary these calibration constants depending on their input cellsize? Or do some kind of auto variation of them? 
+      else{ //then fdpth = f*fT, Ying's equations S7 and S8. 
+        if(arp.temp(i) < -14)
+          arp.fdepth(i) = (std::max(1000/(1+150*arp.slope(i)),25.0f)) * (std::max(0.05, 0.17 + 0.005 * arp.temp(i)));
+        else
+          arp.fdepth(i) = (std::max(1000/(1+150*arp.slope(i)),25.0f)) * (std::min(1.0, 1.5 + 0.1 * arp.temp(i)));
+      }
+
+
   }
+}
   else{
     throw std::runtime_error("That was not a recognised run type! Please choose transient or equilibrium.");
   }
