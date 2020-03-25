@@ -15,17 +15,13 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-
 #include <fstream>
 using namespace std;
- 
-
 
 namespace rd = richdem;
 namespace dh = richdem::dephier;
 
 const double UNDEF  = -1.0e7;
-
 
 
 int main(int argc, char **argv){
@@ -47,7 +43,7 @@ int main(int argc, char **argv){
 
 //Initialise all of the values for an equilibrium or a transient-style run:
 //Open data files, set the changing cellsize arrays, do any needed unit conversions. 
-//load in the data files: ksat, mask, e-folding depth, precipitation, topography, and evaporation files. 
+//load in the data files: ksat, mask, slope, precipitation, temperature, relative humidity, topography, and evaporation files. 
 
 
   arp.ksat = LoadData<float>(params.surfdatadir + params.region + "coarser_ksat.nc", "value");   //Units of ksat are m/s. 
@@ -59,30 +55,28 @@ int main(int argc, char **argv){
     textfile<<"Initialise transient"<<std::endl;
 
 
-    arp.slope_start         = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_slope.nc", "value");  //TODO: remove fdepth input and calculate internally using slope. 
-  //  arp.fdepth_start        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
-    arp.precip_start        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_precip.nc",   "value");  //Units: m/yr. 
+    arp.slope_start         = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_slope.nc",  "value");  //Slope as a value from 0 to 1. 
+    arp.precip_start        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_precip.nc", "value");  //Units: m/yr. 
     arp.temp_start          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_temp.nc",   "value");  //Units: degress Celsius
     arp.topo_start          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_topo.nc",   "value");  //Units: metres
     arp.starting_evap_start = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_evap.nc",   "value");  //Units: m/yr
-    arp.relhum_start        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc",   "value");  //Units: proportion from 0 to 1.
+    arp.relhum_start        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc", "value");  //Units: proportion from 0 to 1.
 
-    arp.slope_end         = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_slope.nc", "value");  //TODO: remove fdepth input and calculate internally using slope. 
-    arp.land_mask         = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
-  //  arp.fdepth_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
-    arp.precip_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_precip.nc",   "value");  //Units: m/yr. 
+    arp.slope_end         = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_slope.nc",  "value");  //Slope as a value from 0 to 1. 
+    arp.land_mask         = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_mask.nc",   "value");  //A binary mask that is 1 where there is land and 0 in the ocean
+    arp.precip_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_precip.nc", "value");  //Units: m/yr. 
     arp.temp_end          = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_temp.nc",   "value");  //Units: degress Celsius
     arp.topo_end          = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_topo.nc",   "value");  //Units: metres
     arp.starting_evap_end = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_evap.nc",   "value");  //Units: m/yr
-    arp.relhum_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_relhum.nc",   "value");  //Units: proportion from 0 to 1.
+    arp.relhum_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_relhum.nc", "value");  //Units: proportion from 0 to 1.
 
 //load in the wtd result from the previous time: 
     arp.wtd    = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_wtd.nc", "value");
 
 
-//calculate the fdepth arrays:
-arp.fdepth_start   = rd::Array2D<float>(arp.topo,0); 
-arp.fdepth_end   = rd::Array2D<float>(arp.topo,0); 
+//calculate the fdepth (e-folding depth, representing rate of decay of the hydraulic conductivity with depth) arrays:
+    arp.fdepth_start = rd::Array2D<float>(arp.topo,0); 
+    arp.fdepth_end   = rd::Array2D<float>(arp.topo,0); 
     for(unsigned int i=0;i<arp.topo_start.size();i++){
       if(arp.temp_start(i) > -5)  //then fdepth = f from Ying's equation S7. 
         arp.fdepth_start(i) = std::max(1000/(1+150*arp.slope_start(i)),25.0f);  //TODO: allow user to vary these calibration constants depending on their input cellsize? Or do some kind of auto variation of them? 
@@ -102,11 +96,7 @@ arp.fdepth_end   = rd::Array2D<float>(arp.topo,0);
       }
     }
 
-
-
-  
-//initialise the arrays to be as at the starting time:
-
+  //initialise the arrays to be as at the starting time:
     arp.fdepth        = arp.fdepth_start;
     arp.precip        = arp.precip_start;
     arp.temp          = arp.temp_start;
@@ -119,20 +109,18 @@ arp.fdepth_end   = rd::Array2D<float>(arp.topo,0);
   else if(params.run_type == "equilibrium"){
     textfile<<"Initialise equilibrium"<<std::endl;
 
-
-    arp.slope         = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_slope.nc", "value");  //TODO: remove fdepth input and calculate internally using slope. 
-    arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
-   // arp.fdepth        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
-    arp.precip        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_precip.nc",   "value");  //Units: m/yr. 
+    arp.slope         = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_slope.nc",  "value");  //Slope as a value from 0 to 1. 
+    arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_mask.nc",   "value"); //A binary mask that is 1 where there is land and 0 in the ocean
+    arp.precip        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_precip.nc", "value");  //Units: m/yr. 
     arp.temp          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_temp.nc",   "value");  //Units: degress Celsius
     arp.topo          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_topo.nc",   "value");  //Units: metres
     arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_evap.nc",   "value");  //Units: m/yr
-    arp.relhum        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc",   "value");  //Units: proportion from 0 to 1.
-    arp.wtd           = rd::Array2D<float>(arp.topo,0.0);
+    arp.relhum        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc", "value");  //Units: proportion from 0 to 1.
+    arp.wtd           = rd::Array2D<float>(arp.topo,0.0);  //we start with a water table at the surface for equilibrium runs. 
 
 
-arp.fdepth   = rd::Array2D<float>(arp.topo,0); 
-for(unsigned int i=0;i<arp.topo.size();i++){
+    arp.fdepth   = rd::Array2D<float>(arp.topo,0); 
+    for(unsigned int i=0;i<arp.topo.size();i++){
       if(arp.temp(i) > -5)  //then fdepth = f from Ying's equation S7. 
         arp.fdepth(i) = std::max(1000/(1+150*arp.slope(i)),25.0f);  //TODO: allow user to vary these calibration constants depending on their input cellsize? Or do some kind of auto variation of them? 
       else{ //then fdpth = f*fT, Ying's equations S7 and S8. 
@@ -141,10 +129,8 @@ for(unsigned int i=0;i<arp.topo.size();i++){
         else
           arp.fdepth(i) = (std::max(1000/(1+150*arp.slope(i)),25.0f)) * (std::min(1.0, 1.5 + 0.1 * arp.temp(i)));
       }
-
-
+    }
   }
-}
   else{
     throw std::runtime_error("That was not a recognised run type! Please choose transient or equilibrium.");
   }
@@ -152,17 +138,16 @@ for(unsigned int i=0;i<arp.topo.size();i++){
 
   //Initialise arrays that start out empty:
 
-  arp.wtd_old = arp.wtd;
-  arp.wtd_mid = arp.wtd;
-  arp.rech   = rd::Array2D<float>(arp.topo,0);  //We have to calculate recharge within the code since we will change the way evaporation works depending on whether or not there is surface water present. 
-  arp.runoff   = rd::Array2D<float>(arp.topo,0);
-  arp.head   = rd::Array2D<float>(arp.topo,0);        //Just to initialise these - we'll add the appropriate values later. 
-  arp.kcell  = rd::Array2D<float>(arp.topo,0);
-  arp.evap   = rd::Array2D<float>(arp.topo,0);  
-  arp.e_sat  = rd::Array2D<float>(arp.topo,0);  
-  arp.e_a    = rd::Array2D<float>(arp.topo,0);  
-  arp.surface_evap    = rd::Array2D<float>(arp.topo,0);  
-  arp.surface_water           = rd::Array2D<float>(arp.topo,0);
+  arp.wtd_old       = arp.wtd;
+  arp.wtd_mid       = arp.wtd;
+  arp.runoff        = rd::Array2D<float>(arp.topo,0);
+  arp.head          = rd::Array2D<float>(arp.topo,0);        //Just to initialise these - we'll add the appropriate values later. 
+  arp.kcell         = rd::Array2D<float>(arp.topo,0);
+  arp.evap          = rd::Array2D<float>(arp.topo,0);  
+  arp.e_sat         = rd::Array2D<float>(arp.topo,0);  
+  arp.e_a           = rd::Array2D<float>(arp.topo,0);  
+  arp.surface_evap  = rd::Array2D<float>(arp.topo,0);  
+  arp.surface_water = rd::Array2D<float>(arp.topo,0);
 
 
   arp.wtd_change_total = rd::Array2D<float>(arp.topo,0.0f);   //This array is used to store the values of how much the water table will change in one iteration, then adding it to wtd gets the new wtd.
@@ -177,11 +162,11 @@ for(unsigned int i=0;i<arp.topo.size();i++){
   params.cellsize_n_s_metres = (earth_radius*(M_PI/180.))/params.cells_per_degree; //distance between lines of latitude is a constant. 
 
 //initialise some arrays
-  arp.latitude_radians.resize       (params.ncells_y);  // the latitude of each row of cells
+  arp.latitude_radians.resize       (params.ncells_y);  //the latitude of each row of cells
   arp.cellsize_e_w_metres.resize    (params.ncells_y);  //size of a cell in the east-west direction at the centre of the cell (metres)
   arp.cellsize_e_w_metres_N.resize  (params.ncells_y);  //size of a cell in the east-west direction at the northern edge of the cell (metres)
   arp.cellsize_e_w_metres_S.resize  (params.ncells_y);  //size of a cell in the east-west direction at the southern edge of the cell (metres)
-  arp.cell_area.resize (params.ncells_y);               //cell area (metres squared)
+  arp.cell_area.resize              (params.ncells_y);  //cell area (metres squared)
 
 
   for(unsigned int j=0;j<arp.latitude_radians.size();j++){
@@ -209,12 +194,7 @@ for(unsigned int i=0;i<arp.topo.size();i++){
     arp.cell_area[j] = params.cellsize_n_s_metres* (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j])/2;
 
 
-  //  delete[] arp.cellsize_e_w_metres_S;
-//    delete[] arp.cellsize_e_w_metres_N;
-  //  delete[] arp.latitude_radians;
-//TODO: see which, if any, arrays can be cleared after use to free up memory. How to do this? Above didn't seem to work.
-
-
+//TODO: see which, if any, arrays can be cleared after use to free up memory. How to do this?
   }
 
   textfile<<"computed distances, areas, and latitudes"<<std::endl;
@@ -226,10 +206,8 @@ for(unsigned int i=0;i<arp.topo.size();i++){
     }
 
     //Converting to appropriate time step
-    arp.precip(i)        *= (params.deltat/(60*60*24*365));  ///10.0;                  //convert to appropriate units for the time step. 
-    //TODO: divide precip by some value to get appropriate partitioning for infiltration vs runoff. 
+    arp.precip(i)        *= (params.deltat/(60*60*24*365));                 //convert to appropriate units for the time step. 
     arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
-    
   } 
 
 
@@ -240,11 +218,8 @@ for(unsigned int i=0;i<arp.topo.size();i++){
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
     arp.evap(i) = arp.starting_evap(i);               //Use a different array for evaporation here because we want to be able to switch back to the original evaporation in cases where there is surface water for a while, but it goes away.
-    arp.rech(i) = (arp.precip(i) - arp.evap(i))*params.infiltration;
-    arp.rech(i) = std::max(arp.rech(i),0.0f);         //Recharge is always positive in locations where there is no surface water. 
-    arp.runoff(i) = (arp.precip(i)-arp.evap(i))*(1-params.infiltration);
+    arp.runoff(i) = (arp.precip(i)-arp.evap(i));
     arp.runoff(i) = std::max(arp.runoff(i),0.0f);         //Runoff is always positive. 
-
   }
 
 
@@ -265,8 +240,6 @@ for(unsigned int i=0;i<arp.topo.size();i++){
   rd::Array2D<dh::dh_label_t> final_label   (params.ncells_x, params.ncells_y, dh::NO_DEP ); //No cells are part of a depression
   rd::Array2D<rd::flowdir_t>  flowdirs(params.ncells_x, params.ncells_y, rd::NO_FLOW); //No cells flow anywhere
 
-
-
     //Label the ocean cells. This is a precondition for using
     //`GetDepressionHierarchy()`.
     #pragma omp parallel for
@@ -277,12 +250,9 @@ for(unsigned int i=0;i<arp.topo.size();i++){
       }
     }
 
-
     //Generate flow directions, label all the depressions, and get the hierarchy
     //connecting them
   auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>(arp, label, final_label, flowdirs);
-
-  
 
  int cycles_done = 0;
  float total_wtd_change = 0.0;
@@ -291,10 +261,9 @@ for(unsigned int i=0;i<arp.topo.size();i++){
 
 while(true){
 
-
   if(params.run_type == "transient"){
-  //I am going to do this just as if the iterations are set to 10 years and I want to update the data files every 10 years here, but probably there should be an option 
-  //for how often you want to do the update. Perhaps every x amount of iterations as a user input. TODO
+  //I am going to do this just as if the iterations are set to 10 years and I want to update the data files every 10 years here (i.e. updates every iteration),
+  // but probably there should be an option for how often you want to do the update. Perhaps every x amount of iterations as a user input. TODO
 
 
     for(unsigned int i=0;i<arp.topo.size();i++){
@@ -308,8 +277,7 @@ while(true){
 
 
       //Converting to appropriate time step
-      arp.precip(i)        *= (params.deltat/(60*60*24*365)); ///10.0;                  //convert to appropriate units for the time step. 
-      //TODO: infiltration/runoff partitioning
+      arp.precip(i)        *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
       arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
     
       label(i)        = dh::NO_DEP; //No cells are part of a depression
@@ -324,10 +292,9 @@ while(true){
         final_label(i) = dh::OCEAN;
       }
     }
-
+    //with transient runs, we have to redo the depression hierarchy every time, since the topography is changing. 
     auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>(arp, label, final_label, flowdirs);
   }
-
 
 
   textfile<<"Cycles done: "<<cycles_done<<std::endl;
@@ -336,22 +303,12 @@ while(true){
 
 //TODO: How should equilibrium know when to exit?
 
-
   if((cycles_done % 10) == 0){
     textfile<<"saving partway result"<<std::endl;  
     SaveAsNetCDF(arp.wtd,params.outfilename,"value");
-    //SaveAsNetCDF(arp.rech,params.outfilename,"value");
-
-
   }
 
-
   arp.wtd_old = arp.wtd;
-  arp.wtd_mid = arp.wtd;
- //Run the groundwater code to move water
-
-  groundwater(params,arp);
-
   arp.wtd_mid = arp.wtd;
 
   for(int y=1;y<params.ncells_y-1;y++)
@@ -363,7 +320,13 @@ while(true){
   
   //Move surface water.
   dh::FillSpillMerge(params,arp.topo, label, final_label, flowdirs, deps, arp.wtd,arp);
-  
+
+  arp.wtd_mid = arp.wtd;
+
+  //Run the groundwater code to move water
+
+  groundwater(params,arp);
+
   //check to see where there is surface water, and adjust how evaporation works at these locations. 
   evaporation_update(params,arp);
 
@@ -372,19 +335,15 @@ while(true){
   GW_wtd_change = 0.0;
   for(int y=1;y<params.ncells_y-1;y++)
   for(int x=1;x<params.ncells_x-1; x++){
-    total_wtd_change += fabs(arp.wtd(x,y) - arp.wtd_old(x,y));
-    wtd_mid_change += fabs(arp.wtd(x,y) - arp.wtd_mid(x,y));
-    GW_wtd_change += fabs(arp.wtd_mid(x,y) - arp.wtd_old(x,y));
+    total_wtd_change += fabs(arp.wtd(x,y)     - arp.wtd_old(x,y));
+    wtd_mid_change   += fabs(arp.wtd(x,y)     - arp.wtd_mid(x,y));
+    GW_wtd_change    += fabs(arp.wtd_mid(x,y) - arp.wtd_old(x,y));
   }
-
-
 
     textfile<<"cycles_done "<<cycles_done<<std::endl;
     textfile<<"total wtd change was "<<total_wtd_change<<" change in GW only was "<<GW_wtd_change<<" and change in SW only was "<<wtd_mid_change<<std::endl;
 
-
   arp.wtd_old = arp.wtd;
-
 
   cycles_done += 1;
 }
@@ -395,7 +354,5 @@ while(true){
 
   textfile.close();
 
-
   return 0;
-
 }

@@ -174,7 +174,7 @@ static void FillDepressions(
 ///        saturated a cell is or how much standing surface water it has.
 template<class elev_t, class wtd_t>
 void FillSpillMerge(
-   Parameters              &params,
+  Parameters                    &params,
   const rd::Array2D<elev_t>     &topo,
   const rd::Array2D<dh_label_t> &label,
   const rd::Array2D<dh_label_t> &final_label,
@@ -567,12 +567,9 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
   params.evaporation = 0.0;
 
   float slope = std::max(arp.slope(cell), 0.000001f);  //assigning a small minimum slope, since otherwise in cells with zero slope, the delta_t will be infinity.
-
   float denominator = arp.ksat(cell) + arp.surface_evap(cell);
-  
   float bracket = std::pow(h_0,(5.0/3.0)) - (denominator * distance * (mannings_n/std::pow(slope,0.5)) * (5/3));
   float numerator = h_0 - std::pow(bracket,(3.0/5.0));
-
   float delta_t = numerator/denominator;  //delta_t is the amount of time it will take the given amount of water to cross the given distance. 
 
  
@@ -598,7 +595,6 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
 
       bracket = std::pow(h_0,(5.0/3.0)) - (denominator * delta_x * (mannings_n/std::pow(slope,0.5)) * (5/3));  
       numerator = h_0 - std::pow(bracket,(3.0/5.0));
-
       delta_t = numerator/denominator;
 
       params.evaporation = arp.surface_evap(cell)*(delta_t);  //how much evaporation happened prior to the cell becoming saturated
@@ -614,7 +610,6 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
         params.evaporation += arp.surface_evap(cell)*(delta_t);
       else                                                    //but if we did run out of water, then just all the rest of the water evaporates. 
         params.evaporation += h_0_evap;
-
 
 
       if(h_0_evap < 0 || isnan(params.evaporation)){       //TODO: when would this actually occur? Shouldn't the above conditions have dealt with this?
@@ -1515,9 +1510,6 @@ static void FillDepressions(
 
       }
       //Water level must be higher than (or equal to) the previous cell we looked at, but lower than (or equal to) the current cell
-     // std::cout<<"topo "<<current_elevation<<" "<<previous_elevation<<std::endl;
-     // std::cout<<" water level "<<water_level<<std::endl;
-     // std::cout<<"current area "<<current_area<<" water vol "<<water_vol<<" total elevation "<<total_elevation<<" cells affected size "<<cells_affected.size()<<std::endl;
       assert(cells_affected.size()==0 || topo(cells_affected.back()) - water_level <= FP_ERROR); 
       assert(topo(c.x,c.y)-water_level >= -FP_ERROR);
 

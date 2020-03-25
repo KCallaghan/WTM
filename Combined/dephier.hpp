@@ -37,10 +37,10 @@ const dh_label_t NO_PARENT = -1;
 const dh_label_t NO_VALUE  = -1;
 
 //This class holds information about a depression. Its pit cell and outlet cell
-//(in flat-index form) as well as the elevations of these cells. It also notes                                                   //what is flat-index form?
+//(in flat-index form) as well as the elevations of these cells. It also notes                                                  
 //the depression's parent. The parent of the depression is the outlet through
 //which it must flow in order to reach the ocean. If a depression has more than
-//one outlet at the same level one of them is arbitrarily chosen; hopefully this                                                  //so, everything should have a parent except for the ocean, right?
+//one outlet at the same level one of them is arbitrarily chosen; hopefully this                                                  
 //happens only rarely in natural environments.
 template<class elev_t>
 class Depression {
@@ -87,8 +87,6 @@ class Depression {
   //the label of the depression, for calling it up again
   dh_label_t dep_label = 0;
  
-   //Total of elevations within the depression, used in the WLE. Because I think I need to start adding up total elevations before I know the outlet of the depression. 
-  //double dep_sum_elevations = 0;
   //Total area of the cells in the depression. Used to help keep track of total dep_vols. 
   double dep_area = 0;
   //Volume of the depression and its children. Used in the Water Level Equation (see below).
@@ -214,7 +212,7 @@ using DepressionHierarchy = std::vector<Depression<elev_t>>;
 //                   direction (even flats) except for pit cells.
 template<class elev_t,  Topology topo>                                                     
 DepressionHierarchy<elev_t> GetDepressionHierarchy(
-  const ArrayPack &arp,
+  const ArrayPack           &arp,
   rd::Array2D<int>          &label,
   rd::Array2D<int>          &final_label,
   rd::Array2D<int8_t>       &flowdirs
@@ -399,7 +397,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //cell found in a flat determines the label for the entirety of that flat.
       clabel            = depressions.size();         //In a 0-based indexing system, size is equal to the id of the next flat
       auto &newdep      = depressions.emplace_back(); //Add the next flat (increases size by 1)
-      newdep.pit_cell   = arp.topo.xyToI(c.x,c.y);         //Make a note of the pit cell's location
+      newdep.pit_cell   = arp.topo.xyToI(c.x,c.y);    //Make a note of the pit cell's location
       newdep.pit_elev   = celev;                      //Make a note of the pit cell's elevation
       newdep.dep_label  = clabel;                     //I am storing the label in the object so that I can find it later and call up the number of cells and volume (better way of doing this?) -- I have since realised I can use the index in the depressions array. So perhaps the label is no longer needed?
       label(ci)         = clabel;                     //Update cell with new label                                                           
@@ -479,7 +477,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
           outlet_database[olink] = Outlet<elev_t>(clabel,nlabel,out_cell,out_elev);   
         }
       }
-
     }
   }
   progress.stop();
@@ -642,12 +639,11 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //resize!
       const auto depa_pitcell_temp = depa.pit_cell;
 
-      auto &newdep     = depressions.emplace_back();                                                                       //is it right to create a new depression for the metadepression like this?
+      auto &newdep     = depressions.emplace_back();                                                                       
       newdep.lchild    = depa_set;
       newdep.rchild    = depb_set; 
       newdep.dep_label = newlabel;
       newdep.pit_cell  = depa_pitcell_temp;
-
 
 
       newdep.my_subdepressions.emplace(depa_set);
@@ -688,7 +684,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       clabel = depressions[clabel].parent;
      
 
-    final_label(x,y) = clabel; //Richard, does this make sense here? I want another layer that contains the labels of which depressions these 
+    final_label(x,y) = clabel; //I want another layer that contains the labels of which depressions these 
     //immediately belong to, even when it is a parent depression. This is so that I can change the wtd_vol in the correct place
     //when we have infiltration and wtd_vol of a depression changes. 
 
@@ -716,7 +712,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       dep.dep_vol += depressions.at(dep.lchild).dep_vol;  //Add the actual dep volume of the child
       dep.dep_vol += (dep.out_elev - depressions.at(dep.lchild).out_elev)* depressions.at(dep.lchild).dep_area; //add the water volume higher than the child depression's outlet, but on the same cells
 
-
       dep.dep_vol += depressions.at(dep.rchild).dep_vol;
       dep.dep_vol += (dep.out_elev - depressions.at(dep.rchild).out_elev)* depressions.at(dep.rchild).dep_area;
       
@@ -733,7 +728,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
   return depressions;
 }
-
 
 
 //Utility function for doing various relabelings based on the depression

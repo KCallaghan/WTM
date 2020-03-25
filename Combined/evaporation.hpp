@@ -8,7 +8,6 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-
 #include <fstream>
 using namespace std;
 
@@ -17,25 +16,29 @@ typedef std::vector<double> dvec;
 typedef rd::Array2D<float>  f2d;
 
 
+///update the amount of evaporation that occurs in each cell. 
+///We are calculating the vapour pressure deficit as a 
+///coefficient for evaporation. 
+///surface_evap is used by fill_spill_merge for evaporation 
+///that occurs as water moves cell-by-cell across the land
+///surface. 
+///
+///The amount of runoff input to a cell is also influenced
+///by evaporation: in cases where surface water is present
+///in a cell, the evaporation may be larger, vs cells without
+///surface water. However, runoff is always a minimum of zero. 
+///TODO: does this mean I am doubling up on evaporation in lakes where I should not be?
 void evaporation_update(Parameters &params, ArrayPack &arp){
   richdem::Timer timer_io;
 
-
   const float R_v = 461.0;
   const float lambda = 2.5*10E6;
-
-
-  ofstream textfile;
-
-  textfile.open (params.textfilename, std::ios_base::app);
-
-  //textfile<<"Calculating the new recharge array..."<<std::endl;
 
   for(unsigned int i=0;i<arp.topo.size();i++){
 
     arp.e_sat(i) = 611 * std::exp((lambda/R_v)*((1/273.15) - (1/(arp.temp(i)+273.15)) ));
     arp.e_a(i) = arp.relhum(i)*arp.e_sat(i);
-    arp.surface_evap(i) = (arp.e_sat(i) - arp.e_a(i));        //TODO: get full/proper equation in here
+    arp.surface_evap(i) = (arp.e_sat(i) - arp.e_a(i));        //TODO: get full/proper equation in here. Or is this equation okay?
 
     if(arp.wtd(i)>0)  //if there is surface water present
       arp.evap(i) = (arp.e_sat(i) - arp.e_a(i));        //TODO: get full/proper equation in here
@@ -45,20 +48,7 @@ void evaporation_update(Parameters &params, ArrayPack &arp){
   }
 
   for(unsigned int i=0;i<arp.topo.size();i++){
-    arp.rech(i) = (arp.precip(i) - arp.evap(i))*params.infiltration;  //update recharge array with new evaporation. 
-    if(arp.wtd(i)<=0)
-      arp.rech(i) = std::max(arp.rech(i),0.0f);  //recharge is positive if there is no surface water
-    arp.runoff(i) = (arp.precip(i)-arp.evap(i))*(1-params.infiltration);
-          arp.runoff(i) = std::max(arp.runoff(i),0.0f);  //recharge is positive if there is no surface water
-
-
-
-
+    arp.runoff(i) = (arp.precip(i)-arp.evap(i));
+    arp.runoff(i) = std::max(arp.runoff(i),0.0f);  //recharge is positive if there is no surface water
   }
-
-//TODO: how to ensure that evaporation does not decrease the surface water to below land surface? The moment wtd dips below 0, we should turn off SW evap.
-  //How to do this, particularly with long time steps where we may have e.g. 5 m water at one iteration and -5 m at the next?
-
-textfile.close();
-
 }

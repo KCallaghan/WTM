@@ -19,6 +19,18 @@ typedef rd::Array2D<float>  f2d;
 
 
 //Mini-function that gives the kcell, which changes through time as the water table depth changes:
+///@param x         The x-coordinate of the cell in question
+///
+///@param y         The y-coordinate of the cell in question
+///
+///@param ArrayPack Global arrays. Here we use: 
+///        - fdepth: The e-folding depth based on slope and temperature. 
+///                  This describes the decay of kcell with depth. 
+///        - wtd:    The water table depth. We use a different calculation
+///                  For water tables above vs below 1.5 m below land surface.
+///        - ksat:   Hydraulic conductivity, based on soil types
+///@return  The kcell value for the cell in question. This is the 
+///         integreation of the hydraulic conductivity over flow depth.
 double kcell(const int x, const int y, const ArrayPack &arp){
   if(arp.fdepth(x,y)>0){
     if(arp.wtd(x,y)<-1.5)            //Work out hydraulic conductivity for each cell
@@ -31,46 +43,35 @@ double kcell(const int x, const int y, const ArrayPack &arp){
     return 0;
 }
 
-
-int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, double total_changes){
+///@param params   Global paramaters - we use the texfilename, run type, 
+///                number of cells in the x and y directions (ncells_x and ncells_y),
+///                delta_t (number of seconds in a time step), 
+///                and cellsize_n_s_metres (size of a cell in the north-south direction)
+///
+///@param arp      Global arrays - we access land_mask, topo, wtd, wtd_change_total,
+///                cellsize_e_w_metres, and cell_area.
+///                land_mask is a binary representation of where land is vs where ocean is.
+///                topo is the input topography, i.e. land elevation above sea level in each cell.
+///                wtd is the water table depth.  
+///                wtd_change_total is the amount by which wtd will change in this iteration
+///                as a result of groundwater movement.
+///                cellsize_e_w_metres is the size of a cell in the east-west direction.
+///                cell_area is the area of the cell, needed because different cells have 
+///                different areas and therefore can accommodate different water volumes.
+///
+///@return  An updated wtd that represents the status of the water table after groundwater
+///         has been able to flow for the amount of time represented by delta_t. 
+void groundwater(const Parameters &params, ArrayPack &arp){
 
   ofstream textfile;
-
   textfile.open (params.textfilename, std::ios_base::app);
+  
+  textfile<<"Groundwater"<<std::endl;
 
-  textfile<<"TransientRun"<<std::endl;
- 
-  total_changes = 0.0;                 //set values to 0
-  float max_total = 0.0;
-  float min_total = 0.0;
- // float local_fdepth = 0.0;
- // float local_kcell = 0.0;
- // float local_wtd = 0.0;
+  double total_changes    = 0.0;                 //reset values to 0
+  float max_total  = 0.0;
+  float min_total  = 0.0;
   float max_change = 0.0f;
- // float stability_min = 100000000000000000000.0;
- // float stability_max = 0.0;
-
-//Cycle through the entire array, adding recharge to each cell. 
-  for(int y=1;y<params.ncells_y-1;y++)
-  for(int x=1;x<params.ncells_x-1; x++){
-    if(arp.land_mask(x,y) == 0)      //skip ocean cells
-      continue;
-
-    //TODO: Does this make sense? The water table itself needs to increase by the amount of recharge, then we can get to calculating head etc. 
-    //I have done this in its own for loop so that we get the new wtd everywhere first. 
-    //is this also the best way to avoid recharge that is negative from evaporating too much water?
-
-    if(arp.rech(x,y)>=0)                   //If recharge is positive, we can just add it to the wtd. 
-      arp.wtd(x,y) += arp.rech(x,y);
-    else{                                  //If recharge is negative, we only want to reduce wtd down to 0, and then we change the evaporative scheme to non-surface-water.
-      if(arp.wtd(x,y)+arp.rech(x,y)>0)
-        arp.wtd(x,y) += arp.rech(x,y);
-      else{
-        arp.wtd(x,y) = 0;
-        arp.rech(x,y) = std::max((arp.precip(x,y) - arp.starting_evap(x,y)),0.0f); //wtd has dipped down to the surface, no more surface water in this cell. Thoughts on updating this vs leaving it until the next evaporation update time?
-      }
-    }
-  }
 
 //cycle through the entire array, calculating how much the water table changes in each cell per iteration. 
   for(int y=1;y<params.ncells_y-1;y++)
@@ -78,8 +79,8 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
     if(arp.land_mask(x,y) == 0)          //skip ocean cells
       continue;
 
-    const auto my_head = arp.topo(x,y) + arp.wtd(x,y);        //just elevation head - topography plus the water table depth (negative if water table is below earth surface)               
-    const auto headN   = arp.topo(x,y+1) + arp.wtd(x,y+1);              
+    const auto my_head = arp.topo(x,y)   + arp.wtd(x,y);        //just elevation head - topography plus the water table depth (negative if water table is below earth surface)               
+    const auto headN   = arp.topo(x,y+1) + arp.wtd(x,y+1);      //and the heads for each of my neighbour cells
     const auto headS   = arp.topo(x,y-1) + arp.wtd(x,y-1);              
     const auto headW   = arp.topo(x-1,y) + arp.wtd(x-1,y);              
     const auto headE   = arp.topo(x+1,y) + arp.wtd(x+1,y);              
@@ -89,20 +90,6 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
     const auto kcellS   = kcell(x,  y-1, arp);
     const auto kcellW   = kcell(x-1,y,   arp);
     const auto kcellE   = kcell(x+1,y,   arp);
-
-
-  //  arp.stability_time_seconds(x,y) = 0.5 * (arp.cell_area[y]*arp.cell_area[y]) / my_kcell;  //Von Neumann stability analysis to get stable timestep
-    //TODO: implement stable timestep, or remove this. 
-
-  //  if(arp.stability_time_seconds(x,y)<stability_min){
-  //    stability_min = arp.stability_time_seconds(x,y);
-  //    local_fdepth = arp.fdepth(x,y);
-  //    local_kcell = my_kcell;
-  //    local_wtd = arp.wtd(x,y);
-  //  }
-  //  if(arp.stability_time_seconds(x,y)>stability_max)
-  //    stability_max = arp.stability_time_seconds(x,y);
-
 
     double QN = 0;             //reset all of these values to 0 before doing the calculation
     double QS = 0;
@@ -144,48 +131,17 @@ int TransientRun(const Parameters &params, ArrayPack &arp, const int iter, doubl
 
     if(fabs(arp.wtd_change_total(x,y)) > max_change)
       max_change =fabs(arp.wtd_change_total(x,y));
-
   }
 
 
  for(int y=1;y<params.ncells_y-1;y++)
  for(int x=1;x<params.ncells_x-1; x++){
-    arp.wtd(x,y) = arp.wtd(x,y) + arp.wtd_change_total(x,y);   //update the whole wtd array at once. 
+    arp.wtd(x,y) = arp.wtd(x,y) + arp.wtd_change_total(x,y);   //update the whole wtd array at once. This is the new water table after groundwater has moved for delta_t seconds. 
     total_changes += arp.wtd_change_total(x,y);
   }
 
-
   textfile<<"total GW changes were "<<total_changes<<std::endl;
   textfile<<"max wtd was "<<max_total<<" and min wtd was "<<min_total<<std::endl;
-//  textfile<<"stability_min "<<stability_min<<" stability_max "<<stability_max<<std::endl;
   textfile<<"max GW change was "<< max_change<< std::endl;
   textfile.close();
-
-
-  return 1;
-}
-
-
-
-void groundwater(Parameters &params, ArrayPack &arp){
-  richdem::Timer timer_io;
-
-  ///////////////////////////////
-  //Execution Section
-
-  int iter                  = 0;                           //Number of iterations made
-  double total_changes      = 0.0;
-  //Start of the main loop with condition - either number of iterations or equilibrium condition. TODO: determine a good equilibrium condition
-  while(true){
-
-    if(iter>=params.maxiter)// || abs(total_changes) < 20000.0)
-      break;
-
-
-    TransientRun(params, arp, iter,total_changes);
- 
-    iter++;
-  }
-
-
 }

@@ -5,7 +5,6 @@ void ArrayPack::check() const {
   assert( topo.width()==ksat.         width() && topo.height()==ksat.         height() );
   assert( topo.width()==land_mask.    width() && topo.height()==land_mask.    height() );
   assert( topo.width()==wtd.          width() && topo.height()==wtd.          height() );
-  assert( topo.width()==rech.         width() && topo.height()==rech.         height() );
   assert( topo.width()==fdepth.       width() && topo.height()==fdepth.       height() );
   assert( topo.width()==temp.         width() && topo.height()==temp.         height() );
   assert( topo.width()==slope.        width() && topo.height()==slope.        height() );
