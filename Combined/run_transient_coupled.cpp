@@ -149,6 +149,10 @@ int main(int argc, char **argv){
   arp.surface_evap  = rd::Array2D<float>(arp.topo,0);  
   arp.surface_water = rd::Array2D<float>(arp.topo,0);
 
+  arp.infiltration_array = rd::Array2D<float>(arp.topo,0);
+  arp.evaporation_array = rd::Array2D<float>(arp.topo,0);
+  arp.surface_array = rd::Array2D<float>(arp.topo,0);
+
 
   arp.wtd_change_total = rd::Array2D<float>(arp.topo,0.0f);   //This array is used to store the values of how much the water table will change in one iteration, then adding it to wtd gets the new wtd.
 
@@ -258,6 +262,13 @@ int main(int argc, char **argv){
  float total_wtd_change = 0.0;
  float wtd_mid_change = 0.0;
  float GW_wtd_change = 0.0;
+ float abs_total_wtd_change = 0.0;
+ float abs_wtd_mid_change = 0.0;
+ float abs_GW_wtd_change = 0.0;
+ float evaporation_change = 0.0;
+ float infiltration_change = 0.0;
+ float surface_change = 0.0;
+
 
 while(true){
 
@@ -303,9 +314,10 @@ while(true){
 
 //TODO: How should equilibrium know when to exit?
 
-  if((cycles_done % 10) == 0){
+  if((cycles_done % 100) == 0){
     textfile<<"saving partway result"<<std::endl;  
-    SaveAsNetCDF(arp.wtd,params.outfilename,"value");
+    string cycles_str = to_string(cycles_done);
+    SaveAsNetCDF(arp.wtd,params.outfilename + cycles_str +".nc","value");
   }
 
   arp.wtd_old = arp.wtd;
@@ -330,18 +342,31 @@ while(true){
   //check to see where there is surface water, and adjust how evaporation works at these locations. 
   evaporation_update(params,arp);
 
+  abs_total_wtd_change = 0.0;
+  abs_wtd_mid_change = 0.0;
+  abs_GW_wtd_change = 0.0;
   total_wtd_change = 0.0;
   wtd_mid_change = 0.0;
   GW_wtd_change = 0.0;
+
   for(int y=1;y<params.ncells_y-1;y++)
   for(int x=1;x<params.ncells_x-1; x++){
-    total_wtd_change += fabs(arp.wtd(x,y)     - arp.wtd_old(x,y));
-    wtd_mid_change   += fabs(arp.wtd(x,y)     - arp.wtd_mid(x,y));
-    GW_wtd_change    += fabs(arp.wtd_mid(x,y) - arp.wtd_old(x,y));
+    abs_total_wtd_change += fabs(arp.wtd(x,y)     - arp.wtd_old(x,y));
+    abs_GW_wtd_change    += fabs(arp.wtd(x,y)     - arp.wtd_mid(x,y));
+    abs_wtd_mid_change   += fabs(arp.wtd_mid(x,y) - arp.wtd_old(x,y));
+    total_wtd_change     += (arp.wtd(x,y)         - arp.wtd_old(x,y));
+    GW_wtd_change        += (arp.wtd(x,y)         - arp.wtd_mid(x,y));
+    wtd_mid_change       += (arp.wtd_mid(x,y)     - arp.wtd_old(x,y));
+    evaporation_change   += arp.evaporation_array(x,y);
+    infiltration_change  += arp.infiltration_array(x,y);
+    surface_change       += arp.surface_array(x,y);
+
   }
 
     textfile<<"cycles_done "<<cycles_done<<std::endl;
     textfile<<"total wtd change was "<<total_wtd_change<<" change in GW only was "<<GW_wtd_change<<" and change in SW only was "<<wtd_mid_change<<std::endl;
+    textfile<<"absolute value total wtd change was "<<abs_total_wtd_change<<" change in GW only was "<<abs_GW_wtd_change<<" and change in SW only was "<<abs_wtd_mid_change<<std::endl;
+    textfile<<"the change in infiltration was "<<infiltration_change<<" change in evaporation was "<<evaporation_change<<" and change to surface water was "<<surface_change<<std::endl;
 
   arp.wtd_old = arp.wtd;
 

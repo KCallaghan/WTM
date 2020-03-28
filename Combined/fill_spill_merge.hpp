@@ -287,6 +287,9 @@ static void MoveWaterIntoPits(
     if(wtd(i)>0){
       arp.surface_water(i) += wtd(i);    //Move any surface water into a separate array. This is to allow us to have infiltration into wtd, that does not necessarily fill all the way to the surface, and still have water continue moving downslope. 
       wtd(i) = 0;                        //And we reset any cells that contained surface water to 0. 
+      arp.infiltration_array(i) = 0;
+      arp.evaporation_array(i) = 0;
+      arp.surface_array(i) = 0;
     }
   }
 
@@ -619,6 +622,9 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
       }
     }
   }
+
+  arp.infiltration_array(cell) += params.infiltration;
+  arp.evaporation_array(cell) += params.evaporation;
 }
 
 
@@ -1316,7 +1322,7 @@ static SubtreeDepressionInfo FindDepressionsToFill(
     //If both of a depression's children have already spread their water, we do not
     //want to attempt to do so again in an empty parent depression. 
     //We check to see if both children have finished spreading water. 
-  
+    // std::cout<<"the water vol was "<<this_dep.water_vol<<" the wtd vol was "<<this_dep.wtd_vol<<" and the dep vol was "<<this_dep.dep_vol<<" equality "<<(this_dep.water_vol == this_dep.wtd_vol)<<std::endl;
      FillDepressions(combined, this_dep.water_vol, deps, topo, label, wtd,arp);
 
     //At this point there should be no more water all the way up the tree until
@@ -1376,6 +1382,19 @@ static void FillDepressions(
   if(water_vol==0)
     return;
 
+  //std::cout<<"checking, water vol "<<deps.at(stdi.top_label).water_vol<<" and wtd vol "<<deps.at(stdi.top_label).wtd_vol<<std::endl;
+
+  int my_cells = 0;
+
+ // if(water_vol == deps.at(stdi.top_label).wtd_vol){
+ //   std::cout<<"we have a case where they are equal "<<std::endl;
+ //   for(unsigned int i=0;i<label.size();i++){   
+ //     if(stdi.my_labels.count(label(i))==1){
+ //       my_cells +=1;
+ //     } 
+ //   }
+ //   std::cout<<"my cells are "<<my_cells<<std::endl;
+ // }
 
   //Hashset stores the ids of the cells we've visited. We don't want to use a 2D
   //array because the size of the DEM as a whole could be massive and that's a
@@ -1452,6 +1471,7 @@ static void FillDepressions(
     //current_volume = cells_affected.size()*static_cast<double>(topo(c.x,c.y)) - total_elevation; 
 
     current_volume += (current_elevation-previous_elevation)*current_area;
+   // std::cout<<"current_volume "<<current_volume<<" current_elevation "<<current_elevation<<" previous_elevation "<<previous_elevation<<" current_area "<<std::endl;
 
     assert(water_vol >= - FP_ERROR);
     if(water_vol < 0)
@@ -1472,7 +1492,7 @@ static void FillDepressions(
     //2. The water surface is below the height of the cell because there is sufficient topographic volume to hold all the water.
     //   In this case, the cell's water table is left unaffected.
 
-    if(water_vol<=current_volume-wtd(c.x,c.y)*arp.cell_area[c.y]){
+    if(water_vol - (current_volume-wtd(c.x,c.y)*arp.cell_area[c.y]) <= FP_ERROR){
       //The current scope of the depression plus the water storage capacity of
       //this cell is sufficient to store all of the water. We'll stop adding
       //cells and fill things now.
@@ -1524,6 +1544,7 @@ static void FillDepressions(
           water_level = topo(c);
         
         wtd(c) = water_level - topo(c);  //only change the wtd if it is an increase, here. We can't take water away from cells that already have it (ie reduce groundwater in saddle cells within a metadepression.)
+        arp.surface_array(c) = wtd(c);
         if(-FP_ERROR<=wtd(c) && wtd(c)<0)
           wtd(c) = 0;
         assert(wtd(c)>= -FP_ERROR);
@@ -1612,6 +1633,7 @@ static void FillDepressions(
 
   std::cerr<<"E PQ loop exited without filling a depression!"<<std::endl;
   std::cerr<<"water vol "<<water_vol<<" current vol "<<current_volume<<std::endl;
+  
 
   assert(!flood_q.empty());
   throw std::runtime_error("PQ loop exited without filling a depression!");

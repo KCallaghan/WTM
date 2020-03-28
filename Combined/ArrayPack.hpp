@@ -37,6 +37,9 @@ class ArrayPack {
   f2d relhum_start; 
   f2d relhum_end;
   f2d wtd;
+  f2d infiltration_array;
+  f2d evaporation_array;
+  f2d surface_array;
 
   f2d fdepth;
   f2d precip;
