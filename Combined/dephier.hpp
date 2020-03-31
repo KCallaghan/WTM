@@ -30,7 +30,7 @@ namespace dephier {
 
 //We use a 32-bit integer for labeling depressions. This allows for a maximum of
 //2,147,483,647 depressions. This should be enough for most practical purposes.
-typedef int32_t dh_label_t;
+//typedef int32_t dh_label_t;
 
 //Some special valuess
 const dh_label_t NO_PARENT = -1;

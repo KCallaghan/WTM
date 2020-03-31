@@ -19,7 +19,7 @@ void ArrayPack::check() const {
   assert( topo.width()==e_sat.        width() && topo.height()==e_sat.        height() );
   assert( topo.width()==e_a.          width() && topo.height()==e_a.          height() );
   assert( topo.width()==surface_evap. width() && topo.height()==surface_evap. height() );
-  assert( topo.width()==surface_water.width() && topo.height()==surface_water.height() );
+  assert( topo.width()==runoff.       width() && topo.height()==runoff.       height() );
 
   if(fdepth_end.size()>0){
     assert( topo.width()==fdepth_end.width()  && topo.height()==fdepth_end.   height()   );

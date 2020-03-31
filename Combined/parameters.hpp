@@ -32,18 +32,27 @@ class Parameters {
 
   bool interpolated = false;
   
-  double southern_edge  = std::numeric_limits<double>::signaling_NaN();
-  double deltat         = std::numeric_limits<double>::signaling_NaN();
-  double wtdmax         = std::numeric_limits<double>::signaling_NaN();
-  double cellsize_n_s_metres         = std::numeric_limits<double>::signaling_NaN();
-  float infiltration = 0.0;
-  float evaporation = 0.0;
-  
-  int total_cycles         = -1;
+  double southern_edge       = std::numeric_limits<double>::signaling_NaN();
+  double deltat              = std::numeric_limits<double>::signaling_NaN();
+  double wtdmax              = std::numeric_limits<double>::signaling_NaN();
+  double cellsize_n_s_metres = std::numeric_limits<double>::signaling_NaN();
+  float infiltration         = 0.0;
+  float evaporation          = 0.0;
+  int cycles_done            = 0;
+  float total_wtd_change     = 0.0;
+  float wtd_mid_change       = 0.0;
+  float GW_wtd_change        = 0.0;
+  float abs_total_wtd_change = 0.0;
+  float abs_wtd_mid_change   = 0.0;
+  float abs_GW_wtd_change    = 0.0;
+  float evaporation_change   = 0.0;
+  float infiltration_change  = 0.0;
+  float surface_change       = 0.0;
+  int total_cycles           = -1;
 
   //Set for convenience within the code
   int ncells_x  = -1;
-  int ncells_y = -1;
+  int ncells_y  = -1;
 
   void print() const;
 };

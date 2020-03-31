@@ -60,11 +60,8 @@ class ArrayPack {
   f2d e_sat;
   f2d e_a;
   f2d surface_evap;
-  f2d surface_water;
   f2d wtd_change_total;
 
-  dh_label_t label;
-  dh_label_t final_label;
   dh_label_t flowdir_t;
 
   richdem::Array2D<bool> done_new;   //Indicates which cells must still be processed
@@ -75,6 +72,11 @@ class ArrayPack {
   dvec cellsize_e_w_metres;
   dvec cellsize_e_w_metres_N;
   dvec cellsize_e_w_metres_S;
+
+  rd::Array2D<dh_label_t> label; //No cells are part of a depression
+  rd::Array2D<dh_label_t> final_label; //No cells are part of a depression
+  rd::Array2D<rd::flowdir_t>  flowdirs; //No cells flow anywhere
+
 
   void check() const;
 };
