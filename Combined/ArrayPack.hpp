@@ -22,6 +22,7 @@ typedef int32_t dh_label_t;
 class ArrayPack {
  public:
   f2d ksat;  
+  f2d vert_ksat;  
   f2d slope_start;
   f2d slope_end;
   f2d fdepth_start; 
@@ -40,6 +41,7 @@ class ArrayPack {
   f2d infiltration_array;
   f2d evaporation_array;
   f2d surface_array;
+  f2d starting_rech;
 
   f2d fdepth;
   f2d precip;

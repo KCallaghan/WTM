@@ -264,7 +264,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //begin looking for depressions. We add all of these ocean cells to the
   //priority queue now.
 
-  std::cerr<<"label"<<label(5,5)<<std::endl;
   int ocean_cells = 0;
   for(int y=0;y<arp.topo.height();y++)
   for(int x=0;x<arp.topo.width();x++){

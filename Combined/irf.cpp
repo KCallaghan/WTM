@@ -1,5 +1,5 @@
-#include "transient_groundwater.hpp"
-#include "fill_spill_merge.hpp"
+#include "transient_groundwater_aw.hpp"
+#include "fill_spill_merge_all_infiltrates_neg_rech.hpp"
 #include "evaporation.hpp"
 
 #include "../common/netcdf.hpp"
@@ -33,10 +33,10 @@ const double UNDEF  = -1.0e7;
 ///have differing cell size inputs? Should these be user-set values?
 void InitialiseTransient(Parameters &params, ArrayPack &arp){
 
-  arp.ksat = LoadData<float>(params.surfdatadir + params.region + "coarser_ksat.nc", "value");   //Units of ksat are m/s. 
+  arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + "coarser_ksat.nc", "value");   //Units of ksat are m/s. 
 
-  params.ncells_x = arp.ksat.width();  //width and height in number of cells in the array
-  params.ncells_y = arp.ksat.height();
+  params.ncells_x = arp.vert_ksat.width();  //width and height in number of cells in the array
+  params.ncells_y = arp.vert_ksat.height();
 
 
   arp.slope_start         = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_slope.nc",  "value");  //Slope as a value from 0 to 1. 
@@ -55,11 +55,13 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   arp.relhum_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_relhum.nc", "value");  //Units: proportion from 0 to 1.
 
 //load in the wtd result from the previous time: 
+   // arp.wtd           = rd::Array2D<float>(arp.topo_start,-500.0);  //we start with a water table at the surface for equilibrium runs. 
+
   arp.wtd    = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_wtd.nc", "value");
 
 //calculate the fdepth (e-folding depth, representing rate of decay of the hydraulic conductivity with depth) arrays:
-  arp.fdepth_start = rd::Array2D<float>(arp.topo,0); 
-  arp.fdepth_end   = rd::Array2D<float>(arp.topo,0); 
+  arp.fdepth_start = rd::Array2D<float>(arp.topo_start,0); 
+  arp.fdepth_end   = rd::Array2D<float>(arp.topo_start,0); 
   for(unsigned int i=0;i<arp.topo_start.size();i++){
     if(arp.temp_start(i) > -5)  //then fdepth = f from Ying's equation S7. 
       arp.fdepth_start(i) = std::max(1000/(1+150*arp.slope_start(i)),25.0f);  //TODO: allow user to vary these calibration constants depending on their input cellsize? Or do some kind of auto variation of them? 
@@ -100,10 +102,10 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 ///have differing cell size inputs? Should these be user-set values?
 void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
-  arp.ksat = LoadData<float>(params.surfdatadir + params.region + "coarser_ksat.nc", "value");   //Units of ksat are m/s. 
+  arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + "coarser_ksat.nc", "value");   //Units of ksat are m/s. 
 
-  params.ncells_x = arp.ksat.width();  //width and height in number of cells in the array
-  params.ncells_y = arp.ksat.height();
+  params.ncells_x = arp.vert_ksat.width();  //width and height in number of cells in the array
+  params.ncells_y = arp.vert_ksat.height();
 
   arp.slope         = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_slope.nc",  "value");  //Slope as a value from 0 to 1. 
   arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_mask.nc",   "value"); //A binary mask that is 1 where there is land and 0 in the ocean
@@ -114,6 +116,9 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   arp.relhum        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc", "value");  //Units: proportion from 0 to 1.
   arp.wtd           = rd::Array2D<float>(arp.topo,0.0);  //we start with a water table at the surface for equilibrium runs. 
   arp.evap          = arp.starting_evap;
+  arp.done_old           = rd::Array2D<bool>(arp.topo,false);  //we start with a water table at the surface for equilibrium runs. 
+  arp.done_new           = rd::Array2D<bool>(arp.topo,false);  //we start with a water table at the surface for equilibrium runs. 
+
 
   arp.fdepth   = rd::Array2D<float>(arp.topo,0); 
   for(unsigned int i=0;i<arp.topo.size();i++){
@@ -183,6 +188,10 @@ void cell_size_area(Parameters &params, ArrayPack &arp){
 ///This includes arrays that start off with zero values, as well as the label, final_label, and flowdirs arrays. 
 void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 
+
+  arp.ksat = LoadData<float>(params.surfdatadir + "N_America_coarser_horizontal_ksat.nc", "value");   //Units of ksat are m/s. 
+
+
   //Set arrays that start off with zero or other values, that are not imported files. Just to initialise these - we'll add the appropriate values later. 
   arp.wtd_old            = arp.wtd;                               //These two are just informational, to see how much change happens in FSM vs in groundwater
   arp.wtd_mid            = arp.wtd;
@@ -196,6 +205,8 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   arp.infiltration_array = rd::Array2D<float>(arp.ksat,0);        //These are used to see how much change occurred in infiltration, evaporation, and updating lakes portions of the code. Just informational. 
   arp.evaporation_array  = rd::Array2D<float>(arp.ksat,0);
   arp.surface_array      = rd::Array2D<float>(arp.ksat,0);
+  arp.starting_rech      = rd::Array2D<float>(arp.ksat,0);
+
   arp.wtd_change_total   = rd::Array2D<float>(arp.ksat,0.0f);     //This array is used to store the values of how much the water table will change in one iteration, then adding it to wtd gets the new wtd.
 
   //These are populated during the calculation of the depression hierarchy:
@@ -209,15 +220,20 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
       arp.topo(i) = 0;
     }
     //Converting to appropriate time step
-    arp.precip(i)        *= (params.deltat/(60*60*24*365));                 //convert to appropriate units for the time step. 
-    arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
+ //   arp.precip(i)        *= (params.deltat/(60*60*24*365));                 //convert to appropriate units for the time step. 
+ //   arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
+
   } 
 
 //get the starting runoff using precip and evap inputs:
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
-    arp.runoff(i) = (arp.precip(i)-arp.evap(i));
-    arp.runoff(i) = std::max(arp.runoff(i),0.0f);         //Runoff is always positive. 
+    arp.starting_rech(i) = (arp.precip(i)-arp.starting_evap(i));
+    if(arp.starting_rech(i) <0)
+      arp.starting_rech(i) = 0.0f;
+    arp.runoff(i) = arp.starting_rech(i);
+  //  if(arp.runoff(i)<0)
+  //  arp.runoff(i) = std::max(arp.runoff(i),0.0f);         //Runoff is always positive. 
   }
 
 //Wtd is 0 in the ocean:
@@ -254,8 +270,8 @@ void UpdateTransientArrays(const Parameters &params, ArrayPack &arp){
     arp.relhum(i)         = (arp.relhum_start(i)        * (1-(params.cycles_done/params.total_cycles))) + (arp.relhum_end(i)        * (params.cycles_done/params.total_cycles));
 
     //Converting to appropriate time step
-    arp.precip(i)        *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
-    arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
+ //   arp.precip(i)        *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
+ //   arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                  //convert to appropriate units for the time step. 
     
     arp.label(i)        = dh::NO_DEP; //No cells are part of a depression
     arp.final_label(i)  = dh::NO_DEP; //No cells are part of a depression

@@ -109,10 +109,10 @@ void groundwater(const Parameters &params, ArrayPack &arp){
 
 //discharge per unit area in each direction:
     //Average hydraulic conductivity of the two cells * head difference between the two * time step (number of seconds we are moving water for, since kcell is in m/s) / cellsize (distance water is travelling)
-    QN = ((kcellN+my_kcell)/2.)*(headN-my_head)*params.deltat/params.cellsize_n_s_metres;
-    QS = ((kcellS+my_kcell)/2.)*(headS-my_head)*params.deltat/params.cellsize_n_s_metres ;
-    QE = ((kcellW+my_kcell)/2.)*(headW-my_head)*params.deltat/arp.cellsize_e_w_metres[y];
-    QW = ((kcellE+my_kcell)/2.)*(headE-my_head)*params.deltat/arp.cellsize_e_w_metres[y] ;
+    QN = ((kcellN+my_kcell)/2.)*(headN-my_head)*params.deltat*arp.cellsize_e_w_metres[y]/params.cellsize_n_s_metres;
+    QS = ((kcellS+my_kcell)/2.)*(headS-my_head)*params.deltat*arp.cellsize_e_w_metres[y]/params.cellsize_n_s_metres ;
+    QE = ((kcellW+my_kcell)/2.)*(headW-my_head)*params.deltat*params.cellsize_n_s_metres/arp.cellsize_e_w_metres[y];
+    QW = ((kcellE+my_kcell)/2.)*(headE-my_head)*params.deltat*params.cellsize_n_s_metres/arp.cellsize_e_w_metres[y] ;
 
 //divide by area of cell into which it is flowing: 
     wtd_change_N  = QN / arp.cell_area[y+1];

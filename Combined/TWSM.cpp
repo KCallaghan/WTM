@@ -59,16 +59,25 @@ void update(Parameters &params, ArrayPack &arp, richdem::dephier::DepressionHier
   arp.wtd_old = arp.wtd;  //These are used to see how much change occurs in FSM vs in the groundwater portion. 
   arp.wtd_mid = arp.wtd;
 
+//  for(int y=1;y<params.ncells_y-1;y++)
+//  for(int x=1;x<params.ncells_x-1; x++){
+//    if(arp.land_mask(x,y) == 0)          //skip ocean cells
+//      continue;
+//    arp.wtd(x,y) += arp.precip(x,y) - arp.starting_evap(x,y);
+//  }
+
+ //Run the groundwater code to move water
+
+
   //Move surface water
   dh::FillSpillMerge(params,deps,arp);
 
-  arp.wtd_mid = arp.wtd;
 
-  //Run the groundwater code to move water
+   arp.wtd_mid = arp.wtd;
   groundwater(params,arp);
 
   //check to see where there is surface water, and adjust how evaporation works at these locations. TODO is this still appropriate with the new method of cell-by-cell evaporation?
-  evaporation_update(params,arp);
+//  evaporation_update(params,arp);
 
   //Print values about the change in water table depth to the text file. 
   PrintValues(params,arp);

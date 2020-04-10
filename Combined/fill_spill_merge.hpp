@@ -337,7 +337,7 @@ static void MoveWaterIntoPits(
    
       //first, we do evaporation and infiltration from the current cell, as the water moves from the cell centre to the edge of the cell in the direction of the neighbour. 
         CalculateEvaporationAndInfiltration(c,distance,arp.runoff(c),params,arp);
-        arp.runoff(c) = arp.runoff(c)-params.evaporation;   //subtract evaporation from the available surface water
+    //    arp.runoff(c) = arp.runoff(c)-params.evaporation;   //subtract evaporation from the available surface water
         arp.wtd(c) += params.infiltration;                                    //add infiltration to the water table
         arp.runoff(c) -= params.infiltration;                      //and subtract the infiltration from the available surface water. 
         assert(arp.wtd(c)<=FP_ERROR);
@@ -350,7 +350,7 @@ static void MoveWaterIntoPits(
         //then, we do the same for the neighbour cell receiving the water, from its edge that it receives along, to its centre. 
         if(arp.runoff(c) > 0){   //check again if there is water available since it's possible the evaporation and infiltration above used it up. 
         CalculateEvaporationAndInfiltration(n,distance,arp.runoff(c),params,arp);
-        arp.runoff(c) = arp.runoff(c)-params.evaporation;
+   //     arp.runoff(c) = arp.runoff(c)-params.evaporation;
         arp.wtd(n) += params.infiltration;
         arp.runoff(c) -= params.infiltration;
         }
@@ -527,8 +527,10 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
   params.infiltration = 0.0;
   params.evaporation = 0.0;
 
+  float vert_ksat = arp.vert_ksat(cell);
+
   float slope = std::max(arp.slope(cell), 0.000001f);  //assigning a small minimum slope, since otherwise in cells with zero slope, the delta_t will be infinity.
-  float denominator = arp.ksat(cell) + arp.surface_evap(cell);
+  float denominator = vert_ksat + arp.surface_evap(cell);
   float bracket = std::pow(h_0,(5.0/3.0)) - (denominator * distance * (mannings_n/std::pow(slope,0.5)) * (5/3));
   float numerator = h_0 - std::pow(bracket,(3.0/5.0));
   float delta_t = numerator/denominator;  //delta_t is the amount of time it will take the given amount of water to cross the given distance. 
@@ -536,12 +538,12 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
  
 //if it's a normal case, the water is not running out and the cell is not becoming saturated. 
 //we calculate the infiltration using the delta_t from above, and ksat as a coefficient for infiltration amount, surface_evap as a coefficient for evaporation amount.
-    params.infiltration = arp.ksat(cell)*(delta_t);
+    params.infiltration = vert_ksat*(delta_t);
     params.evaporation = arp.surface_evap(cell)*(delta_t);
 
   if(bracket < 0){  //all of the water is getting used up. We have to limit the sum of infiltration and evaporation to be equal to the available water, h0.
-    params.infiltration =  h_0/(arp.ksat(cell)+arp.surface_evap(cell)) * arp.ksat(cell);
-    params.evaporation = h_0/(arp.ksat(cell)+arp.surface_evap(cell)) * arp.surface_evap(cell);
+    params.infiltration =  h_0/(vert_ksat+arp.surface_evap(cell)) * vert_ksat;
+    params.evaporation = h_0/(vert_ksat+arp.surface_evap(cell)) * arp.surface_evap(cell);
   }
 
   if(arp.wtd(cell) > -params.infiltration){  //the cell is getting saturated partway. We must recalculate the amount of evaporation that will happen since there is still more water available at that stage.
@@ -551,7 +553,7 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
 
     if(params.infiltration == -arp.wtd(cell)){  //if the water did not run out before saturation occurred,
       //we must calculate how far it went before it got saturated. 
-      bracket = std::pow(h_0,(5.0/3.0)) - std::pow((h_0 - (denominator*(params.infiltration/arp.ksat(cell)))),(5.0/3.0));
+      bracket = std::pow(h_0,(5.0/3.0)) - std::pow((h_0 - (denominator*(params.infiltration/vert_ksat))),(5.0/3.0));
       float delta_x = (3.0/5.0) * (std::pow(slope,0.5) /(mannings_n*denominator) );  //so this is how far it would travel across the cell before the cell got saturated. 
 
       bracket = std::pow(h_0,(5.0/3.0)) - (denominator * delta_x * (mannings_n/std::pow(slope,0.5)) * (5/3));  
@@ -575,11 +577,14 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
 
       if(h_0_evap < 0 || isnan(params.evaporation)){       //TODO: when would this actually occur? Shouldn't the above conditions have dealt with this?
         //maybe in the case where infiltration is 0 in both cases, so we get through to the evap section, but all water runs out during evap, so we get a NaN in the first portion of evap?
-        params.infiltration =  std::min(static_cast<float>((h_0/(arp.ksat(cell)+arp.surface_evap(cell)) * arp.ksat(cell))),params.infiltration);
+        params.infiltration =  std::min(static_cast<float>((h_0/(vert_ksat+arp.surface_evap(cell)) * vert_ksat)),params.infiltration);
         params.evaporation = h_0 - params.infiltration;
       }
     }
   }
+
+  if(params.infiltration > -arp.wtd(cell))
+    params.infiltration = -arp.wtd(cell);
 
   arp.infiltration_array(cell) += params.infiltration;
   arp.evaporation_array(cell) += params.evaporation;
@@ -861,7 +866,7 @@ static void MoveWaterInOverflow(
      
 
     CalculateEvaporationAndInfiltration(current_cell,distance,extra_water,params,arp);
-    extra_water -= params.evaporation;
+ //   extra_water -= params.evaporation;
     arp.wtd(current_cell) += params.infiltration;
     extra_water -= params.infiltration;
     assert(arp.wtd(current_cell)<=FP_ERROR);
@@ -1419,7 +1424,7 @@ static void FillDepressions(
     //into the pit cell. Since we may already have filled other depressions
     //their cells are allowed to have wtd>0. Thus, we raise a warning if we are
     //looking at a cell in this unfilled depression with wtd>0.
-    if(stdi.my_labels.count(arp.label(c.x,c.y))==1 && arp.wtd(c.x,c.y)>0)
+    if(stdi.my_labels.count(arp.label(c.x,c.y))==1 && arp.wtd(c.x,c.y)>FP_ERROR)
       throw std::runtime_error("A cell was discovered in an unfilled depression with wtd>0!");
 
     //There are two possibilities:
