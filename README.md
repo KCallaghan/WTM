@@ -32,11 +32,33 @@ The following files are required:
 * E-folding depth - see the Fan et al paper linked above for details on how this is computed using slope and temperature
 * Hydraulic conductivity - in metres per second
 
-##Dependencies
+## Dependencies
 
 * The C++ compiler g++
 * NetCDF for C++
 * RichDEM
+
+## Downloading with dependencies
+
+The best way to obtian this code is by cloning the repository.
+
+Before starting, note that in order to include RichDEM from GitHub, you will need a Public Key associated with your account. Instructions to do so can be found here.
+https://help.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent
+
+Clone with submodule dependencies (RichDEM) included:
+```sh
+git clone --recurse-submodules https://github.com/KCallaghan/Coupled_SW_GW
+```
+
+If you forget to do this and just run a normal `git clone`, you can still pull the submodules:
+```
+git submodule update --init --recursive
+```
+
+In either case, use the following to update the submodules:
+```
+git pull --recurse-submodules
+```
 
 ## Compilation
 Use the supplied Makefile. Open a terminal in the folder containing the makefile and source code, and type
