@@ -83,28 +83,23 @@ void groundwater(const Parameters &params, ArrayPack &arp){
   **/
 
   // Declare variables updated in the loop
-  double QN;
-  double QS;
-  double QE;
-  double QW;
-
   double wtd_change_N;
   double wtd_change_S;
   double wtd_change_E;
   double wtd_change_W;
 
-
+  // Declare status variables and set initial values to 0
+  double total_changes = 0.;
+  float max_total      = 0.;
+  float min_total      = 0.;
+  float max_change     = 0.;
+  
+  // Set up log file
   ofstream textfile;
   textfile.open (params.textfilename, std::ios_base::app);
   
   textfile<<"Groundwater"<<std::endl;
 
-  //reset values to 0
-  double total_changes = 0.;
-  float max_total  = 0.;
-  float min_total  = 0.;
-  float max_change = 0.;
-  
   
   ////////////////////////////
   // COMPUTE CHANGES IN WTD //
@@ -129,24 +124,11 @@ void groundwater(const Parameters &params, ArrayPack &arp){
       const auto headW   = arp.topo(x-1,y) + arp.wtd(x-1,y);              
       const auto headE   = arp.topo(x+1,y) + arp.wtd(x+1,y);              
 
-      //Get the hydraulic conductivity for our cells of interest
+      // Get the hydraulic conductivity for our cells of interest
       const auto kN = ( kcell(x,  y,   arp) + kcell(x,  y+1, arp) ) / 2.;
       const auto kS = ( kcell(x,  y,   arp) + kcell(x,  y-1, arp) ) / 2.;                
       const auto kW = ( kcell(x,  y,   arp) + kcell(x-1,y,   arp) ) / 2.;
       const auto kE = ( kcell(x,  y,   arp) + kcell(x+1,y,   arp) ) / 2.;
-
-      // Reset all discharges to 0 before doing the calculation
-      QN = 0;
-      QS = 0;
-      QE = 0;
-      QW = 0;
-
-      wtd_change_N = 0;
-      wtd_change_S = 0;
-      wtd_change_E = 0;
-      wtd_change_W = 0;
-
-      arp.wtd_change_total(x,y) = 0;
 
       // Change in water-table depth.
       // (1) Discharge across cell boundaries
@@ -178,11 +160,11 @@ void groundwater(const Parameters &params, ArrayPack &arp){
       //   - lowest wtd
       //   - greatest change in wtd during this time step
       if(arp.wtd(x,y)> max_total)
-        max_total = arp.wtd(x,y);
+        max_total  = arp.wtd(x,y);
       else if(arp.wtd(x,y)< min_total)
-        min_total =arp.wtd(x,y);
+        min_total  = arp.wtd(x,y);
       if(fabs(arp.wtd_change_total(x,y)) > max_change)
-        max_change =fabs(arp.wtd_change_total(x,y));
+        max_change = fabs(arp.wtd_change_total(x,y));
     }
   }
 
@@ -202,8 +184,9 @@ void groundwater(const Parameters &params, ArrayPack &arp){
   }
 
   // Write status to text file
-  textfile<<"total GW changes were "<<total_changes<<std::endl;
-  textfile<<"max wtd was "<<max_total<<" and min wtd was "<<min_total<<std::endl;
-  textfile<<"max GW change was "<< max_change<< std::endl;
+  textfile << "total GW changes were " << total_changes << std::endl;
+  textfile << "max wtd was " << max_total << " and min wtd was " \
+           << min_total << std::endl;
+  textfile << "max GW change was " << max_change << std::endl;
   textfile.close();
 }
