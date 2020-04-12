@@ -31,6 +31,7 @@ class Parameters {
   const double UNDEF  = -1.0e7;
 
   bool interpolated = false;
+  bool infiltration_on;
   
   double southern_edge       = std::numeric_limits<double>::signaling_NaN();
   double deltat              = std::numeric_limits<double>::signaling_NaN();

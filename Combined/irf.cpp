@@ -1,5 +1,5 @@
-#include "transient_groundwater_aw.hpp"
-#include "fill_spill_merge_all_infiltrates_neg_rech.hpp"
+#include "transient_groundwater.hpp"
+#include "fill_spill_merge.hpp"
 #include "evaporation.hpp"
 
 #include "../common/netcdf.hpp"
@@ -187,7 +187,6 @@ void cell_size_area(Parameters &params, ArrayPack &arp){
 ///This function initialises those arrays that are used for both equilibrium and transient model runs. 
 ///This includes arrays that start off with zero values, as well as the label, final_label, and flowdirs arrays. 
 void InitialiseBoth(const Parameters &params, ArrayPack &arp){
-
 
   arp.ksat = LoadData<float>(params.surfdatadir + "N_America_coarser_horizontal_ksat.nc", "value");   //Units of ksat are m/s. 
 

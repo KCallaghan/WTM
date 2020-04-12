@@ -57,7 +57,7 @@ static void CalculateWtdVol(
   DepressionHierarchy<elev_t>   &deps
 );
 
- void CalculateEvaporationAndInfiltration(
+ void CalculateInfiltration(
   int                           cell,
   double                        distance,
   double                        h_0,
@@ -243,10 +243,9 @@ static void MoveWaterIntoPits(
   #pragma omp parallel for 
   for(unsigned int i=0;i<arp.topo.size();i++){   
     if(arp.wtd(i)>0){
-      arp.runoff(i) += arp.wtd(i);    //Move any surface water into a separate array. This is to allow us to have infiltration into wtd, that does not necessarily fill all the way to the surface, and still have water continue moving downslope. 
+      arp.runoff(i) = arp.wtd(i);    //Move any surface water into a separate array. This is to allow us to have infiltration into wtd, that does not necessarily fill all the way to the surface, and still have water continue moving downslope. 
       arp.wtd(i) = 0;                        //And we reset any cells that contained surface water to 0. 
       arp.infiltration_array(i) = 0;
-      arp.evaporation_array(i) = 0;
       arp.surface_array(i) = 0;
     }
   }
@@ -322,10 +321,10 @@ static void MoveWaterIntoPits(
       }
     }else {                               //not a pit cell
 
-
+if(params.infiltration_on == true){
       if(arp.runoff(c)>0){  //if there is water available
       
-      //some evaporation and infiltration happens as the water flows from cell to cell. To do this, we need to first calculate the distance that the water travels. 
+      //some infiltration happens as the water flows from cell to cell. To do this, we need to first calculate the distance that the water travels. 
         distance = 0;
    
         if(x == nx)      //same x means use e-w direction       
@@ -335,9 +334,8 @@ static void MoveWaterIntoPits(
         else    //it is diagonal, use pythagoras
           distance += (std::pow( (std::pow(arp.cellsize_e_w_metres[ny], 2.0) + std::pow(params.cellsize_n_s_metres,2.0)), 0.5))/2.0;
    
-      //first, we do evaporation and infiltration from the current cell, as the water moves from the cell centre to the edge of the cell in the direction of the neighbour. 
-        CalculateEvaporationAndInfiltration(c,distance,arp.runoff(c),params,arp);
-    //    arp.runoff(c) = arp.runoff(c)-params.evaporation;   //subtract evaporation from the available surface water
+      //first, we do infiltration from the current cell, as the water moves from the cell centre to the edge of the cell in the direction of the neighbour. 
+        CalculateInfiltration(c,distance,arp.runoff(c),params,arp);
         arp.wtd(c) += params.infiltration;                                    //add infiltration to the water table
         arp.runoff(c) -= params.infiltration;                      //and subtract the infiltration from the available surface water. 
         assert(arp.wtd(c)<=FP_ERROR);
@@ -348,9 +346,8 @@ static void MoveWaterIntoPits(
           arp.runoff(c) = 0;
 
         //then, we do the same for the neighbour cell receiving the water, from its edge that it receives along, to its centre. 
-        if(arp.runoff(c) > 0){   //check again if there is water available since it's possible the evaporation and infiltration above used it up. 
-        CalculateEvaporationAndInfiltration(n,distance,arp.runoff(c),params,arp);
-   //     arp.runoff(c) = arp.runoff(c)-params.evaporation;
+        if(arp.runoff(c) > 0){   //check again if there is water available since it's possible the infiltration above used it up. 
+        CalculateInfiltration(n,distance,arp.runoff(c),params,arp);
         arp.wtd(n) += params.infiltration;
         arp.runoff(c) -= params.infiltration;
         }
@@ -362,6 +359,9 @@ static void MoveWaterIntoPits(
         if(arp.runoff(c)<0)
           arp.runoff(c) = 0;
       }
+
+}
+
 
       //If we still have water, pass it downstream.
       if(arp.runoff(c)>0){ 
@@ -486,25 +486,20 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
 
 
 
-///We use this function to calculate any evaporation and infiltration 
+///We use this function to calculate any infiltration 
 ///that occurs as water flows cell-by-cell downslope. 
 ///This could happen both when the water is initially flowing down
 ///to the pit cells, and when it overflows from one depression to another. 
 ///
 ///
-///@param cell     The cell in which the evaporation and infiltration 
-///                will take place.
+///@param cell     The cell in which the infiltration will take place.
 ///@param distance The distance over which the water is travelling 
 ///                (i.e. from one cell to the other)
 ///@param h_0      The amount of surface water available in the cell. 
 ///
-///@param params   Global paramaters - we store infiltration and 
-///                evaporation results here
+///@param params   Global paramaters - we store infiltration results here
 ///
-///@param arp      Global arrays - we access ksat, surface_evap, slope, and wtd.
-///                surface_evap is the amount of evaporation that happens
-///                in a cell with surface water, calculated elsewhere using
-///                temperature and relative humidity.
+///@param arp      Global arrays - we access ksat, slope, and wtd.
 ///                wtd is the water table depth. At this stage of the code it is
 ///                always negative, and needed to see if there is space 
 ///                available for infiltration to occur. 
@@ -513,10 +508,9 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
 ///                infiltration can occur. 
 ///                slope is the topographic slope 
 ///
-///@return Calculates the amount of infiltration and evaporation that 
-///        will happen within the time it takes the amount of  water to 
-///        travel the given distance.
- void CalculateEvaporationAndInfiltration(
+///@return Calculates the amount of infiltration that will happen within 
+///        the time it takes the amount of  water to travel the given distance.
+ void CalculateInfiltration(
   int         cell,
   double      distance,
   double      h_0,
@@ -525,69 +519,28 @@ for(int d=0;d<(int)deps.size();d++){  //Just checking that nothing went horribly
 ){
   float mannings_n = 0.05; //TODO: is this the best value?
   params.infiltration = 0.0;
-  params.evaporation = 0.0;
 
   float vert_ksat = arp.vert_ksat(cell);
 
   float slope = std::max(arp.slope(cell), 0.000001f);  //assigning a small minimum slope, since otherwise in cells with zero slope, the delta_t will be infinity.
-  float denominator = vert_ksat + arp.surface_evap(cell);
-  float bracket = std::pow(h_0,(5.0/3.0)) - (denominator * distance * (mannings_n/std::pow(slope,0.5)) * (5/3));
+  float bracket = std::pow(h_0,(5.0/3.0)) - (vert_ksat * distance * (mannings_n/std::pow(slope,0.5)) * (5/3));
   float numerator = h_0 - std::pow(bracket,(3.0/5.0));
-  float delta_t = numerator/denominator;  //delta_t is the amount of time it will take the given amount of water to cross the given distance. 
+  float delta_t = numerator/vert_ksat;  //delta_t is the amount of time it will take the given amount of water to cross the given distance. 
 
- 
 //if it's a normal case, the water is not running out and the cell is not becoming saturated. 
-//we calculate the infiltration using the delta_t from above, and ksat as a coefficient for infiltration amount, surface_evap as a coefficient for evaporation amount.
+//we calculate the infiltration using the delta_t from above, and ksat as a coefficient for infiltration amount.
     params.infiltration = vert_ksat*(delta_t);
-    params.evaporation = arp.surface_evap(cell)*(delta_t);
 
-  if(bracket < 0){  //all of the water is getting used up. We have to limit the sum of infiltration and evaporation to be equal to the available water, h0.
-    params.infiltration =  h_0/(vert_ksat+arp.surface_evap(cell)) * vert_ksat;
-    params.evaporation = h_0/(vert_ksat+arp.surface_evap(cell)) * arp.surface_evap(cell);
+  if(bracket < 0){  //all of the water is getting used up. We have to limit the infiltration to be equal to the available water, h0.
+    params.infiltration =  h_0;
   }
 
-  if(arp.wtd(cell) > -params.infiltration){  //the cell is getting saturated partway. We must recalculate the amount of evaporation that will happen since there is still more water available at that stage.
-
+  if(arp.wtd(cell) > -params.infiltration){  //the cell is getting saturated partway. 
     params.infiltration = std::min(params.infiltration,-arp.wtd(cell));  //But, we must check for the case where both the cell becomes saturated and the water gets used up.
     //sometimes the water may run out before the saturation occurred. 
-
-    if(params.infiltration == -arp.wtd(cell)){  //if the water did not run out before saturation occurred,
-      //we must calculate how far it went before it got saturated. 
-      bracket = std::pow(h_0,(5.0/3.0)) - std::pow((h_0 - (denominator*(params.infiltration/vert_ksat))),(5.0/3.0));
-      float delta_x = (3.0/5.0) * (std::pow(slope,0.5) /(mannings_n*denominator) );  //so this is how far it would travel across the cell before the cell got saturated. 
-
-      bracket = std::pow(h_0,(5.0/3.0)) - (denominator * delta_x * (mannings_n/std::pow(slope,0.5)) * (5/3));  
-      numerator = h_0 - std::pow(bracket,(3.0/5.0));
-      delta_t = numerator/denominator;
-
-      params.evaporation = arp.surface_evap(cell)*(delta_t);  //how much evaporation happened prior to the cell becoming saturated
-
-      float h_0_evap = h_0 - params.evaporation - params.infiltration;  //how much water is still left over in the cell at this point
-
-      denominator = 0 + arp.surface_evap(cell);
-      bracket = std::pow(h_0_evap,(5.0/3.0)) - denominator * (distance - delta_x) * (mannings_n/std::pow(slope,0.5)) * (5/3);
-      numerator = h_0_evap - std::pow(bracket,(3.0/5.0));
-      delta_t = numerator/denominator;
-
-      if((bracket > 0) && !isnan(delta_t) &&!isinf(delta_t))  //it's possible we ran out of water here, after saturation occurred. If not, add the rest of the evap
-        params.evaporation += arp.surface_evap(cell)*(delta_t);
-      else                                                    //but if we did run out of water, then just all the rest of the water evaporates. 
-        params.evaporation += h_0_evap;
-
-
-      if(h_0_evap < 0 || isnan(params.evaporation)){       //TODO: when would this actually occur? Shouldn't the above conditions have dealt with this?
-        //maybe in the case where infiltration is 0 in both cases, so we get through to the evap section, but all water runs out during evap, so we get a NaN in the first portion of evap?
-        params.infiltration =  std::min(static_cast<float>((h_0/(vert_ksat+arp.surface_evap(cell)) * vert_ksat)),params.infiltration);
-        params.evaporation = h_0 - params.infiltration;
-      }
-    }
   }
 
-  if(params.infiltration > -arp.wtd(cell))
-    params.infiltration = -arp.wtd(cell);
-
   arp.infiltration_array(cell) += params.infiltration;
-  arp.evaporation_array(cell) += params.evaporation;
 }
 
 
@@ -815,7 +768,7 @@ static void MoveWaterInOverflow(
 
 //convert extra water to a height
   extra_water = extra_water/arp.cell_area[y];  //it was easier to have extra_water as a volume when calling this function, since it was calculated from the volumes of the depressions and the water.
-  //however, inside this function it is easier to have as a height, since evaporation and infilatration are happening and will be calculated as heights. 
+  //however, inside this function it is easier to have as a height, since infilatration is happening and will be calculated as a height. 
 
   assert(extra_water > 0);
 
@@ -844,7 +797,7 @@ static void MoveWaterInOverflow(
 
   while(extra_water > 0){
  
-
+  if(params.infiltration_on == true){
     distance = 0;
     int p_x,p_y;
     arp.topo.iToxy(previous_cell,p_x,p_y);              
@@ -865,12 +818,12 @@ static void MoveWaterInOverflow(
       distance += (std::pow( (std::pow(arp.cellsize_e_w_metres[ny], 2.0) + std::pow(params.cellsize_n_s_metres,2.0)), 0.5))/2.0;
      
 
-    CalculateEvaporationAndInfiltration(current_cell,distance,extra_water,params,arp);
- //   extra_water -= params.evaporation;
+    CalculateInfiltration(current_cell,distance,extra_water,params,arp);
     arp.wtd(current_cell) += params.infiltration;
     extra_water -= params.infiltration;
     assert(arp.wtd(current_cell)<=FP_ERROR);
     assert(extra_water>=-FP_ERROR);
+  }
 
     if(extra_water <= 0)
       break;
