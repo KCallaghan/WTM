@@ -2,22 +2,12 @@
 #define _array_pack_
 
 #include <richdem/common/Array2D.hpp>
-#include <vector>
-#include "../common/netcdf.hpp"
-#include <iostream>
-#include <string>
-#include <stdexcept>
-//#include "dephier.hpp"
 
 namespace rd = richdem;
-//namespace dh = richdem::dephier;
-
 
 typedef richdem::Array2D<float>  f2d;
 typedef std::vector<double> dvec;
 typedef int32_t dh_label_t;
-
-//typedef richdem::Array2D<dh::dh_label_t> lab_arr;
 
 class ArrayPack {
  public:
@@ -39,7 +29,6 @@ class ArrayPack {
   f2d relhum_end;
   f2d wtd;
   f2d infiltration_array;
-  f2d evaporation_array;
   f2d surface_array;
   f2d starting_rech;
 
@@ -65,9 +54,6 @@ class ArrayPack {
   f2d wtd_change_total;
 
   dh_label_t flowdir_t;
-
-  richdem::Array2D<bool> done_new;   //Indicates which cells must still be processed
-  richdem::Array2D<bool> done_old;   //Indicates which cells must still be processed
 
   dvec latitude_radians;
   dvec cell_area;
