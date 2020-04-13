@@ -49,12 +49,17 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   + params.time_start + "_precip.nc", "value");  //Units: m/yr. 
   arp.temp_start          = LoadData<float>(params.surfdatadir + params.region \
   + params.time_start + "_temp.nc",   "value");  //Units: degress Celsius
+  arp.ground_temp_start          = LoadData<float>(params.surfdatadir + \
+    params.region + params.time_start + "_ground_temp.nc",   "value");  
+    //Units: degress Celsius
   arp.topo_start          = LoadData<float>(params.surfdatadir + params.region \
   + params.time_start + "_topo.nc",   "value");  //Units: metres
   arp.starting_evap_start = LoadData<float>(params.surfdatadir + params.region \
   + params.time_start + "_evap.nc",   "value");  //Units: m/yr
   arp.relhum_start        = LoadData<float>(params.surfdatadir + params.region \
   + params.time_start + "_relhum.nc", "value");  //Units: proportion from 0 to 1
+  arp.wind_speed_start  = LoadData<float>(params.surfdatadir + params.region + \
+  params.time_start + "_wind_speed.nc", "value");  //Units: m/s
 
   arp.slope_end         = LoadData<float>(params.surfdatadir + params.region + \
   params.time_end + "_slope.nc",  "value");  //Slope as a value from 0 to 1. 
@@ -65,12 +70,17 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   params.time_end + "_precip.nc", "value");  //Units: m/yr. 
   arp.temp_end          = LoadData<float>(params.surfdatadir + params.region + \
   params.time_end + "_temp.nc",   "value");  //Units: degress Celsius
+  arp.ground_temp_end          = LoadData<float>(params.surfdatadir + \
+    params.region + params.time_end + "_ground_temp.nc",   "value");  
+    //Units: degress Celsius
   arp.topo_end          = LoadData<float>(params.surfdatadir + params.region + \
   params.time_end + "_topo.nc",   "value");  //Units: metres
   arp.starting_evap_end = LoadData<float>(params.surfdatadir + params.region + \
   params.time_end + "_evap.nc",   "value");  //Units: m/yr
   arp.relhum_end        = LoadData<float>(params.surfdatadir + params.region + \
   params.time_end + "_relhum.nc", "value");  //Units: proportion from 0 to 1.
+  arp.wind_speed_end    = LoadData<float>(params.surfdatadir + params.region + \
+  params.time_end + "_wind_speed.nc", "value");  //Units: m/s
 
   //load in the wtd result from the previous time: 
   arp.wtd    = LoadData<float>(params.surfdatadir + params.region + \
@@ -114,6 +124,8 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   arp.relhum        = arp.relhum_start;
   arp.slope         = arp.slope_start;
   arp.evap          = arp.starting_evap;
+  arp.ground_temp   = arp.ground_temp_start;
+  arp.wind_speed    = arp.wind_speed_start;
 }
 
 
@@ -145,12 +157,18 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   params.time_start + "_precip.nc", "value");  //Units: m/yr. 
   arp.temp          = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_temp.nc",   "value");  //Units: degress Celsius
+  arp.ground_temp          = LoadData<float>(params.surfdatadir + \
+  params.region + params.time_start + "_ground_temp.nc",   "value");  
+  //Units: degress Celsius
   arp.topo          = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_topo.nc",   "value");  //Units: metres
   arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_evap.nc",   "value");  //Units: m/yr
   arp.relhum        = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_relhum.nc", "value");  //Units: proportion from 0 to 1.
+  arp.wind_speed    = LoadData<float>(params.surfdatadir + params.region + \
+  params.time_start + "_wind_speed.nc", "value");  //Units: m/s
+
   arp.wtd           = rd::Array2D<float>(arp.topo,0.0);  
   //we start with a water table at the surface for equilibrium runs. 
   arp.evap          = arp.starting_evap;

@@ -23,6 +23,12 @@ class ArrayPack {
   f2d temp_end;
   f2d topo_start;   
   f2d topo_end;
+  f2d ground_temp_start;
+  f2d ground_temp_end;
+  f2d ground_temp;
+  f2d wind_speed_start;
+  f2d wind_speed_end;
+  f2d wind_speed;
   f2d starting_evap_start; 
   f2d starting_evap_end;
   f2d relhum_start; 
