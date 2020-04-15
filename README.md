@@ -28,9 +28,11 @@ The following files are required:
 * Precipitation - in metres per year
 * Evaporation - in metres per year
 * Relative humidity - as a proportion from 0 to 1
-* Winter temperature - in degrees Celsius
-* E-folding depth - see the Fan et al paper linked above for details on how this is computed using slope and temperature
+* Winter air temperature - in degrees Celsius
+* Ground temperature - in degrees Celsius
+* Slope - determined from your topography
 * Hydraulic conductivity - in metres per second
+* Wind speed - in metres per second
 
 ## Dependencies
 
@@ -73,7 +75,7 @@ Ensure that all of the data files are located appropriately in a folder together
 
 time_start, surfdatadir, and region are all to help you name your input files or place them in a specific folder. The code will look for data files in the following format:
 surfdatadir + region + time_start + "\_suffix.nc",
-where the suffix refers to the specific file (topo, mask, precip, evap, relhum, temp, fdepth, or ksat). 
+where the suffix refers to the specific file (topo, mask, precip, evap, relhum, temp, slope, wind_speed, ground_temp, or ksat). 
 An example of a file path would be: "surfdata/North_America_10000_topo.nc".
 In this case, you would set:
 
@@ -81,7 +83,9 @@ In this case, you would set:
 * region             North_America_
 * time_start         10000
 
-time_end and run_type will become relevant in a future release, for now leave these as they are. 
+Two run types are possible: equilibrium, and transient. An equilibrium run assumes that the topography and climate are not changing and runs for many iterations until the equilibrium condition for the water table is found. Set the run_type parameter to 'equilibrium'.
+A transient run requires a starting depth to water table as an additional input. The algorithm will then run for a set number of iterations, to represent a number of years passing, and output the new water table under a changing set of climatic and topographic conditions. In this case, both start and end states are required for all file inputs. Set the time_end parameter to lead to the files at the end time of the transient run, while time_start leads to the files at the initial time of the transient run. The run_type parameter should be set to 'transient'. 
+Other parameters include: 
 
 * deltat             {Number of seconds per time step, e.g. 315360000 for a 10-year time step}
 * southern_edge      {Southern-most latitude of your domain in decimal degrees, e.g. 5}
@@ -91,11 +95,11 @@ Once the configuration file has been set up appropriately, simply open a termina
 ```
 ./a.out global.cfg
 ```
-There will be some on-screen outputs to indicate the first steps through the code, after which values of interest will be output to the text file and an updated netcdf output file will be saved every 10 iterations. 
+There will be some on-screen outputs to indicate the first steps through the code, after which values of interest will be output to the text file and an updated netcdf output file will be saved every 100 iterations. 
 
 ## Outputs
 The program outputs a text file that provides information on the current minimum and maximum water table elevation, the changes in surface water and groundwater within the past iteration, and the number of iterations passed. 
 The main output is a netcdf file that supplies the depth to/elevation of the water table. Negative values indicate a water table below the surface, while positive values indicate a water table above the surface (i.e. a lake). 
 
 ## Completing a model run
-A satisfactory method of detecting whether the model has reached equilibrium is still under construction. For now, it is at the discretion of the user whether he output after a given number of iterations is appropriate to use. The code will automatically complete after 500000 iterations have been performed.
+A satisfactory method of detecting whether the model has reached equilibrium is still under construction. For now, it is at the discretion of the user whether he output after a given number of iterations is appropriate to use. The code will automatically complete after the number of iterations selected in the total_cycles parameter have been performed.
