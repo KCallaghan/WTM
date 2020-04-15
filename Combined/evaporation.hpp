@@ -45,8 +45,11 @@ void evaporation_update(Parameters &params, ArrayPack &arp){
 
     if(arp.wtd(i)>0)  //if there is surface water present
       arp.rech(i) = arp.precip(i) - arp.surface_evap(i);
-    else              //water table is below the surface
-      arp.rech(i) = arp.precip(i) - arp.starting_evap(i);  
+    else{              //water table is below the surface
+      arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
+      if(arp.rech(i) <0)    //Recharge is always positive. 
+        arp.rech(i) = 0.0f;
+     }
       //we have to reset it to not surface water conditions, 
     //else a cell that used to have surface water would still be 
     //considered that way.

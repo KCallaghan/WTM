@@ -314,6 +314,8 @@ static void MoveWaterIntoPits(
     const auto ndir = arp.flowdirs(c); 
     int x,y,nx,ny;
     arp.topo.iToxy(c,x,y);
+    nx = -1;
+    ny = -1;
 
     int n = NO_FLOW;
     if(ndir!=NO_FLOW){  //TODO: Fix this monkey patching
@@ -1371,9 +1373,9 @@ static SubtreeDepressionInfo FindDepressionsToFill(
   //water will have been transferred into the parent and we don't want to pool
   //the parent's water with our own (it might be at the bottom of a cliff).
 
-//  if(this_dep.water_vol==this_dep.dep_vol \
+//  if(this_dep.water_vol==this_dep.dep_vol 
 //&& deps.at(this_dep.parent).water_vol==0){
-  //  std::cout<<"here is an exact equal depression"\
+  //  std::cout<<"here is an exact equal depression"
   //<<this_dep.dep_label<<std::endl;
   //  for(int y=0;y<label.height();y++)
     //  for(int x=0;x<label.width();x++){
@@ -1399,7 +1401,7 @@ static SubtreeDepressionInfo FindDepressionsToFill(
 
  //   if(this_dep.water_vol > this_dep.wtd_vol)
    //   this_dep.water_vol = this_dep.wtd_vol;
-  //  assert(deps.at(this_dep.parent).dep_label == OCEAN || \
+  //  assert(deps.at(this_dep.parent).dep_label == OCEAN || 
   //deps.at(this_dep.parent).water_vol == 0);
      //I no longer understand the above assert. 
   //Why on earth would the parent of an ocean-linked depression not 
@@ -1710,7 +1712,7 @@ static void FillDepressions(
         //mistakenly miss adding higher cells which belong to the ocean's 
         //depression e.g. an escarpment before the ocean. 
   
-        if(visited.count(ni)==0){ //&& ((label(nx,ny)!=OCEAN) \
+        if(visited.count(ni)==0){ //&& ((label(nx,ny)!=OCEAN) 
         //|| arp.land_mask(nx,ny)>0.0f)){
           if(stdi.my_labels.count(arp.label(nx,ny))==0)  
           //CHECK. This was preventing cells that flowed to the ocean from 
