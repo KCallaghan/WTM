@@ -89,7 +89,6 @@ Other parameters include:
 
 * deltat             {Number of seconds per time step, e.g. 315360000 for a 10-year time step}
 * southern_edge      {Southern-most latitude of your domain in decimal degrees, e.g. 5}
-* maxiter            {How many iterations groundwater should run before running surface water. If in doubt, leave this as 1 at first.}
 
 Once the configuration file has been set up appropriately, simply open a terminal and type 
 ```
