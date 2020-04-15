@@ -42,7 +42,7 @@ The following files are required:
 
 ## Downloading with dependencies
 
-The best way to obtian this code is by cloning the repository.
+The best way to obtain this code is by cloning the repository.
 
 Before starting, note that in order to include RichDEM from GitHub, you will need a Public Key associated with your account. Instructions to do so can be found here.
 https://help.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent
