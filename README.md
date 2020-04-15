@@ -1,4 +1,4 @@
-# Coupled_SW_GW
+# The Terrestrial Water Storage Model (TWSM)
 
 ***This model combines groundwater and surface water flow to output the elevation of the water table relative to the land surface at a given time.***
 
