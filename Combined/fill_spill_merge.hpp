@@ -241,7 +241,6 @@ static void MoveWaterIntoPits(
   rd::ProgressBar progress;
   timer.start();
 
-  double distance = 0;
 
   //Our first step is to move all of the water downstream into pit cells. To do
   //so, we use the steepest-descent flow directions provided by the depression
@@ -265,33 +264,6 @@ static void MoveWaterIntoPits(
     }
   }
 
-  //Calculate how many upstream cells flow into each cell
-  rd::Array2D<char>  dependencies(arp.topo.width(),arp.topo.height(),0);
-  #pragma omp parallel for collapse(2)
-  for(int y=0;y<arp.topo.height();y++)
-  for(int x=0;x<arp.topo.width(); x++)
-  for(int n=1;n<=neighbours;n++){     //Loop through neighbours
-    const int nx = x+dx[n];           //Identify coordinates of neighbour
-    const int ny = y+dy[n];
-    if(!arp.topo.inGrid(nx,ny))
-      continue;    
-    if(arp.flowdirs(nx,ny)==dinverse[n])  //Does my neighbour flow into me?
-      dependencies(x,y)++;            //Increment my dependencies
-  }
-
-  
-  //Find the peaks. These are the cells into which no other cells pass flow 
-  //(i.e. 0 dependencies). We know the flow accumulation of the peaks 
-  //without having to perform any recursive calculations; 
-  //they just pass flow downstream. From the peaks, we
-  //can begin a breadth-first traversal in the downstream direction by adding
-  //each cell to the frontier/queue as its dependency count drops to zero.
-  std::queue<int> q;
-  for(unsigned int i=0;i<arp.topo.size();i++){
-    if(dependencies(i)==0)// && flowdirs(i)!=NO_FLOW)  //Is it a peak?
-      q.emplace(i); 
-  }  //Yes.
-
   for(int d=0;d<(int)deps.size();d++){   
   //reset all of the water volumes to 0 for each time we iterate 
     //through the surface water. 
@@ -300,52 +272,112 @@ static void MoveWaterIntoPits(
     dep.wtd_vol = 0;
   }
 
-  
-  //Starting with the peaks, pass flow downstream
-  progress.start(arp.topo.size());
-  while(!q.empty()){
 
-    ++progress;
 
-    const auto c = q.front();          //Copy focal cell from queue
-    q.pop();                           //Clear focal cell from queue
 
-    //Coordinates of downstream neighbour, if any
-    const auto ndir = arp.flowdirs(c); 
-    int x,y,nx,ny;
-    arp.topo.iToxy(c,x,y);
-    nx = -1;
-    ny = -1;
 
-    int n = NO_FLOW;
-    if(ndir!=NO_FLOW){  //TODO: Fix this monkey patching
-      nx = x+dx[ndir];
-      ny = y+dy[ndir];
-      n            = arp.topo.xyToI(nx,ny);
-      assert(n>=0);
-    }
-
-  //If downstream neighbour is the ocean, we drop our water into it 
-    //and the ocean is unaffected. 
-    if(arp.label(c) == OCEAN){    
-      arp.runoff(c) = 0;
-    }
-  
-//if this is a pit cell, move the water to the appropriate 
-    //depression's water_vol.   
-    if(n == NO_FLOW){     
-      if(arp.runoff(c)>0){
-        deps[arp.label(c)].water_vol += arp.runoff(c)*arp.cell_area[y];   
+  if(params.infiltration_on == false){
+    //move the water to the appropriate depression's water_vol.   
+    for(int y=0;y<arp.topo.height();y++)
+    for(int x=0;x<arp.topo.width(); x++){
+      if(arp.runoff(x,y)>0){
+        //If downstream neighbour is the ocean, we drop our water into it 
+        //and the ocean is unaffected. 
+        if(arp.label(x,y) == OCEAN){    
+          arp.runoff(x,y) = 0.0;
+        }
+        else{
+        deps[arp.label(x,y)].water_vol += arp.runoff(x,y)*arp.cell_area[y];   
         //runoff is a depth of water and water_vol is a volume, 
         //so multiply by the area of the pit cell to convert. 
-        assert(deps[arp.label(c)].water_vol >= -FP_ERROR);
-        if(deps[arp.label(c)].water_vol < 0)
-          deps[arp.label(c)].water_vol = 0.0;
-        arp.runoff(c) = 0; //Clean up as we go
+        assert(deps[arp.label(x,y)].water_vol >= -FP_ERROR);
+        if(deps[arp.label(x,y)].water_vol < 0)
+          deps[arp.label(x,y)].water_vol = 0.0;
+        arp.runoff(x,y) = 0; //Clean up as we go
+        }
       }
-    }else {                               //not a pit cell
+    }
+  }
 
-      if(params.infiltration_on == true){
+
+  else{
+
+    double distance = 0;
+
+    //Calculate how many upstream cells flow into each cell
+    rd::Array2D<char>  dependencies(arp.topo.width(),arp.topo.height(),0);
+    #pragma omp parallel for collapse(2)
+    for(int y=0;y<arp.topo.height();y++)
+    for(int x=0;x<arp.topo.width(); x++)
+    for(int n=1;n<=neighbours;n++){     //Loop through neighbours
+      const int nx = x+dx[n];           //Identify coordinates of neighbour
+      const int ny = y+dy[n];
+      if(!arp.topo.inGrid(nx,ny))
+        continue;    
+      if(arp.flowdirs(nx,ny)==dinverse[n])  //Does my neighbour flow into me?
+        dependencies(x,y)++;            //Increment my dependencies
+    }
+
+  
+    //Find the peaks. These are the cells into which no other cells pass flow 
+    //(i.e. 0 dependencies). We know the flow accumulation of the peaks 
+    //without having to perform any recursive calculations; 
+    //they just pass flow downstream. From the peaks, we
+    //can begin a breadth-first traversal in the downstream direction by adding
+    //each cell to the frontier/queue as its dependency count drops to zero.
+    std::queue<int> q;
+    for(unsigned int i=0;i<arp.topo.size();i++){
+      if(dependencies(i)==0)// && flowdirs(i)!=NO_FLOW)  //Is it a peak?
+        q.emplace(i); 
+    }  //Yes.
+
+
+
+  
+    //Starting with the peaks, pass flow downstream
+    progress.start(arp.topo.size());
+    while(!q.empty()){
+  
+      ++progress;
+  
+      const auto c = q.front();          //Copy focal cell from queue
+      q.pop();                           //Clear focal cell from queue
+  
+      //Coordinates of downstream neighbour, if any
+      const auto ndir = arp.flowdirs(c); 
+      int x,y,nx,ny;
+      arp.topo.iToxy(c,x,y);
+      nx = -1;
+      ny = -1;
+  
+      int n = NO_FLOW;
+      if(ndir!=NO_FLOW){  //TODO: Fix this monkey patching
+        nx = x+dx[ndir];
+        ny = y+dy[ndir];
+        n            = arp.topo.xyToI(nx,ny);
+        assert(n>=0);
+      }
+
+      //If downstream neighbour is the ocean, we drop our water into it 
+      //and the ocean is unaffected. 
+      if(arp.label(c) == OCEAN){    
+        arp.runoff(c) = 0;
+      }
+  
+      //if this is a pit cell, move the water to the appropriate 
+      //depression's water_vol.   
+      if(n == NO_FLOW){     
+        if(arp.runoff(c)>0){
+          deps[arp.label(c)].water_vol += arp.runoff(c)*arp.cell_area[y];   
+          //runoff is a depth of water and water_vol is a volume, 
+          //so multiply by the area of the pit cell to convert. 
+          assert(deps[arp.label(c)].water_vol >= -FP_ERROR);
+          if(deps[arp.label(c)].water_vol < 0)
+            deps[arp.label(c)].water_vol = 0.0;
+          arp.runoff(c) = 0; //Clean up as we go
+        }
+      }else {                               //not a pit cell
+
         if(arp.runoff(c)>0){  //if there is water available
       
   //some infiltration happens as the water flows from cell to cell. 
@@ -391,33 +423,34 @@ static void MoveWaterIntoPits(
             arp.wtd(n) = 0;
           if(arp.runoff(c)<0)
             arp.runoff(c) = 0;
+        }
+    
+
+
+        //If we still have water, pass it downstream.
+        if(arp.runoff(c)>0){ 
+          //We use cell areas because the depth will change if we are moving 
+          //to a cell on a different latitude. 
+          arp.runoff(n) += arp.runoff(c)*arp.cell_area[y]/arp.cell_area[ny];  
+          //Add water to downstream neighbour. This might result in filling up 
+          //the groundwater table, which could have been negative
+          arp.runoff(c)  = 0;       //Clean up as we go
+        }
+
+      //Decrement the neighbour's dependencies. If there are no more dependencies,
+      //we can process the neighbour.
+        if(--dependencies(n)==0){                            
+          assert(dependencies(n)>=0);
+          q.emplace(n);                   //Add neighbour to the queue
+        }
       }
     }
 
+    progress.stop();
 
-      //If we still have water, pass it downstream.
-      if(arp.runoff(c)>0){ 
-        //We use cell areas because the depth will change if we are moving 
-        //to a cell on a different latitude. 
-        arp.runoff(n) += arp.runoff(c)*arp.cell_area[y]/arp.cell_area[ny];  
-        //Add water to downstream neighbour. This might result in filling up 
-        //the groundwater table, which could have been negative
-        arp.runoff(c)  = 0;       //Clean up as we go
-      }
-
-    //Decrement the neighbour's dependencies. If there are no more dependencies,
-    //we can process the neighbour.
-      if(--dependencies(n)==0){                            
-        assert(dependencies(n)>=0);
-        q.emplace(n);                   //Add neighbour to the queue
-      }
-    }
+    std::cerr<<"t FlowInDepressionHierarchy: Surface water = "\
+    <<timer.stop()<<" s"<<std::endl;
   }
-
-  progress.stop();
-
-  std::cerr<<"t FlowInDepressionHierarchy: Surface water = "\
-  <<timer.stop()<<" s"<<std::endl;
 }
 
 
