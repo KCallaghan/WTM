@@ -13,6 +13,7 @@ class ArrayPack {
  public:
   f2d ksat;  
   f2d vert_ksat;  
+  f2d porosity;  
   f2d slope_start;
   f2d slope_end;
   f2d fdepth_start; 
@@ -22,6 +23,10 @@ class ArrayPack {
   f2d temp_start; 
   f2d temp_end;
   f2d topo_start;   
+  f2d winter_temp_start; 
+  f2d winter_temp_end;
+  f2d winter_temp;
+
   f2d topo_end;
   f2d ground_temp_start;
   f2d ground_temp_end;

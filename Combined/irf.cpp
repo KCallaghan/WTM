@@ -61,6 +61,12 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   arp.wind_speed_start  = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_wind_speed.nc", "value");  //Units: m/s
 
+
+  arp.winter_temp_start  = LoadData<float>(params.surfdatadir + params.region + \
+  params.time_start + "_winter_temp.nc", "value");  //Units: degrees celsius
+
+
+
   arp.slope_end         = LoadData<float>(params.surfdatadir + params.region + \
   params.time_end + "_slope.nc",  "value");  //Slope as a value from 0 to 1. 
   arp.land_mask         = LoadData<float>(params.surfdatadir + params.region + \
@@ -82,6 +88,11 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   arp.wind_speed_end    = LoadData<float>(params.surfdatadir + params.region + \
   params.time_end + "_wind_speed.nc", "value");  //Units: m/s
 
+
+  arp.winter_temp_end    = LoadData<float>(params.surfdatadir + params.region + \
+  params.time_end + "_winter_temp.nc", "value");  //Units: degrees Celsius
+ 
+
   //load in the wtd result from the previous time: 
   arp.wtd    = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_wtd.nc", "value");
@@ -93,25 +104,25 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   //TODO: allow user to vary these calibration constants depending on their 
   //input cellsize? Or do some kind of auto variation of them? 
   for(unsigned int i=0;i<arp.topo_start.size();i++){
-    if(arp.temp_start(i) > -5)  //then fdepth = f from Ying's equation S7. 
+    if(arp.winter_temp_start(i) > -5)  //then fdepth = f from Ying's equation S7. 
       arp.fdepth_start(i) = std::max(1000/(1+150*arp.slope_start(i)),25.0f);  
     else{ //then fdpth = f*fT, Ying's equations S7 and S8. 
-      if(arp.temp_start(i) < -14)
+      if(arp.winter_temp_start(i) < -14)
         arp.fdepth_start(i) = (std::max(1000/(1+150*arp.slope_start(i)),25.0f))\
-         * (std::max(0.05, 0.17 + 0.005 * arp.temp_start(i)));
+         * (std::max(0.05, 0.17 + 0.005 * arp.winter_temp_start(i)));
       else
         arp.fdepth_start(i) = (std::max(1000/(1+150*arp.slope_start(i)),25.0f))\
-         * (std::min(1.0, 1.5 + 0.1 * arp.temp_start(i)));
+         * (std::min(1.0, 1.5 + 0.1 * arp.winter_temp_start(i)));
     }
-    if(arp.temp_end(i) > -5)  //then fdepth = f from Ying's equation S7. 
+    if(arp.winter_temp_end(i) > -5)  //then fdepth = f from Ying's equation S7. 
       arp.fdepth_end(i) = std::max(1000/(1+150*arp.slope_end(i)),25.0f);  
     else{ //then fdpth = f*fT, Ying's equations S7 and S8. 
-      if(arp.temp_end(i) < -14)
+      if(arp.winter_temp_end(i) < -14)
         arp.fdepth_end(i) = (std::max(1000/(1+150*arp.slope_end(i)),25.0f)) * \
-      (std::max(0.05, 0.17 + 0.005 * arp.temp_end(i)));
+      (std::max(0.05, 0.17 + 0.005 * arp.winter_temp_end(i)));
       else
         arp.fdepth_end(i) = (std::max(1000/(1+150*arp.slope_end(i)),25.0f)) * \
-      (std::min(1.0, 1.5 + 0.1 * arp.temp_end(i)));
+      (std::min(1.0, 1.5 + 0.1 * arp.winter_temp_end(i)));
     }
   }
 
@@ -119,6 +130,7 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   arp.fdepth        = arp.fdepth_start;
   arp.precip        = arp.precip_start;
   arp.temp          = arp.temp_start;
+  arp.winter_temp   = arp.winter_temp_start
   arp.topo          = arp.topo_start;
   arp.starting_evap = arp.starting_evap_start;
   arp.relhum        = arp.relhum_start;
@@ -169,6 +181,12 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   arp.wind_speed    = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_wind_speed.nc", "value");  //Units: m/s
 
+
+  arp.winter_temp    = LoadData<float>(params.surfdatadir + params.region + \
+  params.time_start + "_winter_temp.nc", "value");  //Units: degrees Celsius
+
+
+
   arp.wtd           = rd::Array2D<float>(arp.topo,0.0);  
   //we start with a water table at the surface for equilibrium runs. 
   arp.evap          = arp.starting_evap;
@@ -177,15 +195,15 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   for(unsigned int i=0;i<arp.topo.size();i++){
     //TODO: allow user to vary these calibration constants depending on their 
     //input cellsize? Or do some kind of auto variation of them? 
-    if(arp.temp(i) > -5)  //then fdepth = f from Ying's equation S7. 
+    if(arp.winter_temp(i) > -5)  //then fdepth = f from Ying's equation S7. 
       arp.fdepth(i) = std::max(1000/(1+150*arp.slope(i)),25.0f);  
     else{ //then fdpth = f*fT, Ying's equations S7 and S8. 
-      if(arp.temp(i) < -14)
+      if(arp.winter_temp(i) < -14)
         arp.fdepth(i) = (std::max(1000/(1+150*arp.slope(i)),25.0f)) * \
-      (std::max(0.05, 0.17 + 0.005 * arp.temp(i)));
+      (std::max(0.05, 0.17 + 0.005 * arp.winter_temp(i)));
       else
         arp.fdepth(i) = (std::max(1000/(1+150*arp.slope(i)),25.0f)) * \
-      (std::min(1.0, 1.5 + 0.1 * arp.temp(i)));
+      (std::min(1.0, 1.5 + 0.1 * arp.winter_temp(i)));
     }
   }
 }
@@ -273,6 +291,8 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 
   arp.ksat = LoadData<float>(params.surfdatadir + params.region + \
   "horizontal_ksat.nc", "value");   //Units of ksat are m/s. 
+  arp.porosity    = LoadData<float>(params.surfdatadir + params.region + \
+  "_porosity.nc", "value");  //Units: unitless
 
 
   //Set arrays that start off with zero or other values, 
@@ -372,6 +392,10 @@ void UpdateTransientArrays(const Parameters &params, ArrayPack &arp){
     arp.temp(i)           = (arp.temp_start(i)          * \
       (1-(params.cycles_done/params.total_cycles))) + (arp.temp_end(i)         \
        * (params.cycles_done/params.total_cycles));
+    arp.winter_temp(i)    = (arp.winter_temp_start(i)   * \
+      (1-(params.cycles_done/params.total_cycles))) + (arp.winter_temp_end(i)  \
+       * (params.cycles_done/params.total_cycles));
+
     arp.topo(i)           = (arp.topo_start(i)          * \
       (1-(params.cycles_done/params.total_cycles))) + (arp.topo_end(i)         \
        * (params.cycles_done/params.total_cycles));
