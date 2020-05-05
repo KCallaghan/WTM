@@ -33,7 +33,7 @@ double kcell(const int x, const int y, const ArrayPack &arp){
                     For water tables above vs below 1.5 m below land surface.
           - ksat:   Hydraulic conductivity, based on soil types
   @return  The kcell value for the cell in question. This is the 
-           integreation of the hydraulic conductivity over flow depth.
+           integration of the hydraulic conductivity over flow depth.
   **/
 
   if(arp.fdepth(x,y)>0){
@@ -93,6 +93,10 @@ void groundwater(const Parameters &params, ArrayPack &arp){
   float max_total      = 0.;
   float min_total      = 0.;
   float max_change     = 0.;
+
+  float stability_min = 100000000000000000000.0;
+  float stability_max = 0.0;
+
   
   // Set up log file
   ofstream textfile;
@@ -130,6 +134,26 @@ void groundwater(const Parameters &params, ArrayPack &arp){
       const auto kW = ( kcell(x,  y,   arp) + kcell(x-1,y,   arp) ) / 2.;
       const auto kE = ( kcell(x,  y,   arp) + kcell(x+1,y,   arp) ) / 2.;
 
+      float water_height_N = 0.0;
+      float water_height_S = 0.0;
+      float water_height_W = 0.0;
+      float water_height_E = 0.0;
+
+
+
+
+          arp.stability_time_seconds(x,y) = 0.5 * (arp.cell_area[y]*arp.cell_area[y]) / kcell(x,y,arp);  //Von Neumann stability analysis to get stable timestep
+    //TODO: implement stable timestep, or remove this. 
+
+      if(arp.stability_time_seconds(x,y)<stability_min){
+        stability_min = arp.stability_time_seconds(x,y);
+      }
+      if(arp.stability_time_seconds(x,y)>stability_max)
+        stability_max = arp.stability_time_seconds(x,y);
+
+
+
+
       // Change in water-table depth.
       // (1) Discharge across cell boundaries
       // Average hydraulic conductivity of the two cells * 
@@ -151,9 +175,125 @@ void groundwater(const Parameters &params, ArrayPack &arp){
                       * params.cellsize_n_s_metres * params.deltat \
                       / arp.cell_area[y];
 
+      //Now think about porosity for each of these directions:
+      if(wtd_change_N > 0){  //the current cell is receiving water from the North
+        if(arp.wtd(x,y+1) > 0){
+          water_height_N = wtd_change_N; //if it is only surface water, it does not change. 
+          if(wtd_change_N > arp.wtd(x,y+1)){ 
+          //some surface water that does not think about porosity, and some groundwater that does. 
+            water_height_N = arp.wtd(x,y+1) + (wtd_change_N - arp.wtd(x,y+1))*arp.porosity(x,y+1); 
+          }    
+        }
+        else if(arp.wtd(x,y+1) < 0){ //all groundwater that needs porosity
+          water_height_N = wtd_change_N*arp.porosity(x,y+1);
+        }
+      }
+      else{ //the current cell is giving water to the North. 
+        if(arp.wtd(x,y) > 0){
+          water_height_N = wtd_change_N; //if it is only surface water, it does not change. 
+          if(fabs(wtd_change_N) > arp.wtd(x,y)){ 
+          //some surface water that does not think about porosity, and some groundwater that does. 
+            water_height_N = -arp.wtd(x,y) - (-wtd_change_N - arp.wtd(x,y))*arp.porosity(x,y); 
+          }    
+        }
+        else if(arp.wtd(x,y) < 0){ //all groundwater that needs porosity
+          water_height_N = wtd_change_N*arp.porosity(x,y);
+        }
+      }
+
+
+
+
+
+      if(wtd_change_S > 0){  //the current cell is receiving water from the South
+        if(arp.wtd(x,y-1) > 0){
+          water_height_S = wtd_change_S; //if it is only surface water, it does not change. 
+          if(wtd_change_S > arp.wtd(x,y-1)){ 
+          //some surface water that does not think about porosity, and some groundwater that does. 
+            water_height_S = arp.wtd(x,y-1) + (wtd_change_S - arp.wtd(x,y-1))*arp.porosity(x,y-1); 
+          }    
+        }
+        else if(arp.wtd(x,y-1) < 0){ //all groundwater that needs porosity
+          water_height_S = wtd_change_S*arp.porosity(x,y-1);
+        }
+      }
+      else{ //the current cell is giving water to the South. 
+        if(arp.wtd(x,y) > 0){
+          water_height_S = wtd_change_S; //if it is only surface water, it does not change. 
+          if(fabs(wtd_change_S) > arp.wtd(x,y)){ 
+          //some surface water that does not think about porosity, and some groundwater that does. 
+            water_height_S = -arp.wtd(x,y) - (-wtd_change_S - arp.wtd(x,y))*arp.porosity(x,y); 
+          }    
+        }
+        else if(arp.wtd(x,y) < 0){ //all groundwater that needs porosity
+          water_height_S = wtd_change_S*arp.porosity(x,y);
+        }
+      }
+
+
+
+      if(wtd_change_W > 0){  //the current cell is receiving water from the West
+        if(arp.wtd(x-1,y) > 0){
+          water_height_W = wtd_change_W; //if it is only surface water, it does not change. 
+          if(wtd_change_W > arp.wtd(x-1,y)){ 
+          //some surface water that does not think about porosity, and some groundwater that does. 
+            water_height_W = arp.wtd(x-1,y) + (wtd_change_W - arp.wtd(x-1,y))*arp.porosity(x-1,y); 
+          }    
+        }
+        else if(arp.wtd(x-1,y) < 0){ //all groundwater that needs porosity
+          water_height_W = wtd_change_W*arp.porosity(x-1,y);
+        }
+      }
+      else{ //the current cell is giving water to the West. 
+        if(arp.wtd(x,y) > 0){
+          water_height_W = wtd_change_W; //if it is only surface water, it does not change. 
+          if(fabs(wtd_change_W) > arp.wtd(x,y)){ 
+          //some surface water that does not think about porosity, and some groundwater that does. 
+            water_height_W = -arp.wtd(x,y) - (-wtd_change_W - arp.wtd(x,y))*arp.porosity(x,y); 
+          }    
+        }
+        else if(arp.wtd(x,y) < 0){ //all groundwater that needs porosity
+          water_height_W = wtd_change_W*arp.porosity(x,y);
+        }
+      }
+
+
+
+      if(wtd_change_E > 0){  //the current cell is receiving water from the East
+        if(arp.wtd(x+1,y) > 0){
+          water_height_E = wtd_change_E; //if it is only surface water, it does not change. 
+          if(wtd_change_E > arp.wtd(x+1,y)){ 
+          //some surface water that does not think about porosity, and some groundwater that does. 
+            water_height_E = arp.wtd(x+1,y) + (wtd_change_E - arp.wtd(x+1,y))*arp.porosity(x+1,y); 
+          }    
+        }
+        else if(arp.wtd(x+1,y) < 0){ //all groundwater that needs porosity
+          water_height_E = wtd_change_E*arp.porosity(x+1,y);
+        }
+      }
+      else{ //the current cell is giving water to the East. 
+        if(arp.wtd(x,y) > 0){
+          water_height_E = wtd_change_E; //if it is only surface water, it does not change. 
+          if(fabs(wtd_change_E) > arp.wtd(x,y)){ 
+          //some surface water that does not think about porosity, and some groundwater that does. 
+            water_height_E = -arp.wtd(x,y) - (-wtd_change_E - arp.wtd(x,y))*arp.porosity(x,y); 
+          }    
+        }
+        else if(arp.wtd(x,y) < 0){ //all groundwater that needs porosity
+          water_height_E = wtd_change_E*arp.porosity(x,y);
+        }
+      }
+
+
+
+  //    arp.wtd_change_total(x,y) = ( wtd_change_N + wtd_change_E \
+                                    + wtd_change_S + wtd_change_W );
+//std::cout<<"wtd_changes: N "<<wtd_change_N<<" S "<<wtd_change_S<<" E "<<wtd_change_E<<" W "<<wtd_change_W<<std::endl;
+//std::cout<<"water_heights: N "<<water_height_N<<" S "<<water_height_S<<" E "<<water_height_E<<" W "<<water_height_W<<std::endl;
+
       //Total change in wtd for our target cell in this iteration
-      arp.wtd_change_total(x,y) = ( wtd_change_N + wtd_change_S \
-                                    + wtd_change_E + wtd_change_W );
+      arp.wtd_change_total(x,y) = ( water_height_N + water_height_E \
+                                    + water_height_S + water_height_W );
 
       // Update variables with some potentially interesting values:
       //   - highest wtd
@@ -168,6 +308,7 @@ void groundwater(const Parameters &params, ArrayPack &arp){
     }
   }
 
+  std::cout<<"stability_min "<<stability_min<<" stability_max "<<stability_max<<std::endl;
 
   ////////////////
   // UPDATE WTD // 
@@ -175,11 +316,41 @@ void groundwater(const Parameters &params, ArrayPack &arp){
 
   for(int y=1;y<params.ncells_y-1;y++){
     for(int x=1;x<params.ncells_x-1; x++){
+
+            if(arp.land_mask(x,y) == 0)
+        continue;
+
       // Update the whole wtd array at once. 
       // This is the new water table after groundwater has moved 
       // for delta_t seconds. 
-      arp.wtd(x,y) = arp.wtd(x,y) + arp.wtd_change_total(x,y);   
       total_changes += arp.wtd_change_total(x,y);
+
+
+      //now we must once again think about porosity. 
+      if(arp.wtd(x,y)>0){
+        if(arp.wtd(x,y) + arp.wtd_change_total(x,y) > 0){
+          //it's all surface water, so no multiplier needed
+          arp.wtd(x,y) = arp.wtd(x,y) + arp.wtd_change_total(x,y);  
+        }
+        else{ //some surface and some groundwater, and we are losing water. 
+          arp.wtd_change_total(x,y) += arp.wtd(x,y); //remove the surface water part. wtd_change_total is negative, so add the positive wtd to see how much is left.
+          arp.wtd(x,y) = arp.wtd_change_total(x,y) / arp.porosity(x,y); // wtd_change_total was negative, now so is wtd. 
+
+        } 
+      }
+      else{ //the starting wtd is negative. 
+        if(arp.wtd(x,y) + arp.wtd_change_total(x,y) < 0){
+          //it is staying negative, so all is affected by porosity. 
+          arp.wtd(x,y) += arp.wtd_change_total(x,y) / arp.porosity(x,y);
+        }
+       else{ //water table is getting filled in and some surface water added. 
+          arp.wtd_change_total(x,y) += arp.wtd(x,y)*arp.porosity(x,y); //remove the surface water part. wtd_change_total is positive, so add the negative wtd to see how much is left.
+          arp.wtd(x,y) = arp.wtd_change_total(x,y); // wtd_change_total was positive, now so is wtd. 
+
+        }
+
+      }
+  //  std::cout<<"wtd "<<arp.wtd(x,y)<<" change "<<arp.wtd_change_total(x,y)<<" porosity "<<arp.porosity(x,y)<<" x "<<x<<" y "<<y<<std::endl;
     }
   }
 

@@ -105,23 +105,23 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   //input cellsize? Or do some kind of auto variation of them? 
   for(unsigned int i=0;i<arp.topo_start.size();i++){
     if(arp.winter_temp_start(i) > -5)  //then fdepth = f from Ying's equation S7. 
-      arp.fdepth_start(i) = std::max(1000/(1+150*arp.slope_start(i)),25.0f);  
+      arp.fdepth_start(i) = std::max(5000/(1+150*arp.slope_start(i)),25.0f);  
     else{ //then fdpth = f*fT, Ying's equations S7 and S8. 
       if(arp.winter_temp_start(i) < -14)
-        arp.fdepth_start(i) = (std::max(1000/(1+150*arp.slope_start(i)),25.0f))\
+        arp.fdepth_start(i) = (std::max(5000/(1+150*arp.slope_start(i)),25.0f))\
          * (std::max(0.05, 0.17 + 0.005 * arp.winter_temp_start(i)));
       else
-        arp.fdepth_start(i) = (std::max(1000/(1+150*arp.slope_start(i)),25.0f))\
+        arp.fdepth_start(i) = (std::max(5000/(1+150*arp.slope_start(i)),25.0f))\
          * (std::min(1.0, 1.5 + 0.1 * arp.winter_temp_start(i)));
     }
     if(arp.winter_temp_end(i) > -5)  //then fdepth = f from Ying's equation S7. 
-      arp.fdepth_end(i) = std::max(1000/(1+150*arp.slope_end(i)),25.0f);  
+      arp.fdepth_end(i) = std::max(5000/(1+150*arp.slope_end(i)),25.0f);  
     else{ //then fdpth = f*fT, Ying's equations S7 and S8. 
       if(arp.winter_temp_end(i) < -14)
-        arp.fdepth_end(i) = (std::max(1000/(1+150*arp.slope_end(i)),25.0f)) * \
+        arp.fdepth_end(i) = (std::max(5000/(1+150*arp.slope_end(i)),25.0f)) * \
       (std::max(0.05, 0.17 + 0.005 * arp.winter_temp_end(i)));
       else
-        arp.fdepth_end(i) = (std::max(1000/(1+150*arp.slope_end(i)),25.0f)) * \
+        arp.fdepth_end(i) = (std::max(5000/(1+150*arp.slope_end(i)),25.0f)) * \
       (std::min(1.0, 1.5 + 0.1 * arp.winter_temp_end(i)));
     }
   }
@@ -130,7 +130,7 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   arp.fdepth        = arp.fdepth_start;
   arp.precip        = arp.precip_start;
   arp.temp          = arp.temp_start;
-  arp.winter_temp   = arp.winter_temp_start
+  arp.winter_temp   = arp.winter_temp_start;
   arp.topo          = arp.topo_start;
   arp.starting_evap = arp.starting_evap_start;
   arp.relhum        = arp.relhum_start;
@@ -292,7 +292,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   arp.ksat = LoadData<float>(params.surfdatadir + params.region + \
   "horizontal_ksat.nc", "value");   //Units of ksat are m/s. 
   arp.porosity    = LoadData<float>(params.surfdatadir + params.region + \
-  "_porosity.nc", "value");  //Units: unitless
+  "porosity.nc", "value");  //Units: unitless
 
 
   //Set arrays that start off with zero or other values, 
@@ -320,6 +320,9 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   arp.surface_array      = rd::Array2D<float>(arp.ksat,0);
 
   arp.rech               = rd::Array2D<float>(arp.ksat,0);
+
+    arp.stability_time_seconds               = rd::Array2D<float>(arp.ksat,0);
+
 
   //This array is used to store the values of how much the water table will 
   //change in one iteration, then adding it to wtd gets the new wtd.
@@ -353,6 +356,8 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
     arp.rech(i) = (arp.precip(i)-arp.starting_evap(i));
     if(arp.rech(i) <0)    //Recharge is always positive. 
       arp.rech(i) = 0.0f;
+    if(arp.porosity(i) <=0 )
+      arp.porosity(i) = 0.0000001; //not sure why it is sometimes processing cells with 0 porosity?
   }
 
 //Wtd is 0 in the ocean:

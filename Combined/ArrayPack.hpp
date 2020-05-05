@@ -64,6 +64,8 @@ class ArrayPack {
   f2d surface_evap;
   f2d wtd_change_total;
 
+  f2d stability_time_seconds;
+
   dh_label_t flowdir_t;
 
   dvec latitude_radians;
