@@ -69,14 +69,14 @@ void update(Parameters &params, ArrayPack &arp, \
   for(int x=1;x<params.ncells_x-1; x++){
     if(arp.land_mask(x,y) == 0)          //skip ocean cells
       continue;
-//    if(arp.wtd(x,y) > 0){  //only above-ground water, so don't worry about porosity
+    if(arp.wtd(x,y) > 0){  //only above-ground water, so don't worry about porosity
       arp.wtd(x,y) += arp.rech(x,y)/31536000 * params.deltat;
- //   }  
-  //  else if( (arp.wtd(x,y) + arp.rech(x,y)/arp.porosity(x,y)) < 0 ){  //only below-ground water, so all affected by porosity.
-  //    arp.wtd(x,y) += arp.rech(x,y)/arp.porosity(x,y);
-  //  }
-  //  else  // Some of the recharge will go below the ground, some above. 
-  //    arp.wtd(x,y) = arp.rech(x,y) + (arp.wtd(x,y) * arp.porosity(x,y));
+    }  
+    else if( (arp.wtd(x,y) + (arp.rech(x,y)/31536000 * params.deltat) /arp.porosity(x,y)) < 0 ){  //only below-ground water, so all affected by porosity.
+      arp.wtd(x,y) += (arp.rech(x,y)/31536000 * params.deltat)/arp.porosity(x,y);
+    }
+    else  // Some of the recharge will go below the ground, some above. 
+      arp.wtd(x,y) = (arp.rech(x,y)/31536000 * params.deltat) + (arp.wtd(x,y) * arp.porosity(x,y));
     //add the recharge to the water table. 
   }
 
