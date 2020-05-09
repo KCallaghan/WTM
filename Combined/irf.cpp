@@ -345,8 +345,8 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
       arp.topo(i) = 0;
     }
     //Converting units to appropriate time step
-    arp.precip(i)        *= (params.deltat/(60*60*24*365));                 
-    arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                 
+ //   arp.precip(i)        *= (params.deltat/(60*60*24*365));                 
+   // arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                 
 
   } 
 
@@ -412,8 +412,8 @@ void UpdateTransientArrays(const Parameters &params, ArrayPack &arp){
        * (params.cycles_done/params.total_cycles));
 
     //Converting to appropriate time step
-    arp.precip(i)        *= (params.deltat/(60*60*24*365));                  
-    arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                  
+  //  arp.precip(i)        *= (params.deltat/(60*60*24*365));                  
+   // arp.starting_evap(i) *= (params.deltat/(60*60*24*365));                  
  
     arp.label(i)        = dh::NO_DEP; //No cells are part of a depression
     arp.final_label(i)  = dh::NO_DEP; //No cells are part of a depression
