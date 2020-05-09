@@ -43,6 +43,14 @@ class Parameters {
   float  surface_change       = 0.0;
   int    total_cycles         = -1;
 
+
+  float N = 0.0;
+  float S = 0.0;
+  float E = 0.0;
+  float W = 0.0;
+  float me = 0.0;
+
+
   //Set for convenience within the code
   int ncells_x  = -1;
   int ncells_y  = -1;

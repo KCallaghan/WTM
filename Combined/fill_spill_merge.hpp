@@ -516,7 +516,6 @@ static void CalculateWtdVol(
       continue;
 
 
-//    std::cout<<"huh "<<wtd(x,y)<<" x "<<x<<" y "<<y<<std::endl;
 
     assert(wtd(x,y) <= FP_ERROR);  
     //because all wtds get set to 0 when doing movewaterintopits - 
@@ -525,10 +524,11 @@ static void CalculateWtdVol(
     if(wtd(x,y) > 0)
       wtd(x,y) = 0.0;
 
-    deps[clabel].wtd_only -= wtd(x,y)*arp.cell_area[y]*arp.porosity(x,y);  
+    deps[clabel].wtd_only -= arp.cell_area[y] * arp.porosity(x,y) * arp.fdepth(x,y) * (exp(arp.wtd(x,y)/arp.fdepth(x,y)) - 1);
+
     //- because wtd is negative. This records only 
     //the below-ground volume available
-    deps[clabel].wtd_vol  -= wtd(x,y)*arp.cell_area[y]*arp.porosity(x,y);  
+    deps[clabel].wtd_vol  -= arp.cell_area[y] * arp.porosity(x,y) * arp.fdepth(x,y) * (exp(arp.wtd(x,y)/arp.fdepth(x,y)) - 1);
     //and this records the total volume - above and below ground - 
     //available to store water. 
     }
@@ -1603,8 +1603,9 @@ static void FillDepressions(
     //sufficient topographic volume to hold all the water.
     //   In this case, the cell's water table is left unaffected.
 
-    if(water_vol - (current_volume - arp.wtd(c.x,c.y) * arp.cell_area[c.y] \
-     * arp.porosity(c.x,c.y)) <= FP_ERROR){
+    if(water_vol - (current_volume - (arp.cell_area[c.y] * arp.porosity(c.x,c.y) * \
+      arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1) ) ) <= FP_ERROR){
+
       //The current scope of the depression plus the water storage capacity of
       //this cell is sufficient to store all of the water. We'll stop adding
       //cells and fill things now.
@@ -1630,7 +1631,13 @@ static void FillDepressions(
    //     if(fill_amount < 0)
      //     fill_amount = 0; 
 
-        arp.wtd(c.x,c.y)   += fill_amount / arp.cell_area[c.y] / arp.porosity(c.x,c.y);
+        arp.wtd(c.x,c.y) = arp.fdepth(c.x,c.y) * log(exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) + \
+          fill_amount/(arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y)));
+
+ 
+
+
+
         water_vol -= fill_amount;   
         //Doesn't matter because we don't use water_vol anymore
         water_level     = arp.topo(c.x,c.y);
@@ -1656,6 +1663,7 @@ static void FillDepressions(
       }
       //Water level must be higher than (or equal to) the previous cell
       // we looked at, but lower than (or equal to) the current cell
+
       assert(cells_affected.size()==0 || arp.topo(cells_affected.back()) - \
         water_level <= FP_ERROR); 
       assert(arp.topo(c.x,c.y)-water_level >= -FP_ERROR);
@@ -1711,7 +1719,8 @@ static void FillDepressions(
       assert(arp.wtd(c.x,c.y) <= FP_ERROR);
       if(arp.wtd(c.x,c.y) > 0)
         arp.wtd(c.x,c.y) = 0;
-      water_vol += arp.wtd(c.x,c.y) * arp.cell_area[c.y] * arp.porosity(c.x,c.y);  
+      water_vol += arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1);
+
       //We use += because wtd is less than or equal to zero
       arp.wtd(c.x,c.y)    = 0;             
       //Now we are sure that wtd is 0, since we've just filled it
