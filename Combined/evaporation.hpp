@@ -41,7 +41,7 @@ void evaporation_update(Parameters &params, ArrayPack &arp){
     arp.e_a(i) = arp.relhum(i) * 0.611 * std::exp((17.3*arp.temp(i))\
     /(arp.temp(i)+237.3));
 
-    arp.surface_evap(i) = (K_e*arp.wind_speed(i))*(arp.e_sat(i) - arp.e_a(i));        
+    arp.surface_evap(i) = (K_e*arp.wind_speed(i))*(arp.e_sat(i) - arp.e_a(i)) * 31536000;        //convert from m/s to m/yr        
 
     if(arp.wtd(i)>0)  //if there is surface water present
       arp.rech(i) = arp.precip(i) - arp.surface_evap(i);
