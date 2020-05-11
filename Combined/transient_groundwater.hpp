@@ -208,7 +208,6 @@ double get_change(const int x, const int y, const double time_remaining,
       change_in_S_cell = 0;
     }
 
-
     if(wtd_change_E > 1e-5){
       change_in_E_cell =  - wtd_change_E;
       mycell_change_E  = receiving_cell_wtd(wtd_change_E, params.E, params.me, x+1, y, x, y, arp);
@@ -222,7 +221,6 @@ double get_change(const int x, const int y, const double time_remaining,
             mycell_change_E = 0;
       change_in_E_cell = 0;
     }
-
 
     if(wtd_change_W > 1e-5){
       change_in_W_cell =  - wtd_change_W;
@@ -254,17 +252,19 @@ double get_change(const int x, const int y, const double time_remaining,
     else if( (((headN - my_head)*((headN + change_in_N_cell) - (my_head + mycell_change_N)) < 0) && wtd_change_N > 1e-6)  || \
              (((headS - my_head)*((headS + change_in_S_cell) - (my_head + mycell_change_S)) < 0) && wtd_change_S > 1e-6) ||
              (((headE - my_head)*((headE + change_in_E_cell) - (my_head + mycell_change_E)) < 0) && wtd_change_E > 1e-6) ||
-             (((headW - my_head)*((headW + change_in_W_cell) - (my_head + mycell_change_W)) < 0) && wtd_change_W > 1e-6) ){  //The change between any 2 cells can't be greater than the difference between those two cells.
-              time_step = time_step/2.;
+             (((headW - my_head)*((headW + change_in_W_cell) - (my_head + mycell_change_W)) < 0) && wtd_change_W > 1e-6) ){
+      // The change between any 2 cells can't be greater than the difference
+      // between those two cells.
+      time_step = time_step/2.;
     }
 
     else{
       arp.wtd_change_total(x,y) += ( mycell_change_N + mycell_change_E + mycell_change_S + mycell_change_W );
       params.me += mycell_change_N + mycell_change_E + mycell_change_S + mycell_change_W;
-      params.N   += change_in_N_cell ;
-      params.S   += change_in_S_cell ;
-      params.W   += change_in_W_cell ;
-      params.E   += change_in_E_cell ;
+      params.N  += change_in_N_cell;
+      params.S  += change_in_S_cell;
+      params.W  += change_in_W_cell;
+      params.E  += change_in_E_cell;
 
       stable = true;
 
