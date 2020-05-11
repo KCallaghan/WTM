@@ -81,6 +81,7 @@ double receiving_cell_wtd(const float giving_cell_change, const float giving_wtd
                         exp(giving_wtd / arp.fdepth(x_giving,y_giving)));
   }
 
+
   //so now we have the volume change as a positive value from the giving cell, whether it was all above ground, all below ground, or a combination. 
   //Next, we need to use that to calculate the height change in the receiving cell.   
 
@@ -88,9 +89,9 @@ double receiving_cell_wtd(const float giving_cell_change, const float giving_wtd
     receiving_cell_change = volume_change / arp.cell_area[y_receiving];
   }
   else{  //either it is all below the surface, or a combination. 
-    //we don't know yet what the height of the change will be, so we start off assuming that it will all be below the surface. 
-    receiving_cell_change =  arp.fdepth(x_receiving,y_receiving) * log(exp(receiving_wtd / arp.fdepth(x_receiving,y_receiving)) \
-          + volume_change / (arp.cell_area[y_receiving] * arp.porosity(x_receiving,y_receiving) * arp.fdepth(x_receiving,y_receiving)) ) - receiving_wtd;
+ //   //we don't know yet what the height of the change will be, so we start off assuming that it will all be below the surface. 
+    receiving_cell_change = arp.fdepth(x_receiving,y_receiving) * log(exp(receiving_wtd / arp.fdepth(x_receiving,y_receiving)) \
+          + volume_change / ( arp.cell_area[y_receiving] * arp.porosity(x_receiving,y_receiving) * arp.fdepth(x_receiving,y_receiving)) ) - receiving_wtd;
     if(receiving_wtd +  receiving_cell_change > 0){  //it has changed from GW to SW, so we need to adjust the receiving cell change appropriately. 
       //we want to calculate how much of the water is used up in the ground, i.e. the portion between the starting wtd and 0. 
       double GW_portion = -arp.cell_area[y_receiving] * arp.porosity(x_receiving,y_receiving) * arp.fdepth(x_receiving,y_receiving) * \
@@ -101,7 +102,8 @@ double receiving_cell_wtd(const float giving_cell_change, const float giving_wtd
     }
 
   }
-        
+//  if(x_receiving==550&&y_receiving==750 || x_giving == 550 && y_giving==750)
+//    std::cout<<"change "<<receiving_cell_change<<" volume "<<volume_change<<" wtd "<<receiving_wtd<<std::endl;
   return receiving_cell_change;
 }
 
@@ -145,7 +147,14 @@ double get_change(const int x, const int y, const double time_remaining, Paramet
   int stable = 0;
   double time_step = time_remaining;
 
+//if( x== 1366&& y ==794)
+ // std::cout<<"************************************"<<std::endl;
+
   while(stable == 0){
+
+//if( x== 1366&& y ==794)
+ // std::cout<<"params S "<<params.S<<" wtd change S "<<wtd_change_S<<" change "<<change_in_S_cell<<" time "<<time_step<<" remaining "<<time_remaining<<std::endl;
+
  //   std::cout<<"time step is "<<time_step<<" and time remaining is "<<time_remaining<<std::endl;
     // Change in water-table depth.
     // (1) Discharge across cell boundaries
@@ -171,72 +180,110 @@ double get_change(const int x, const int y, const double time_remaining, Paramet
 
     //Using the wtd_changes from above, we need to calculate how much change will occur in the target cell, accounting for porosity. 
 
-    if(wtd_change_N > 0){  //the current cell is receiving water from the North, so (x,y+1) is the giving cell. 
+    if(wtd_change_N > 1e-5){  //the current cell is receiving water from the North, so (x,y+1) is the giving cell. 
       //target cell is the receiving cell. 
-      change_in_N_cell = arp.topo(x,y+1) + params.N - wtd_change_N;
+      change_in_N_cell =  - wtd_change_N;
       mycell_change_N  = receiving_cell_wtd(wtd_change_N, params.N, params.me, x, y+1, x, y, arp);
     }
-    else{  //the current cell is giving water to the North. The North is the receiving cell. 
-      change_in_N_cell = arp.topo(x,y+1) + params.N + receiving_cell_wtd(-wtd_change_N, params.me, params.N, x, y, x, y+1, arp);
+    else if (wtd_change_N < -1e-5){  //the current cell is giving water to the North. The North is the receiving cell. 
+      change_in_N_cell =  receiving_cell_wtd(-wtd_change_N, params.me, params.N, x, y, x, y+1, arp);
       mycell_change_N  = wtd_change_N;
     }
+    else{
+      wtd_change_N = 0;
+      mycell_change_N = 0;
+      change_in_N_cell = 0;
+    }
 
-    if(wtd_change_S > 0){
-      change_in_S_cell = arp.topo(x,y-1) + params.S - wtd_change_S;
+    if(wtd_change_S > 1e-5){
+      change_in_S_cell =  - wtd_change_S;
       mycell_change_S  = receiving_cell_wtd(wtd_change_S, params.S, params.me, x, y-1, x, y, arp);
     }
-    else{
-      change_in_S_cell = arp.topo(x,y-1) + params.S + receiving_cell_wtd(-wtd_change_S, params.me, params.S, x, y, x, y-1, arp);
+    else if (wtd_change_S < -1e-5){
+      change_in_S_cell =  receiving_cell_wtd(-wtd_change_S, params.me, params.S, x, y, x, y-1, arp);
       mycell_change_S  = wtd_change_S;
     }
+    else{
+      wtd_change_S = 0;
+            mycell_change_S = 0;
+      change_in_S_cell = 0;
+    }
 
-    if(wtd_change_E > 0){
-      change_in_E_cell = arp.topo(x+1,y) + params.E - wtd_change_E;
+
+    if(wtd_change_E > 1e-5){
+      change_in_E_cell =  - wtd_change_E;
       mycell_change_E  = receiving_cell_wtd(wtd_change_E, params.E, params.me, x+1, y, x, y, arp);
     }
-    else{
-      change_in_E_cell = arp.topo(x+1,y) + params.E + receiving_cell_wtd(-wtd_change_E, params.me, params.E, x, y, x+1, y, arp);
+    else if (wtd_change_E < -1e-5){
+      change_in_E_cell =  receiving_cell_wtd(-wtd_change_E, params.me, params.E, x, y, x+1, y, arp);
       mycell_change_E  = wtd_change_E;
     }
+    else{
+      wtd_change_E = 0;
+            mycell_change_E = 0;
+      change_in_E_cell = 0;
+    }
 
-    if(wtd_change_W > 0){
-      change_in_W_cell = arp.topo(x-1,y) + params.W - wtd_change_W;
+
+    if(wtd_change_W > 1e-5){
+      change_in_W_cell =  - wtd_change_W;
       mycell_change_W  = receiving_cell_wtd(wtd_change_W, params.W, params.me, x-1, y, x, y, arp);
     }
-    else{
-      change_in_W_cell = arp.topo(x-1,y) + params.W + receiving_cell_wtd(-wtd_change_W, params.me, params.W, x, y, x-1, y, arp);
+    else if (wtd_change_W < -1e-5){
+      change_in_W_cell = receiving_cell_wtd(-wtd_change_W, params.me, params.W, x, y, x-1, y, arp);
       mycell_change_W  = wtd_change_W;
     }
+    else{
+      wtd_change_W = 0;
+            mycell_change_W = 0;
+      change_in_W_cell = 0;
+    }
+
     //now we have the height changes that will take place in the target cell and each of the four neighbours. 
 
     //Total change in wtd for our target cell in this iteration
 
+    mycell_change =  mycell_change_N + mycell_change_E + mycell_change_S + mycell_change_W;
 
-    mycell_change = arp.topo(x,y) + params.me + mycell_change_N + mycell_change_E + mycell_change_S + mycell_change_W;
-
-    if( ((headN > my_head) && (headS > my_head) && (change_in_N_cell < mycell_change) && (change_in_S_cell < mycell_change) && fabs(wtd_change_N)> 1e-6 && fabs(wtd_change_S) > 1e-6 ) ||  \
-        ((headN < my_head) && (headS < my_head) && (change_in_N_cell > mycell_change) && (change_in_S_cell > mycell_change) && fabs(wtd_change_N)> 1e-6 && fabs(wtd_change_S) > 1e-6 ) ||  \
-        ((headE > my_head) && (headW > my_head) && (change_in_E_cell < mycell_change) && (change_in_W_cell < mycell_change) && fabs(wtd_change_E)> 1e-6 && fabs(wtd_change_W) > 1e-6 ) ||  \
-        ((headE < my_head) && (headW < my_head) && (change_in_E_cell > mycell_change) && (change_in_W_cell > mycell_change) && fabs(wtd_change_E)> 1e-6 && fabs(wtd_change_W) > 1e-6 )  ){
+    if( ((headN > my_head) && (headS > my_head) && (change_in_N_cell+arp.topo(x,y+1)+params.N < mycell_change+arp.topo(x,y)+params.me) && (change_in_S_cell+arp.topo(x,y-1)+params.S < mycell_change+arp.topo(x,y)+params.me) && fabs(wtd_change_N)> 1e-6 && fabs(wtd_change_S) > 1e-6 ) ||  \
+        ((headN < my_head) && (headS < my_head) && (change_in_N_cell+arp.topo(x,y+1)+params.N > mycell_change+arp.topo(x,y)+params.me) && (change_in_S_cell+arp.topo(x,y-1)+params.S > mycell_change+arp.topo(x,y)+params.me) && fabs(wtd_change_N)> 1e-6 && fabs(wtd_change_S) > 1e-6 ) ||  \
+        ((headE > my_head) && (headW > my_head) && (change_in_E_cell+arp.topo(x+1,y)+params.E < mycell_change+arp.topo(x,y)+params.me) && (change_in_W_cell+arp.topo(x-1,y)+params.W < mycell_change+arp.topo(x,y)+params.me) && fabs(wtd_change_E)> 1e-6 && fabs(wtd_change_W) > 1e-6 ) ||  \
+        ((headE < my_head) && (headW < my_head) && (change_in_E_cell+arp.topo(x+1,y)+params.E > mycell_change+arp.topo(x,y)+params.me) && (change_in_W_cell+arp.topo(x-1,y)+params.W > mycell_change+arp.topo(x,y)+params.me) && fabs(wtd_change_E)> 1e-6 && fabs(wtd_change_W) > 1e-6 )  ){
       //there is an instability. 
       time_step = time_step/2.;
     }
-    else if( (((headN - my_head)*(change_in_N_cell - (my_head + mycell_change_N)) < 0) && wtd_change_N > 1e-6)  || \ 
-             (((headS - my_head)*(change_in_S_cell - (my_head + mycell_change_S)) < 0) && wtd_change_S > 1e-6) ||
-             (((headE - my_head)*(change_in_E_cell - (my_head + mycell_change_E)) < 0) && wtd_change_E > 1e-6) ||
-             (((headW - my_head)*(change_in_W_cell - (my_head + mycell_change_W)) < 0) && wtd_change_W > 1e-6) ){  //The change between any 2 cells can't be greater than the difference between those two cells. 
+    else if( (((headN - my_head)*((headN + change_in_N_cell) - (my_head + mycell_change_N)) < 0) && wtd_change_N > 1e-6)  || \ 
+             (((headS - my_head)*((headS + change_in_S_cell) - (my_head + mycell_change_S)) < 0) && wtd_change_S > 1e-6) ||
+             (((headE - my_head)*((headE + change_in_E_cell) - (my_head + mycell_change_E)) < 0) && wtd_change_E > 1e-6) ||
+             (((headW - my_head)*((headW + change_in_W_cell) - (my_head + mycell_change_W)) < 0) && wtd_change_W > 1e-6) ){  //The change between any 2 cells can't be greater than the difference between those two cells. 
               time_step = time_step/2.;
     }
  
     else{
       arp.wtd_change_total(x,y) += ( mycell_change_N + mycell_change_E + mycell_change_S + mycell_change_W );
       params.me += mycell_change_N + mycell_change_E + mycell_change_S + mycell_change_W;
-      params.N   = change_in_N_cell - arp.topo(x,y+1);
-      params.S   = change_in_S_cell - arp.topo(x,y-1);
-      params.W   = change_in_W_cell - arp.topo(x-1,y);
-      params.E   = change_in_E_cell - arp.topo(x+1,y);
+      params.N   += change_in_N_cell ;
+      params.S   += change_in_S_cell ;
+      params.W   += change_in_W_cell ;
+      params.E   += change_in_E_cell ;
+
+
 
       stable = 1; 
+
+
+if(fabs(arp.wtd_change_total(x,y)) > 100000){
+  std::cout<<"stable "<<arp.wtd(x,y)<<" change "<<arp.wtd_change_total(x,y)<<" x "<<x<<" y "<<y<<std::endl;
+
+std::cout<<"N "<<mycell_change_N<<" S "<<mycell_change_S<<" E "<<mycell_change_E<<" W "<<mycell_change_W<<std::endl;
+std::cout<<"wtd change N "<<wtd_change_N<<" S "<<wtd_change_S<<" E "<<wtd_change_E<<" W "<<wtd_change_W<<std::endl;
+std::cout<<"wtd W "<<arp.wtd(x-1,y)<<" wtd me "<<arp.wtd(x,y)<<std::endl;
+std::cout<<"W was the problem "<<headW<<" mine "<<my_head<<" k "<<kW<<" time step "<<time_step<<std::endl;
+
+//wtd_change_S = kS * (headS - my_head) / params.cellsize_n_s_metres \
+                    * arp.cellsize_e_w_metres[y] * time_step \
+                    / arp.cell_area[y];
+}
     }
 
 
@@ -303,6 +350,7 @@ void groundwater(Parameters &params, ArrayPack &arp){
   for(int y=1; y<params.ncells_y-1; y++){
     for(int x=1; x<params.ncells_x-1; x++){
       //skip ocean cells
+
       if(arp.land_mask(x,y) == 0)
         continue;
 
@@ -320,17 +368,6 @@ void groundwater(Parameters &params, ArrayPack &arp){
         time_step = get_change(x, y,time_remaining,params,arp);
         time_remaining -= time_step;
       }
-
-      // Update variables with some potentially interesting values:
-      //   - highest wtd
-      //   - lowest wtd
-      //   - greatest change in wtd during this time step
-      if(arp.wtd(x,y)> max_total)
-        max_total  = arp.wtd(x,y);
-      else if(arp.wtd(x,y)< min_total)
-        min_total  = arp.wtd(x,y);
-      if(fabs(arp.wtd_change_total(x,y)) > max_change)
-        max_change = fabs(arp.wtd_change_total(x,y));
     }
   }
 
@@ -348,7 +385,6 @@ void groundwater(Parameters &params, ArrayPack &arp){
       // Update the whole wtd array at once. 
       // This is the new water table after groundwater has moved 
       // for delta_t seconds. 
-      total_changes += arp.wtd_change_total(x,y);
       arp.wtd(x,y) += arp.wtd_change_total(x,y);     
     }
   }

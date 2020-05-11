@@ -516,7 +516,9 @@ static void CalculateWtdVol(
       continue;
 
 
-
+if(x==1292 && y==833){
+  std::cout<<"wtd "<<wtd(x,y)<<" x "<<x<<" y "<<y<<std::endl;
+}
     assert(wtd(x,y) <= FP_ERROR);  
     //because all wtds get set to 0 when doing movewaterintopits - 
     //surface water is now gathered in the pits and has not yet been 
