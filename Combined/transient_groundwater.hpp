@@ -143,13 +143,13 @@ double get_change(const int x, const int y, const double time_remaining,
   float change_in_E_cell = 0.0;
   float change_in_W_cell = 0.0;
 
-  int stable = 0;
+  bool stable = false;
   double time_step = time_remaining;
 
   //if( x== 1366&& y ==794)
   // std::cout<<"************************************"<<std::endl;
 
-  while(stable == 0){
+  while(!stable){
 
     //if( x== 1366&& y ==794)
     // std::cout<<"params S "<<params.S<<" wtd change S "<<wtd_change_S<<" change "<<change_in_S_cell<<" time "<<time_step<<" remaining "<<time_remaining<<std::endl;
@@ -266,7 +266,7 @@ double get_change(const int x, const int y, const double time_remaining,
       params.W   += change_in_W_cell ;
       params.E   += change_in_E_cell ;
 
-      stable = 1;
+      stable = true;
 
       if(fabs(arp.wtd_change_total(x,y)) > 100000){
         std::cout<<"stable "<<arp.wtd(x,y)<<" change "<<arp.wtd_change_total(x,y)<<" x "<<x<<" y "<<y<<std::endl;
