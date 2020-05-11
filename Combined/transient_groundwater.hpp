@@ -52,12 +52,9 @@ double kcell(const int x, const int y, const ArrayPack &arp){
     return 0;
 }
 
-
-
-
-
-double receiving_cell_wtd(const float giving_cell_change, const float giving_wtd,const float receiving_wtd, const int x_giving, const int y_giving, \
-                          const int x_receiving, const int y_receiving, const ArrayPack &arp){
+double receiving_cell_wtd(float giving_cell_change, float giving_wtd,
+                          float receiving_wtd, int x_giving, int y_giving,
+                          int x_receiving, int y_receiving, ArrayPack &arp){
 
   double receiving_cell_change = 0.0;
   double volume_change = 0.0;
