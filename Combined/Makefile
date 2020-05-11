@@ -4,8 +4,8 @@ export RD_CXX_FLAGS=-I../common/richdem/include -DRICHDEM_GIT_HASH="\"$(RICHDEM_
 export CXXFLAGS=--std=c++17 -O3 -g -Wall -Wno-unknown-pragmas #-fsanitize=address
 export LIBS=-lnetcdf
 
-a.out: DisjointDenseIntSet.hpp ArrayPack.cpp  ArrayPack.hpp  evaporation.hpp transient_groundwater.hpp TWSM.cpp irf.cpp parameters.cpp parameters.hpp Makefile ../common/netcdf.hpp
-	g++-7 $(CXXFLAGS) $(RD_CXX_FLAGS) TWSM.cpp parameters.cpp ArrayPack.cpp ../common/richdem/include/richdem/richdem.cpp $(LIBS)	
+twsm: DisjointDenseIntSet.hpp ArrayPack.cpp  ArrayPack.hpp  evaporation.hpp transient_groundwater.hpp TWSM.cpp irf.cpp parameters.cpp parameters.hpp Makefile ../common/netcdf.hpp
+	g++-7 $(CXXFLAGS) $(RD_CXX_FLAGS) TWSM.cpp parameters.cpp ArrayPack.cpp ../common/richdem/include/richdem/richdem.cpp $(LIBS) -o twsm
 
 clean:
 	rm a.out
