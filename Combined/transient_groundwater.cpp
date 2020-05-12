@@ -48,56 +48,9 @@ double computeTransmissivity(int x, int y){
     }
 }
 
-double receiving_cell_wtd(float giving_cell_change, float giving_wtd,
+void receiving_cell_wtd(float giving_cell_change, float giving_wtd,
                           float receiving_wtd, int x_giving, int y_giving,
                           int x_receiving, int y_receiving, ArrayPack &arp){
-
-  double receiving_cell_change = 0.;
-  double volume_change = 0.;
-  //we have the change in the giving cell. The giving cell is always losing water.
-  //so, we subtract this value from the giving cell when adjusting wtd later.
-
-  //first, we check to see if the starting wtd in the giving cell was above the surface.
-  if(giving_wtd > 0){
-    //If it stays above 0 once the change has occurred, then no need to worry about porosity.
-    volume_change = giving_cell_change * arp.cell_area[y_giving]; //The volume change is just the height change multiplied by the cell's area.
-    if(giving_wtd - giving_cell_change < 0){  //the water table drops below the surface during this iteration, so we need to consider porosity for part of the water.
-      volume_change = giving_wtd * arp.cell_area[y_giving]; //this is the portion of the water that is above the land surface.
-      volume_change -= arp.cell_area[y_giving] * arp.porosity(x_giving,y_giving) * arp.fdepth(x_giving,y_giving) * \
-                      (exp((giving_wtd - giving_cell_change) / arp.fdepth(x_giving,y_giving)) - 1);  //the portion that is below tht land surface.
-        //-= because this comes out as a negative number.
-    }
-  }
-  else{  // the water table is below the surface to start with, therefore it is below the surface the whole time and we need porosity for all the change.
-    volume_change = -arp.cell_area[y_giving] * arp.porosity(x_giving,y_giving) * arp.fdepth(x_giving,y_giving) * \
-                      (exp((giving_wtd - giving_cell_change) / arp.fdepth(x_giving,y_giving)) - \
-                        exp(giving_wtd / arp.fdepth(x_giving,y_giving)));
-  }
-
-
-  //so now we have the volume change as a positive value from the giving cell, whether it was all above ground, all below ground, or a combination.
-  //Next, we need to use that to calculate the height change in the receiving cell.
-
-  if(receiving_wtd > 0){  //the receiving cell gains water, so if the starting wtd is above 0, all the change is above the surface.
-    receiving_cell_change = volume_change / arp.cell_area[y_receiving];
-  }
-  else{  //either it is all below the surface, or a combination.
- //   //we don't know yet what the height of the change will be, so we start off assuming that it will all be below the surface.
-    receiving_cell_change = arp.fdepth(x_receiving,y_receiving) * log(exp(receiving_wtd / arp.fdepth(x_receiving,y_receiving)) \
-          + volume_change / ( arp.cell_area[y_receiving] * arp.porosity(x_receiving,y_receiving) * arp.fdepth(x_receiving,y_receiving)) ) - receiving_wtd;
-    if(receiving_wtd +  receiving_cell_change > 0){  //it has changed from GW to SW, so we need to adjust the receiving cell change appropriately.
-      //we want to calculate how much of the water is used up in the ground, i.e. the portion between the starting wtd and 0.
-      double GW_portion = -arp.cell_area[y_receiving] * arp.porosity(x_receiving,y_receiving) * arp.fdepth(x_receiving,y_receiving) * \
-                       (exp(receiving_wtd / arp.fdepth(x_receiving,y_receiving)) - 1);
-                       //this is the volume of water used up in filling in the ground.
-                       //volume_change - GW_portion is left over to fill surface water.
-      receiving_cell_change = ((volume_change - GW_portion) / arp.cell_area[y_receiving]) - receiving_wtd;
-    }
-
-  }
-//  if(x_receiving==550&&y_receiving==750 || x_giving == 550 && y_giving==750)
-//    std::cout<<"change "<<receiving_cell_change<<" volume "<<volume_change<<" wtd "<<receiving_wtd<<std::endl;
-  return receiving_cell_change;
 }
 
 
