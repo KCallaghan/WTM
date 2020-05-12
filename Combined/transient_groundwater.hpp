@@ -17,47 +17,58 @@ using namespace std;
 typedef std::vector<double> dvec;
 typedef rd::Array2D<float>  f2d;
 
-double kcell(const int x, const int y, const ArrayPack &arp){
-  /**
-  Mini-function that gives the hydraulic conductivity per cell, kcell.
-  This changes through time as the water-table depth changes:
-
-  @param x         The x-coordinate of the cell in question
-
-  @param y         The y-coordinate of the cell in question
-
-  @param ArrayPack Global arrays. Here we use:
+double computeTransmissivity(const int x, const int y, const ArrayPack &arp){
+    /**
+    Mini-function that gives the transmissivity per cell, kcell.
+    This changes through time as the water-table depth changes
+    due to a combination of:
+    (a) the increasing to tal thickness of the water column, and
+    (b) the exponentially-increasing hydraulic conductivity that reaches its
+        maximum value at 1.5 meters depth, at which point it becomes a constant
+        based on soil-survey data.
+    @param x         The x-coordinate of the cell in question
+    @param y         The y-coordinate of the cell in question
+    @param ArrayPack Global arrays. Here we use:
           - fdepth: The e-folding depth based on slope and temperature.
                     This describes the decay of kcell with depth.
           - wtd:    The water-table depth. We use a different calculation
                     For water tables above vs below 1.5 m below land surface.
           - ksat:   Hydraulic conductivity, based on soil types
-  @return  The kcell value for the cell in question. This is the
-           integration of the hydraulic conductivity over flow depth.
-  **/
-
-  if(arp.fdepth(x,y)>0){
-    // Equation S6 from the Fan paper
-    if(arp.wtd(x,y)<-1.5)
-      return arp.fdepth(x,y) * arp.ksat(x,y) \
-                 * std::exp((arp.wtd(x,y)+1.5)/arp.fdepth(x,y));
-    // If wtd is greater than 0, max out rate of groundwater movement
-    // as though wtd were 0. The surface water will get to move in
-    // FillSpillMerge.
-    else if(arp.wtd(x,y) > 0)
-      return arp.ksat(x,y) * (0+1.5+arp.fdepth(x,y));
-    else
-      return arp.ksat(x,y) * (arp.wtd(x,y)+1.5+arp.fdepth(x,y));                             //Equation S4 from the Fan paper
-  }else
-    return 0;
+    @return  The transmissivity value for the cell in question. This is the
+             integration of the hydraulic conductivity over flow depth.
+    **/
+    if(arp.fdepth(x,y)>0){
+        // Equation S6 from the Fan paper
+        if(arp.wtd(x,y)<-1.5){
+            return arp.fdepth(x,y) * arp.ksat(x,y) \
+                       * std::exp( (arp.wtd(x,y)+1.5)/arp.fdepth(x,y) );
+        }
+        // If wtd is greater than 0, max out rate of groundwater movement
+        // as though wtd were 0. The surface water will get to move in
+        // FillSpillMerge.
+        else if(arp.wtd(x,y) > 0){
+            return arp.ksat(x,y) * (0+1.5+arp.fdepth(x,y));
+        }
+        //Equation S4 from the Fan paper
+        else{
+            return arp.ksat(x,y) * (arp.wtd(x,y) + 1.5 + arp.fdepth(x,y));
+        }
+    }
+    // If the fdepth is zero, there is no water transmission below the surface
+    // soil layer.
+    // If it is less than zero, it is incorrect -- but no water transmission
+    // also seems an okay thing to do in this case.
+    else{
+        return 0;
+    }
 }
 
 double receiving_cell_wtd(float giving_cell_change, float giving_wtd,
                           float receiving_wtd, int x_giving, int y_giving,
                           int x_receiving, int y_receiving, ArrayPack &arp){
 
-  double receiving_cell_change = 0.0;
-  double volume_change = 0.0;
+  double receiving_cell_change = 0.;
+  double volume_change = 0.;
   //we have the change in the giving cell. The giving cell is always losing water.
   //so, we subtract this value from the giving cell when adjusting wtd later.
 
@@ -160,6 +171,12 @@ double get_change(const int x, const int y, const double time_remaining,
     // time step
     // (2) Divide by the area of the given cell: maps water volume
     // increases/decreases to change in head
+    //Q_N = kN * (headN - my_head)
+    //Q_S =
+    //Q_W =
+    //Q_E =
+
+
     wtd_change_N = kN * (headN - my_head) / params.cellsize_n_s_metres \
                     * arp.cellsize_e_w_metres[y] * time_step \
                     / arp.cell_area[y];
@@ -201,7 +218,7 @@ double get_change(const int x, const int y, const double time_remaining,
     }
     else{
       wtd_change_S = 0;
-            mycell_change_S = 0;
+      mycell_change_S = 0;
       change_in_S_cell = 0;
     }
 
@@ -215,7 +232,7 @@ double get_change(const int x, const int y, const double time_remaining,
     }
     else{
       wtd_change_E = 0;
-            mycell_change_E = 0;
+      mycell_change_E = 0;
       change_in_E_cell = 0;
     }
 
@@ -229,7 +246,7 @@ double get_change(const int x, const int y, const double time_remaining,
     }
     else{
       wtd_change_W = 0;
-            mycell_change_W = 0;
+      mycell_change_W = 0;
       change_in_W_cell = 0;
     }
 
@@ -254,8 +271,8 @@ double get_change(const int x, const int y, const double time_remaining,
       // between those two cells.
       time_step = time_step/2.;
     }
-
     else{
+      // Otherwise, a stable time step has been found
       arp.wtd_change_total(x,y) += ( mycell_change_N + mycell_change_E + mycell_change_S + mycell_change_W );
       params.me += mycell_change_N + mycell_change_E + mycell_change_S + mycell_change_W;
       params.N  += change_in_N_cell;
