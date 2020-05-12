@@ -136,17 +136,22 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
     wtdE -= QE * dt / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
 }
 
-            wtdCenter = arp.wtd(x,y);
-            wtdN      = arp.wtd(x,y+1);
-            wtdS      = arp.wtd(x,y-1);
-            wtdE      = arp.wtd(x+1,y);
-            wtdW      = arp.wtd(x-1,y);
-
 void FanDarcyGroundwater::updateCell(uint32_t x, uint32_t y){
     // Runs functions to compute time steps and update WTD for the center cell
     // and its neighbours until the outer time step has been completed
+
+    // Initialize variables for dynamic time stepping
     float64_t time_remaining = params.deltat;
     float64_t dt_inner;
+
+    // Initial water-table depths, prior to updating
+    wtdCenter = arp.wtd(x,y);
+    wtdN      = arp.wtd(x,y+1);
+    wtdS      = arp.wtd(x,y-1);
+    wtdE      = arp.wtd(x+1,y);
+    wtdW      = arp.wtd(x-1,y);
+
+    // Update water-table depths using dynamic time stepping
     while (time_remaining > 0){
         float64_t max_stable_time_step = computeMaxStableTimeStep(x,y);
         // Choose the inner-loop time step
