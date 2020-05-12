@@ -104,6 +104,26 @@ void FanDarcyGroundwater::updateCell(x,y){
 }
 
 
+///////////////////////
+// PRIVATE FUNCTIONS //
+///////////////////////
+
+void FanDarcyGroundwater::initialize(x,y){
+
+}
+
+void FanDarcyGroundwater::update(x,y){
+
+}
+
+void FanDarcyGroundwater::run(x,y){
+
+}
+
+void FanDarcyGroundwater::finalize(x,y){
+
+}
+
 
 void receiving_cell_wtd(float giving_cell_change, float giving_wtd,
                           float receiving_wtd, int x_giving, int y_giving,
