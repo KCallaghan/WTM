@@ -45,14 +45,13 @@ void computeCellNeighborDischarge(int x, int y){
 
 void receiving_cell_wtd(float giving_cell_change, float giving_wtd,
                           float receiving_wtd, int x_giving, int y_giving,
-                          int x_receiving, int y_receiving, ArrayPack &arp){
+                          int x_receiving, int y_receiving){
 }
 
 
 
 
-double get_change(const int x, const int y, const double time_remaining,
-                  Parameters &params, ArrayPack &arp){
+double get_change(const int x, const int y, const double time_remaining){
 
   // Declare variables updated in the loop
   double wtd_change_N;
@@ -62,12 +61,12 @@ double get_change(const int x, const int y, const double time_remaining,
 
   // Elevation head - topography plus the water table depth (negative if
   // water table is below earth surface)
-  const auto my_head = arp.topo(x,y) + params.me;
+  const auto my_head = arp.topo(x,y) + params.wtdCenter;
   // heads for each of my neighbour cells
-  const auto headN   = arp.topo(x,y+1) + params.N;
-  const auto headS   = arp.topo(x,y-1) + params.S;
-  const auto headW   = arp.topo(x-1,y) + params.W;
-  const auto headE   = arp.topo(x+1,y) + params.E;
+  const auto headN   = arp.topo(x,y+1) + params.wtdN;
+  const auto headS   = arp.topo(x,y-1) + params.wtdS;
+  const auto headW   = arp.topo(x-1,y) + params.wtdW;
+  const auto headE   = arp.topo(x+1,y) + params.wtdE;
 
 
   float mycell_change_N = 0.0;
@@ -232,7 +231,7 @@ double get_change(const int x, const int y, const double time_remaining,
 
 
 
-void groundwater(Parameters &params, ArrayPack &arp){
+void groundwater(){
   /**
   @param params   Global paramaters - we use the texfilename, run type,
                   number of cells in the x and y directions (ncells_x

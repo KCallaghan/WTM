@@ -26,6 +26,7 @@ public:
     // INSTANCE VARIABLES AND OBJECTS //
     ////////////////////////////////////
     ArrayPack &arp;
+    Parameters &params;
 
     ///////////////
     // FUNCTIONS //
