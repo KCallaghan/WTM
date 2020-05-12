@@ -94,26 +94,84 @@ float64_t FanDarcyGroundwater::computeMaxStableTimeStep(int32_t x, int32_t y){
     return dt_max_diffusion_withPorosity/2.;
 }
 
-void FanDarcyGroundwater::computeCellNeighborDischarge(int32_t x, int32_t y){
-    // Get the hydraulic conductivity for our cells of interest
+void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
+                                                 float64_t _dt_inner){
+    // Update WTD change
 
+    // First, compute elevation head at center cell and all neighbours
+    // This equals topography plus the water table depth
+    // (positive upwards; negative if water table is below Earth surface)
+    //!WHERE ARE THESE PARAMS SET???????????????????????????????????????????????
+    //!AND CAN THESE BE CLASS VARIABLES INSTEAD OF GLOBAL PARAMS????????????????
+    float64_t headCenter = arp.topo(x,y) + params.wtdCenter;
+    float64_t headN      = arp.topo(x,y+1) + params.wtdN;
+    float64_t headS      = arp.topo(x,y-1) + params.wtdS;
+    float64_t headW      = arp.topo(x-1,y) + params.wtdW;
+    float64_t headE      = arp.topo(x+1,y) + params.wtdE;
+
+    // Then, compute the discharges
+    float64_t QN = transmissivityN * (headN - my_head) \
+                    / params.cellsize_n_s_metres \
+                    * arp.cellsize_e_w_metres[y];
+    float64_t QS = transmissivityS * (headS - my_head) \
+                    / params.cellsize_n_s_metres \
+                    * arp.cellsize_e_w_metres[y];
+    float64_t QE = transmissivityE * (headS - my_head) \
+                    / arp.cellsize_e_w_metres[y] \
+                    * params.cellsize_n_s_metres;
+    float64_t QW = transmissivityW * (headW - my_head) \
+                    / arp.cellsize_e_w_metres[y] \
+                    * params.cellsize_n_s_metres;
+
+    // Move the water, but only in the "internal" variables to handle internal
+    // time stepping to maintain stability.
+    // dH = sum(discharges) times time step, divided by cell area,
+    //      divided by porosity.
+    params.wtdCenter = ( QN + QS + QE + QW ) * _dt_inner \
+                           / ( arp.cell_area[y] * arp.porosity(x,y) )
+    params.wtdN -= QN * dt_inner / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
+    params.wtdS -= QS * dt_inner / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
+    params.wtdW -= QW * dt_inner / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
+    params.wtdE -= QE * dt_inner / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
 }
 
 void FanDarcyGroundwater::updateCell(x,y){
-
+    // Runs functions to compute time steps and update WTD for the center cell
+    // and its neighbours until the outer time step has been completed
+    float64_t time_remaining = params.deltat;
+    float64_t dt_inner;
+    while (time_remaining > 0){
+        float64_t max_stable_time_step = computeMaxStableTimeStep(x,y);
+        // Choose the inner-loop time step
+        if(time_remaining >= max_stable_time_step){
+            dt_inner = time_remaining;
+        }
+        else{
+            dt_inner = max_stable_time_step;
+        }
+        computeWTDchangeAtCell(x, y, dt_inner);
+        time_remaining -= dt_inner;
+    }
+    // When exiting loop, the wtdCenter variable holds the final
+    // water-table depth
+    arp.wtd_change_total = params.wtdCenter;
 }
 
 
-///////////////////////
-// PRIVATE FUNCTIONS //
-///////////////////////
+//////////////////////
+// PUBLIC FUNCTIONS //
+//////////////////////
 
-void FanDarcyGroundwater::initialize(x,y){
+void FanDarcyGroundwater::initialize(){
 
 }
 
 void FanDarcyGroundwater::update(x,y){
-
+    for(_y=0, _y<sizeof....., _y++){
+        for(_x=0, _y<sizeof....., _x++){
+            updateCell( _x, _y );
+        }
+    }
 }
 
 void FanDarcyGroundwater::run(x,y){
@@ -141,14 +199,6 @@ double get_change(const int x, const int y, const double time_remaining){
   double wtd_change_E;
   double wtd_change_W;
 
-  // Elevation head - topography plus the water table depth (negative if
-  // water table is below earth surface)
-  const auto my_head = arp.topo(x,y) + params.wtdCenter;
-  // heads for each of my neighbour cells
-  const auto headN   = arp.topo(x,y+1) + params.wtdN;
-  const auto headS   = arp.topo(x,y-1) + params.wtdS;
-  const auto headW   = arp.topo(x-1,y) + params.wtdW;
-  const auto headE   = arp.topo(x+1,y) + params.wtdE;
 
 
   float mycell_change_N = 0.0;
@@ -187,19 +237,6 @@ double get_change(const int x, const int y, const double time_remaining){
     //Q_W =
     //Q_E =
 
-
-    wtd_change_N = kN * (headN - my_head) / params.cellsize_n_s_metres \
-                    * arp.cellsize_e_w_metres[y] * time_step \
-                    / arp.cell_area[y];
-    wtd_change_S = kS * (headS - my_head) / params.cellsize_n_s_metres \
-                    * arp.cellsize_e_w_metres[y] * time_step \
-                    / arp.cell_area[y];
-    wtd_change_E = kE * (headE - my_head) / arp.cellsize_e_w_metres[y] \
-                    * params.cellsize_n_s_metres * time_step \
-                    / arp.cell_area[y];
-    wtd_change_W = kW * (headW - my_head) / arp.cellsize_e_w_metres[y] \
-                    * params.cellsize_n_s_metres * time_step \
-                    / arp.cell_area[y];
 
 
     //Using the wtd_changes from above, we need to calculate how much change will occur in the target cell, accounting for porosity.

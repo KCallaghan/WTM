@@ -37,10 +37,17 @@ private:
     ////////////////////////
     // INSTANCE VARIABLES //
     ////////////////////////
+
     float64_t transmissivityN;
     float64_t transmissivityS;
     float64_t transmissivityW;
     float64_t transmissivityE;
+
+    float64_t headCenter;
+    float64_t headN;
+    float64_t headS;
+    float64_t headW;
+    float64_t headE;
 
     ///////////////
     // FUNCTIONS //
