@@ -4,7 +4,7 @@
 // PRIVATE FUNCTIONS //
 ///////////////////////
 
-float64_t FanDarcyGroundwater::computeTransmissivity(int x, int y){
+float64_t FanDarcyGroundwater::computeTransmissivity(uint32_t x, uint32_t y){
     if(arp.fdepth(x,y)>0){
         // Equation S6 from the Fan paper
         if(arp.wtd(x,y)<-1.5){
@@ -31,7 +31,7 @@ float64_t FanDarcyGroundwater::computeTransmissivity(int x, int y){
     }
 }
 
-void FanDarcyGroundwater::computeNeighborTransmissivity(int32_t x, int32_t y){
+void FanDarcyGroundwater::computeNeighborTransmissivity(uint32_t x, uint32_t y){
     float64_t transmissivityTargetCell = computeTransmissivity(x, y);
     transmissivityN = ( transmissivityTargetCell
                           + computeTransmissivity(x,  y+1) ) / 2.;
@@ -43,7 +43,7 @@ void FanDarcyGroundwater::computeNeighborTransmissivity(int32_t x, int32_t y){
                           + computeTransmissivity(x+1,y  ) ) / 2.;
 }
 
-float64_t FanDarcyGroundwater::computeArrayMax(float64_t T, uint32_t size){
+float64_t FanDarcyGroundwater::computeArrayMax(float64_t T, uint8_t size){
     float64_t maxValue = std::numeric_limits<float64_t>::min();
     for (i = 0; i < size; i++){
         if(T[i] > maxValue){
@@ -53,7 +53,7 @@ float64_t FanDarcyGroundwater::computeArrayMax(float64_t T, uint32_t size){
     return maxValue;
 }
 
-float64_t FanDarcyGroundwater::computeArrayMin(float64_t T, uint32_t size){
+float64_t FanDarcyGroundwater::computeArrayMin(float64_t T, uint8_t size){
     float64_t minValue = std::numeric_limits<float64_t>::max();
     for (i = 0; i < size; i++){
         if(T[i] < minValue){
@@ -63,7 +63,7 @@ float64_t FanDarcyGroundwater::computeArrayMin(float64_t T, uint32_t size){
     return minValue;
 }
 
-float64_t FanDarcyGroundwater::computeMaxStableTimeStep(int32_t x, int32_t y){
+float64_t FanDarcyGroundwater::computeMaxStableTimeStep(uint32_t x, uint32_t y){
     // Transmissivity is an effective diffusivity
     // Use the highest transmissivity for this time-step calculation
     float64_t dt_max_diffusion_basic;
@@ -142,7 +142,7 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
             wtdE      = arp.wtd(x+1,y);
             wtdW      = arp.wtd(x-1,y);
 
-void FanDarcyGroundwater::updateCell(x,y){
+void FanDarcyGroundwater::updateCell(uint32_t x, uint32_t y){
     // Runs functions to compute time steps and update WTD for the center cell
     // and its neighbours until the outer time step has been completed
     float64_t time_remaining = params.deltat;
@@ -185,7 +185,7 @@ void FanDarcyGroundwater::initialize(){
 
 }
 
-void FanDarcyGroundwater::update(x, y, bool _log=true){
+void FanDarcyGroundwater::update(bool _log){
     // Updates water-table depth grid over one time step
     for(uint32_t y=1; y<params.ncells_y-1; y++){
         for(uint32_t x=1; x<params.ncells_x-1; x++){
