@@ -61,7 +61,7 @@ private:
     @return  The transmissivity value for the cell in question. This is the
              integration of the hydraulic conductivity over flow depth.
     **/
-    double computeTransmissivity(int x, int y)
+    float64_t computeTransmissivity(int x, int y)
 
 }
 

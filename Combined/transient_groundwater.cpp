@@ -21,7 +21,7 @@ typedef rd::Array2D<float>  f2d;
 // PRIVATE FUNCTIONS //
 ///////////////////////
 
-double computeTransmissivity(int x, int y){
+float64_t computeTransmissivity(int x, int y){
     if(arp.fdepth(x,y)>0){
         // Equation S6 from the Fan paper
         if(arp.wtd(x,y)<-1.5){
