@@ -95,7 +95,7 @@ float64_t FanDarcyGroundwater::computeMaxStableTimeStep(uint32_t x, uint32_t y){
 }
 
 void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
-                                                 float64_t _dt_inner){
+                                                 float64_t dt){
     // Update WTD change
 
     // We do this instead of using a staggered grid to approx. double CPU time
@@ -128,12 +128,12 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
     // time stepping to maintain stability.
     // dH = sum(discharges) times time step, divided by cell area,
     //      divided by porosity.
-    wtdCenter = ( QN + QS + QE + QW ) * _dt_inner \
+    wtdCenter = ( QN + QS + QE + QW ) * dt \
                            / ( arp.cell_area[y] * arp.porosity(x,y) )
-    wtdN -= QN * dt_inner / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
-    wtdS -= QS * dt_inner / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
-    wtdW -= QW * dt_inner / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
-    wtdE -= QE * dt_inner / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
+    wtdN -= QN * dt / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
+    wtdS -= QS * dt / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
+    wtdW -= QW * dt / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
+    wtdE -= QE * dt / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
 }
 
             wtdCenter = arp.wtd(x,y);
