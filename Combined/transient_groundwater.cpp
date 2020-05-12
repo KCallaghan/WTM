@@ -4,7 +4,7 @@
 // PRIVATE FUNCTIONS //
 ///////////////////////
 
-float64_t computeTransmissivity(int x, int y){
+float64_t FanDarcyGroundwater::computeTransmissivity(int x, int y){
     if(arp.fdepth(x,y)>0){
         // Equation S6 from the Fan paper
         if(arp.wtd(x,y)<-1.5){
@@ -31,13 +31,67 @@ float64_t computeTransmissivity(int x, int y){
     }
 }
 
-void computeCellNeighborDischarge(int x, int y){
-    // Get the hydraulic conductivity for our cells of interest
+void FanDarcyGroundwater::computeNeighborTransmissivity(int32_t x, int32_t y){
     float64_t transmissivityTargetCell = computeTransmissivity(x, y);
     transmissivityN = ( transmissivityTargetCell + kcell(x,  y+1) ) / 2.;
     transmissivityS = ( transmissivityTargetCell + kcell(x,  y-1) ) / 2.;
     transmissivityW = ( transmissivityTargetCell + kcell(x-1,y  ) ) / 2.;
     transmissivityE = ( transmissivityTargetCell + kcell(x+1,y  ) ) / 2.;
+}
+
+float64_t FanDarcyGroundwater::computeArrayMax(float64_t T, uint32_t size){
+    float64_t maxValue = std::numeric_limits<float64_t>::min();
+    for (i = 0; i < size; i++){
+        if(T[i] > maxValue){
+            maxValue = T[i];
+        }
+    }
+    return maxValue;
+}
+
+float64_t FanDarcyGroundwater::computeArrayMin(float64_t T, uint32_t size){
+    float64_t minValue = std::numeric_limits<float64_t>::max();
+    for (i = 0; i < size; i++){
+        if(T[i] < minValue){
+            minValue = T[i];
+        }
+    }
+    return minValue;
+}
+
+float64_t FanDarcyGroundwater::computeMaxStableTimeStep(int32_t x, int32_t y){
+    // Transmissivity is an effective diffusivity
+    // Use the highest transmissivity for this time-step calculation
+    float64_t dt_max_diffusion_basic;
+    float64_t dt_max_diffusion_withPorosity;
+    float64_t Tarray[4] = { &transmissivityN, &transmissivityS,
+                            &transmissivityW, &transmissivityE };
+    float64_t Dmax = computeArrayMax( Tarray, 4 ); // Max diffusivity
+    dt_max_diffusion_basic = ( arp.cellsize_e_w_metres[y]**2
+                                  * params.cellsize_n_s_metres**2) \
+                                  / ( 2 * Dmax \
+                                      * ( arp.cellsize_e_w_metres[y]**2
+                                          + arp.cellsize_e_w_metres[y]**2 ) );
+    // Now let's add in the porosity differences
+    // Porosity differences will AMPLIFY the WTD changes.
+    // Let us choose a time step that is also based on the LOWEST porosity
+    // (highest WTD change per water volume transfer)
+    float64_t PhiArray[5] = { &arp.porosity(x, y),
+                              &arp.porosity(x+1, y), &arp.porosity(x-1, y),
+                              &arp.porosity(x, y+1), &arp.porosity(x, y-1) };
+    float64_t PhiMin = computeArrayMin( Tarray, 4 ); // Minimum porosity
+    // Porosity is a linear amplifier of WTD change, and it amplifies change
+    // in both the giving and receiving cells.
+    // Amplification goes as 1 / phi.
+    // We need to consider this going up and down, so 1 / (2*phi)
+    dt_max_diffusion_withPorosity = dt_max_diffusion_basic / (2 * PhiMin);
+    // In order to avoid operating at the very maximum time step possible,
+    // we apply a factor of safety of 2
+    return dt_max_diffusion_withPorosity/2.;
+}
+
+void FanDarcyGroundwater::computeCellNeighborDischarge(int32_t x, int32_t y){
+    // Get the hydraulic conductivity for our cells of interest
 
 }
 
