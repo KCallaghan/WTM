@@ -14,12 +14,36 @@
 #include <fstream>
 using namespace std;
 
+//!WHERE DO WE BRING IN ARP?
+
 typedef std::vector<double> dvec;
 typedef rd::Array2D<float>  f2d;
 
-double computeTransmissivity(const int x, const int y, const ArrayPack &arp){
+class FanDarcyGroundwater{
+
+public:
+    ////////////////////////
+    // INSTANCE VARIABLES //
+    ////////////////////////
+
+
+    ///////////////
+    // FUNCTIONS //
+    ///////////////
+
+
+private:
+    ////////////////////////
+    // INSTANCE VARIABLES //
+    ////////////////////////
+
+
+    ///////////////
+    // FUNCTIONS //
+    ///////////////
+
     /**
-    Mini-function that gives the transmissivity per cell, kcell.
+    Gives the transmissivity per cell.
     This changes through time as the water-table depth changes
     due to a combination of:
     (a) the increasing to tal thickness of the water column, and
@@ -37,30 +61,8 @@ double computeTransmissivity(const int x, const int y, const ArrayPack &arp){
     @return  The transmissivity value for the cell in question. This is the
              integration of the hydraulic conductivity over flow depth.
     **/
-    if(arp.fdepth(x,y)>0){
-        // Equation S6 from the Fan paper
-        if(arp.wtd(x,y)<-1.5){
-            return arp.fdepth(x,y) * arp.ksat(x,y) \
-                       * std::exp( (arp.wtd(x,y)+1.5)/arp.fdepth(x,y) );
-        }
-        // If wtd is greater than 0, max out rate of groundwater movement
-        // as though wtd were 0. The surface water will get to move in
-        // FillSpillMerge.
-        else if(arp.wtd(x,y) > 0){
-            return arp.ksat(x,y) * (0+1.5+arp.fdepth(x,y));
-        }
-        //Equation S4 from the Fan paper
-        else{
-            return arp.ksat(x,y) * (arp.wtd(x,y) + 1.5 + arp.fdepth(x,y));
-        }
-    }
-    // If the fdepth is zero, there is no water transmission below the surface
-    // soil layer.
-    // If it is less than zero, it is incorrect -- but no water transmission
-    // also seems an okay thing to do in this case.
-    else{
-        return 0;
-    }
+    double computeTransmissivity(int x, int y, ArrayPack &arp)
+
 }
 
 double receiving_cell_wtd(float giving_cell_change, float giving_wtd,

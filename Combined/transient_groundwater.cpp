@@ -19,7 +19,7 @@ typedef rd::Array2D<float>  f2d;
 
 class
 
-double computeTransmissivity(const int x, const int y, const ArrayPack &arp){
+double computeTransmissivity(int x, int y, ArrayPack &arp){
     /**
     Mini-function that gives the transmissivity per cell, kcell.
     This changes through time as the water-table depth changes
