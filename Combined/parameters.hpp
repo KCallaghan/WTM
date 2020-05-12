@@ -46,13 +46,6 @@ public:
     float32_t  surface_change       = 0.;
     int32_t    total_cycles         = -1;
 
-    // Water-table depths for transient_groundwater module
-    float32_t wtdN      = 0.;
-    float32_t wtdS      = 0.;
-    float32_t wtdE      = 0.;
-    float32_t wtdW      = 0.;
-    float32_t wtdCenter = 0.;
-
     //Set for convenience within the code
     int32_t ncells_x  = -1;
     int32_t ncells_y  = -1;

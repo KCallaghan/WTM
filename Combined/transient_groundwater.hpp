@@ -49,6 +49,12 @@ private:
     float64_t headW;
     float64_t headE;
 
+    float64_t wtdCenter;
+    float64_t wtdN;
+    float64_t wtdS;
+    float64_t wtdW;
+    float64_t wtdE;
+
     ///////////////
     // FUNCTIONS //
     ///////////////

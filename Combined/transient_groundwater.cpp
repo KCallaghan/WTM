@@ -103,11 +103,11 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
     // (positive upwards; negative if water table is below Earth surface)
     //!WHERE ARE THESE PARAMS SET???????????????????????????????????????????????
     //!AND CAN THESE BE CLASS VARIABLES INSTEAD OF GLOBAL PARAMS????????????????
-    float64_t headCenter = arp.topo(x,y) + params.wtdCenter;
-    float64_t headN      = arp.topo(x,y+1) + params.wtdN;
-    float64_t headS      = arp.topo(x,y-1) + params.wtdS;
-    float64_t headW      = arp.topo(x-1,y) + params.wtdW;
-    float64_t headE      = arp.topo(x+1,y) + params.wtdE;
+    float64_t headCenter = arp.topo(x,y) + wtdCenter;
+    float64_t headN      = arp.topo(x,y+1) + wtdN;
+    float64_t headS      = arp.topo(x,y-1) + wtdS;
+    float64_t headW      = arp.topo(x-1,y) + wtdW;
+    float64_t headE      = arp.topo(x+1,y) + wtdE;
 
     // Then, compute the discharges
     float64_t QN = transmissivityN * (headN - my_head) \
@@ -127,12 +127,12 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
     // time stepping to maintain stability.
     // dH = sum(discharges) times time step, divided by cell area,
     //      divided by porosity.
-    params.wtdCenter = ( QN + QS + QE + QW ) * _dt_inner \
+    wtdCenter = ( QN + QS + QE + QW ) * _dt_inner \
                            / ( arp.cell_area[y] * arp.porosity(x,y) )
-    params.wtdN -= QN * dt_inner / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
-    params.wtdS -= QS * dt_inner / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
-    params.wtdW -= QW * dt_inner / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
-    params.wtdE -= QE * dt_inner / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
+    wtdN -= QN * dt_inner / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
+    wtdS -= QS * dt_inner / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
+    wtdW -= QW * dt_inner / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
+    wtdE -= QE * dt_inner / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
 }
 
 void FanDarcyGroundwater::updateCell(x,y){
@@ -154,7 +154,7 @@ void FanDarcyGroundwater::updateCell(x,y){
     }
     // When exiting loop, the wtdCenter variable holds the final
     // water-table depth
-    arp.wtd_change_total = params.wtdCenter;
+    arp.wtd_change_total = wtdCenter;
 }
 
 
@@ -167,6 +167,7 @@ void FanDarcyGroundwater::initialize(){
 }
 
 void FanDarcyGroundwater::update(x,y){
+    // Updates groundwater grid over one time step
     for(_y=0, _y<sizeof....., _y++){
         for(_x=0, _y<sizeof....., _x++){
             updateCell( _x, _y );
