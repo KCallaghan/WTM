@@ -33,10 +33,14 @@ float64_t FanDarcyGroundwater::computeTransmissivity(int x, int y){
 
 void FanDarcyGroundwater::computeNeighborTransmissivity(int32_t x, int32_t y){
     float64_t transmissivityTargetCell = computeTransmissivity(x, y);
-    transmissivityN = ( transmissivityTargetCell + kcell(x,  y+1) ) / 2.;
-    transmissivityS = ( transmissivityTargetCell + kcell(x,  y-1) ) / 2.;
-    transmissivityW = ( transmissivityTargetCell + kcell(x-1,y  ) ) / 2.;
-    transmissivityE = ( transmissivityTargetCell + kcell(x+1,y  ) ) / 2.;
+    transmissivityN = ( transmissivityTargetCell
+                          + computeTransmissivity(x,  y+1) ) / 2.;
+    transmissivityS = ( transmissivityTargetCell
+                          + computeTransmissivity(x,  y-1) ) / 2.;
+    transmissivityW = ( transmissivityTargetCell
+                          + computeTransmissivity(x-1,y  ) ) / 2.;
+    transmissivityE = ( transmissivityTargetCell
+                          + computeTransmissivity(x+1,y  ) ) / 2.;
 }
 
 float64_t FanDarcyGroundwater::computeArrayMax(float64_t T, uint32_t size){
@@ -92,6 +96,10 @@ float64_t FanDarcyGroundwater::computeMaxStableTimeStep(int32_t x, int32_t y){
 
 void FanDarcyGroundwater::computeCellNeighborDischarge(int32_t x, int32_t y){
     // Get the hydraulic conductivity for our cells of interest
+
+}
+
+void FanDarcyGroundwater::updateCell(x,y){
 
 }
 
