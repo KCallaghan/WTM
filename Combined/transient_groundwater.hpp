@@ -22,10 +22,10 @@ typedef rd::Array2D<float>  f2d;
 class FanDarcyGroundwater{
 
 public:
-    ////////////////////////
-    // INSTANCE VARIABLES //
-    ////////////////////////
-
+    ////////////////////////////////////
+    // INSTANCE VARIABLES AND OBJECTS //
+    ////////////////////////////////////
+    ArrayPack &arp;
 
     ///////////////
     // FUNCTIONS //
@@ -61,7 +61,7 @@ private:
     @return  The transmissivity value for the cell in question. This is the
              integration of the hydraulic conductivity over flow depth.
     **/
-    double computeTransmissivity(int x, int y, ArrayPack &arp)
+    double computeTransmissivity(int x, int y)
 
 }
 

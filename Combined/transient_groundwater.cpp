@@ -17,28 +17,11 @@ using namespace std;
 typedef std::vector<double> dvec;
 typedef rd::Array2D<float>  f2d;
 
-class
+///////////////////////
+// PRIVATE FUNCTIONS //
+///////////////////////
 
-double computeTransmissivity(int x, int y, ArrayPack &arp){
-    /**
-    Mini-function that gives the transmissivity per cell, kcell.
-    This changes through time as the water-table depth changes
-    due to a combination of:
-    (a) the increasing to tal thickness of the water column, and
-    (b) the exponentially-increasing hydraulic conductivity that reaches its
-        maximum value at 1.5 meters depth, at which point it becomes a constant
-        based on soil-survey data.
-    @param x         The x-coordinate of the cell in question
-    @param y         The y-coordinate of the cell in question
-    @param ArrayPack Global arrays. Here we use:
-          - fdepth: The e-folding depth based on slope and temperature.
-                    This describes the decay of kcell with depth.
-          - wtd:    The water-table depth. We use a different calculation
-                    For water tables above vs below 1.5 m below land surface.
-          - ksat:   Hydraulic conductivity, based on soil types
-    @return  The transmissivity value for the cell in question. This is the
-             integration of the hydraulic conductivity over flow depth.
-    **/
+double computeTransmissivity(int x, int y){
     if(arp.fdepth(x,y)>0){
         // Equation S6 from the Fan paper
         if(arp.wtd(x,y)<-1.5){
@@ -137,10 +120,10 @@ double get_change(const int x, const int y, const double time_remaining,
   const auto headE   = arp.topo(x+1,y) + params.E;
 
   // Get the hydraulic conductivity for our cells of interest
-  const auto kN = ( kcell(x,  y,   arp) + kcell(x,  y+1, arp) ) / 2.;
-  const auto kS = ( kcell(x,  y,   arp) + kcell(x,  y-1, arp) ) / 2.;
-  const auto kW = ( kcell(x,  y,   arp) + kcell(x-1,y,   arp) ) / 2.;
-  const auto kE = ( kcell(x,  y,   arp) + kcell(x+1,y,   arp) ) / 2.;
+  const auto kN = ( kcell(x, y) + kcell(x,  y+1) ) / 2.;
+  const auto kS = ( kcell(x, y) + kcell(x,  y-1) ) / 2.;
+  const auto kW = ( kcell(x, y) + kcell(x-1,y, ) ) / 2.;
+  const auto kE = ( kcell(x, y) + kcell(x+1,y, ) ) / 2.;
 
   float mycell_change_N = 0.0;
   float mycell_change_S = 0.0;
