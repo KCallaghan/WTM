@@ -98,11 +98,12 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
                                                  float64_t _dt_inner){
     // Update WTD change
 
+    // We do this instead of using a staggered grid to approx. double CPU time
+    // in exchange for using less memory.
+
     // First, compute elevation head at center cell and all neighbours
     // This equals topography plus the water table depth
     // (positive upwards; negative if water table is below Earth surface)
-    //!WHERE ARE THESE PARAMS SET???????????????????????????????????????????????
-    //!AND CAN THESE BE CLASS VARIABLES INSTEAD OF GLOBAL PARAMS????????????????
     float64_t headCenter = arp.topo(x,y) + wtdCenter;
     float64_t headN      = arp.topo(x,y+1) + wtdN;
     float64_t headS      = arp.topo(x,y-1) + wtdS;
@@ -135,6 +136,12 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
     wtdE -= QE * dt_inner / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
 }
 
+            wtdCenter = arp.wtd(x,y);
+            wtdN      = arp.wtd(x,y+1);
+            wtdS      = arp.wtd(x,y-1);
+            wtdE      = arp.wtd(x+1,y);
+            wtdW      = arp.wtd(x-1,y);
+
 void FanDarcyGroundwater::updateCell(x,y){
     // Runs functions to compute time steps and update WTD for the center cell
     // and its neighbours until the outer time step has been completed
@@ -154,9 +161,21 @@ void FanDarcyGroundwater::updateCell(x,y){
     }
     // When exiting loop, the wtdCenter variable holds the final
     // water-table depth
-    arp.wtd_change_total = wtdCenter;
+    arp.wtd_change_total(x,y) = wtdCenter;
 }
 
+//!WHERE IS TOTAL_CHANGES UPDATED???????????????????????????????????????????????
+void FanDarcyGroundwater::logToFile(){
+  // Set up log file
+  ofstream textfile;
+  textfile.open (params.textfilename, std::ios_base::app);
+  textfile<<"Groundwater"<<std::endl;
+  textfile << "total GW changes were " << total_changes << std::endl;
+  textfile << "max wtd was " << max_total << " and min wtd was " \
+           << min_total << std::endl;
+  textfile << "max GW change was " << max_change << std::endl;
+  textfile.close();
+}
 
 //////////////////////
 // PUBLIC FUNCTIONS //
@@ -166,20 +185,43 @@ void FanDarcyGroundwater::initialize(){
 
 }
 
-void FanDarcyGroundwater::update(x,y){
-    // Updates groundwater grid over one time step
-    for(_y=0, _y<sizeof....., _y++){
-        for(_x=0, _y<sizeof....., _x++){
+void FanDarcyGroundwater::update(x, y, bool _log=true){
+    // Updates water-table depth grid over one time step
+    for(uint32_t y=1; y<params.ncells_y-1; y++){
+        for(uint32_t x=1; x<params.ncells_x-1; x++){
+            // Skip ocean cells
+            if(arp.land_mask(x,y) == 0)
+                continue;
+            // Otherwise, update the water-table depth change array
             updateCell( _x, _y );
         }
     }
+    // Once all the changes are known, update the WTD everywhere with the
+    // difference array
+    for(int y=1;y<params.ncells_y-1;y++){
+        for(int x=1;x<params.ncells_x-1; x++){
+            // Skip ocean cells
+            if(arp.land_mask(x,y) == 0)
+              continue;
+            // Update the whole wtd array at once.
+            // This is the new water table after groundwater has moved
+            // for delta_t seconds.
+            arp.wtd(x,y) += arp.wtd_change_total(x,y);
+        }
+    }
+    if(_log){
+        logToFile();
+    }
 }
 
-void FanDarcyGroundwater::run(x,y){
+// This can be populated if we intend to run this module on its own.
+// Otherwise, will not be called
+void FanDarcyGroundwater::run(){
 
 }
 
-void FanDarcyGroundwater::finalize(x,y){
+// This can include functions to clean up / clear memory, if needed
+void FanDarcyGroundwater::finalize(){
 
 }
 
@@ -346,110 +388,4 @@ double get_change(const int x, const int y, const double time_remaining){
     }
   }
   return time_step;
-}
-
-
-
-
-void groundwater(){
-  /**
-  @param params   Global paramaters - we use the texfilename, run type,
-                  number of cells in the x and y directions (ncells_x
-                  and ncells_y), delta_t (number of seconds in a time step),
-                  and cellsize_n_s_metres (size of a cell in the north-south
-                  direction)
-
-  @param arp      Global arrays - we access land_mask, topo, wtd,
-                  wtd_change_total, cellsize_e_w_metres, and cell_area.
-                  land_mask is a binary representation of where land is vs
-                                        where ocean is.
-                  topo is the input topography, i.e. land elevation above
-                                        sea level in each cell.
-                  wtd is the water table depth.
-                  wtd_change_total is the amount by which wtd will change
-                                        during this time step as a result of
-                                        groundwater movement.
-                  cellsize_e_w_metres is the distance across a cell in the
-                                        east-west direction.
-                  cell_area is the area of the cell, needed because different
-                                        cells have different areas and
-                                        therefore an accommodate different
-                                        water volumes.
-
-  @return  An updated wtd that represents the status of the water table after
-           groundwater has been able to flow for the amount of time represented
-           by delta_t.
-  **/
-
-
-  // Declare status variables and set initial values to 0
-  double total_changes = 0.;
-  float max_total      = 0.;
-  float min_total      = 0.;
-  float max_change     = 0.;
-
-
-  // Set up log file
-  ofstream textfile;
-  textfile.open (params.textfilename, std::ios_base::app);
-
-  textfile<<"Groundwater"<<std::endl;
-
-
-  ////////////////////////////
-  // COMPUTE CHANGES IN WTD //
-  ////////////////////////////
-
-  // Cycle through the entire array, calculating how much the water-table
-  // changes in each cell per iteration.
-  // We do this instead of using a staggered grid to approx. double CPU time
-  // in exchange for using less memory.
-  for(int y=1; y<params.ncells_y-1; y++){
-    for(int x=1; x<params.ncells_x-1; x++){
-      //skip ocean cells
-
-      if(arp.land_mask(x,y) == 0)
-        continue;
-
-      double time_step = 0.0;
-      arp.wtd_change_total(x,y) = 0.0;
-      double time_remaining = params.deltat;
-
-      params.N  = arp.wtd(x,y+1);
-      params.S  = arp.wtd(x,y-1);
-      params.E  = arp.wtd(x+1,y);
-      params.W  = arp.wtd(x-1,y);
-      params.me = arp.wtd(x,y);
-
-      while(time_remaining > 1e-4){
-        time_step = get_change(x, y,time_remaining,params,arp);
-        time_remaining -= time_step;
-      }
-    }
-  }
-
-
-  ////////////////
-  // UPDATE WTD //
-  ////////////////
-
-  for(int y=1;y<params.ncells_y-1;y++){
-    for(int x=1;x<params.ncells_x-1; x++){
-
-      if(arp.land_mask(x,y) == 0)
-        continue;
-
-      // Update the whole wtd array at once.
-      // This is the new water table after groundwater has moved
-      // for delta_t seconds.
-      arp.wtd(x,y) += arp.wtd_change_total(x,y);
-    }
-  }
-
-  // Write status to text file
-  textfile << "total GW changes were " << total_changes << std::endl;
-  textfile << "max wtd was " << max_total << " and min wtd was " \
-           << min_total << std::endl;
-  textfile << "max GW change was " << max_change << std::endl;
-  textfile.close();
 }
