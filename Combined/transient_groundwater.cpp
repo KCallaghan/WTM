@@ -31,10 +31,24 @@ float64_t computeTransmissivity(int x, int y){
     }
 }
 
+void computeCellNeighborDischarge(int x, int y){
+    // Get the hydraulic conductivity for our cells of interest
+    float64_t transmissivityTargetCell = computeTransmissivity(x, y);
+    transmissivityN = ( transmissivityTargetCell + kcell(x,  y+1) ) / 2.;
+    transmissivityS = ( transmissivityTargetCell + kcell(x,  y-1) ) / 2.;
+    transmissivityW = ( transmissivityTargetCell + kcell(x-1,y  ) ) / 2.;
+    transmissivityE = ( transmissivityTargetCell + kcell(x+1,y  ) ) / 2.;
+
+}
+
+
+
 void receiving_cell_wtd(float giving_cell_change, float giving_wtd,
                           float receiving_wtd, int x_giving, int y_giving,
                           int x_receiving, int y_receiving, ArrayPack &arp){
 }
+
+
 
 
 double get_change(const int x, const int y, const double time_remaining,
@@ -55,11 +69,6 @@ double get_change(const int x, const int y, const double time_remaining,
   const auto headW   = arp.topo(x-1,y) + params.W;
   const auto headE   = arp.topo(x+1,y) + params.E;
 
-  // Get the hydraulic conductivity for our cells of interest
-  const auto kN = ( kcell(x, y) + kcell(x,  y+1) ) / 2.;
-  const auto kS = ( kcell(x, y) + kcell(x,  y-1) ) / 2.;
-  const auto kW = ( kcell(x, y) + kcell(x-1,y, ) ) / 2.;
-  const auto kE = ( kcell(x, y) + kcell(x+1,y, ) ) / 2.;
 
   float mycell_change_N = 0.0;
   float mycell_change_S = 0.0;
