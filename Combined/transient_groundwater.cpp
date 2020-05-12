@@ -1,21 +1,4 @@
-#include "../common/netcdf.hpp"
-#include "ArrayPack.hpp"
-#include "parameters.hpp"
-#include <cassert>
-#include <cmath>
-#include <iomanip>
-#include <iostream>
-#include <richdem/common/Array2D.hpp>
-#include <richdem/common/timer.hpp>
-#include <richdem/common/ProgressBar.hpp>
-#include <stdexcept>
-#include <string>
-#include <vector>
-#include <fstream>
-using namespace std;
-
-typedef std::vector<double> dvec;
-typedef rd::Array2D<float>  f2d;
+#include "transient_groundwater.hpp"
 
 ///////////////////////
 // PRIVATE FUNCTIONS //
