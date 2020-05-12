@@ -55,6 +55,13 @@ private:
     float64_t wtdW;
     float64_t wtdE;
 
+    // Declare status variables and set initial values to 0.
+    // These variables are used to monitor the state of the calculation
+    float64_t total_changes  = 0.;
+    float32_t max_total      = 0.;
+    float32_t min_total      = 0.;
+    float32_t max_change     = 0.;
+
     ///////////////
     // FUNCTIONS //
     ///////////////
@@ -352,11 +359,6 @@ void groundwater(Parameters &params, ArrayPack &arp){
   **/
 
 
-  // Declare status variables and set initial values to 0
-  double total_changes = 0.;
-  float max_total      = 0.;
-  float min_total      = 0.;
-  float max_change     = 0.;
 
 
   // Set up log file
