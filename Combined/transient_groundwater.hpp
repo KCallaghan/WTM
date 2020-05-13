@@ -130,7 +130,7 @@ private:
     /**
      * @brief Returns the minimum value in an array (max size 256 items)
      */
-    double computeArrayMin(double *T[], uint8_t size);
+    float computeArrayMin(double *T[], uint8_t size);
 
     /**
      * @brief Returns the maximum stable time step with a 2x factor of safety
