@@ -117,7 +117,7 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
     double QS = transmissivityS * (headS - headCenter) \
                     / params.cellsize_n_s_metres \
                     * arp.cellsize_e_w_metres[y];
-    double QE = transmissivityE * (headS - headCenter) \
+    double QE = transmissivityE * (headE - headCenter) \
                     / arp.cellsize_e_w_metres[y] \
                     * params.cellsize_n_s_metres;
     double QW = transmissivityW * (headW - headCenter) \
