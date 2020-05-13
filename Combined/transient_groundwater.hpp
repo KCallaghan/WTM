@@ -125,12 +125,12 @@ private:
     /**
      * @brief Returns the maximum value in an array (max size 256 items)
      */
-    double computeArrayMax(double T[], uint8_t size);
+    double computeArrayMax(double *T[], uint8_t size);
 
     /**
      * @brief Returns the minimum value in an array (max size 256 items)
      */
-    double computeArrayMin(double T[], uint8_t size);
+    double computeArrayMin(double *T[], uint8_t size);
 
     /**
      * @brief Returns the maximum stable time step with a 2x factor of safety
