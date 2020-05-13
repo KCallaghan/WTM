@@ -43,21 +43,21 @@ void FanDarcyGroundwater::computeNeighborTransmissivity(uint32_t x, uint32_t y){
                           + computeTransmissivity(x+1,y  ) ) / 2.;
 }
 
-double FanDarcyGroundwater::computeArrayMax(double *T[], uint8_t size){
+double FanDarcyGroundwater::computeArrayMax(double *_val[], uint8_t size){
     double maxValue = std::numeric_limits<double>::min();
     for (uint32_t i = 0; i < size; i++){
-        if(*T[i] > maxValue){
-            maxValue = *T[i];
+        if(*_val[i] > maxValue){
+            maxValue = *_val[i];
         }
     }
     return maxValue;
 }
 
-float FanDarcyGroundwater::computeArrayMin(double *T[], uint8_t size){
+float FanDarcyGroundwater::computeArrayMin(float *_val[], uint8_t size){
     float minValue = std::numeric_limits<double>::max();
     for (uint32_t i = 0; i < size; i++){
-        if(*T[i] < minValue){
-            minValue = *T[i];
+        if(*_val[i] < minValue){
+            minValue = *_val[i];
         }
     }
     return minValue;
@@ -83,7 +83,7 @@ double FanDarcyGroundwater::computeMaxStableTimeStep(uint32_t x, uint32_t y){
     float *PhiArray[5] = { &arp.porosity(x, y),
                              &arp.porosity(x+1, y), &arp.porosity(x-1, y),
                              &arp.porosity(x, y+1), &arp.porosity(x, y-1) };
-    double PhiMin = computeArrayMin( Tarray, 4 ); // Minimum porosity
+    float PhiMin = computeArrayMin( PhiArray, 4 ); // Minimum porosity
     // Porosity is a linear amplifier of WTD change, and it amplifies change
     // in both the giving and receiving cells.
     // Amplification goes as 1 / phi.
