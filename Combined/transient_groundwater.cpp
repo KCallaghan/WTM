@@ -208,8 +208,8 @@ void FanDarcyGroundwater::initialize(){
 
 void FanDarcyGroundwater::update(bool _log){
     // Updates water-table depth grid over one time step
-    for(uint32_t y=1; y<params.ncells_y-1; y++){
-        for(uint32_t x=1; x<params.ncells_x-1; x++){
+    for(int32_t y=1; y<params.ncells_y-1; y++){
+        for(int32_t x=1; x<params.ncells_x-1; x++){
             // Skip ocean cells
             if(arp.land_mask(x,y) == 0);
                 continue;
@@ -219,8 +219,8 @@ void FanDarcyGroundwater::update(bool _log){
     }
     // Once all the changes are known, update the WTD everywhere with the
     // difference array
-    for(int y=1;y<params.ncells_y-1;y++){
-        for(int x=1;x<params.ncells_x-1; x++){
+    for(int32_t y=1; y<params.ncells_y-1; y++){
+        for(int32_t x=1; x<params.ncells_x-1; x++){
             // Skip ocean cells
             if(arp.land_mask(x,y) == 0){
                 continue;
