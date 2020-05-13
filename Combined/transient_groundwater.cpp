@@ -53,8 +53,8 @@ double FanDarcyGroundwater::computeArrayMax(double *T[], uint8_t size){
     return maxValue;
 }
 
-double FanDarcyGroundwater::computeArrayMin(double *T[], uint8_t size){
-    double minValue = std::numeric_limits<double>::max();
+float FanDarcyGroundwater::computeArrayMin(double *T[], uint8_t size){
+    float minValue = std::numeric_limits<double>::max();
     for (uint32_t i = 0; i < size; i++){
         if(*T[i] < minValue){
             minValue = *T[i];
@@ -72,17 +72,17 @@ double FanDarcyGroundwater::computeMaxStableTimeStep(uint32_t x, uint32_t y){
                              &transmissivityW, &transmissivityE };
     double Dmax = computeArrayMax( Tarray, 4 ); // Max diffusivity
     dt_max_diffusion_basic = ( pow(arp.cellsize_e_w_metres[y], 2)
-                                  * pow(params.cellsize_n_s_metres, 2) \
+                                  * pow(params.cellsize_n_s_metres, 2) ) \
                                   / ( 2 * Dmax \
-                                    * ( pow(arp.cellsize_e_w_metres[y], 2)
+                                    * ( pow(arp.cellsize_e_w_metres[y], 2) \
                                       + pow(arp.cellsize_e_w_metres[y], 2) ) );
     // Now let's add in the porosity differences
     // Porosity differences will AMPLIFY the WTD changes.
     // Let us choose a time step that is also based on the LOWEST porosity
     // (highest WTD change per water volume transfer)
-    double *PhiArray[5] = { &arp.porosity(x, y),
-                               &arp.porosity(x+1, y), &arp.porosity(x-1, y),
-                               &arp.porosity(x, y+1), &arp.porosity(x, y-1) };
+    float *PhiArray[5] = { &arp.porosity(x, y),
+                             &arp.porosity(x+1, y), &arp.porosity(x-1, y),
+                             &arp.porosity(x, y+1), &arp.porosity(x, y-1) };
     double PhiMin = computeArrayMin( Tarray, 4 ); // Minimum porosity
     // Porosity is a linear amplifier of WTD change, and it amplifies change
     // in both the giving and receiving cells.
