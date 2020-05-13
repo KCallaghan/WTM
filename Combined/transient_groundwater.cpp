@@ -111,16 +111,16 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
     double headE      = arp.topo(x+1,y) + wtdE;
 
     // Then, compute the discharges
-    double QN = transmissivityN * (headN - my_head) \
+    double QN = transmissivityN * (headN - headCenter) \
                     / params.cellsize_n_s_metres \
                     * arp.cellsize_e_w_metres[y];
-    double QS = transmissivityS * (headS - my_head) \
+    double QS = transmissivityS * (headS - headCenter) \
                     / params.cellsize_n_s_metres \
                     * arp.cellsize_e_w_metres[y];
-    double QE = transmissivityE * (headS - my_head) \
+    double QE = transmissivityE * (headS - headCenter) \
                     / arp.cellsize_e_w_metres[y] \
                     * params.cellsize_n_s_metres;
-    double QW = transmissivityW * (headW - my_head) \
+    double QW = transmissivityW * (headW - headCenter) \
                     / arp.cellsize_e_w_metres[y] \
                     * params.cellsize_n_s_metres;
 
@@ -129,11 +129,11 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
     // dH = sum(discharges) times time step, divided by cell area,
     //      divided by porosity.
     wtdCenter = ( QN + QS + QE + QW ) * dt \
-                           / ( arp.cell_area[y] * arp.porosity(x,y) )
-    wtdN -= QN * dt / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
-    wtdS -= QS * dt / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
-    wtdW -= QW * dt / ( arp.cell_area[y-1] * arp.porosity(x,y-1) )
-    wtdE -= QE * dt / ( arp.cell_area[y+1] * arp.porosity(x,y+1) )
+                           / ( arp.cell_area[y] * arp.porosity(x,y) );
+    wtdN -= QN * dt / ( arp.cell_area[y+1] * arp.porosity(x,y+1) );
+    wtdS -= QS * dt / ( arp.cell_area[y-1] * arp.porosity(x,y-1) );
+    wtdW -= QW * dt / ( arp.cell_area[y-1] * arp.porosity(x,y-1) );
+    wtdE -= QE * dt / ( arp.cell_area[y+1] * arp.porosity(x,y+1) );
 }
 
 void FanDarcyGroundwater::updateCell(uint32_t x, uint32_t y){
