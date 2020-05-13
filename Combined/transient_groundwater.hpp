@@ -29,12 +29,18 @@ public:
     // INSTANCE VARIABLES AND OBJECTS //
     ////////////////////////////////////
 
+    //char infname[] = "path";
+    //char *argv[2] = {&infname, &infname}
+
+    ArrayPack arp;
+    Parameters params;
 
     /////////////////
     // CONSTRUCTOR //
     /////////////////
 
     FanDarcyGroundwater();
+    FanDarcyGroundwater(Parameters _params, ArrayPack _arp);
 
     ///////////////
     // FUNCTIONS //
@@ -53,8 +59,6 @@ private:
     // INSTANCE OBJECTS //
     //////////////////////
 
-    ArrayPack &arp;
-    Parameters &params;
 
 
     ////////////////////////
@@ -125,12 +129,12 @@ private:
     /**
      * @brief Returns the maximum value in an array (max size 256 items)
      */
-    double computeArrayMax(double *T[], uint8_t size);
+    double computeArrayMax(double *_val[], uint8_t size);
 
     /**
      * @brief Returns the minimum value in an array (max size 256 items)
      */
-    float computeArrayMin(double *T[], uint8_t size);
+    float computeArrayMin(float *_val[], uint8_t size);
 
     /**
      * @brief Returns the maximum stable time step with a 2x factor of safety
