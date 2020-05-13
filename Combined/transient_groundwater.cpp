@@ -211,8 +211,9 @@ void FanDarcyGroundwater::update(bool _log){
     for(int32_t y=1; y<params.ncells_y-1; y++){
         for(int32_t x=1; x<params.ncells_x-1; x++){
             // Skip ocean cells
-            if(arp.land_mask(x,y) == 0);
+            if(arp.land_mask(x,y) == 0){
                 continue;
+            }
             // Otherwise, update the water-table depth change array
             updateCell( x, y );
         }
