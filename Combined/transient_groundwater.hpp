@@ -1,7 +1,7 @@
 #ifndef transient_groundwater_h
 #define transient_groundwater_h
 
-
+#include <stdint.h>
 #include "../common/netcdf.hpp"
 #include "ArrayPack.hpp"
 #include "parameters.hpp"
@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+
 using namespace std;
 
 typedef std::vector<double> dvec;
@@ -52,28 +53,28 @@ private:
     // INSTANCE VARIABLES //
     ////////////////////////
 
-    float64_t transmissivityN;
-    float64_t transmissivityS;
-    float64_t transmissivityW;
-    float64_t transmissivityE;
+    double transmissivityN;
+    double transmissivityS;
+    double transmissivityW;
+    double transmissivityE;
 
-    float64_t headCenter;
-    float64_t headN;
-    float64_t headS;
-    float64_t headW;
-    float64_t headE;
+    double headCenter;
+    double headN;
+    double headS;
+    double headW;
+    double headE;
 
-    float64_t wtdCenter;
-    float64_t wtdN;
-    float64_t wtdS;
-    float64_t wtdW;
-    float64_t wtdE;
+    double wtdCenter;
+    double wtdN;
+    double wtdS;
+    double wtdW;
+    double wtdE;
 
     // These variables are used to monitor the state of the calculation
-    float64_t total_changes  = 0.;
-    float32_t max_total      = 0.;
-    float32_t min_total      = 0.;
-    float32_t max_change     = 0.;
+    double total_changes  = 0.;
+    float max_total       = 0.;
+    float min_total       = 0.;
+    float max_change      = 0.;
 
 
     ///////////////
@@ -106,7 +107,7 @@ private:
      *          integration of the hydraulic conductivity from -infinity to the
      *          groundwater table.
      */
-    float64_t computeTransmissivity(uint32_t x, uint32_t y);
+    double computeTransmissivity(uint32_t x, uint32_t y);
 
     /**
      * @brief Compute mean transmissivity between neighboring cells (N, S, W, E)
@@ -116,12 +117,12 @@ private:
     /**
      * @brief Returns the maximum value in an array (max size 256 items)
      */
-    float64_t computeArrayMax(float64_t T, uint8_t size);
+    double computeArrayMax(double T, uint8_t size);
 
     /**
      * @brief Returns the minimum value in an array (max size 256 items)
      */
-    float64_t computeArrayMin(float64_t T, uint8_t size);
+    double computeArrayMin(double T, uint8_t size);
 
     /**
      * @brief Returns the maximum stable time step with a 2x factor of safety
@@ -129,14 +130,14 @@ private:
      *          "worst case" scenario highest transmissivity, combined with
      *          a porosity-based amplification factor.
      */
-    float64_t computeMaxStableTimeStep(int32_t x, int32_t y);
+    double computeMaxStableTimeStep(int32_t x, int32_t y);
 
     /**
      * @brief Calculates water-table depth change at a cell (and associated
      *        surrounding cells) and updates the class variables associated
      *        with these.
      */
-    void computeWTDchangeAtCell(int32_t x, int32_t y, float64_t dt);
+    void computeWTDchangeAtCell(int32_t x, int32_t y, double dt);
 
     /**
      * @brief Updates the wtd_depth_total array at a cell(x,y) using the
