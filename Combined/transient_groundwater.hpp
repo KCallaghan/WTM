@@ -30,9 +30,17 @@ public:
     ////////////////////////////////////
 
 
+    /////////////////
+    // CONSTRUCTOR //
+    /////////////////
+
+    FanDarcyGroundwater();
+
     ///////////////
     // FUNCTIONS //
     ///////////////
+    void set_arp(ArrayPack &_arp);
+    void set_params(Parameters &_params);
 
     void initialize();
     void update(bool _log=true);
@@ -117,12 +125,12 @@ private:
     /**
      * @brief Returns the maximum value in an array (max size 256 items)
      */
-    double computeArrayMax(double T, uint8_t size);
+    double computeArrayMax(double T[], uint8_t size);
 
     /**
      * @brief Returns the minimum value in an array (max size 256 items)
      */
-    double computeArrayMin(double T, uint8_t size);
+    double computeArrayMin(double T[], uint8_t size);
 
     /**
      * @brief Returns the maximum stable time step with a 2x factor of safety
@@ -130,7 +138,7 @@ private:
      *          "worst case" scenario highest transmissivity, combined with
      *          a porosity-based amplification factor.
      */
-    double computeMaxStableTimeStep(int32_t x, int32_t y);
+    double computeMaxStableTimeStep(uint32_t x, uint32_t y);
 
     /**
      * @brief Calculates water-table depth change at a cell (and associated
@@ -150,6 +158,6 @@ private:
      *        on the run.
      */
     void logToFile();
-}
+};
 
 #endif

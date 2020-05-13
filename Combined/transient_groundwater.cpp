@@ -43,9 +43,9 @@ void FanDarcyGroundwater::computeNeighborTransmissivity(uint32_t x, uint32_t y){
                           + computeTransmissivity(x+1,y  ) ) / 2.;
 }
 
-double FanDarcyGroundwater::computeArrayMax(double T, uint8_t size){
+double FanDarcyGroundwater::computeArrayMax(double T[], uint8_t size){
     double maxValue = std::numeric_limits<double>::min();
-    for (i = 0; i < size; i++){
+    for (uint32_t i = 0; i < size; i++){
         if(T[i] > maxValue){
             maxValue = T[i];
         }
@@ -53,9 +53,9 @@ double FanDarcyGroundwater::computeArrayMax(double T, uint8_t size){
     return maxValue;
 }
 
-double FanDarcyGroundwater::computeArrayMin(double T, uint8_t size){
+double FanDarcyGroundwater::computeArrayMin(double T[], uint8_t size){
     double minValue = std::numeric_limits<double>::max();
-    for (i = 0; i < size; i++){
+    for (uint32_t i = 0; i < size; i++){
         if(T[i] < minValue){
             minValue = T[i];
         }
@@ -182,9 +182,25 @@ void FanDarcyGroundwater::logToFile(){
   textfile.close();
 }
 
+/////////////////
+// CONSTRUCTOR //
+/////////////////
+
+FanDarcyGroundwater::FanDarcyGroundwater(){
+}
+
 //////////////////////
 // PUBLIC FUNCTIONS //
 //////////////////////
+
+void set_arp(ArrayPack &_arp){
+    arp = &_arp;
+}
+
+void set_params(Parameters &_params){
+    params = &_params;
+}
+
 
 void FanDarcyGroundwater::initialize(){
 
@@ -195,10 +211,10 @@ void FanDarcyGroundwater::update(bool _log){
     for(uint32_t y=1; y<params.ncells_y-1; y++){
         for(uint32_t x=1; x<params.ncells_x-1; x++){
             // Skip ocean cells
-            if(arp.land_mask(x,y) == 0)
+            if(arp.land_mask(x,y) == 0);
                 continue;
             // Otherwise, update the water-table depth change array
-            updateCell( _x, _y );
+            updateCell( x, y );
         }
     }
     // Once all the changes are known, update the WTD everywhere with the
@@ -206,8 +222,9 @@ void FanDarcyGroundwater::update(bool _log){
     for(int y=1;y<params.ncells_y-1;y++){
         for(int x=1;x<params.ncells_x-1; x++){
             // Skip ocean cells
-            if(arp.land_mask(x,y) == 0)
-              continue;
+            if(arp.land_mask(x,y) == 0){
+                continue;
+            }
             // Update the whole wtd array at once.
             // This is the new water table after groundwater has moved
             // for delta_t seconds.
