@@ -5,6 +5,10 @@
 #include <sstream>
 #include <stdexcept>
 
+// Dummy initializer
+Parameters::Parameters(){}
+
+// Real initializer
 Parameters::Parameters(const std::string config_file){
   std::ifstream fin(config_file);
 
@@ -21,8 +25,8 @@ Parameters::Parameters(const std::string config_file){
     ss>>key;
 
 
-  //Dummy key to make it easier to alphabetize list below
-    if     (key=="")                   {}                 
+    //Dummy key to make it easier to alphabetize list below
+    if     (key=="")                   {}
     else if(key=="cells_per_degree")   ss>>cells_per_degree;
     else if(key=="deltat")             ss>>deltat;
     else if(key=="infiltration_on")    ss>>infiltration_on;
@@ -39,7 +43,7 @@ Parameters::Parameters(const std::string config_file){
 
     else
       throw std::runtime_error("Unrecognised key!");
-  } 
+  }
 }
 
 void Parameters::print() const {
