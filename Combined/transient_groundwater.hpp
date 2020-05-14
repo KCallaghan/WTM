@@ -45,11 +45,11 @@ public:
     ///////////////
     // FUNCTIONS //
     ///////////////
-    void set_arp(ArrayPack &_arp);
-    void set_params(Parameters &_params);
+    void set_arp(ArrayPack _arp);
+    void set_params(Parameters _params);
 
     void initialize();
-    void update(bool _log=true);
+    void update(Parameters &params, ArrayPack &arp, bool _log=true);
     void run();
     void finalize();
 
@@ -119,12 +119,12 @@ private:
      *          integration of the hydraulic conductivity from -infinity to the
      *          groundwater table.
      */
-    double computeTransmissivity(uint32_t x, uint32_t y);
+    double computeTransmissivity(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
 
     /**
      * @brief Compute mean transmissivity between neighboring cells (N, S, W, E)
      */
-    void computeNeighborTransmissivity(uint32_t x, uint32_t y);
+    void computeNeighborTransmissivity(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
 
     /**
      * @brief Returns the maximum value in an array (max size 256 items)
@@ -142,20 +142,20 @@ private:
      *          "worst case" scenario highest transmissivity, combined with
      *          a porosity-based amplification factor.
      */
-    double computeMaxStableTimeStep(uint32_t x, uint32_t y);
+    double computeMaxStableTimeStep(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
 
     /**
      * @brief Calculates water-table depth change at a cell (and associated
      *        surrounding cells) and updates the class variables associated
      *        with these.
      */
-    void computeWTDchangeAtCell(int32_t x, int32_t y, double dt);
+    void computeWTDchangeAtCell(Parameters &params, ArrayPack &arp, int32_t x, int32_t y, double dt);
 
     /**
      * @brief Updates the wtd_depth_total array at a cell(x,y) using the
      * pre-set time step and dynamic time stepping within this as needed.
      */
-    void updateCell(uint32_t x, uint32_t y);
+    void updateCell(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
 
     /**
      * @brief Create a continuously updating output file with basic information

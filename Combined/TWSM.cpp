@@ -84,9 +84,9 @@ template<class elev_t>
   cout << "WTD before: ";
   cout << arp.wtd(1000,476);
   cout << "\n";
-  gw.set_arp(arp);
-  gw.set_params(params);
-  gw.update();
+  //gw.set_arp(arp);
+  //gw.set_params(params);
+  gw.update(params, arp);
   cout << "WTD after: ";
   cout << arp.wtd(1000,476);
   cout << "\n";
@@ -154,8 +154,8 @@ int main(int argc, char **argv){
   std::cerr<<"Argv"<<argv<<std::endl;
   Parameters params(argv[1]);
 
-  gw.set_arp(arp);
-  gw.set_params(params);
+  //gw.set_arp(arp);
+  //gw.set_params(params);
 
   initialise(params,arp);
   run(params,arp);
@@ -163,3 +163,10 @@ int main(int argc, char **argv){
 
   return 0;
 }
+
+//Class
+//twsm::twsm(char* paramfile_name){
+//    ArrayPack arp;
+//    std::cerr<<"Argv"<<argv<<std::endl;
+//    Parameters params(argv[1]);
+//}

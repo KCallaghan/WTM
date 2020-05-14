@@ -6,7 +6,7 @@
 // PRIVATE FUNCTIONS //
 ///////////////////////
 
-double FanDarcyGroundwater::computeTransmissivity(uint32_t x, uint32_t y){
+double FanDarcyGroundwater::computeTransmissivity(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y){
     using namespace std::this_thread;     // sleep_for, sleep_until
     using namespace std::chrono_literals; // ns, us, ms, s, h, etc.
     //cout << "COMPUTING Transmissivity\n";
@@ -44,16 +44,16 @@ double FanDarcyGroundwater::computeTransmissivity(uint32_t x, uint32_t y){
     return T;
 }
 
-void FanDarcyGroundwater::computeNeighborTransmissivity(uint32_t x, uint32_t y){
-    double transmissivityTargetCell = computeTransmissivity(x, y);
+void FanDarcyGroundwater::computeNeighborTransmissivity(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y){
+    double transmissivityTargetCell = computeTransmissivity(params, arp, x, y);
     transmissivityN = ( transmissivityTargetCell
-                          + computeTransmissivity(x,  y+1) ) / 2.;
+                          + computeTransmissivity(params, arp, x,  y+1) ) / 2.;
     transmissivityS = ( transmissivityTargetCell
-                          + computeTransmissivity(x,  y-1) ) / 2.;
+                          + computeTransmissivity(params, arp, x,  y-1) ) / 2.;
     transmissivityW = ( transmissivityTargetCell
-                          + computeTransmissivity(x-1,y  ) ) / 2.;
+                          + computeTransmissivity(params, arp, x-1,y  ) ) / 2.;
     transmissivityE = ( transmissivityTargetCell
-                          + computeTransmissivity(x+1,y  ) ) / 2.;
+                          + computeTransmissivity(params, arp, x+1,y  ) ) / 2.;
 }
 
 double FanDarcyGroundwater::computeArrayMax(double *_val[], uint8_t size){
@@ -76,7 +76,7 @@ float FanDarcyGroundwater::computeArrayMin(float *_val[], uint8_t size){
     return minValue;
 }
 
-double FanDarcyGroundwater::computeMaxStableTimeStep(uint32_t x, uint32_t y){
+double FanDarcyGroundwater::computeMaxStableTimeStep(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y){
     // Transmissivity is an effective diffusivity
     // Use the highest transmissivity for this time-step calculation
     double dt_max_diffusion_basic;
@@ -117,7 +117,7 @@ double FanDarcyGroundwater::computeMaxStableTimeStep(uint32_t x, uint32_t y){
     return dt_max_diffusion_withPorosity/2.;
 }
 
-void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
+void FanDarcyGroundwater::computeWTDchangeAtCell(Parameters &params, ArrayPack &arp, int32_t x, int32_t y,
                                                  double dt){
     // Update WTD change
 
@@ -127,11 +127,11 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
     // First, compute elevation head at center cell and all neighbours
     // This equals topography plus the water table depth
     // (positive upwards; negative if water table is below Earth surface)
-    double headCenter = arp.topo(x,y) - wtdCenter;
-    double headN      = arp.topo(x,y+1) - wtdN;
-    double headS      = arp.topo(x,y-1) - wtdS;
-    double headW      = arp.topo(x-1,y) - wtdW;
-    double headE      = arp.topo(x+1,y) - wtdE;
+    double headCenter = arp.topo(x,y) + wtdCenter;
+    double headN      = arp.topo(x,y+1) + wtdN;
+    double headS      = arp.topo(x,y-1) + wtdS;
+    double headW      = arp.topo(x-1,y) + wtdW;
+    double headE      = arp.topo(x+1,y) + wtdE;
 
     // Then, compute the discharges
     double QN = transmissivityN * (headN - headCenter) \
@@ -151,6 +151,17 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
     // time stepping to maintain stability.
     // dH = sum(discharges) times time step, divided by cell area,
     //      divided by porosity.
+
+    //if (T != 0){
+    //    cout << "T: ";
+    //    cout << T;
+    //    cout << "\n";
+    //    sleep_for(0.3s);
+    //}
+    //cout << "d_wtdCenter: ";
+    //cout << ( QN + QS + QE + QW ) * dt \
+    //                       / ( arp.cell_area[y] * arp.porosity(x,y) );
+    //cout << " m\n";
     wtdCenter += ( QN + QS + QE + QW ) * dt \
                            / ( arp.cell_area[y] * arp.porosity(x,y) );
     wtdN -= QN * dt / ( arp.cell_area[y+1] * arp.porosity(x,y+1) );
@@ -172,7 +183,7 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(int32_t x, int32_t y,
     //cout << "\n";
 }
 
-void FanDarcyGroundwater::updateCell(uint32_t x, uint32_t y){
+void FanDarcyGroundwater::updateCell(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y){
 
     using namespace std::this_thread;     // sleep_for, sleep_until
     using namespace std::chrono_literals; // ns, us, ms, s, h, etc.
@@ -205,8 +216,8 @@ void FanDarcyGroundwater::updateCell(uint32_t x, uint32_t y){
         //cout << " ";
         //cout << time_remaining;
         //cout << "\n";
-        computeNeighborTransmissivity(x,y);
-        double max_stable_time_step = computeMaxStableTimeStep(x,y);
+        computeNeighborTransmissivity(params, arp, x, y);
+        double max_stable_time_step = computeMaxStableTimeStep(params, arp, x, y);
         // Choose the inner-loop time step
         if(time_remaining <= max_stable_time_step){
             dt_inner = time_remaining;
@@ -222,7 +233,7 @@ void FanDarcyGroundwater::updateCell(uint32_t x, uint32_t y){
         //cout << "!dt_inner\n";
         //cout << "\n";
         //cout << "\n";
-        computeWTDchangeAtCell(x, y, dt_inner);
+        computeWTDchangeAtCell(params, arp, x, y, dt_inner);
         time_remaining -= dt_inner;
         //cout << wtdCenter;
         //cout << "\n";
@@ -238,7 +249,11 @@ void FanDarcyGroundwater::updateCell(uint32_t x, uint32_t y){
     }
     // When exiting loop, the wtdCenter variable holds the final
     // water-table depth
+    // This subtraction is unnecessary; could just give the new total instead
     arp.wtd_change_total(x,y) = wtdCenter - wtdCenter_initial;
+    //cout << "wtd_change_total: ";
+    //cout << arp.wtd_change_total(x,y);
+    //cout << " m\n";
 }
 
 //!WHERE IS TOTAL_CHANGES UPDATED???????????????????????????????????????????????
@@ -270,11 +285,11 @@ FanDarcyGroundwater::FanDarcyGroundwater(Parameters _params, ArrayPack _arp){
 // PUBLIC FUNCTIONS //
 //////////////////////
 
-void FanDarcyGroundwater::set_arp(ArrayPack &_arp){
+void FanDarcyGroundwater::set_arp(ArrayPack _arp){
     arp = _arp;
 }
 
-void FanDarcyGroundwater::set_params(Parameters &_params){
+void FanDarcyGroundwater::set_params(Parameters _params){
     params = _params;
 }
 
@@ -282,7 +297,7 @@ void FanDarcyGroundwater::initialize(){
 
 }
 
-void FanDarcyGroundwater::update(bool _log){
+void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp, bool _log){
     //cout << "Output sentence\n"; // prints Output sentence on screen
     //cout << params.ncells_x; // prints Output sentence on screen
     //cout << "\n";
@@ -296,7 +311,7 @@ void FanDarcyGroundwater::update(bool _log){
                 continue;
             }
             // Otherwise, update the water-table depth change array
-            updateCell( x, y );
+            updateCell( params, arp, x, y );
             //cout << "Test";
             //cout << arp.wtd_change_total(x,y);
             //cout << "\n";
@@ -304,6 +319,8 @@ void FanDarcyGroundwater::update(bool _log){
     }
     // Once all the changes are known, update the WTD everywhere with the
     // difference array
+    cout << arp.wtd(1000,476);
+    cout << "-->";
     for(int32_t y=1; y<params.ncells_y-1; y++){
         for(int32_t x=1; x<params.ncells_x-1; x++){
             // Skip ocean cells
@@ -313,9 +330,16 @@ void FanDarcyGroundwater::update(bool _log){
             // Update the whole wtd array at once.
             // This is the new water table after groundwater has moved
             // for delta_t seconds.
+            //cout << arp.wtd(x,y);
+            //cout << "-->";
             arp.wtd(x,y) += arp.wtd_change_total(x,y);
+            //cout << arp.wtd(x,y);
+            //cout << "\n";
         }
     }
+    cout << arp.wtd(1000,476);
+    cout << "\n";
+    //SaveAsNetCDF(arp.wtd, "wtdCheck.nc", "WTD");
     if(_log){
         logToFile();
     }
