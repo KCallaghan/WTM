@@ -32,21 +32,21 @@ public:
     //char infname[] = "path";
     //char *argv[2] = {&infname, &infname}
 
-    ArrayPack arp;
-    Parameters params;
+    //ArrayPack arp;
+    //Parameters params;
 
     /////////////////
     // CONSTRUCTOR //
     /////////////////
 
     FanDarcyGroundwater();
-    FanDarcyGroundwater(Parameters _params, ArrayPack _arp);
+    //FanDarcyGroundwater(Parameters _params, ArrayPack _arp);
 
     ///////////////
     // FUNCTIONS //
     ///////////////
-    void set_arp(ArrayPack _arp);
-    void set_params(Parameters _params);
+    //void set_arp(ArrayPack _arp);
+    //void set_params(Parameters _params);
 
     void initialize();
     void update(Parameters &params, ArrayPack &arp, bool _log=true);

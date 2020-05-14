@@ -276,22 +276,22 @@ void FanDarcyGroundwater::logToFile(){
 FanDarcyGroundwater::FanDarcyGroundwater(){
 }
 
-FanDarcyGroundwater::FanDarcyGroundwater(Parameters _params, ArrayPack _arp){
-    arp = _arp;
-    params = _params;
-}
+//FanDarcyGroundwater::FanDarcyGroundwater(Parameters _params, ArrayPack _arp){
+//    arp = _arp;
+//    params = _params;
+//}
 
 //////////////////////
 // PUBLIC FUNCTIONS //
 //////////////////////
 
-void FanDarcyGroundwater::set_arp(ArrayPack _arp){
-    arp = _arp;
-}
+//void FanDarcyGroundwater::set_arp(ArrayPack _arp){
+//    arp = _arp;
+//}
 
-void FanDarcyGroundwater::set_params(Parameters _params){
-    params = _params;
-}
+//void FanDarcyGroundwater::set_params(Parameters _params){
+//    params = _params;
+//}
 
 void FanDarcyGroundwater::initialize(){
 
