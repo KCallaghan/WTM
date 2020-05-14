@@ -49,7 +49,7 @@ public:
     //void set_params(Parameters _params);
 
     void initialize();
-    void update(Parameters &params, ArrayPack &arp, bool _log=true);
+    void update(Parameters &params, ArrayPack &arp);
     void run();
     void finalize();
 
@@ -157,11 +157,6 @@ private:
      */
     void updateCell(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
 
-    /**
-     * @brief Create a continuously updating output file with basic information
-     *        on the run.
-     */
-    void logToFile();
 };
 
 #endif

@@ -256,19 +256,6 @@ void FanDarcyGroundwater::updateCell(Parameters &params, ArrayPack &arp, uint32_
     //cout << " m\n";
 }
 
-//!WHERE IS TOTAL_CHANGES UPDATED???????????????????????????????????????????????
-void FanDarcyGroundwater::logToFile(){
-  // Set up log file
-  ofstream textfile;
-  textfile.open (params.textfilename, std::ios_base::app);
-  textfile<<"Groundwater"<<std::endl;
-  textfile << "total GW changes were " << total_changes << std::endl;
-  textfile << "max wtd was " << max_total << " and min wtd was " \
-           << min_total << std::endl;
-  textfile << "max GW change was " << max_change << std::endl;
-  textfile.close();
-}
-
 /////////////////
 // CONSTRUCTOR //
 /////////////////
@@ -297,7 +284,7 @@ void FanDarcyGroundwater::initialize(){
 
 }
 
-void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp, bool _log){
+void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp){
     //cout << "Output sentence\n"; // prints Output sentence on screen
     //cout << params.ncells_x; // prints Output sentence on screen
     //cout << "\n";
@@ -340,9 +327,6 @@ void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp, bool _log){
     cout << arp.wtd(1000,476);
     cout << "\n";
     //SaveAsNetCDF(arp.wtd, "wtdCheck.nc", "WTD");
-    if(_log){
-        logToFile();
-    }
 }
 
 // This can be populated if we intend to run this module on its own.
