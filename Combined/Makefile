@@ -4,13 +4,10 @@ export RD_CXX_FLAGS=-I../common/richdem/include -DRICHDEM_GIT_HASH="\"$(RICHDEM_
 export CXXFLAGS=--std=c++17 -g -Wall -Wno-unknown-pragmas #-fsanitize=address
 export LIBS=-lnetcdf
 
-objects = test.o parameters.o richdem.o ArrayPack.o transient_groundwater.o
-test-aw : $(objects)
+objects = twsm.o parameters.o richdem.o ArrayPack.o transient_groundwater.o
+twsm.x : $(objects)
 	g++ $(CXXFLAGS) $(RD_CXX_FLAGS) $(objects) $(LIBS) \
-			-o test-aw.x
-
-test.o : test.cpp
-	g++ -c -fPIC $(CXXFLAGS) $(RD_CXX_FLAGS) $(PYBINDFLAGS) test.cpp $(LIBS) -o test.o
+			-o twsm.x
 
 twsm.o : TWSM.cpp
 	g++ -c -fPIC $(CXXFLAGS) $(RD_CXX_FLAGS) TWSM.cpp $(LIBS) -o twsm.o
@@ -28,9 +25,8 @@ parameters.o : parameters.cpp parameters.hpp
 	g++ -fPIC -c $(CXXFLAGS) $(RD_CXX_FLAGS) parameters.cpp $(LIBS) -o parameters.o
 
 clean:
-	rm test-aw.x
+	rm twsm.x
 
 distclean:
-	rm test-aw.x
 	rm $(objects)
 
