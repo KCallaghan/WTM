@@ -1115,7 +1115,7 @@ static dh_label_t OverflowInto(
       //route that water.   
   //in the case where the original depression was ocean_linked to this one, 
       //it won't be one of this depression's children. 
-      this_dep.water_vol += extra_water; 
+      this_dep.water_vol = std::min(this_dep.wtd_vol,this_dep.water_vol + extra_water); 
 
       //no matter what, the water_vol needs to be updated. 
       assert(this_dep.water_vol>= -FP_ERROR);

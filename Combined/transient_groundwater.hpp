@@ -102,8 +102,7 @@ double receiving_cell_wtd(const float giving_cell_change, const float giving_wtd
     }
 
   }
-//  if(x_receiving==550&&y_receiving==750 || x_giving == 550 && y_giving==750)
-//    std::cout<<"change "<<receiving_cell_change<<" volume "<<volume_change<<" wtd "<<receiving_wtd<<std::endl;
+  
   return receiving_cell_change;
 }
 
@@ -147,15 +146,9 @@ double get_change(const int x, const int y, const double time_remaining, Paramet
   int stable = 0;
   double time_step = time_remaining;
 
-//if( x== 1366&& y ==794)
- // std::cout<<"************************************"<<std::endl;
 
   while(stable == 0){
 
-//if( x== 1366&& y ==794)
- // std::cout<<"params S "<<params.S<<" wtd change S "<<wtd_change_S<<" change "<<change_in_S_cell<<" time "<<time_step<<" remaining "<<time_remaining<<std::endl;
-
- //   std::cout<<"time step is "<<time_step<<" and time remaining is "<<time_remaining<<std::endl;
     // Change in water-table depth.
     // (1) Discharge across cell boundaries
     // Average hydraulic conductivity of the two cells * 
@@ -205,7 +198,7 @@ double get_change(const int x, const int y, const double time_remaining, Paramet
     }
     else{
       wtd_change_S = 0;
-            mycell_change_S = 0;
+      mycell_change_S = 0;
       change_in_S_cell = 0;
     }
 
@@ -220,7 +213,7 @@ double get_change(const int x, const int y, const double time_remaining, Paramet
     }
     else{
       wtd_change_E = 0;
-            mycell_change_E = 0;
+      mycell_change_E = 0;
       change_in_E_cell = 0;
     }
 
@@ -235,7 +228,7 @@ double get_change(const int x, const int y, const double time_remaining, Paramet
     }
     else{
       wtd_change_W = 0;
-            mycell_change_W = 0;
+      mycell_change_W = 0;
       change_in_W_cell = 0;
     }
 
@@ -267,8 +260,6 @@ double get_change(const int x, const int y, const double time_remaining, Paramet
       params.W   += change_in_W_cell ;
       params.E   += change_in_E_cell ;
 
-
-
       stable = 1; 
 
 
@@ -280,9 +271,7 @@ std::cout<<"wtd change N "<<wtd_change_N<<" S "<<wtd_change_S<<" E "<<wtd_change
 std::cout<<"wtd W "<<arp.wtd(x-1,y)<<" wtd me "<<arp.wtd(x,y)<<std::endl;
 std::cout<<"W was the problem "<<headW<<" mine "<<my_head<<" k "<<kW<<" time step "<<time_step<<std::endl;
 
-//wtd_change_S = kS * (headS - my_head) / params.cellsize_n_s_metres \
-                    * arp.cellsize_e_w_metres[y] * time_step \
-                    / arp.cell_area[y];
+
 }
     }
 
