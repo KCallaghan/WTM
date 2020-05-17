@@ -100,8 +100,9 @@ double FanDarcyGroundwater::computeMaxStableTimeStep(Parameters &params, ArrayPa
     // Porosity is a linear amplifier of WTD change, and it amplifies change
     // in both the giving and receiving cells.
     // Amplification goes as 1 / phi.
-    // We need to consider this going up and down, so 1 / (2*phi)
-    dt_max_diffusion_withPorosity = dt_max_diffusion_basic / (2 * PhiMin);
+    // We need to consider this going up and down, so the amplification becomes
+    // 2/Phi, and therefore we multiply our stable dt by Phi/2
+    dt_max_diffusion_withPorosity = dt_max_diffusion_basic * PhiMin / 2.;
     // In order to avoid operating at the very maximum time step possible,
     // we apply a factor of safety of 2
 
