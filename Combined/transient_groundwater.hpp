@@ -263,16 +263,7 @@ double get_change(const int x, const int y, const double time_remaining, Paramet
       stable = 1; 
 
 
-if(fabs(arp.wtd_change_total(x,y)) > 100000){
-  std::cout<<"stable "<<arp.wtd(x,y)<<" change "<<arp.wtd_change_total(x,y)<<" x "<<x<<" y "<<y<<std::endl;
 
-std::cout<<"N "<<mycell_change_N<<" S "<<mycell_change_S<<" E "<<mycell_change_E<<" W "<<mycell_change_W<<std::endl;
-std::cout<<"wtd change N "<<wtd_change_N<<" S "<<wtd_change_S<<" E "<<wtd_change_E<<" W "<<wtd_change_W<<std::endl;
-std::cout<<"wtd W "<<arp.wtd(x-1,y)<<" wtd me "<<arp.wtd(x,y)<<std::endl;
-std::cout<<"W was the problem "<<headW<<" mine "<<my_head<<" k "<<kW<<" time step "<<time_step<<std::endl;
-
-
-}
     }
 
 
@@ -336,6 +327,24 @@ void groundwater(Parameters &params, ArrayPack &arp){
   // changes in each cell per iteration.
   // We do this instead of using a staggered grid to approx. double CPU time 
   // in exchange for using less memory.
+  double time_remaining = params.deltat;
+  double no_change = 0.;
+
+for(int y=1; y<params.ncells_y-1; y++){
+    for(int x=1; x<params.ncells_x-1; x++){
+  
+          arp.wtd_change_total(x,y) = 0.0;
+        }
+      }
+
+
+
+  while(time_remaining > 1e-4){
+    float time_step = params.deltat;
+    double temp = 0.0;
+
+
+
   for(int y=1; y<params.ncells_y-1; y++){
     for(int x=1; x<params.ncells_x-1; x++){
       //skip ocean cells
@@ -343,9 +352,7 @@ void groundwater(Parameters &params, ArrayPack &arp){
       if(arp.land_mask(x,y) == 0)
         continue;
 
-      double time_step = 0.0;
-      arp.wtd_change_total(x,y) = 0.0;
-      double time_remaining = params.deltat;
+      no_change = arp.wtd_change_total(x,y);
 
       params.N  = arp.wtd(x,y+1);
       params.S  = arp.wtd(x,y-1);
@@ -353,11 +360,37 @@ void groundwater(Parameters &params, ArrayPack &arp){
       params.W  = arp.wtd(x-1,y);
       params.me = arp.wtd(x,y);
 
-      while(time_remaining > 1e-4){
-        time_step = get_change(x, y,time_remaining,params,arp);
-        time_remaining -= time_step;
+      arp.times(x,y) = get_change(x,y,time_remaining,params,arp);
+      time_step = std::min(time_step,arp.times(x, y));
+
+      arp.wtd_change_total(x,y) = no_change;  //we don't want to actually change it here, we just want to calculate the time step. 
+
       }
     }
+
+    textfile<<params.cycles_done<<" iterations. the chosen time step was "<<time_step<<" and the time remaining is "<<time_remaining<<std::endl;
+
+
+    for(int y=1; y<params.ncells_y-1; y++){
+    for(int x=1; x<params.ncells_x-1; x++){
+      if(arp.land_mask(x,y) == 0)
+        continue;
+
+
+      params.N  = arp.wtd(x,y+1);
+      params.S  = arp.wtd(x,y-1);
+      params.E  = arp.wtd(x+1,y);
+      params.W  = arp.wtd(x-1,y);
+      params.me = arp.wtd(x,y);
+
+      temp = get_change(x, y,time_step,params,arp);
+
+
+    }
+  }
+
+      time_remaining -= time_step;
+
   }
 
 
