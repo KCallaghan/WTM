@@ -22,6 +22,8 @@ using namespace std;
 namespace rd = richdem;
 namespace dh = richdem::dephier;
 
+FanDarcyGroundwater gw;
+
 const double UNDEF  = -1.0e7;
 
 
@@ -470,3 +472,4 @@ void PrintValues(Parameters &params, ArrayPack &arp){
   <<" and change to surface water was "<<params.surface_change<<std::endl;
   textfile.close();
 }
+
