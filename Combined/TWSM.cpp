@@ -50,7 +50,7 @@ template<class elev_t>
     //since the topography is changing.
   }
 
-  textfile<<"Cycles done: "<<params.cycles_done<<std::endl;
+  std::cout<<"Cycles done: "<<params.cycles_done<<std::endl;
 
 //TODO: How should equilibrium know when to exit?
 
@@ -69,15 +69,7 @@ template<class elev_t>
   for(int x=1;x<params.ncells_x-1; x++){
     if(arp.land_mask(x,y) == 0)          //skip ocean cells
       continue;
-    if(arp.wtd(x,y) > 0){  //only above-ground water, so don't worry about porosity
-      arp.wtd(x,y) += arp.rech(x,y)/31536000. * params.deltat;
-    }
-    else if( (arp.wtd(x,y) + (arp.rech(x,y)/31536000. * params.deltat) /arp.porosity(x,y)) < 0 ){  //only below-ground water, so all affected by porosity.
-      arp.wtd(x,y) += (arp.rech(x,y)/31536000. * params.deltat)/arp.porosity(x,y);
-    }
-    else  // Some of the recharge will go below the ground, some above.
-      arp.wtd(x,y) = (arp.rech(x,y)/31536000. * params.deltat) + (arp.wtd(x,y) * arp.porosity(x,y));
-    //add the recharge to the water table.
+    add_recharge(x, y, params, arp);
   }
 
   //Run the groundwater code to move water
