@@ -97,6 +97,8 @@ double FanDarcyGroundwater::computeMaxStableTimeStep(Parameters &params, ArrayPa
                              &arp.porosity(x+1, y), &arp.porosity(x-1, y),
                              &arp.porosity(x, y+1), &arp.porosity(x, y-1) };
     float PhiMin = computeArrayMin( PhiArray, 5 ); // Minimum porosity
+    if(PhiMin < 0.2)
+        PhiMin = 0.2;
     // Porosity is a linear amplifier of WTD change, and it amplifies change
     // in both the giving and receiving cells.
     // Amplification goes as 1 / phi.
