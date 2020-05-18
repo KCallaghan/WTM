@@ -119,12 +119,12 @@ private:
      *          integration of the hydraulic conductivity from -infinity to the
      *          groundwater table.
      */
-    double computeTransmissivity(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
+    double computeTransmissivity(ArrayPack &arp, uint32_t x, uint32_t y);
 
     /**
      * @brief Compute mean transmissivity between neighboring cells (N, S, W, E)
      */
-    void computeNeighborTransmissivity(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
+    void computeNeighborTransmissivity(ArrayPack &arp, uint32_t x, uint32_t y);
 
     /**
      * @brief Returns the maximum value in an array (max size 256 items)

@@ -6,7 +6,25 @@
 // PRIVATE FUNCTIONS //
 ///////////////////////
 
-double FanDarcyGroundwater::computeTransmissivity(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y){
+double FanDarcyGroundwater::computeTransmissivity(ArrayPack &arp, uint32_t x, uint32_t y){
+  /**
+  Mini-function that gives the hydraulic conductivity per cell, kcell.
+  This changes through time as the water-table depth changes:
+
+  @param x         The x-coordinate of the cell in question
+
+  @param y         The y-coordinate of the cell in question
+
+  @param ArrayPack Global arrays. Here we use: 
+          - fdepth: The e-folding depth based on slope and temperature. 
+                    This describes the decay of kcell with depth. 
+          - wtd:    The water-table depth. We use a different calculation
+                    For water tables above vs below 1.5 m below land surface.
+          - ksat:   Hydraulic conductivity, based on soil types
+  @return  The kcell value for the cell in question. This is the 
+           integration of the hydraulic conductivity over flow depth.
+  **/
+
     using namespace std::this_thread;     // sleep_for, sleep_until
     using namespace std::chrono_literals; // ns, us, ms, s, h, etc.
     //cout << "COMPUTING Transmissivity\n";
@@ -44,16 +62,16 @@ double FanDarcyGroundwater::computeTransmissivity(Parameters &params, ArrayPack 
     return T;
 }
 
-void FanDarcyGroundwater::computeNeighborTransmissivity(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y){
-    double transmissivityTargetCell = computeTransmissivity(params, arp, x, y);
+void FanDarcyGroundwater::computeNeighborTransmissivity(ArrayPack &arp, uint32_t x, uint32_t y){
+    double transmissivityTargetCell = computeTransmissivity(arp, x, y);
     transmissivityN = ( transmissivityTargetCell
-                          + computeTransmissivity(params, arp, x,  y+1) ) / 2.;
+                          + computeTransmissivity(arp, x,  y+1) ) / 2.;
     transmissivityS = ( transmissivityTargetCell
-                          + computeTransmissivity(params, arp, x,  y-1) ) / 2.;
+                          + computeTransmissivity(arp, x,  y-1) ) / 2.;
     transmissivityW = ( transmissivityTargetCell
-                          + computeTransmissivity(params, arp, x-1,y  ) ) / 2.;
+                          + computeTransmissivity(arp, x-1,y  ) ) / 2.;
     transmissivityE = ( transmissivityTargetCell
-                          + computeTransmissivity(params, arp, x+1,y  ) ) / 2.;
+                          + computeTransmissivity(arp, x+1,y  ) ) / 2.;
 }
 
 double FanDarcyGroundwater::computeArrayMax(double *_val[], uint8_t size){
@@ -219,7 +237,7 @@ void FanDarcyGroundwater::updateCell(Parameters &params, ArrayPack &arp, uint32_
         //cout << " ";
         //cout << time_remaining;
         //cout << "\n";
-        computeNeighborTransmissivity(params, arp, x, y);
+        computeNeighborTransmissivity(arp, x, y);
         double max_stable_time_step = computeMaxStableTimeStep(params, arp, x, y);
         // Choose the inner-loop time step
         if(time_remaining <= max_stable_time_step){
