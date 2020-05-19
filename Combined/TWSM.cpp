@@ -54,7 +54,7 @@ template<class elev_t>
 
 //TODO: How should equilibrium know when to exit?
 
-  if((params.cycles_done % 1) == 0){
+  if((params.cycles_done % 100) == 0){
     textfile<<"saving partway result"<<std::endl;
     string cycles_str = to_string(params.cycles_done);
     SaveAsNetCDF(arp.wtd,params.outfilename + cycles_str +".nc","value");
@@ -73,16 +73,9 @@ template<class elev_t>
   }
 
   //Run the groundwater code to move water
-  cout << "WTD before: ";
-  cout << arp.wtd(1000,476);
-  cout << "\n";
-  //gw.set_arp(arp);
-  //gw.set_params(params);
+ 
   gw.update(params, arp);
-  cout << "WTD after: ";
-  cout << arp.wtd(1000,476);
-  cout << "\n";
-  //groundwater(params,arp);
+ 
   arp.wtd_mid = arp.wtd;
 
   //Move surface water
