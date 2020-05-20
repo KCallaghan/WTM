@@ -228,7 +228,7 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     double headW      = arp.topo(x-1,y) + wtdW;
     double headE      = arp.topo(x+1,y) + wtdE;
 
-    mycell_change = 0.0;
+    double mycell_change = 0.;
 
     // Then, compute the discharges
     double QN = transmissivityN * (headN - headCenter) \
@@ -244,14 +244,14 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
                     / arp.cellsize_e_w_metres[y] \
                     * params.cellsize_n_s_metres;
 
-    // Move the water, but only in the "internal" variables to handle internal
-    // time stepping to maintain stability.
+    // Update water-table depth, but only in the "internal" variables to
+    // handle internal time stepping to maintain stability.
     // dH = sum(discharges) times time step, divided by cell area,
     //      divided by porosity.
-    wtd_change_N = QN * dt / ( arp.cell_area[y+1]);
-    wtd_change_S = QS * dt / ( arp.cell_area[y-1]);
-    wtd_change_W = QW * dt / ( arp.cell_area[y] );
-    wtd_change_E = QE * dt / ( arp.cell_area[y] );
+    double wtd_change_N = QN * dt / ( arp.cell_area[y+1]);
+    double wtd_change_S = QS * dt / ( arp.cell_area[y-1]);
+    double wtd_change_W = QW * dt / ( arp.cell_area[y] );
+    double wtd_change_E = QE * dt / ( arp.cell_area[y] );
 
     // Using the wtd_changes from above, we need to calculate how much change
     // will occur in the target cell, accounting for porosity.
