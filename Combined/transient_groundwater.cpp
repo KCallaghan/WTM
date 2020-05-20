@@ -36,7 +36,6 @@ double FanDarcyGroundwater::computeTransmissivity(ArrayPack &arp, uint32_t x,
     else{
         T = 0;
     }
-
     return T;
 }
 
@@ -111,7 +110,6 @@ double FanDarcyGroundwater::computeMaxStableTimeStep(Parameters &params,
     return dt_max_diffusion_withPorosity/2.;
 }
 
-
 double FanDarcyGroundwater::computeNewWTD(const float giving_cell_change,
                                           const float giving_wtd,
                                           const float receiving_wtd,
@@ -162,7 +160,7 @@ double FanDarcyGroundwater::computeNewWTD(const float giving_cell_change,
                           ( exp( (giving_wtd - giving_cell_change) \
                                     / arp.fdepth(x_giving,y_giving) ) - \
                             exp(giving_wtd / arp.fdepth(x_giving,y_giving)) );
-    }
+        }
 
     // So now we have the volume change as a positive value from the giving
     // cell, whether it was all above ground, all below ground, or a
@@ -295,7 +293,6 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
         wtdS += 0;
     }
 
-
     if(wtd_change_E > 1e-5){
         mycell_change += computeNewWTD( wtd_change_E, wtdE, wtdCenter, x+1, y,
                                          x, y, arp );
@@ -311,7 +308,6 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
         mycell_change += 0;
         wtdE += 0;
     }
-
 
     if(wtd_change_W > 1e-5){
         mycell_change  += computeNewWTD( wtd_change_W, wtdW, wtdCenter, x-1, y,
@@ -332,8 +328,6 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     // Now we have the height changes that will take place in the target cell
     // and each of the four neighbours.
     wtdCenter += mycell_change;
-
-
 }
 
 void FanDarcyGroundwater::updateCell( Parameters &params, ArrayPack &arp,
@@ -377,14 +371,12 @@ void FanDarcyGroundwater::updateCell( Parameters &params, ArrayPack &arp,
 
         computeWTDchangeAtCell(params, arp, x, y, dt_inner);
         time_remaining -= dt_inner;
-
     }
 
     // When exiting loop, the wtdCenter variable holds the final
     // water-table depth
     // This subtraction is unnecessary; could just give the new total instead
     arp.wtd_change_total(x,y) = wtdCenter - wtdCenter_initial;
-
 }
 
 /////////////////
