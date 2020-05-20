@@ -394,22 +394,9 @@ void FanDarcyGroundwater::updateCell( Parameters &params, ArrayPack &arp,
 FanDarcyGroundwater::FanDarcyGroundwater(){
 }
 
-//FanDarcyGroundwater::FanDarcyGroundwater(Parameters _params, ArrayPack _arp){
-//    arp = _arp;
-//    params = _params;
-//}
-
 //////////////////////
 // PUBLIC FUNCTIONS //
 //////////////////////
-
-//void FanDarcyGroundwater::set_arp(ArrayPack _arp){
-//    arp = _arp;
-//}
-
-//void FanDarcyGroundwater::set_params(Parameters _params){
-//    params = _params;
-//}
 
 void FanDarcyGroundwater::initialize(){
 
@@ -430,7 +417,6 @@ void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp){
             }
             // Otherwise, update the water-table depth change array
             updateCell( params, arp, x, y );
-
         }
     }
     // Once all the changes are known, update the WTD everywhere with the
@@ -448,7 +434,6 @@ void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp){
             arp.wtd(x,y) += arp.wtd_change_total(x,y);
         }
     }
-
 }
 
 // This can be populated if we intend to run this module on its own.
