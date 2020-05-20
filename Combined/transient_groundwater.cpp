@@ -9,7 +9,7 @@
 double FanDarcyGroundwater::computeTransmissivity(ArrayPack &arp, uint32_t x, uint32_t y){
     using namespace std::this_thread;     // sleep_for, sleep_until
     using namespace std::chrono_literals; // ns, us, ms, s, h, etc.
-    //cout << "COMPUTING Transmissivity\n";
+
     double T;
     if(arp.fdepth(x,y)>0){
         // Equation S6 from the Fan paper
@@ -35,12 +35,7 @@ double FanDarcyGroundwater::computeTransmissivity(ArrayPack &arp, uint32_t x, ui
     else{
         T = 0;
     }
-    //if (T != 0){
-    //    cout << "T: ";
-    //    cout << T;
-    //    cout << "\n";
-    //    sleep_for(0.3s);
-    //}
+   
     return T;
 }
 
@@ -107,15 +102,6 @@ double FanDarcyGroundwater::computeMaxStableTimeStep(Parameters &params, ArrayPa
     dt_max_diffusion_withPorosity = dt_max_diffusion_basic * PhiMin / 2.;
     // In order to avoid operating at the very maximum time step possible,
     // we apply a factor of safety of 2
-
-    //cout << "\n";
-    //cout << "DMAX: ";
-    //cout << dt_max_diffusion_withPorosity;
-    //cout << "\n";
-    //cout << "MAX TIME STEP: ";
-    //cout << dt_max_diffusion_withPorosity;
-    //cout << "\n";
-    //cout << "\n";
 
     return dt_max_diffusion_withPorosity/2.;
 }
@@ -210,15 +196,11 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(Parameters &params, ArrayPack &
     // dH = sum(discharges) times time step, divided by cell area,
     //      divided by porosity.
 
-  
-
     wtd_change_N = QN * dt / ( arp.cell_area[y+1]);
     wtd_change_S = QS * dt / ( arp.cell_area[y-1]);
     wtd_change_W = QW * dt / ( arp.cell_area[y] );
     wtd_change_E = QE * dt / ( arp.cell_area[y] );
     
-
-
     //Using the wtd_changes from above, we need to calculate how much change will occur in the target cell, accounting for porosity. 
 
     if(wtd_change_N > 1e-5){  //the current cell is receiving water from the North, so (x,y+1) is the giving cell. 
@@ -281,10 +263,9 @@ void FanDarcyGroundwater::computeWTDchangeAtCell(Parameters &params, ArrayPack &
     }
 
     //now we have the height changes that will take place in the target cell and each of the four neighbours. 
-wtdCenter += mycell_change;
+    wtdCenter += mycell_change;
 
-//          if(x==447&&y==715)
-  //          std::cout<<"N "<<wtd_change_N<<" S "<<wtd_change_S<<" E "<<wtd_change_E<<" W "<<wtd_change_W<<std::endl;
+
 }
 
 void FanDarcyGroundwater::updateCell(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y){
@@ -302,79 +283,35 @@ void FanDarcyGroundwater::updateCell(Parameters &params, ArrayPack &arp, uint32_
     // Initial water-table depths, prior to updating
     double wtdCenter_initial = arp.wtd(x,y);
     wtdCenter = arp.wtd(x,y);
-
-
-    double temp = params.deltat;
-    //cout << "\n";
-    //cout << "\n";
-    //cout << wtdCenter_initial;
-    //cout << "\n";
+    
     wtdN      = arp.wtd(x,y+1);
     wtdS      = arp.wtd(x,y-1);
     wtdE      = arp.wtd(x+1,y);
     wtdW      = arp.wtd(x-1,y);
-    //cout << wtdW;
-    //cout << "\n";
-    //cout << "\n";
-
+   
     // Update water-table depths using dynamic time stepping
     while (time_remaining > 0){
-        //cout << wtdCenter;
-        //cout << " ";
-        //cout << time_remaining;
-        //cout << "\n";
+       
         computeNeighborTransmissivity(arp, x, y);  //currently transmissivity is based on wtd, which does not change during the while loop.
         //should we change it during the while loop? If not, we can move it out. 
-
-
-        for(int32_t y=1; y<params.ncells_y-1; y++){
-        for(int32_t x=1; x<params.ncells_x-1; x++){
- 
         double max_stable_time_step = computeMaxStableTimeStep(params, arp, x, y);
-
-        if(max_stable_time_step<temp)
-        	temp = max_stable_time_step;
-
-    }
-}
         // Choose the inner-loop time step
-        if(time_remaining <= temp){
+        if(time_remaining <= max_stable_time_step){
             dt_inner = time_remaining;
         }
         else{
-            dt_inner = temp;
+            dt_inner = max_stable_time_step;
         }
-        //cout << "\n";
-        //cout << "\n";
-        //cout << "!dt_inner\n";
-        //cout << dt_inner;
-        //cout << "\n";
-        //cout << "!dt_inner\n";
-        //cout << "\n";
-        //cout << "\n";
+       
         computeWTDchangeAtCell(params, arp, x, y, dt_inner);
         time_remaining -= dt_inner;
-        //cout << wtdCenter;
-        //cout << "\n";
-        //cout << arp.cell_area[y];
-        //cout << "\n";
-        //cout << arp.porosity(x,y);
-        //cout << "\n";
-        //cout << params.cellsize_n_s_metres;
-        //cout << "\n";
-        //cout << arp.cellsize_e_w_metres[y];
-        //cout << "\n";
-        //sleep_for(0.3s);
- //       if(x==447&&y==715)
-   //     	std::cout<<"dt inner was "<<dt_inner<<" change so far was "<<wtdCenter - wtdCenter_initial<<std::endl;
+        
     }
     // When exiting loop, the wtdCenter variable holds the final
     // water-table depth
     // This subtraction is unnecessary; could just give the new total instead
     arp.wtd_change_total(x,y) = wtdCenter - wtdCenter_initial;
-    //cout << "wtd_change_total: ";
-    //cout << arp.wtd_change_total(x,y);
-    //cout << " m\n";
+   
 }
 
 /////////////////
@@ -420,15 +357,12 @@ void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp){
             }
             // Otherwise, update the water-table depth change array
             updateCell( params, arp, x, y );
-            //cout << "Test";
-            //cout << arp.wtd_change_total(x,y);
-            //cout << "\n";
+            
         }
     }
     // Once all the changes are known, update the WTD everywhere with the
     // difference array
-   // cout << arp.wtd(447,715);
-   // cout << "-->";
+   
     for(int32_t y=1; y<params.ncells_y-1; y++){
         for(int32_t x=1; x<params.ncells_x-1; x++){
             // Skip ocean cells
@@ -438,16 +372,10 @@ void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp){
             // Update the whole wtd array at once.
             // This is the new water table after groundwater has moved
             // for delta_t seconds.
-            //cout << arp.wtd(x,y);
-            //cout << "-->";
             arp.wtd(x,y) += arp.wtd_change_total(x,y);
-            //cout << arp.wtd(x,y);
-            //cout << "\n";
         }
     }
-  //  cout << arp.wtd(447,715);
-  //  cout << "\n";
-    //SaveAsNetCDF(arp.wtd, "wtdCheck.nc", "WTD");
+  
 }
 
 // This can be populated if we intend to run this module on its own.
