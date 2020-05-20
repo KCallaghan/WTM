@@ -7,8 +7,11 @@ void add_recharge(const int x, const int y, Parameters &params, ArrayPack &arp){
   double volume_change = arp.rech(x,y)/31536000. * params.deltat * arp.cell_area[y];
   double GW_portion = 0;
 
-  if(arp.wtd(x,y) >= 0)  //all the recharge will occur above the land surface; don't worry about porosity. 
+  if(arp.wtd(x,y) >= 0){  //all the recharge will occur above the land surface; don't worry about porosity. 
     arp.wtd(x,y) += arp.rech(x,y)/31536000. * params.deltat;
+    if(arp.wtd(x,y) < 0)
+      arp.wtd(x,y) = 0; //however, if we had evaporation, don't evaporate more surface water than is available. 
+  }
   else{ //at least some of the water will be added into the ground, so we need to think about porosity. 
     arp.wtd(x,y) = arp.fdepth(x,y) * log(exp(arp.wtd(x,y) / arp.fdepth(x,y)) \
           + volume_change / ( arp.cell_area[y] * arp.porosity(x,y) * arp.fdepth(x,y)) );
