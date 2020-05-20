@@ -260,7 +260,7 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     // giving cell.
     // Target cell is the receiving cell.
     if(wtd_change_N > 1e-5){
-        mycell_change  += computeNewWTD( wtd_change_N, wtdN, wtdCenter, x, y+1,
+        mycell_change += computeNewWTD( wtd_change_N, wtdN, wtdCenter, x, y+1,
                                          x, y, arp);
         wtdN -= wtd_change_N;
     }
@@ -273,12 +273,10 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     }
     else{
         wtd_change_N = 0;
-        mycell_change += 0;
-        wtdN += 0;
     }
 
     if(wtd_change_S > 1e-5){
-        mycell_change  += computeNewWTD( wtd_change_S, wtdS, wtdCenter, x, y-1,
+        mycell_change += computeNewWTD( wtd_change_S, wtdS, wtdCenter, x, y-1,
                                          x, y, arp );
         wtdS -= wtd_change_S;
     }
@@ -289,8 +287,6 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     }
     else{
         wtd_change_S = 0;
-        mycell_change += 0;
-        wtdS += 0;
     }
 
     if(wtd_change_E > 1e-5){
@@ -305,24 +301,20 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     }
     else{
         wtd_change_E = 0;
-        mycell_change += 0;
-        wtdE += 0;
     }
 
     if(wtd_change_W > 1e-5){
-        mycell_change  += computeNewWTD( wtd_change_W, wtdW, wtdCenter, x-1, y,
+        mycell_change += computeNewWTD( wtd_change_W, wtdW, wtdCenter, x-1, y,
                                          x, y, arp );
         wtdW +=  - wtd_change_W;
     }
     else if (wtd_change_W < -1e-5){
         wtdW += computeNewWTD( -wtd_change_W, wtdCenter, wtdW, x, y, x-1, y,
                                arp );
-        mycell_change  += wtd_change_W;
+        mycell_change += wtd_change_W;
     }
     else{
         wtd_change_W = 0;
-        mycell_change += 0;
-        wtdW += 0;
     }
 
     // Now we have the height changes that will take place in the target cell
