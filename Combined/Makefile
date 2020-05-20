@@ -1,10 +1,20 @@
+# Default to optimized compile
+opt?=-O3
+fsanitize?=
+$(info Optimization flag: $(opt))
+$(info Defaults to "-O3"; use "opt=X" to change it.)
+
 RICHDEM_GIT_HASH="-NA-"
 RICHDEM_COMPILE_TIME=`date -u +'%Y-%m-%d %H:%M:%S UTC'`
-export RD_CXX_FLAGS=-I../common/richdem/include -DRICHDEM_GIT_HASH="\"$(RICHDEM_GIT_HASH)\"" -DRICHDEM_COMPILE_TIME="\"$(RICHDEM_COMPILE_TIME)\""
-export CXXFLAGS=--std=c++17 -g -Wall -Wno-unknown-pragmas #-fsanitize=address
+export RD_CXX_FLAGS=-I../common/richdem/include \
+	-DRICHDEM_GIT_HASH="\"$(RICHDEM_GIT_HASH)\"" \
+	-DRICHDEM_COMPILE_TIME="\"$(RICHDEM_COMPILE_TIME)\""
+export CXXFLAGS=--std=c++17 ${opt} -g -Wall -Wno-unknown-pragmas
+# use -fsanitize=address (above) to check for memory errors
 export LIBS=-lnetcdf
 
 objects = twsm.o parameters.o richdem.o ArrayPack.o transient_groundwater.o
+
 twsm.x : $(objects)
 	g++ $(CXXFLAGS) $(RD_CXX_FLAGS) $(objects) $(LIBS) \
 			-o twsm.x
