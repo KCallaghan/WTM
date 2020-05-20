@@ -50,7 +50,7 @@ template<class elev_t>
     //since the topography is changing.
   }
 
-  std::cout<<"Cycles done: "<<params.cycles_done<<std::endl;
+  textfile<<"Cycles done: "<<params.cycles_done<<std::endl;
 
 //TODO: How should equilibrium know when to exit?
 

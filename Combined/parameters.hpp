@@ -46,7 +46,6 @@ public:
     float     abs_wtd_mid_change   = 0.;
     float     abs_GW_wtd_change    = 0.;
     float     infiltration_change  = 0.;
-    float     surface_change       = 0.;
     int32_t   total_cycles         = -1;
 
     //Set for convenience within the code

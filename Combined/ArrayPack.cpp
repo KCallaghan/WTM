@@ -26,8 +26,6 @@ void ArrayPack::check() const {
     topo.height()==relhum.       height() );
   assert( topo.width()==head.         width() && \
     topo.height()==head.         height() );
-  assert( topo.width()==kcell.        width() && \
-    topo.height()==kcell.        height() );
   assert( topo.width()==evap.         width() && \
     topo.height()==evap.         height() );
   assert( topo.width()==e_sat.        width() && \
