@@ -82,6 +82,14 @@ private:
     double wtdW;
     double wtdE;
 
+    double wtd_change_N;
+    double wtd_change_S;
+    double wtd_change_E;
+    double wtd_change_W;
+
+    double mycell_change;
+
+
     // These variables are used to monitor the state of the calculation
     double total_changes  = 0.;
     float max_total       = 0.;
@@ -119,12 +127,12 @@ private:
      *          integration of the hydraulic conductivity from -infinity to the
      *          groundwater table.
      */
-    double computeTransmissivity(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
+    double computeTransmissivity(ArrayPack &arp, uint32_t x, uint32_t y);
 
     /**
      * @brief Compute mean transmissivity between neighboring cells (N, S, W, E)
      */
-    void computeNeighborTransmissivity(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
+    void computeNeighborTransmissivity(ArrayPack &arp, uint32_t x, uint32_t y);
 
     /**
      * @brief Returns the maximum value in an array (max size 256 items)
@@ -143,6 +151,14 @@ private:
      *          a porosity-based amplification factor.
      */
     double computeMaxStableTimeStep(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
+
+
+    /**
+     * @brief Calculates water-table depth change in a cell that receives water, 
+     * given the change in the corresponding cell that gives water. 
+     */
+    double computeNewWTD(const float giving_cell_change, const float giving_wtd,const float receiving_wtd, \
+    const int x_giving, const int y_giving, const int x_receiving, const int y_receiving, const ArrayPack &arp);
 
     /**
      * @brief Calculates water-table depth change at a cell (and associated

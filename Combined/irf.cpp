@@ -309,7 +309,6 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 
   arp.runoff             = rd::Array2D<float>(arp.ksat,0);
   arp.head               = rd::Array2D<float>(arp.ksat,0);        
-  arp.kcell              = rd::Array2D<float>(arp.ksat,0);
 
   //Several arrays that are used for calculations of evaporation
   arp.evap               = rd::Array2D<float>(arp.ksat,0);        
@@ -320,11 +319,9 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   //These are used to see how much change occurred in infiltration 
   //and updating lakes portions of the code. Just informational.  
   arp.infiltration_array = rd::Array2D<float>(arp.ksat,0);        
-  arp.surface_array      = rd::Array2D<float>(arp.ksat,0);
 
   arp.rech               = rd::Array2D<float>(arp.ksat,0);
 
-    arp.stability_time_seconds               = rd::Array2D<float>(arp.ksat,0);
 
 
   //This array is used to store the values of how much the water table will 
@@ -455,10 +452,9 @@ void PrintValues(Parameters &params, ArrayPack &arp){
     params.abs_GW_wtd_change    += fabs(arp.wtd(x,y)     - arp.wtd_mid(x,y));
     params.abs_wtd_mid_change   += fabs(arp.wtd_mid(x,y) - arp.wtd_old(x,y));
     params.total_wtd_change     += (arp.wtd(x,y)         - arp.wtd_old(x,y));
-    params.GW_wtd_change        += (arp.wtd(x,y)         - arp.wtd_mid(x,y));
-    params.wtd_mid_change       += (arp.wtd_mid(x,y)     - arp.wtd_old(x,y));
+    params.wtd_mid_change       += (arp.wtd(x,y)         - arp.wtd_mid(x,y));
+    params.GW_wtd_change        += (arp.wtd_mid(x,y)     - arp.wtd_old(x,y));
     params.infiltration_change  += arp.infiltration_array(x,y);
-    params.surface_change       += arp.surface_array(x,y);
   }
 
   textfile<<"params.cycles_done "<<params.cycles_done<<std::endl;
@@ -469,7 +465,7 @@ void PrintValues(Parameters &params, ArrayPack &arp){
   <<" change in GW only was "<<params.abs_GW_wtd_change<<\
   " and change in SW only was "<<params.abs_wtd_mid_change<<std::endl;
   textfile<<"the change in infiltration was "<<params.infiltration_change\
-  <<" and change to surface water was "<<params.surface_change<<std::endl;
+  <<std::endl;
   textfile.close();
 }
 

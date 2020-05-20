@@ -261,7 +261,6 @@ static void MoveWaterIntoPits(
       arp.wtd(i) = 0;                        
       //And we reset any cells that contained surface water to 0. 
       arp.infiltration_array(i) = 0;
-      arp.surface_array(i) = 0;
     }
   }
 
@@ -1684,7 +1683,6 @@ static void FillDepressions(
         //only change the wtd if it is an increase, here. 
         //We can't take water away from cells that already have it 
         //(ie reduce groundwater in saddle cells within a metadepression.)
-        arp.surface_array(c) = arp.wtd(c);
         if(-FP_ERROR<=arp.wtd(c) && arp.wtd(c)<0)
           arp.wtd(c) = 0;
         assert(arp.wtd(c)>= -FP_ERROR);
