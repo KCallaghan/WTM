@@ -142,7 +142,8 @@ private:
      *          "worst case" scenario highest transmissivity, combined with
      *          a porosity-based amplification factor.
      */
-    double computeMaxStableTimeStep(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
+    double computeMaxStableTimeStep(Parameters &params, ArrayPack &arp,
+                                    uint32_t x, uint32_t y);
 
 
     /**
@@ -157,7 +158,8 @@ private:
      *        surrounding cells) and updates the class variables associated
      *        with these.
      */
-    void computeWTDchangeAtCell(Parameters &params, ArrayPack &arp, int32_t x, int32_t y, double dt);
+    void computeWTDchangeAtCell(Parameters &params, ArrayPack &arp, int32_t x,
+                                int32_t y, double dt);
 
     /**
      * @brief Updates the wtd_depth_total array at a cell(x,y) using the
