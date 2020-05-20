@@ -150,8 +150,9 @@ private:
      * @brief Calculates water-table depth change in a cell that receives water,
      * given the change in the corresponding cell that gives water.
      */
-    double computeNewWTD(const float giving_cell_change, const float giving_wtd,const float receiving_wtd, \
-    const int x_giving, const int y_giving, const int x_receiving, const int y_receiving, const ArrayPack &arp);
+    double computeNewWTD(float giving_cell_change, float giving_wtd,
+                         float receiving_wtd, int x_giving, int y_giving,
+                         int x_receiving, int y_receiving, ArrayPack &arp);
 
     /**
      * @brief Calculates water-table depth change at a cell (and associated
