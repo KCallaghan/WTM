@@ -82,14 +82,6 @@ private:
     double wtdW;
     double wtdE;
 
-    double wtd_change_N;
-    double wtd_change_S;
-    double wtd_change_E;
-    double wtd_change_W;
-
-    double mycell_change;
-
-
     // These variables are used to monitor the state of the calculation
     double total_changes  = 0.;
     float max_total       = 0.;
@@ -150,22 +142,25 @@ private:
      *          "worst case" scenario highest transmissivity, combined with
      *          a porosity-based amplification factor.
      */
-    double computeMaxStableTimeStep(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
+    double computeMaxStableTimeStep(Parameters &params, ArrayPack &arp,
+                                    uint32_t x, uint32_t y);
 
 
     /**
-     * @brief Calculates water-table depth change in a cell that receives water, 
-     * given the change in the corresponding cell that gives water. 
+     * @brief Calculates water-table depth change in a cell that receives water,
+     * given the change in the corresponding cell that gives water.
      */
-    double computeNewWTD(const float giving_cell_change, const float giving_wtd,const float receiving_wtd, \
-    const int x_giving, const int y_giving, const int x_receiving, const int y_receiving, const ArrayPack &arp);
+    double computeNewWTD(float giving_cell_change, float giving_wtd,
+                         float receiving_wtd, int x_giving, int y_giving,
+                         int x_receiving, int y_receiving, ArrayPack &arp);
 
     /**
      * @brief Calculates water-table depth change at a cell (and associated
      *        surrounding cells) and updates the class variables associated
      *        with these.
      */
-    void computeWTDchangeAtCell(Parameters &params, ArrayPack &arp, int32_t x, int32_t y, double dt);
+    void computeWTDchangeAtCell(Parameters &params, ArrayPack &arp, int32_t x,
+                                int32_t y, double dt);
 
     /**
      * @brief Updates the wtd_depth_total array at a cell(x,y) using the
