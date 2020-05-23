@@ -110,102 +110,166 @@ double FanDarcyGroundwater::computeMaxStableTimeStep(Parameters &params,
     return dt_max_diffusion_withPorosity/2.;
 }
 
-double FanDarcyGroundwater::computeNewWTD(const float giving_cell_change,
-                                          const float giving_wtd,
-                                          const float receiving_wtd,
-                                          const int x_giving,
-                                          const int y_giving,
-                                          const int x_receiving,
-                                          const int y_receiving,
+
+double FanDarcyGroundwater::calculateWaterVolume(const float wtd_change,
+                                          const float center_wtd,
+                                          const float neighbour_wtd,
+                                          const int x1,
+                                          const int y1,
+                                          const int x2,
+                                          const int y2,
                                           const ArrayPack &arp){
 
-    double receiving_cell_change = 0.;
+
     double volume_change = 0.;
 
-    // We have the change in the giving cell.
-    // The giving cell is always losing water.
-    // Therefore, we subtract this value from the giving cell when adjusting
-    // wtd later.
+    // We have the change in the water table between the two cells.
+    // We will use this to calculate the volume that moves between the two,
+    // based on the average porosity and average water table depths
+    // of the two cells. 
+    // This volume can then be used to calculate the actual 
+    // change in water table height in each of the two cells. 
 
-    // First, we check to see if the starting wtd in the giving cell was above
-    // the surface.
+    float mean_wtd = (center_wtd + neighbour_wtd) / 2.;
+    float mean_porosity = (arp.porosity(x1,y1) + arp.porosity(x2,y2)) / 2.;
+    float mean_fdepth = (arp.fdepth(x1,y1) + arp.fdepth(x2,y2)) / 2.;
+    float mean_area = (arp.cell_area[y1] + arp.cell_area[y2]) / 2.;
+
+    float upper_edge = mean_wtd + wtd_change/2.;
+    float lower_edge = mean_wtd - wtd_change/2.;
+    //since I am using averages between the two cells, I have to take
+    //water both moving up or moving down into account. 
+    //So, I treat the average wtd as the middle of where water is
+    //with respect to changing porosity. 
+
+  
+    // First, we check to see if the mean wtd was above the surface.
 
     // If wtd stays above 0 once the change has occurred, then no need to worry
     // about porosity.
-    if(giving_wtd > 0){
+    if(lower_edge > 0){
         // The volume change is just the height change multiplied by the cell's
         // area.
-        volume_change = giving_cell_change * arp.cell_area[y_giving];
+        volume_change = wtd_change * mean_area;
         // The water table drops below the surface during this iteration, so we
         // need to consider porosity for part of the water.
-        if(giving_wtd - giving_cell_change < 0){
-             // This is the portion of the water that is above the land surface.
-            volume_change = giving_wtd * arp.cell_area[y_giving];
-            // The portion that is below the land surface.
-            // -= because this comes out as a negative number.
-            volume_change -= arp.cell_area[y_giving] \
-                              * arp.porosity(x_giving,y_giving) \
-                              * arp.fdepth(x_giving,y_giving) * \
-                                ( exp( (giving_wtd - giving_cell_change) \
-                                          / arp.fdepth(x_giving,y_giving) ) \
-                                  - 1);
-        }
+    }
+    else if(lower_edge < 0 && upper_edge > 0){
+    // There is a portion of the water that is above the land surface.
+        volume_change = upper_edge * mean_area;
+        // The portion that is below the land surface.
+        // -= because this comes out as a negative number.
+        volume_change -= mean_area * mean_porosity * mean_fdepth * \
+                            ( exp( (lower_edge) / mean_fdepth ) \
+                              - 1);
+        
     }
     // the water table is below the surface to start with, therefore it is
     // below the surface the whole time and we need porosity for all the change.
     else{
-        volume_change = -arp.cell_area[y_giving] \
-                        * arp.porosity(x_giving,y_giving) \
-                        * arp.fdepth(x_giving,y_giving) * \
-                          ( exp( (giving_wtd - giving_cell_change) \
-                                    / arp.fdepth(x_giving,y_giving) ) - \
-                            exp(giving_wtd / arp.fdepth(x_giving,y_giving)) );
+        volume_change = -mean_area * mean_porosity * mean_fdepth * \
+                          ( exp(lower_edge / mean_fdepth) - \
+                            exp(upper_edge / mean_fdepth) );
         }
 
-    // So now we have the volume change as a positive value from the giving
-    // cell, whether it was all above ground, all below ground, or a
-    // combination.
-    // Next, we need to use that to calculate the height change in the
-    // receiving cell.
+    // So now we have the volume change that occurs in each of the two cells
+    // as a positive value  whether it was all above ground, all below ground, 
+    // or a combination.
+   
+   return volume_change;
+}
 
-    // The receiving cell gains water, so if the starting wtd is above 0,
-    // all the change is above the surface.
-    if(receiving_wtd > 0){
-        receiving_cell_change = volume_change / arp.cell_area[y_receiving];
+
+
+double FanDarcyGroundwater::computeNewWTD(const float volume,
+                                          const float my_wtd,
+                                          const int x,
+                                          const int y,
+                                          const int direction, 
+                                          const ArrayPack &arp){
+
+    //We convert the known change in water volume to a change
+	//change in water table depth for this cell. 
+
+    //We have a volume, which is positive; we also need to know
+    //if this cell is gaining or losing water. The 'direction' 
+    //tells us this. If 'direction' is 1, it is gaining water, 
+    //if 'direction' is 0, it is losing water. 
+
+
+    double change_in_wtd = 0.;
+
+    if(my_wtd > 0){
+    	//at least some of the change is above the surface. 
+    	change_in_wtd = volume / arp.cell_area[y];
+
+    	if(direction == 0){
+    		change_in_wtd = -volume / arp.cell_area[y];
+
+    	    if(my_wtd + change_in_wtd < 0){
+    	    	//how much of the volume is used up above the surface?
+    	    	double SW_portion = my_wtd * arp.cell_area[y];
+    	    	//this is the volume used in water above the surface. 
+    	    	//The total volume minus this is left over to 
+    	    	//decrease groundwater.
+    	    	change_in_wtd = -arp.fdepth(x,y) * \
+    	    	            log( exp(my_wtd / arp.fdepth(x,y)) \
+    	    	            + (volume - SW_portion) / (arp.cell_area[y] \
+    	    	            	* arp.porosity(x,y) \
+    	    	            *arp.fdepth(x,y)) ) + my_wtd;
+    
+        	    //the cell is losing water, and it's losing enough
+        	    //that some of the change is below the surface and
+    	    	//so we need to take porosity into account. 
+    	    }
+        }
     }
-    // Either it is all below the surface, or a combination.
     else{
-        // We don't know yet what the height of the change will be,
-        // So we start off assuming that it will all be below the surface.
-        receiving_cell_change = arp.fdepth(x_receiving,y_receiving) \
-                                * log( exp(receiving_wtd /
-                                        arp.fdepth(x_receiving,y_receiving))
-                                       + volume_change
-                                          / ( arp.cell_area[y_receiving]
-                                            * arp.porosity(x_receiving,
-                                                           y_receiving)
-                                            * arp.fdepth(x_receiving,
-                                                         y_receiving)) ) \
-                                 - receiving_wtd;
-        // It has changed from GW to SW, so we need to adjust the receiving
-        // cell change appropriately.
-        if(receiving_wtd +  receiving_cell_change > 0){
-            // We want to calculate how much of the water is used up in the
-            // ground, i.e. the portion between the starting wtd and 0.
-            double GW_portion = -arp.cell_area[y_receiving] \
-                                * arp.porosity(x_receiving,y_receiving) \
-                                * arp.fdepth(x_receiving,y_receiving) \
-                                * ( exp( receiving_wtd /
-                                         arp.fdepth(x_receiving,y_receiving) )
+    	//either all of the change is below the surface, 
+    	//or it's a combination of above and below. 
+    	//we start off assuming that it will all be below the surface:
+    	if(direction == 1){
+    		change_in_wtd = -arp.fdepth(x,y) * \
+    		            log( exp(my_wtd / arp.fdepth(x,y)) \
+    		            - volume / (arp.cell_area[y] * arp.porosity(x,y) \
+    		            *arp.fdepth(x,y)) ) + my_wtd;
+
+        	if((my_wtd + change_in_wtd > 0) || \
+        	(exp(my_wtd) / arp.fdepth(x,y)) < \
+        	(volume/(arp.cell_area[y] * arp.porosity(x,y)*arp.fdepth(x,y)))  ){ 
+        	    //it is gaining enough water
+        		//that some will be above the surface. 
+        		//we want to calculate how much of the water is used up 
+        		//in the ground, i.e. the portion between the starting
+        		//wtd and 0. 
+        		double GW_portion = -arp.cell_area[y] \
+                                    * arp.porosity(x,y) \
+                                    * arp.fdepth(x,y) \
+                                    * ( exp( my_wtd /arp.fdepth(x,y) )
                                     - 1);
-             //this is the volume of water used up in filling in the ground.
-             //volume_change - GW_portion is left over to fill surface water.
-            receiving_cell_change = ( (volume_change - GW_portion)
-                                      / arp.cell_area[y_receiving] ) \
-                                      - receiving_wtd;
+              //this is the volume of water used up in filling in the ground.
+             //the volume minus GW_portion is left over to fill surface water.
+                change_in_wtd = ( (volume - GW_portion)
+                                      / arp.cell_area[y] ) \
+                                      - my_wtd;  //-my_wtd because this
+                                       //was a negative number and we are
+                                      //getting the total change in wtd.
+        	}
+        }
+        else{  //it is losing water, so it is definitely all below the surface. 
+        	change_in_wtd = -arp.fdepth(x,y) * \
+        	            log( exp(my_wtd / arp.fdepth(x,y)) \
+    		            + volume / (arp.cell_area[y] * arp.porosity(x,y) \
+    		            *arp.fdepth(x,y)) ) + my_wtd;
         }
     }
-    return receiving_cell_change;
+
+    if(direction == 1)
+	    assert (change_in_wtd>-1e-4);
+    if(direction == 0)
+	    assert(change_in_wtd<1e-4);
+
+    return change_in_wtd;
 }
 
 
@@ -253,74 +317,79 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     double wtd_change_W = QW * dt / ( arp.cell_area[y] );
     double wtd_change_E = QE * dt / ( arp.cell_area[y] );
 
+   //We use the calculated wtd change fluxes to calculate a volume 
+    //change between the 2 cells. This is based on average
+    //porosity, e-folding depth, wtd, and cell area of the 2 cells. 
+
+    double volume_N = calculateWaterVolume(fabs(wtd_change_N), 
+    	 wtdCenter, wtdN, x, y, x, y+1, arp);
+
+    double volume_S = calculateWaterVolume(fabs(wtd_change_S), 
+    	 wtdCenter, wtdS, x, y, x, y-1, arp);
+
+    double volume_E = calculateWaterVolume(fabs(wtd_change_E), 
+    	 wtdCenter, wtdE, x, y, x+1, y, arp);
+
+    double volume_W = calculateWaterVolume(fabs(wtd_change_W), 
+    	 wtdCenter, wtdW, x, y, x-1, y, arp);
+
+  //we now use these volumes to compute the actual changes in 
+    //water table depths in the target cell and each of the neighbouring cells:
+
+    
     // Using the wtd_changes from above, we need to calculate how much change
     // will occur in the target cell, accounting for porosity.
 
     // The current cell is receiving water from the North, so (x,y+1) is the
     // giving cell.
     // Target cell is the receiving cell.
-    if(wtd_change_N > 1e-5){
-        mycell_change += computeNewWTD( wtd_change_N, wtdN, wtdCenter, x, y+1,
-                                         x, y, arp);
-        wtdN -= wtd_change_N;
+    if(wtd_change_N > 0){
+        wtdN           += computeNewWTD( volume_N, wtdN,      x, y+1, 0, arp);
+        mycell_change  += computeNewWTD( volume_N, wtdCenter, x, y,   1, arp);
     }
     // The current cell is giving water to the North.
     // The North is the receiving cell.
-    else if (wtd_change_N < -1e-5){
-        wtdN += computeNewWTD( -wtd_change_N, wtdCenter, wtdN, x, y, x, y+1,
-                               arp );
-        mycell_change += wtd_change_N;
-    }
     else{
-        wtd_change_N = 0;
+        wtdN           += computeNewWTD( volume_N, wtdN,      x, y+1, 1, arp);
+        mycell_change  += computeNewWTD( volume_N, wtdCenter, x, y,   0, arp);
     }
+    
 
-    if(wtd_change_S > 1e-5){
-        mycell_change += computeNewWTD( wtd_change_S, wtdS, wtdCenter, x, y-1,
-                                         x, y, arp );
-        wtdS -= wtd_change_S;
+    if(wtd_change_S > 0){
+         wtdS          += computeNewWTD( volume_S, wtdS,      x, y-1, 0, arp);
+         mycell_change += computeNewWTD( volume_S, wtdCenter, x, y,   1, arp);
+     }
+    else {
+        wtdS           += computeNewWTD( volume_S, wtdS,      x, y-1, 1, arp);
+        mycell_change  += computeNewWTD( volume_S, wtdCenter, x, y,   0, arp);
     }
-    else if (wtd_change_S < -1e-5){
-        wtdS += computeNewWTD( -wtd_change_S, wtdCenter, wtdS, x, y, x, y-1,
-                               arp );
-        mycell_change += wtd_change_S;
-    }
+    
+
+    if(wtd_change_E > 0){
+        wtdE           += computeNewWTD( volume_E, wtdE,      x+1, y, 0, arp);
+        mycell_change  += computeNewWTD( volume_E, wtdCenter, x,   y, 1, arp);
+     }
+    else {
+        wtdE           += computeNewWTD( volume_E, wtdE,      x+1, y, 1, arp);
+        mycell_change  += computeNewWTD( volume_E, wtdCenter, x,   y, 0, arp);
+     }
+    
+
+    if(wtd_change_W > 0){
+        wtdW           += computeNewWTD( volume_W, wtdW,      x-1, y, 0, arp);
+        mycell_change  += computeNewWTD( volume_W, wtdCenter, x,   y, 1, arp);
+     }
     else{
-        wtd_change_S = 0;
-    }
-
-    if(wtd_change_E > 1e-5){
-        mycell_change += computeNewWTD( wtd_change_E, wtdE, wtdCenter, x+1, y,
-                                         x, y, arp );
-        wtdE -= wtd_change_E;
-    }
-    else if (wtd_change_E < -1e-5){
-        wtdE +=  computeNewWTD( -wtd_change_E, wtdCenter, wtdE, x, y, x+1, y,
-                                arp );
-        mycell_change += wtd_change_E;
-    }
-    else{
-        wtd_change_E = 0;
-    }
-
-    if(wtd_change_W > 1e-5){
-        mycell_change += computeNewWTD( wtd_change_W, wtdW, wtdCenter, x-1, y,
-                                         x, y, arp );
-        wtdW +=  - wtd_change_W;
-    }
-    else if (wtd_change_W < -1e-5){
-        wtdW += computeNewWTD( -wtd_change_W, wtdCenter, wtdW, x, y, x-1, y,
-                               arp );
-        mycell_change += wtd_change_W;
-    }
-    else{
-        wtd_change_W = 0;
-    }
-
+        wtdW           += computeNewWTD( volume_W, wtdW,      x-1, y, 1, arp);
+        mycell_change  += computeNewWTD( volume_W, wtdCenter, x,   y, 0, arp);
+     }
+    
     // Now we have the height changes that will take place in the target cell
     // and each of the four neighbours.
     wtdCenter += mycell_change;
 }
+
+
 
 void FanDarcyGroundwater::updateCell( Parameters &params, ArrayPack &arp,
                                       uint32_t x, uint32_t y ){

@@ -146,13 +146,37 @@ private:
                                     uint32_t x, uint32_t y);
 
 
+
+
+    /**
+     * @brief Calculates the change in water volume that occurs between 
+     * two cells, given the water-table depth flux between the two.
+     */
+    double calculateWaterVolume(const float wtd_change,
+                                          const float center_wtd,
+                                          const float neighbour_wtd,
+                                          const int x1,
+                                          const int y1,
+                                          const int x2,
+                                          const int y2,
+                                          const ArrayPack &arp);
+
+
+
+
+
+
+
     /**
      * @brief Calculates water-table depth change in a cell that receives water,
      * given the change in the corresponding cell that gives water.
      */
-    double computeNewWTD(float giving_cell_change, float giving_wtd,
-                         float receiving_wtd, int x_giving, int y_giving,
-                         int x_receiving, int y_receiving, ArrayPack &arp);
+    double computeNewWTD(const float volume,
+                                          const float my_wtd,
+                                          const int x,
+                                          const int y,
+                                          const int direction, 
+                                          const ArrayPack &arp);
 
     /**
      * @brief Calculates water-table depth change at a cell (and associated
