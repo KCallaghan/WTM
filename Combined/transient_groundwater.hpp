@@ -163,10 +163,6 @@ private:
 
 
 
-
-
-
-
     /**
      * @brief Calculates water-table depth change in a cell that receives water,
      * given the change in the corresponding cell that gives water.

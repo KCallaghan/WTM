@@ -235,7 +235,7 @@ double FanDarcyGroundwater::computeNewWTD(const float volume,
     		            *arp.fdepth(x,y)) ) + my_wtd;
 
         	if((my_wtd + change_in_wtd > 0) || \
-        	(exp(my_wtd) / arp.fdepth(x,y)) < \
+        	exp(my_wtd / arp.fdepth(x,y)) < \
         	(volume/(arp.cell_area[y] * arp.porosity(x,y)*arp.fdepth(x,y)))  ){ 
         	    //it is gaining enough water
         		//that some will be above the surface. 
