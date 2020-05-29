@@ -1091,20 +1091,7 @@ static dh_label_t OverflowInto(
   if(root==stop_node){
 
   
-  //We've made a loop, so everything is full
-    if(this_dep.parent==OCEAN){           //If our parent is the ocean
-       
-      this_dep.water_vol = std::min(this_dep.wtd_vol,this_dep.water_vol + extra_water); 
-      assert(this_dep.water_vol>=-FP_ERROR);
-      if(this_dep.water_vol < 0)
-        this_dep.water_vol = 0;
-
-      assert(this_dep.water_vol==0 || this_dep.water_vol - this_dep.wtd_vol\
-       <= FP_ERROR);
-      return OCEAN;                      //Then the extra water just goes away
-    }
-    else  {                               //Otherwise
-      
+  //We've made a loop, so everything is full.   
   
   //if this node is a normal parent, then I don't think it matters where in 
   //the depression the water goes, and it can just get added to 
@@ -1117,7 +1104,7 @@ static dh_label_t OverflowInto(
 
 
         this_dep.water_vol += extra_water;
-      //this_dep.water_vol = std::min(this_dep.wtd_vol,this_dep.water_vol + extra_water); 
+    //  this_dep.water_vol = std::min(this_dep.wtd_vol,this_dep.water_vol + extra_water); 
 
       //no matter what, the water_vol needs to be updated. 
       assert(this_dep.water_vol>= -FP_ERROR);
@@ -1144,7 +1131,7 @@ static dh_label_t OverflowInto(
             this_dep.wtd_vol <= FP_ERROR);      
         } 
       }  
-    }
+    //}
 
     return stop_node;
   }
