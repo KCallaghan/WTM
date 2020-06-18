@@ -313,6 +313,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   for(int y=0;y<arp.topo.height();y++){  //Look at all the cells
   for(int x=0;x<arp.topo.width() ;x++){ //Yes, all of them
     ++progress;
+    if(label(x,y)==OCEAN)  //Already in priority queue
+      continue;
     const auto my_elev = arp.topo(x,y); //Focal cell's elevation
     bool has_lower     = false;    //Pretend we have no lower neighbours
     for(int n=1;n<=neighbours;n++){ //Check out our neighbours
@@ -501,6 +503,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     }
   }
   progress.stop();
+  std::cerr<<"t Outlets found in = "<<progress.time_it_took()<<" s"<<std::endl;
 
   //At this point every cell is associated with the label of a depression. Each
   //depression contains the cells lower than its outlet elevation as well as all
@@ -724,9 +727,19 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   std::cerr<<"p Calculating depression marginal volumes..."<<std::endl;
 
   //Get the marginal depression cell counts and total elevations
-  
+  progress.start(label.size());
+  #pragma omp parallel default(none) shared(progress,depressions,arp,label,final_label)
+  {
+  //  std::vector<uint32_t> cell_counts     (deps.size(), 0);
+    std::vector<double>   total_volumes(depressions.size(), 0);
+    std::vector<double>   total_areas  (depressions.size(), 0);
+
+
+
+  #pragma omp parallel for collapse(2)
   for(int y=0;y<label.height();y++)
   for(int x=0;x<label.width();x++){
+    ++progress;
     const auto my_elev = arp.topo(x,y);
     auto clabel        = label(x,y);
     
@@ -743,16 +756,33 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     if(clabel==OCEAN)
       continue;
 
-    depressions[clabel].dep_area += arp.cell_area[y];         
+
+    total_areas[clabel] += arp.cell_area[y];
+    total_volumes[clabel] += (static_cast<double>(\
+    depressions[clabel].out_elev)-arp.topo(x,y))*arp.cell_area[y]; 
+
+
+  //  depressions[clabel].dep_area += arp.cell_area[y];         
      //We need to know the area of our child depressions when getting 
     //the total depression volumes below.
-    depressions[clabel].dep_vol += (static_cast<double>(\
+//    depressions[clabel].dep_vol += (static_cast<double>(\
     depressions[clabel].out_elev)-arp.topo(x,y))*arp.cell_area[y];  
     //Add the area of one cell at a time - elevation difference between 
     //the outlet of this depression and the current cell, 
     //multiplied by the area of the current cell. 
  
+
   }
+
+    #pragma omp critical
+    for(unsigned int i=0;i<depressions.size();i++){
+      depressions[i].dep_area        += total_areas[i];
+      depressions[i].dep_vol         += total_volumes[i];
+    }
+
+}
+  progress.stop();
+
 
   
   std::cerr<<"p Calculating depression total volumes..."<<std::endl;
@@ -783,6 +813,10 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //so that our parent can also get the correct total dep_vol. 
       dep.dep_area += depressions.at(dep.rchild).dep_area;
     }
+
+if(!(dep.lchild==NO_VALUE || (depressions.at(dep.lchild).dep_vol + \
+      depressions.at(dep.rchild).dep_vol) - dep.dep_vol <= FP_ERROR))
+        std::cout<<"lchild vol "<<depressions.at(dep.lchild).dep_vol<<" rchild vol "<<depressions.at(dep.rchild).dep_vol<<" my vol "<<dep.dep_vol<<std::endl;
 
 
     assert(dep.lchild==NO_VALUE || (depressions.at(dep.lchild).dep_vol + \

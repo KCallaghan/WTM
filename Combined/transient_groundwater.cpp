@@ -2,6 +2,9 @@
 #include <thread>
 #include "transient_groundwater.hpp"
 
+
+const double FP_ERROR = 1e-4;
+
 ///////////////////////
 // PRIVATE FUNCTIONS //
 ///////////////////////
@@ -264,10 +267,22 @@ double FanDarcyGroundwater::computeNewWTD(const float volume,
         }
     }
 
-    if(direction == 1)
+    if(direction == 1){
+    	if(change_in_wtd <= -1e-4){
+    		std::cout<<"change was too small "<<change_in_wtd<<" x "<<x<<" y "<<y<<std::endl;
+    		std::cout<<"volume "<<volume<<" area "<<arp.cell_area[y]<<" my wtd "<<my_wtd<<std::endl;
+    		std::cout<<"fdepth "<<arp.fdepth(x,y)<<" porosity "<<arp.porosity(x,y)<<std::endl;
+    	}
 	    assert (change_in_wtd>-1e-4);
-    if(direction == 0)
+    }
+    if(direction == 0){
+    	if(change_in_wtd>=1e-4){
+    		std::cout<<"change was too large "<<change_in_wtd<<" x "<<x<<" y "<<y<<std::endl;
+    		std::cout<<"volume "<<volume<<" area "<<arp.cell_area[y]<<" my wtd "<<my_wtd<<std::endl;
+    		std::cout<<"fdepth "<<arp.fdepth(x,y)<<" porosity "<<arp.porosity(x,y)<<std::endl;
+        }
 	    assert(change_in_wtd<1e-4);
+    }
 
     return change_in_wtd;
 }
@@ -333,6 +348,16 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     double volume_W = calculateWaterVolume(fabs(wtd_change_W), 
     	 wtdCenter, wtdW, x, y, x-1, y, arp);
 
+
+    if(volume_N < 0)
+    	std::cout<<"negative volume N "<<volume_N<<" wtd change "<<wtd_change_N<<" wtd centre "<<wtdCenter<<" wtd N "<<wtdN<<" x "<<x<<" y "<<y<<std::endl;
+    if(volume_S < 0)
+    	std::cout<<"negative volume S "<<volume_S<<" wtd change "<<wtd_change_S<<" wtd centre "<<wtdCenter<<" wtd S "<<wtdS<<" x "<<x<<" y "<<y<<std::endl;
+    if(volume_E < 0)
+    	std::cout<<"negative volume E "<<volume_E<<" wtd change "<<wtd_change_E<<" wtd centre "<<wtdCenter<<" wtd E "<<wtdE<<" x "<<x<<" y "<<y<<std::endl;
+    if(volume_W < 0)
+    	std::cout<<"negative volume W "<<volume_W<<" wtd change "<<wtd_change_W<<" wtd centre "<<wtdCenter<<" wtd W "<<wtdW<<" x "<<x<<" y "<<y<<std::endl;
+    
   //we now use these volumes to compute the actual changes in 
     //water table depths in the target cell and each of the neighbouring cells:
 
@@ -343,47 +368,51 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     // The current cell is receiving water from the North, so (x,y+1) is the
     // giving cell.
     // Target cell is the receiving cell.
-    if(wtd_change_N > 0){
-        wtdN           += computeNewWTD( volume_N, wtdN,      x, y+1, 0, arp);
-        mycell_change  += computeNewWTD( volume_N, wtdCenter, x, y,   1, arp);
-    }
-    // The current cell is giving water to the North.
-    // The North is the receiving cell.
-    else{
-        wtdN           += computeNewWTD( volume_N, wtdN,      x, y+1, 1, arp);
-        mycell_change  += computeNewWTD( volume_N, wtdCenter, x, y,   0, arp);
-    }
-    
-
-    if(wtd_change_S > 0){
-         wtdS          += computeNewWTD( volume_S, wtdS,      x, y-1, 0, arp);
-         mycell_change += computeNewWTD( volume_S, wtdCenter, x, y,   1, arp);
-     }
-    else {
-        wtdS           += computeNewWTD( volume_S, wtdS,      x, y-1, 1, arp);
-        mycell_change  += computeNewWTD( volume_S, wtdCenter, x, y,   0, arp);
+    if(volume_N > FP_ERROR){
+      if(wtd_change_N > 0){
+          wtdN           += computeNewWTD( volume_N, wtdN,      x, y+1, 0, arp);
+          mycell_change  += computeNewWTD( volume_N, wtdCenter, x, y,   1, arp);
+      }
+      // The current cell is giving water to the North.
+      // The North is the receiving cell.
+      else{
+          wtdN           += computeNewWTD( volume_N, wtdN,      x, y+1, 1, arp);
+          mycell_change  += computeNewWTD( volume_N, wtdCenter, x, y,   0, arp);
+      }
     }
     
+    if(volume_S > FP_ERROR){
+      if(wtd_change_S > 0){
+           wtdS          += computeNewWTD( volume_S, wtdS,      x, y-1, 0, arp);
+           mycell_change += computeNewWTD( volume_S, wtdCenter, x, y,   1, arp);
+       }
+      else {
+          wtdS           += computeNewWTD( volume_S, wtdS,      x, y-1, 1, arp);
+          mycell_change  += computeNewWTD( volume_S, wtdCenter, x, y,   0, arp);
+      }
+    }
 
-    if(wtd_change_E > 0){
-        wtdE           += computeNewWTD( volume_E, wtdE,      x+1, y, 0, arp);
-        mycell_change  += computeNewWTD( volume_E, wtdCenter, x,   y, 1, arp);
-     }
-    else {
-        wtdE           += computeNewWTD( volume_E, wtdE,      x+1, y, 1, arp);
-        mycell_change  += computeNewWTD( volume_E, wtdCenter, x,   y, 0, arp);
-     }
-    
+    if(volume_E > FP_ERROR){
+      if(wtd_change_E > 0){
+          wtdE           += computeNewWTD( volume_E, wtdE,      x+1, y, 0, arp);
+          mycell_change  += computeNewWTD( volume_E, wtdCenter, x,   y, 1, arp);
+       }
+      else {
+          wtdE           += computeNewWTD( volume_E, wtdE,      x+1, y, 1, arp);
+          mycell_change  += computeNewWTD( volume_E, wtdCenter, x,   y, 0, arp);
+      }
+    }
 
-    if(wtd_change_W > 0){
-        wtdW           += computeNewWTD( volume_W, wtdW,      x-1, y, 0, arp);
-        mycell_change  += computeNewWTD( volume_W, wtdCenter, x,   y, 1, arp);
-     }
-    else{
-        wtdW           += computeNewWTD( volume_W, wtdW,      x-1, y, 1, arp);
-        mycell_change  += computeNewWTD( volume_W, wtdCenter, x,   y, 0, arp);
-     }
-    
+    if(volume_W > FP_ERROR){
+      if(wtd_change_W > 0){
+          wtdW           += computeNewWTD( volume_W, wtdW,      x-1, y, 0, arp);
+          mycell_change  += computeNewWTD( volume_W, wtdCenter, x,   y, 1, arp);
+       }
+      else{
+          wtdW           += computeNewWTD( volume_W, wtdW,      x-1, y, 1, arp);
+          mycell_change  += computeNewWTD( volume_W, wtdCenter, x,   y, 0, arp);
+      }
+    }
     // Now we have the height changes that will take place in the target cell
     // and each of the four neighbours.
     wtdCenter += mycell_change;
@@ -462,6 +491,7 @@ void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp){
     //cout << params.ncells_y; // prints Output sentence on screen
     //cout << "\n";
     // Updates water-table depth grid over one time step
+  //  #pragma omp parallel for collapse(2)
     for(int32_t y=1; y<params.ncells_y-1; y++){
         for(int32_t x=1; x<params.ncells_x-1; x++){
             // Skip ocean cells
@@ -475,6 +505,7 @@ void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp){
     // Once all the changes are known, update the WTD everywhere with the
     // difference array
 
+    #pragma omp parallel for collapse(2)
     for(int32_t y=1; y<params.ncells_y-1; y++){
         for(int32_t x=1; x<params.ncells_x-1; x++){
             // Skip ocean cells

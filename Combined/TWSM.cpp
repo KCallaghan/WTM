@@ -65,6 +65,7 @@ template<class elev_t>
   arp.wtd_old = arp.wtd;  //These are used to see how much change occurs
   arp.wtd_mid = arp.wtd;  //in FSM vs in the groundwater portion.
 
+  #pragma omp parallel for collapse(2)  
   for(int y=1;y<params.ncells_y-1;y++)
   for(int x=1;x<params.ncells_x-1; x++){
     if(arp.land_mask(x,y) == 0)          //skip ocean cells

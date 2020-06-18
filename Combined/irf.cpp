@@ -199,13 +199,13 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
     //TODO: allow user to vary these calibration constants depending on their 
     //input cellsize? Or do some kind of auto variation of them? 
     if(arp.winter_temp(i) > -5)  //then fdepth = f from Ying's equation S7. 
-      arp.fdepth(i) = std::max(1000/(1+150*arp.slope(i)),25.0f);  
+      arp.fdepth(i) = std::max(1/(1+150*arp.slope(i)),25.0f);  
     else{ //then fdpth = f*fT, Ying's equations S7 and S8. 
       if(arp.winter_temp(i) < -14)
-        arp.fdepth(i) = (std::max(1000/(1+150*arp.slope(i)),25.0f)) * \
+        arp.fdepth(i) = (std::max(1/(1+150*arp.slope(i)),25.0f)) * \
       (std::max(0.05, 0.17 + 0.005 * arp.winter_temp(i)));
       else
-        arp.fdepth(i) = (std::max(1000/(1+150*arp.slope(i)),25.0f)) * \
+        arp.fdepth(i) = (std::max(1/(1+150*arp.slope(i)),25.0f)) * \
       (std::min(1.0, 1.5 + 0.1 * arp.winter_temp(i)));
     }
   }
