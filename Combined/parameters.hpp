@@ -47,6 +47,10 @@ public:
     float     abs_GW_wtd_change    = 0.;
     float     infiltration_change  = 0.;
     int32_t   total_cycles         = -1;
+    float     fdepth_a             = 0.;
+    float     fdepth_b             = 0.;
+    float     fdepth_fmin          = 0.;
+
 
     //Set for convenience within the code
     int32_t ncells_x  = -1;

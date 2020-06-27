@@ -40,6 +40,10 @@ Parameters::Parameters(const std::string config_file){
     else if(key=="time_end")           ss>>time_end;
     else if(key=="time_start")         ss>>time_start;
     else if(key=="total_cycles")       ss>>total_cycles;
+    else if(key=="fdepth_a")           ss>>fdepth_a;
+    else if(key=="fdepth_b")           ss>>fdepth_b;
+    else if(key=="fdepth_fmin")        ss>>fdepth_fmin;
+
 
     else
       throw std::runtime_error("Unrecognised key!");
