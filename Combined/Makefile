@@ -11,7 +11,7 @@ export RD_CXX_FLAGS=-I../common/richdem/include \
 	-DRICHDEM_COMPILE_TIME="\"$(RICHDEM_COMPILE_TIME)\""
 export CXXFLAGS=--std=c++17 ${opt} -g -Wall -Wno-unknown-pragmas
 # use -fsanitize=address (above) to check for memory errors
-export LIBS=-lnetcdf
+export LIBS=-lnetcdf -fopenmp
 
 objectsTWSM = twsm.o parameters.o richdem.o ArrayPack.o transient_groundwater.o
 objectsDH = run_dephier.o parameters.o richdem.o ArrayPack.o
