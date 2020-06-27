@@ -62,7 +62,8 @@ class ArrayPack {
   f2d surface_evap;
 
   f2d infiltration_array;
- 
+  f2d transmissivity;
+
   dh_label_t flowdir_t;
 
   dvec latitude_radians;
@@ -70,6 +71,8 @@ class ArrayPack {
   dvec cellsize_e_w_metres;
   dvec cellsize_e_w_metres_N;
   dvec cellsize_e_w_metres_S;
+
+
 
   rd::Array2D<dh_label_t> label; //No cells are part of a depression
   rd::Array2D<dh_label_t> final_label; //No cells are part of a depression

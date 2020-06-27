@@ -39,7 +39,7 @@ const double UNDEF  = -1.0e7;
 void InitialiseTransient(Parameters &params, ArrayPack &arp){
 
   arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + \
-  "ksat.nc", "value");   //Units of ksat are m/s. 
+  "vertical_ksat.nc", "value");   //Units of ksat are m/s. 
 
 //width and height in number of cells in the array
   params.ncells_x = arp.vert_ksat.width();  
@@ -157,7 +157,7 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
   arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + \
-  "ksat.nc", "value");   //Units of ksat are m/s. 
+  "vertical_ksat.nc", "value");   //Units of ksat are m/s. 
 
 //width and height in number of cells in the array
   params.ncells_x = arp.vert_ksat.width();  
@@ -169,16 +169,16 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   params.time_start + "_mask.nc",   "value"); 
   //A binary mask that is 1 where there is land and 0 in the ocean
   arp.precip        = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_precip.nc", "value");  //Units: m/yr. 
+  params.time_start + "_precipitation.nc", "value");  //Units: m/yr. 
   arp.temp          = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_temp.nc",   "value");  //Units: degress Celsius
+  params.time_start + "_air_temperature.nc",   "value");  //Units: degress Celsius
   arp.ground_temp          = LoadData<float>(params.surfdatadir + \
-  params.region + params.time_start + "_ground_temp.nc",   "value");  
+  params.region + params.time_start + "_ground_temperature.nc",   "value");  
   //Units: degress Celsius
   arp.topo          = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_topo.nc",   "value");  //Units: metres
+  params.time_start + "_topography.nc",   "value");  //Units: metres
   arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_evap.nc",   "value");  //Units: m/yr
+  params.time_start + "_evaporation.nc",   "value");  //Units: m/yr
   arp.relhum        = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_relhum.nc", "value");  //Units: proportion from 0 to 1.
   arp.wind_speed    = LoadData<float>(params.surfdatadir + params.region + \
@@ -186,7 +186,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
 
   arp.winter_temp    = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_winter_temp.nc", "value");  //Units: degrees Celsius
+  params.time_start + "_winter_temperature.nc", "value");  //Units: degrees Celsius
 
 
 
@@ -199,13 +199,13 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
     //TODO: allow user to vary these calibration constants depending on their 
     //input cellsize? Or do some kind of auto variation of them? 
     if(arp.winter_temp(i) > -5)  //then fdepth = f from Ying's equation S7. 
-      arp.fdepth(i) = std::max(1/(1+150*arp.slope(i)),25.0f);  
+      arp.fdepth(i) = std::max(params.fdepth_a/(1+params.fdepth_b*arp.slope(i)),params.fdepth_fmin);  
     else{ //then fdpth = f*fT, Ying's equations S7 and S8. 
       if(arp.winter_temp(i) < -14)
-        arp.fdepth(i) = (std::max(1/(1+150*arp.slope(i)),25.0f)) * \
+        arp.fdepth(i) = (std::max(params.fdepth_a/(1+params.fdepth_b*arp.slope(i)),params.fdepth_fmin)) * \
       (std::max(0.05, 0.17 + 0.005 * arp.winter_temp(i)));
       else
-        arp.fdepth(i) = (std::max(1/(1+150*arp.slope(i)),25.0f)) * \
+        arp.fdepth(i) = (std::max(params.fdepth_a/(1+params.fdepth_b*arp.slope(i)),params.fdepth_fmin)) * \
       (std::min(1.0, 1.5 + 0.1 * arp.winter_temp(i)));
     }
   }
@@ -280,7 +280,8 @@ void cell_size_area(Parameters &params, ArrayPack &arp){
     arp.cell_area[j] = params.cellsize_n_s_metres* \
     (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j])/2;
 
-
+    if(arp.cell_area[j] < 0)
+      std::cout<<"how can this be? ns size "<<params.cellsize_n_s_metres<<" ew size N "<<arp.cellsize_e_w_metres_N[j]<<" ew size S "<<arp.cellsize_e_w_metres_S[j]<<" area "<<arp.cell_area[j]<<std::endl;
 //TODO: see which, if any, arrays can be cleared after use to free up memory. 
     //How to do this?
   }
@@ -321,7 +322,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   arp.infiltration_array = rd::Array2D<float>(arp.ksat,0);        
 
   arp.rech               = rd::Array2D<float>(arp.ksat,0);
-
+  arp.transmissivity               = rd::Array2D<float>(arp.ksat,0);
 
 
   //This array is used to store the values of how much the water table will 

@@ -391,12 +391,13 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     const auto ci    = arp.topo.xyToI(c.x,c.y); //Flat-index of focal cell
     auto clabel      = label(ci);          //Nominal label of cell
 
+
     if(clabel==OCEAN){
-      //This cell is an ocean cell or a cell that flows into the ocean without
+        //This cell is an ocean cell or a cell that flows into the ocean without
       //encountering any depressions on the way. Upon encountering it we do not
       //need to do anything special.
     } else if(clabel==NO_DEP){
-      //Since cells label their neighbours and ocean cells are labeled in the
+       //Since cells label their neighbours and ocean cells are labeled in the
       //initialization, the only way to get to a cell that is still labeled as
       //not being part of a depression is if that cell were added as a pit cell.
       //For each pit cell we find, we make a new depression and label it
@@ -442,7 +443,9 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
         pq.emplace(nx,ny,arp.topo(ni));//Add the neighbour to the priority queue
         flowdirs(nx,ny) = dinverse[n]; 
         //Neighbour flows in the direction of this cell
-      } else if (nlabel==clabel) {
+
+
+       } else if (nlabel==clabel) {
         //Skip because we are not interested in ourself. That would be vain.
         //Note that this case will come up frequently as we traverse flats since
         //the first cell to be visited in a flat labels all the cells in the
@@ -450,7 +453,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
         //the priority queue later and, in looking at their neighbours, reach
         //this point.
       } else {
-        //We've found a neighbouring depression!
+
+          //We've found a neighbouring depression!
 
         //Determine whether the focal cell or this neighbour is the outlet of
         //the depression. The outlet is the higher of the two.
@@ -596,6 +600,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
 
     if(depa_set==OCEAN || depb_set==OCEAN){
+     
       //If we're here then both depressions cannot link to the ocean, since we
       //would have used `continue` above. Therefore, one and only one of them
       //links to the ocean. We swap them to ensure that `depb` is the one which
@@ -647,6 +652,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       djset.mergeAintoB(depa_set,OCEAN); 
       //Make a note that Depression A MetaLabel has a path to the ocean
     } else {
+
       //Neither depression has found the ocean, so we merge the two depressions
       //into a new depression.
       auto &depa          = depressions.at(depa_set); 
@@ -712,6 +718,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
       djset.mergeAintoB(depa_set, newlabel); //A has a parent now
       djset.mergeAintoB(depb_set, newlabel); //B has a parent now
+    
+
     }
   }
   progress.stop();
@@ -728,8 +736,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
   //Get the marginal depression cell counts and total elevations
   progress.start(label.size());
-  #pragma omp parallel default(none) shared(progress,depressions,arp,label,final_label)
-  {
+ // #pragma omp parallel default(none) shared(progress,depressions,arp,label,final_label)
+  //{
   //  std::vector<uint32_t> cell_counts     (deps.size(), 0);
     std::vector<double>   total_volumes(depressions.size(), 0);
     std::vector<double>   total_areas  (depressions.size(), 0);
@@ -774,13 +782,13 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
   }
 
-    #pragma omp critical
+  //  #pragma omp critical
     for(unsigned int i=0;i<depressions.size();i++){
       depressions[i].dep_area        += total_areas[i];
       depressions[i].dep_vol         += total_volumes[i];
     }
 
-}
+//}
   progress.stop();
 
 
@@ -821,6 +829,8 @@ if(!(dep.lchild==NO_VALUE || (depressions.at(dep.lchild).dep_vol + \
 
     assert(dep.lchild==NO_VALUE || (depressions.at(dep.lchild).dep_vol + \
       depressions.at(dep.rchild).dep_vol) - dep.dep_vol <= FP_ERROR);
+  
+
   }
   progress.stop();
 

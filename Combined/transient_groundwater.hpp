@@ -76,11 +76,11 @@ private:
     double headW;
     double headE;
 
-    double wtdCenter;
-    double wtdN;
-    double wtdS;
-    double wtdW;
-    double wtdE;
+//    double wtdCenter;
+//    double wtdN;
+//    double wtdS;
+//    double wtdW;
+//    double wtdE;
 
     // These variables are used to monitor the state of the calculation
     double total_changes  = 0.;
@@ -180,8 +180,8 @@ private:
      *        with these.
      */
     void computeWTDchangeAtCell(Parameters &params, ArrayPack &arp, int32_t x,
-                                int32_t y, double dt);
-
+                                int32_t y, double dt,double test[5]);
+ 
     /**
      * @brief Updates the wtd_depth_total array at a cell(x,y) using the
      * pre-set time step and dynamic time stepping within this as needed.

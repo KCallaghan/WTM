@@ -148,7 +148,7 @@ void FillSpillMerge(
 ){
   rd::Timer timer_overall;
   timer_overall.start();
- 
+
   //We move standing water downhill to the pit cells of each depression
   MoveWaterIntoPits(params, deps, arp);
 
@@ -174,6 +174,7 @@ void FillSpillMerge(
 
     MoveWaterInDepHier(OCEAN, deps,jump_table,params,arp);
 
+
     std::cerr<<"t FlowInDepressionHierarchy: Overflow time = "\
     <<timer_overflow.stop()<<std::endl;
   }
@@ -182,6 +183,9 @@ void FillSpillMerge(
   for(int d=1;d<(int)deps.size();d++){
     const auto &dep = deps.at(d);
  
+if(!(dep.water_vol==0 || dep.water_vol - dep.wtd_vol <= FP_ERROR))
+  std::cout<<"water vol "<<dep.water_vol<<" wtd vol "<<dep.wtd_vol<<" dep label "<<dep.dep_label<<std::endl;
+
     assert(dep.water_vol==0 || dep.water_vol - dep.wtd_vol <= FP_ERROR);
     assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) \
       || (dep.lchild!=NO_VALUE && deps.at(dep.lchild).water_vol - dep.water_vol\
@@ -513,6 +517,10 @@ static void CalculateWtdVol(
     if(clabel==OCEAN)
       continue;
 
+if(wtd(x,y)>FP_ERROR)
+  std::cout<<"there is wtd where there shouldn't be "<<wtd(x,y)<<" x "<<x<<" y "<<y<<std::endl;
+
+
     assert(wtd(x,y) <= FP_ERROR);  
     //because all wtds get set to 0 when doing movewaterintopits - 
     //surface water is now gathered in the pits and has not yet been 
@@ -688,7 +696,6 @@ static void MoveWaterInDepHier(
 
   auto &this_dep = deps.at(current_depression);
 
-
   //Visit child depressions. When these both overflow, then we spread water
   //across them by spreading water across their common metadepression
   MoveWaterInDepHier(this_dep.lchild, deps, jump_table,params,arp);
@@ -707,6 +714,8 @@ static void MoveWaterInDepHier(
   //otherwise want to modify the ocean we quit here.
   if(current_depression==OCEAN)
     return;
+
+
 
   {
     const int lchild = this_dep.lchild;
@@ -763,6 +772,8 @@ static void MoveWaterInDepHier(
     if(this_dep.water_vol > this_dep.wtd_vol)
       this_dep.water_vol = this_dep.wtd_vol;
 
+
+
   } else if(this_dep.water_vol>this_dep.wtd_vol) {
     //The neighbouring depression is not the ocean and this depression is
     //overflowing (therefore, all of its children are full)
@@ -794,16 +805,16 @@ static void MoveWaterInDepHier(
     if(this_dep.water_vol > this_dep.wtd_vol)
       this_dep.water_vol = this_dep.wtd_vol;
 
-
-    //OverflowInto will initially send water to this depression's neighbour's
+   //OverflowInto will initially send water to this depression's neighbour's
     //leaf depression via the geolink. If everything fills up, the water will
     //end up in this depression's parent. So at this point we don't have to
     //worry about the extra water here any more.
 
-
     OverflowInto(this_dep.geolink, this_dep.dep_label, this_dep.parent, deps, \
     jump_table, extra_water,params,arp); //TODO: use odep or geolink here?
 
+
+ 
 
     assert(this_dep.water_vol >= -FP_ERROR);
     if(this_dep.water_vol < 0)
@@ -1085,6 +1096,7 @@ static dh_label_t OverflowInto(
   auto &this_dep = deps.at(root);
   auto &last_dep = deps.at(previous_dep);
 
+
   
   if(root==OCEAN)             //We've reached the ocean
     return OCEAN;             
@@ -1217,7 +1229,7 @@ static dh_label_t OverflowInto(
   if(extra_water==0)  {                       //If there's no more extra water
     assert(this_dep.water_vol==0 || this_dep.water_vol - \
       this_dep.wtd_vol <= FP_ERROR); 
-          
+         
     return root;        
   }                                                             //Call it quits
 
@@ -1237,7 +1249,12 @@ static dh_label_t OverflowInto(
     //but only if we are its child (we shouldn't add the water volume of an ocean-linked depression). 
     if(this_dep.parent!=OCEAN && pdep.water_vol==0 && (pdep.lchild == this_dep.dep_label || pdep.rchild == this_dep.dep_label)) 
       pdep.water_vol += this_dep.water_vol;   
- 
+
+    if(pdep.water_vol > pdep.wtd_vol)
+      pdep.water_vol = pdep.wtd_vol; //is this ok??????? TODO 
+
+
+
     return jump_table[root] = OverflowInto(this_dep.parent, \
     this_dep.dep_label, stop_node, deps, jump_table, extra_water,params,arp);  
     //Nope. Pass the water to the parent
@@ -1256,6 +1273,9 @@ static dh_label_t OverflowInto(
     //It might take a while, but our neighbour will overflow, 
       //so our parent needs to know about our water volumes
       pdep.water_vol += this_dep.wtd_vol + odep.wtd_vol;           //*******************************
+
+    if(pdep.water_vol > pdep.wtd_vol)
+      pdep.water_vol = pdep.wtd_vol; //is this ok??????? TODO
       //Neighbour's water_vol will equal its dep_vol
     }
 
@@ -1285,9 +1305,12 @@ static dh_label_t OverflowInto(
     (pdep.lchild == this_dep.dep_label || pdep.rchild == this_dep.dep_label) && \
     (pdep.lchild == odep.dep_label || pdep.rchild == odep.dep_label)){
     pdep.water_vol += this_dep.wtd_vol + odep.wtd_vol;  
+    if(pdep.water_vol > pdep.wtd_vol)
+      pdep.water_vol = pdep.wtd_vol; //is this ok??????? TODO
   }
    //THIRD PLACE TO STASH WATER: IN THIS DEPRESSION'S PARENT
   
+ 
 
   return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, \
     stop_node,deps, jump_table, extra_water,params,arp);
@@ -1550,6 +1573,9 @@ static void FillDepressions(
   //dephier.hpp TODO)
   double current_elevation = 0;
   double previous_elevation = 0;
+  double highest_elevation = arp.topo(deps.at(stdi.leaf_label).pit_cell);
+  double highest_diff = 0;
+
 
 //Stores the sum of the elevations of all of the cells in cells_affected. Used
   //for calculating the volume we've seen so far. (See explanation above or in
@@ -1564,6 +1590,13 @@ static void FillDepressions(
     const auto c = flood_q.top();
     flood_q.pop();
     current_elevation = static_cast<double>(arp.topo(c.x,c.y));
+
+    highest_diff = 0;  //This is the difference between the current highest cell seen, and the previous highest cell. 
+    //it is 0 unless this is the new highest cell. 
+    if(current_elevation > highest_elevation){
+      highest_diff = current_elevation - highest_elevation;
+      highest_elevation = current_elevation;
+    }
 
     //We keep track of the current volume of the depression by noting the total
     //elevation of the cells we've seen as well as the number of cells we've
@@ -1582,7 +1615,36 @@ static void FillDepressions(
     //current_volume = cells_affected.size()*static_cast<double>(topo(c.x,c.y))
     // - total_elevation; 
 
-    current_volume += (current_elevation-previous_elevation)*current_area;
+ //   current_volume += (current_elevation-previous_elevation)*current_area;
+    current_volume += arp.cell_area[c.y]*(highest_elevation-current_elevation);//This is the volume added by the current cell. 
+    //if the current elevation is equal to the highest elevation, this is 0: The current cell has no volume above its elevation to add. 
+
+     if(current_elevation != highest_elevation && stdi.my_labels.count(arp.label(c.x,c.y))!=0){  
+        cells_affected.emplace_back(arp.topo.xyToI(c.x,c.y));
+      
+      //Fill in cells' water tables as we go
+
+      assert(arp.wtd(c.x,c.y) <= FP_ERROR);
+      if(arp.wtd(c.x,c.y) > 0)
+        arp.wtd(c.x,c.y) = 0;
+      water_vol += arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1);
+
+      //We use += because wtd is less than or equal to zero
+      arp.wtd(c.x,c.y)    = 0;             
+      //Now we are sure that wtd is 0, since we've just filled it
+
+           //Add the current cell's information to the running total
+      total_elevation += arp.topo(c.x,c.y);
+      current_area += arp.cell_area[c.y];  
+      //adding to the area after the volume because when there is only 1 cell, 
+      //the answer for volume should be 0, etc. 
+      //Don't want to include the area of the target cell. 
+      area_times_elevation_total += arp.topo(c.x,c.y)*arp.cell_area[c.y];
+}
+    current_volume += highest_diff*current_area;//This is the volume added by previous cells, if we have found a new highest cell. 
+    //highest_diff is only non-zero if the current cell is a new 'highest cell' for the depression so far. In this case, we need to 
+    //add the amount of volume above all scanned cells, between the heights of the previous highest cell and this one. 
+
 
     assert(water_vol >= - FP_ERROR);
     if(water_vol < 0)
@@ -1641,13 +1703,16 @@ static void FillDepressions(
         water_vol -= fill_amount;   
    
         //Doesn't matter because we don't use water_vol anymore
-        water_level     = arp.topo(c.x,c.y);
+    //    water_level     = arp.topo(c.x,c.y);
+
+        water_level = highest_elevation;
    
 
       } else if (current_volume==water_vol) {  
         //The volume of water is exactly equal to the above ground volume 
         //so we set the water level equal to this cell's elevation
-          water_level = arp.topo(c.x,c.y);
+       //   water_level = arp.topo(c.x,c.y);
+        water_level = highest_elevation;
         }
       else {  //The water volume is less than this cell's elevation, 
         //so we calculate what the water level should be.
@@ -1666,11 +1731,16 @@ static void FillDepressions(
 
       }
       //Water level must be higher than (or equal to) the previous cell
-      // we looked at, but lower than (or equal to) the current cell
+      // we looked at, but lower than (or equal to) the highest cell
 
       assert(cells_affected.size()==0 || arp.topo(cells_affected.back()) - \
-        water_level <= FP_ERROR); 
-      assert(arp.topo(c.x,c.y)-water_level >= -FP_ERROR);
+        water_level <= FP_ERROR);
+        if(highest_elevation - water_level < -FP_ERROR){
+          std::cout<<"highest_elevation "<<highest_elevation<<" water level "<<water_level<<std::endl;
+          std::cout<<"water vol "<<water_vol<<" current area "<<current_area<<" area_times_elevation_total "<<area_times_elevation_total<<std::endl;
+        } 
+      assert(highest_elevation-water_level >= -FP_ERROR);
+     
 
       for(const auto c: cells_affected){
         assert(arp.wtd(c) >= -FP_ERROR);               
@@ -1721,7 +1791,10 @@ static void FillDepressions(
 
       //Add this cell to those affected so that its volume is available for
       //filling.
-      cells_affected.emplace_back(arp.topo.xyToI(c.x,c.y));
+ 
+      if(current_elevation == highest_elevation){
+        cells_affected.emplace_back(arp.topo.xyToI(c.x,c.y));
+      
       //Fill in cells' water tables as we go
 
       assert(arp.wtd(c.x,c.y) <= FP_ERROR);
@@ -1740,9 +1813,8 @@ static void FillDepressions(
       //the answer for volume should be 0, etc. 
       //Don't want to include the area of the target cell. 
       area_times_elevation_total += arp.topo(c.x,c.y)*arp.cell_area[c.y];
+}
 
-      
- 
       for(int n=1;n<=neighbours;n++){
         const int nx = c.x + dx[n]; 
         //TODO ModFloor(x+dx[n],topo.width()); 
@@ -1777,11 +1849,14 @@ static void FillDepressions(
           visited.emplace(ni);
         }
       }
-    }
+    
+  }
 
 
     if(flood_q.empty() && !neighbour_q.empty()){
+  //    std::cout<<"this is where I am supposed to add something from the neighbour q"<<std::endl;
       const auto c = neighbour_q.top();
+    //  std::cout<<arp.topo(c.x,c.y)<<std::endl;
       neighbour_q.pop();    
       flood_q.emplace(c.x,c.y,arp.topo(c.x,c.y));
     }
@@ -1797,6 +1872,7 @@ static void FillDepressions(
   std::cerr<<"E PQ loop exited without filling a depression!"<<std::endl;
   std::cerr<<"water vol "<<water_vol<<" current vol "\
   <<current_volume<<std::endl;
+  std::cerr<<"dep vol "<<deps.at(stdi.top_label).dep_vol<<" dep label "<<stdi.top_label<<std::endl;
   
 
   assert(!flood_q.empty());

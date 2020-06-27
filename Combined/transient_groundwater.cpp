@@ -83,6 +83,11 @@ double FanDarcyGroundwater::computeMaxStableTimeStep(Parameters &params,
     // Use the highest transmissivity for this time-step calculation
     double dt_max_diffusion_basic;
     double dt_max_diffusion_withPorosity;
+    double transmissivityN = arp.transmissivity(x,y+1);
+    double transmissivityS = arp.transmissivity(x,y-1);
+    double transmissivityE = arp.transmissivity(x+1,y);
+    double transmissivityW = arp.transmissivity(x-1,y);
+
     double *Tarray[4] = { &transmissivityN, &transmissivityS,
                              &transmissivityW, &transmissivityE };
     double Dmax = computeArrayMax( Tarray, 4 ); // Max diffusivity
@@ -292,7 +297,7 @@ double FanDarcyGroundwater::computeNewWTD(const float volume,
 void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
                                                   ArrayPack &arp,
                                                   int32_t x, int32_t y,
-                                                  double dt){
+                                                  double dt,double local_wtd[5]){
     // Update WTD change
 
     // We do this instead of using a staggered grid to approx. double CPU time
@@ -301,25 +306,25 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     // First, compute elevation head at center cell and all neighbours
     // This equals topography plus the water table depth
     // (positive upwards; negative if water table is below Earth surface)
-    double headCenter = arp.topo(x,y) + wtdCenter;
-    double headN      = arp.topo(x,y+1) + wtdN;
-    double headS      = arp.topo(x,y-1) + wtdS;
-    double headW      = arp.topo(x-1,y) + wtdW;
-    double headE      = arp.topo(x+1,y) + wtdE;
+    double headCenter = arp.topo(x,y)   + local_wtd[0];
+    double headN      = arp.topo(x,y+1) + local_wtd[1];
+    double headS      = arp.topo(x,y-1) + local_wtd[2];
+    double headE      = arp.topo(x+1,y) + local_wtd[3];
+    double headW      = arp.topo(x-1,y) + local_wtd[4];
 
     double mycell_change = 0.;
 
     // Then, compute the discharges
-    double QN = transmissivityN * (headN - headCenter) \
+    double QN = arp.transmissivity(x,y+1) * (headN - headCenter) \
                     / params.cellsize_n_s_metres \
                     * arp.cellsize_e_w_metres[y];
-    double QS = transmissivityS * (headS - headCenter) \
+    double QS = arp.transmissivity(x,y-1) * (headS - headCenter) \
                     / params.cellsize_n_s_metres \
                     * arp.cellsize_e_w_metres[y];
-    double QE = transmissivityE * (headE - headCenter) \
+    double QE = arp.transmissivity(x+1,y) * (headE - headCenter) \
                     / arp.cellsize_e_w_metres[y] \
                     * params.cellsize_n_s_metres;
-    double QW = transmissivityW * (headW - headCenter) \
+    double QW = arp.transmissivity(x-1,y) * (headW - headCenter) \
                     / arp.cellsize_e_w_metres[y] \
                     * params.cellsize_n_s_metres;
 
@@ -337,26 +342,26 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     //porosity, e-folding depth, wtd, and cell area of the 2 cells. 
 
     double volume_N = calculateWaterVolume(fabs(wtd_change_N), 
-    	 wtdCenter, wtdN, x, y, x, y+1, arp);
+    	 local_wtd[0], local_wtd[1], x, y, x, y+1, arp);
 
     double volume_S = calculateWaterVolume(fabs(wtd_change_S), 
-    	 wtdCenter, wtdS, x, y, x, y-1, arp);
+    	 local_wtd[0], local_wtd[2], x, y, x, y-1, arp);
 
     double volume_E = calculateWaterVolume(fabs(wtd_change_E), 
-    	 wtdCenter, wtdE, x, y, x+1, y, arp);
+    	 local_wtd[0], local_wtd[3], x, y, x+1, y, arp);
 
     double volume_W = calculateWaterVolume(fabs(wtd_change_W), 
-    	 wtdCenter, wtdW, x, y, x-1, y, arp);
+    	 local_wtd[0], local_wtd[4], x, y, x-1, y, arp);
 
 
     if(volume_N < 0)
-    	std::cout<<"negative volume N "<<volume_N<<" wtd change "<<wtd_change_N<<" wtd centre "<<wtdCenter<<" wtd N "<<wtdN<<" x "<<x<<" y "<<y<<std::endl;
+    	std::cout<<"negative volume N "<<volume_N<<" wtd change "<<wtd_change_N<<" wtd centre "<<local_wtd[0]<<" wtd N "<<local_wtd[1]<<" x "<<x<<" y "<<y<<std::endl;
     if(volume_S < 0)
-    	std::cout<<"negative volume S "<<volume_S<<" wtd change "<<wtd_change_S<<" wtd centre "<<wtdCenter<<" wtd S "<<wtdS<<" x "<<x<<" y "<<y<<std::endl;
+    	std::cout<<"negative volume S "<<volume_S<<" wtd change "<<wtd_change_S<<" wtd centre "<<local_wtd[0]<<" wtd S "<<local_wtd[2]<<" x "<<x<<" y "<<y<<std::endl;
     if(volume_E < 0)
-    	std::cout<<"negative volume E "<<volume_E<<" wtd change "<<wtd_change_E<<" wtd centre "<<wtdCenter<<" wtd E "<<wtdE<<" x "<<x<<" y "<<y<<std::endl;
+    	std::cout<<"negative volume E "<<volume_E<<" wtd change "<<wtd_change_E<<" wtd centre "<<local_wtd[0]<<" wtd E "<<local_wtd[3]<<" x "<<x<<" y "<<y<<std::endl;
     if(volume_W < 0)
-    	std::cout<<"negative volume W "<<volume_W<<" wtd change "<<wtd_change_W<<" wtd centre "<<wtdCenter<<" wtd W "<<wtdW<<" x "<<x<<" y "<<y<<std::endl;
+    	std::cout<<"negative volume W "<<volume_W<<" wtd change "<<wtd_change_W<<" wtd centre "<<local_wtd[0]<<" wtd W "<<local_wtd[4]<<" x "<<x<<" y "<<y<<std::endl;
     
   //we now use these volumes to compute the actual changes in 
     //water table depths in the target cell and each of the neighbouring cells:
@@ -370,52 +375,53 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( Parameters &params,
     // Target cell is the receiving cell.
     if(volume_N > FP_ERROR){
       if(wtd_change_N > 0){
-          wtdN           += computeNewWTD( volume_N, wtdN,      x, y+1, 0, arp);
-          mycell_change  += computeNewWTD( volume_N, wtdCenter, x, y,   1, arp);
+          local_wtd[1]   += computeNewWTD( volume_N, local_wtd[1], x, y+1, 0, arp);
+          mycell_change  += computeNewWTD( volume_N, local_wtd[0], x, y,   1, arp);
       }
       // The current cell is giving water to the North.
       // The North is the receiving cell.
       else{
-          wtdN           += computeNewWTD( volume_N, wtdN,      x, y+1, 1, arp);
-          mycell_change  += computeNewWTD( volume_N, wtdCenter, x, y,   0, arp);
+          local_wtd[1]   += computeNewWTD( volume_N, local_wtd[1], x, y+1, 1, arp);
+          mycell_change  += computeNewWTD( volume_N, local_wtd[0], x, y,   0, arp);
       }
     }
     
     if(volume_S > FP_ERROR){
       if(wtd_change_S > 0){
-           wtdS          += computeNewWTD( volume_S, wtdS,      x, y-1, 0, arp);
-           mycell_change += computeNewWTD( volume_S, wtdCenter, x, y,   1, arp);
+           local_wtd[2]  += computeNewWTD( volume_S, local_wtd[2], x, y-1, 0, arp);
+           mycell_change += computeNewWTD( volume_S, local_wtd[0], x, y,   1, arp);
        }
       else {
-          wtdS           += computeNewWTD( volume_S, wtdS,      x, y-1, 1, arp);
-          mycell_change  += computeNewWTD( volume_S, wtdCenter, x, y,   0, arp);
+          local_wtd[2]   += computeNewWTD( volume_S, local_wtd[2], x, y-1, 1, arp);
+          mycell_change  += computeNewWTD( volume_S, local_wtd[0], x, y,   0, arp);
       }
     }
 
     if(volume_E > FP_ERROR){
       if(wtd_change_E > 0){
-          wtdE           += computeNewWTD( volume_E, wtdE,      x+1, y, 0, arp);
-          mycell_change  += computeNewWTD( volume_E, wtdCenter, x,   y, 1, arp);
+          local_wtd[3]   += computeNewWTD( volume_E, local_wtd[3], x+1, y, 0, arp);
+          mycell_change  += computeNewWTD( volume_E, local_wtd[0], x,   y, 1, arp);
        }
       else {
-          wtdE           += computeNewWTD( volume_E, wtdE,      x+1, y, 1, arp);
-          mycell_change  += computeNewWTD( volume_E, wtdCenter, x,   y, 0, arp);
+          local_wtd[3]   += computeNewWTD( volume_E, local_wtd[3], x+1, y, 1, arp);
+          mycell_change  += computeNewWTD( volume_E, local_wtd[0], x,   y, 0, arp);
       }
     }
 
     if(volume_W > FP_ERROR){
       if(wtd_change_W > 0){
-          wtdW           += computeNewWTD( volume_W, wtdW,      x-1, y, 0, arp);
-          mycell_change  += computeNewWTD( volume_W, wtdCenter, x,   y, 1, arp);
+          local_wtd[4]   += computeNewWTD( volume_W, local_wtd[4], x-1, y, 0, arp);
+          mycell_change  += computeNewWTD( volume_W, local_wtd[0], x,   y, 1, arp);
        }
       else{
-          wtdW           += computeNewWTD( volume_W, wtdW,      x-1, y, 1, arp);
-          mycell_change  += computeNewWTD( volume_W, wtdCenter, x,   y, 0, arp);
+          local_wtd[4]   += computeNewWTD( volume_W, local_wtd[4], x-1, y, 1, arp);
+          mycell_change  += computeNewWTD( volume_W, local_wtd[0], x,   y, 0, arp);
       }
     }
     // Now we have the height changes that will take place in the target cell
     // and each of the four neighbours.
-    wtdCenter += mycell_change;
+    local_wtd[0] += mycell_change;
+
 }
 
 
@@ -435,19 +441,15 @@ void FanDarcyGroundwater::updateCell( Parameters &params, ArrayPack &arp,
 
     // Initial water-table depths, prior to updating
     double wtdCenter_initial = arp.wtd(x,y);
-    wtdCenter = arp.wtd(x,y);
 
-    wtdN      = arp.wtd(x,y+1);
-    wtdS      = arp.wtd(x,y-1);
-    wtdE      = arp.wtd(x+1,y);
-    wtdW      = arp.wtd(x-1,y);
+    double local_wtd[5] = {arp.wtd(x,y),arp.wtd(x,y+1),arp.wtd(x,y-1),arp.wtd(x+1,y),arp.wtd(x-1,y)};
 
     // Update water-table depths using dynamic time stepping
     while (time_remaining > 0){
 
         // Currently transmissivity is based on wtd, which does not change
         // during the while loop.
-        computeNeighborTransmissivity(arp, x, y);
+      //  computeNeighborTransmissivity(arp, x, y);
         //should we change it during the while loop? If not, we can move it out.
         double max_stable_time_step = computeMaxStableTimeStep( params, arp,
                                                                 x, y);
@@ -459,14 +461,14 @@ void FanDarcyGroundwater::updateCell( Parameters &params, ArrayPack &arp,
             dt_inner = max_stable_time_step;
         }
 
-        computeWTDchangeAtCell(params, arp, x, y, dt_inner);
+        computeWTDchangeAtCell(params, arp, x, y, dt_inner,local_wtd);
         time_remaining -= dt_inner;
     }
 
     // When exiting loop, the wtdCenter variable holds the final
     // water-table depth
     // This subtraction is unnecessary; could just give the new total instead
-    arp.wtd_change_total(x,y) = wtdCenter - wtdCenter_initial;
+    arp.wtd_change_total(x,y) = local_wtd[0] - wtdCenter_initial;
 }
 
 /////////////////
@@ -490,10 +492,46 @@ void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp){
     //cout << "\n";
     //cout << params.ncells_y; // prints Output sentence on screen
     //cout << "\n";
-    // Updates water-table depth grid over one time step
-  //  #pragma omp parallel for collapse(2)
+
+    #pragma omp parallel for collapse(2)
     for(int32_t y=1; y<params.ncells_y-1; y++){
         for(int32_t x=1; x<params.ncells_x-1; x++){
+     if(arp.fdepth(x,y)>0){
+        // Equation S6 from the Fan paper
+        if(arp.wtd(x,y)<-1.5){
+            arp.transmissivity(x,y) = arp.fdepth(x,y) * arp.ksat(x,y) \
+                       * std::exp( (arp.wtd(x,y)+1.5)/arp.fdepth(x,y) );
+        }
+        // If wtd is greater than 0, max out rate of groundwater movement
+        // as though wtd were 0. The surface water will get to move in
+        // FillSpillMerge.
+        else if(arp.wtd(x,y) > 0){
+            arp.transmissivity(x,y) = arp.ksat(x,y) * (0+1.5+arp.fdepth(x,y));
+        }
+        //Equation S4 from the Fan paper
+        else{
+            arp.transmissivity(x,y) = arp.ksat(x,y) * (arp.wtd(x,y) + 1.5 + arp.fdepth(x,y));
+        }
+    }
+    // If the fdepth is zero, there is no water transmission below the surface
+    // soil layer.
+    // If it is less than zero, it is incorrect -- but no water transmission
+    // also seems an okay thing to do in this case.
+    else{
+        arp.transmissivity(x,y) = 0;
+    }
+    }
+}
+
+
+
+    // Updates water-table depth grid over one time step
+    #pragma omp parallel for collapse(2)
+    for(int32_t y=1; y<params.ncells_y-1; y++){
+        for(int32_t x=1; x<params.ncells_x-1; x++){
+
+        	if(x==931 && y==625 || x == 931 && y == 624)
+        		std::cout<<y<<" GW before wtd "<<arp.wtd(x,y)<<std::endl;
             // Skip ocean cells
             if(arp.land_mask(x,y) == 0){
                 continue;
@@ -516,6 +554,10 @@ void FanDarcyGroundwater::update(Parameters &params, ArrayPack &arp){
             // This is the new water table after groundwater has moved
             // for delta_t seconds.
             arp.wtd(x,y) += arp.wtd_change_total(x,y);
+
+
+        	if(x==931 && y==625|| x == 931 && y == 624)
+        		std::cout<<y<<" GW after wtd "<<arp.wtd(x,y)<<std::endl;
         }
     }
 }
