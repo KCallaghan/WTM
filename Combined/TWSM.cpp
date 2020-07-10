@@ -9,24 +9,41 @@ void initialise(Parameters &params, ArrayPack &arp){
   if(params.run_type=="transient"){
     textfile<<"Initialise transient"<<std::endl;
     InitialiseTransient(params,arp);
+    //compute changing cell size and distances between cells as
+    //these change with latitude:
+    cell_size_area(params,arp);
+    textfile<<"computed distances, areas, and latitudes"<<std::endl;
+
+    //finalise some setup for runoff, labels, etc that is the
+    //same for both run types.
+    InitialiseBoth(params,arp);
   }
   else if(params.run_type == "equilibrium"){
     textfile<<"Initialise equilibrium"<<std::endl;
     InitialiseEquilibrium(params,arp);
+    //compute changing cell size and distances between cells as
+    //these change with latitude:
+    cell_size_area(params,arp);
+    textfile<<"computed distances, areas, and latitudes"<<std::endl;
+
+    //finalise some setup for runoff, labels, etc that is the
+    //same for both run types.
+    InitialiseBoth(params,arp);
+  }
+  else if(params.run_type == "test"){
+    textfile<<"Initialise test"<<std::endl;
+    InitialiseTest(params,arp);
+    //compute changing cell size and distances between cells as
+    //these change with latitude:
+    cell_size_area(params,arp);
+    textfile<<"computed distances, areas, and latitudes"<<std::endl;
   }
   else{
     throw std::runtime_error("That was not a recognised run type! \
       Please choose transient or equilibrium.");
   }
 
-  //compute changing cell size and distances between cells as
-  //these change with latitude:
-  cell_size_area(params,arp);
-  textfile<<"computed distances, areas, and latitudes"<<std::endl;
 
-  //finalise some setup for runoff, labels, etc that is the
-  //same for both run types.
-  InitialiseBoth(params,arp);
 
   arp.check();
   textfile.close();
@@ -66,13 +83,18 @@ template<class elev_t>
   arp.wtd_mid = arp.wtd;  //in FSM vs in the groundwater portion.
 
 
-//  #pragma omp parallel
-//  {
-//    printf("Hello from process: %d\n",omp_get_thread_num());
-//  }
 
 
+  //Run the groundwater code to move water
 
+   time_t now = time(0);
+   char* dt = ctime(&now);
+
+   std::cerr << "Before GW time: " << dt << std::endl;
+
+int iter_count = 0;
+while(iter_count < params.maxiter){
+  
   #pragma omp parallel for collapse(2)  
   for(int y=1;y<params.ncells_y-1;y++)
   for(int x=1;x<params.ncells_x-1; x++){
@@ -81,24 +103,40 @@ template<class elev_t>
     add_recharge(x, y, params, arp);
   }
 
-  //Run the groundwater code to move water
-
   gw.update(params, arp);
+  iter_count +=1;
+}
+ 
+
+   now = time(0);
+   dt = ctime(&now);
+
+   std::cerr << "After GW time: " << dt << std::endl;
  
   arp.wtd_mid = arp.wtd;
 
   //Move surface water
   dh::FillSpillMerge(params,deps,arp);
 
+
+   now = time(0);
+   dt = ctime(&now);
+
+   std::cerr << "After FSM time: " << dt << std::endl;
+
   //check to see where there is surface water, and adjust how evaporation works
   //at these locations.
   evaporation_update(params,arp);
+
+     std::cerr << "After evaporation_update: " << dt << std::endl;
 
   //Print values about the change in water table depth to the text file.
   PrintValues(params,arp);
 
   arp.wtd_old = arp.wtd;
   params.cycles_done += 1;
+     std::cerr << "Done time: " << dt << std::endl;
+
 }
 
 
