@@ -65,16 +65,16 @@ private:
     // INSTANCE VARIABLES //
     ////////////////////////
 
-    double transmissivityN;
-    double transmissivityS;
-    double transmissivityW;
-    double transmissivityE;
+    // double transmissivityN;
+    // double transmissivityS;
+    // double transmissivityW;
+    // double transmissivityE;
 
-    double headCenter;
-    double headN;
-    double headS;
-    double headW;
-    double headE;
+    // double headCenter;
+    // double headN;
+    // double headS;
+    // double headW;
+    // double headE;
 
 //    double wtdCenter;
 //    double wtdN;
@@ -83,10 +83,10 @@ private:
 //    double wtdE;
 
     // These variables are used to monitor the state of the calculation
-    double total_changes  = 0.;
-    float max_total       = 0.;
-    float min_total       = 0.;
-    float max_change      = 0.;
+    // double total_changes  = 0.;
+    // float max_total       = 0.;
+    // float min_total       = 0.;
+    // float max_change      = 0.;
 
 
     ///////////////
@@ -149,7 +149,7 @@ private:
 
 
     /**
-     * @brief Calculates the change in water volume that occurs between 
+     * @brief Calculates the change in water volume that occurs between
      * two cells, given the water-table depth flux between the two.
      */
     double calculateWaterVolume(const float wtd_change,
@@ -171,7 +171,7 @@ private:
                                           const float my_wtd,
                                           const int x,
                                           const int y,
-                                          const int direction, 
+                                          const int direction,
                                           const ArrayPack &arp);
 
     /**
@@ -181,7 +181,7 @@ private:
      */
     void computeWTDchangeAtCell(Parameters &params, ArrayPack &arp, int32_t x,
                                 int32_t y, double dt,double test[5]);
- 
+
     /**
      * @brief Updates the wtd_depth_total array at a cell(x,y) using the
      * pre-set time step and dynamic time stepping within this as needed.
