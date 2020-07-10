@@ -69,7 +69,7 @@ private:
     // double transmissivityS;
     // double transmissivityW;
     // double transmissivityE;
-
+    
     // double headCenter;
     // double headN;
     // double headS;
@@ -167,11 +167,21 @@ private:
      * @brief Calculates water-table depth change in a cell that receives water,
      * given the change in the corresponding cell that gives water.
      */
-    double computeNewWTD(const float volume,
+    double computeNewWTDGain(const float volume,
                                           const float my_wtd,
                                           const int x,
                                           const int y,
-                                          const int direction,
+                                          const ArrayPack &arp);
+
+
+        /**
+     * @brief Calculates water-table depth change in a cell that receives water,
+     * given the change in the corresponding cell that gives water.
+     */
+    double computeNewWTDLoss(const float volume,
+                                          const float my_wtd,
+                                          const int x,
+                                          const int y,
                                           const ArrayPack &arp);
 
     /**
