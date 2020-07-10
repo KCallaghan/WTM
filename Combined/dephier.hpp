@@ -744,7 +744,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
 
 
-  #pragma omp parallel for collapse(2)
+  //#pragma omp parallel for collapse(2)
   for(int y=0;y<label.height();y++)
   for(int x=0;x<label.width();x++){
     ++progress;
@@ -821,10 +821,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //so that our parent can also get the correct total dep_vol. 
       dep.dep_area += depressions.at(dep.rchild).dep_area;
     }
-
-if(!(dep.lchild==NO_VALUE || (depressions.at(dep.lchild).dep_vol + \
-      depressions.at(dep.rchild).dep_vol) - dep.dep_vol <= FP_ERROR))
-        std::cout<<"lchild vol "<<depressions.at(dep.lchild).dep_vol<<" rchild vol "<<depressions.at(dep.rchild).dep_vol<<" my vol "<<dep.dep_vol<<std::endl;
 
 
     assert(dep.lchild==NO_VALUE || (depressions.at(dep.lchild).dep_vol + \
