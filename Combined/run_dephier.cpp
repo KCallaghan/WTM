@@ -147,7 +147,7 @@ int main(int argc, char **argv){
 
 
 //We are finished, save the result.   
-  std:cout<<"done with processing"<<std::endl;  
+  std::cout<<"done with processing"<<std::endl;  
 
   SaveAsNetCDF(label,"label.nc","value");
   SaveAsNetCDF(final_label,"final_label.nc","value");
