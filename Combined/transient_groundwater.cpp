@@ -11,7 +11,6 @@ const double FP_ERROR = 1e-4;
 
 namespace FanDarcyGroundwater {
 
-namespace details {
 
 /**
  * @brief Returns the maximum stable time step with a 2x factor of safety
@@ -377,7 +376,7 @@ void updateCell( const Parameters &params, ArrayPack &arp,
     arp.wtd_changed(x,y) = local_wtd[0];
 }
 
-}
+
 
 //////////////////////
 // PUBLIC FUNCTIONS //
@@ -424,7 +423,7 @@ void update(const Parameters &params, ArrayPack &arp){
     // Skip ocean cells
     if(arp.land_mask(x,y) == 1){
       // Otherwise, update the water-table depth change array
-      details::updateCell( params, arp, x, y );;
+      updateCell( params, arp, x, y );;
     }
   }
 
