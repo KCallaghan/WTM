@@ -289,7 +289,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
 
   //This array is used to store the values of how much the water table will 
   //change in one iteration, then adding it to wtd gets the new wtd.
-  arp.wtd_change_total   = rd::Array2D<float>(arp.ksat,0.0f);     
+  arp.wtd_changed        = rd::Array2D<float>(arp.ksat,0.0f);     
 
   //These are populated during the calculation of the depression hierarchy:
   arp.label              = rd::Array2D<dh_label_t>   \
@@ -456,7 +456,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 
   //This array is used to store the values of how much the water table will 
   //change in one iteration, then adding it to wtd gets the new wtd.
-  arp.wtd_change_total   = rd::Array2D<float>(arp.ksat,0.0f);     
+  arp.wtd_changed        = rd::Array2D<float>(arp.ksat,0.0f);     
 
   //These are populated during the calculation of the depression hierarchy:
   arp.label              = rd::Array2D<dh_label_t>   \

@@ -51,7 +51,7 @@ class ArrayPack {
   f2d wtd;
   f2d wtd_mid;
   f2d wtd_old;
-  f2d wtd_change_total;
+  f2d wtd_changed;
  
   f2d rech;
   f2d runoff;
