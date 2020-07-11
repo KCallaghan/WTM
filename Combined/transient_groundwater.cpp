@@ -352,7 +352,6 @@ void updateCell( const Parameters &params, ArrayPack &arp,
   double dt_inner;
 
   // Initial water-table depths, prior to updating
-  double wtdCenter_initial = arp.wtd(x,y);
 
   std::array<double, 5> local_wtd = {arp.wtd(x,y),arp.wtd(x,y+1),arp.wtd(x,y-1),arp.wtd(x+1,y),arp.wtd(x-1,y)};
 
