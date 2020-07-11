@@ -9,7 +9,11 @@ const double FP_ERROR = 1e-4;
 // PRIVATE FUNCTIONS //
 ///////////////////////
 
-double FanDarcyGroundwater::computeMaxStableTimeStep(const Parameters &params,
+namespace FanDarcyGroundwater {
+
+namespace details {
+
+double computeMaxStableTimeStep(const Parameters &params,
                                                      ArrayPack &arp,
                                                      uint32_t x,
                                                      uint32_t y){
@@ -50,7 +54,7 @@ double FanDarcyGroundwater::computeMaxStableTimeStep(const Parameters &params,
 }
 
 
-double FanDarcyGroundwater::calculateWaterVolume(const float wtd_change,
+double calculateWaterVolume(const float wtd_change,
                                                  const float center_wtd,
                                                  const float neighbour_wtd,
                                                  const int x1,
@@ -120,7 +124,7 @@ double FanDarcyGroundwater::calculateWaterVolume(const float wtd_change,
 
 
 
-double FanDarcyGroundwater::computeNewWTDGain(const float volume,
+double computeNewWTDGain(const float volume,
                                               const float my_wtd,
                                               const int x,
                                               const int y,
@@ -159,7 +163,7 @@ double FanDarcyGroundwater::computeNewWTDGain(const float volume,
 }
 
 
-double FanDarcyGroundwater::computeNewWTDLoss(const float volume,
+double computeNewWTDLoss(const float volume,
                                               const float my_wtd,
                                               const int x,
                                               const int y,
@@ -198,7 +202,7 @@ double FanDarcyGroundwater::computeNewWTDLoss(const float volume,
 
 
 
-void FanDarcyGroundwater::computeWTDchangeAtCell( const Parameters &params,
+void computeWTDchangeAtCell( const Parameters &params,
                                                   ArrayPack &arp,
                                                   int32_t x, int32_t y,
                                                   double dt, std::array<double,5> &local_wtd){
@@ -311,7 +315,7 @@ void FanDarcyGroundwater::computeWTDchangeAtCell( const Parameters &params,
 
 
 
-void FanDarcyGroundwater::updateCell( const Parameters &params, ArrayPack &arp,
+void updateCell( const Parameters &params, ArrayPack &arp,
                                       uint32_t x, uint32_t y ){
 
   using namespace std::this_thread;     // sleep_for, sleep_until
@@ -349,22 +353,13 @@ void FanDarcyGroundwater::updateCell( const Parameters &params, ArrayPack &arp,
     arp.wtd_changed(x,y) = local_wtd[0];
 }
 
-/////////////////
-// CONSTRUCTOR //
-/////////////////
-
-FanDarcyGroundwater::FanDarcyGroundwater(){
 }
 
 //////////////////////
 // PUBLIC FUNCTIONS //
 //////////////////////
 
-void FanDarcyGroundwater::initialize(){
-
-}
-
-void FanDarcyGroundwater::update(const Parameters &params, ArrayPack &arp){
+void update(const Parameters &params, ArrayPack &arp){
 
   #pragma omp parallel for collapse(2) default(none) shared(arp,params)
   for(int32_t y=1; y<params.ncells_y-1; y++)
@@ -405,7 +400,7 @@ void FanDarcyGroundwater::update(const Parameters &params, ArrayPack &arp){
     // Skip ocean cells
     if(arp.land_mask(x,y) == 1){
       // Otherwise, update the water-table depth change array
-      updateCell( params, arp, x, y );;
+      details::updateCell( params, arp, x, y );;
     }
   }
 
@@ -423,6 +418,8 @@ void FanDarcyGroundwater::update(const Parameters &params, ArrayPack &arp){
       arp.wtd(x,y) = arp.wtd_changed(x,y);;
     }
   }
+<<<<<<< richard/fandarcydeclass
+=======
 }
 
 
@@ -431,9 +428,7 @@ void FanDarcyGroundwater::update(const Parameters &params, ArrayPack &arp){
 // Otherwise, will not be called
 void FanDarcyGroundwater::run(){
 
+>>>>>>> master
 }
-
-// This can include functions to clean up / clear memory, if needed
-void FanDarcyGroundwater::finalize(){
 
 }
