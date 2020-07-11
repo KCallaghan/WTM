@@ -32,7 +32,7 @@ void evaporation_update(Parameters &params, ArrayPack &arp){
 
   float K_e = (0.622*p_a*k*k)/(atm_p*p_w*std::pow(log_bracket,2));
 
-
+  #pragma omp parallel for 
   for(unsigned int i=0;i<arp.topo.size();i++){
 
     arp.e_sat(i) = 0.611 * std::exp((17.3*arp.ground_temp(i))\

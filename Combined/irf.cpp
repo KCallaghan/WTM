@@ -213,6 +213,135 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
 
 
+
+void InitialiseTest(Parameters &params, ArrayPack &arp){
+
+
+  arp.topo          = LoadData<float>(params.surfdatadir + params.region + \
+  "topography.nc",   "value");  //Units: metres
+
+  params.ncells_x = arp.topo.width();  
+  params.ncells_y = arp.topo.height();
+ 
+
+  arp.slope         = LoadData<float>(params.surfdatadir + params.region + \
+  "slope.nc",  "value");  //Slope as a value from 0 to 1. 
+
+  arp.vert_ksat = rd::Array2D<float>(arp.topo,0.00001);  //Units of ksat are m/s. 
+
+//width and height in number of cells in the array
+
+  //A binary mask that is 1 where there is land and 0 in the ocean
+  arp.precip        = rd::Array2D<float>(arp.topo,0.03);  //Units: m/yr. 
+  arp.temp          = rd::Array2D<float>(arp.topo,10);
+  arp.ground_temp   = rd::Array2D<float>(arp.topo,10);
+  //Units: degress Celsius
+  arp.starting_evap = rd::Array2D<float>(arp.topo,0);
+  arp.relhum        = rd::Array2D<float>(arp.topo,0.5);
+  arp.wind_speed    = rd::Array2D<float>(arp.topo,1);
+  arp.winter_temp    = rd::Array2D<float>(arp.topo,0);
+  arp.wtd           = rd::Array2D<float>(arp.topo,0.0);  
+  //we start with a water table at the surface for equilibrium runs. 
+  arp.evap          = arp.starting_evap;
+
+  arp.fdepth   = rd::Array2D<float>(arp.topo,500); 
+
+  arp.land_mask = rd::Array2D<float>(arp.topo,1);
+
+
+  for(int y=1;y<params.ncells_y;y++)
+  for(int x=1;x<params.ncells_x; x++){
+    if(x==1 || y==1 || x==params.ncells_x || y==params.ncells_y)
+      arp.land_mask(x,y) = 0;
+  }
+
+
+
+  arp.ksat = rd::Array2D<float>(arp.topo,0.0001);   //Units of ksat are m/s. 
+  arp.porosity    = rd::Array2D<float>(arp.topo,0.25);  //Units: unitless
+
+
+  //Set arrays that start off with zero or other values, 
+  //that are not imported files. Just to initialise these - 
+  //we'll add the appropriate values later. 
+
+  //These two are just informational, to see how much change 
+  //happens in FSM vs in groundwater
+  arp.wtd_old            = arp.wtd;                               
+  arp.wtd_mid            = arp.wtd;
+
+  arp.runoff             = rd::Array2D<float>(arp.ksat,0);
+  arp.head               = rd::Array2D<float>(arp.ksat,0);        
+
+  //Several arrays that are used for calculations of evaporation
+  arp.evap               = rd::Array2D<float>(arp.ksat,0);        
+  arp.e_sat              = rd::Array2D<float>(arp.ksat,0);  
+  arp.e_a                = rd::Array2D<float>(arp.ksat,0);  
+  arp.surface_evap       = rd::Array2D<float>(arp.ksat,0); 
+
+  //These are used to see how much change occurred in infiltration 
+  //and updating lakes portions of the code. Just informational.  
+  arp.infiltration_array = rd::Array2D<float>(arp.ksat,0);        
+
+  arp.rech               = rd::Array2D<float>(arp.ksat,0);
+  arp.transmissivity               = rd::Array2D<float>(arp.ksat,0);
+
+
+  //This array is used to store the values of how much the water table will 
+  //change in one iteration, then adding it to wtd gets the new wtd.
+  arp.wtd_change_total   = rd::Array2D<float>(arp.ksat,0.0f);     
+
+  //These are populated during the calculation of the depression hierarchy:
+  arp.label              = rd::Array2D<dh_label_t>   \
+  (params.ncells_x, params.ncells_y, dh::NO_DEP ); 
+  //No cells are part of a depression
+  arp.final_label        = rd::Array2D<dh_label_t>   \
+  (params.ncells_x, params.ncells_y, dh::NO_DEP ); 
+  //No cells are part of a depression
+  arp.flowdirs           = rd::Array2D<rd::flowdir_t>\
+  (params.ncells_x, params.ncells_y, rd::NO_FLOW); 
+  //No cells flow anywhere
+
+  //Change undefined cells to 0
+  for(unsigned int i=0;i<arp.topo.size();i++){
+    if(arp.topo(i)<=UNDEF){
+      arp.topo(i) = 0;
+    }
+  
+
+  } 
+
+//get the starting runoff using precip and evap inputs:
+  #pragma omp parallel for
+  for(unsigned int i=0;i<arp.topo.size();i++){
+    arp.rech(i) = (arp.precip(i)-arp.starting_evap(i));
+    if(arp.rech(i) <0)    //Recharge is always positive. 
+      arp.rech(i) = 0.0f;
+    if(arp.porosity(i) <=0 )
+      arp.porosity(i) = 0.0000001; //not sure why it is sometimes processing cells with 0 porosity?
+  }
+
+//Wtd is 0 in the ocean:
+  #pragma omp parallel for
+  for(unsigned int i=0;i<arp.topo.size();i++){
+    if(arp.land_mask(i) == 0){ 
+      arp.wtd  (i) = 0;
+    }
+  }
+
+//Label the ocean cells. This is a precondition for 
+  //using `GetDepressionHierarchy()`.
+  #pragma omp parallel for
+  for(unsigned int i=0;i<arp.label.size();i++){
+    if(arp.land_mask(i) == 0.0f){ 
+      arp.label(i) = dh::OCEAN;
+      arp.final_label(i) = dh::OCEAN;
+    }
+  }
+
+}
+
+
 ///Here, we use the number of cells per degree (a user-defined value), 
 ///the southern-most latitude of the domain (also user-defined), 
 ///and the radius of the Earth to calculate the latitude of each row of cells, 

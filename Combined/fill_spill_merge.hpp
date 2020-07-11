@@ -279,7 +279,7 @@ static void MoveWaterIntoPits(
 
   if(params.infiltration_on == false){
     //move the water to the appropriate depression's water_vol. 
-    #pragma omp parallel for collapse(2)  
+  //  #pragma omp parallel for collapse(2)  
     for(int y=0;y<arp.topo.height();y++)
     for(int x=0;x<arp.topo.width(); x++){
       if(arp.runoff(x,y)>0){
@@ -1527,6 +1527,8 @@ static void FillDepressions(
   ArrayPack                         &arp
 ){
   //Nothing to do if we have no water
+
+
   if(water_vol==0)
     return; 
 

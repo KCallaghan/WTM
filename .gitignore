@@ -39,3 +39,9 @@ a.out
 test
 twsm
 twsm.x
+
+# Cmake default build dir
+build/
+
+# Code editor stuff
+.vscode/

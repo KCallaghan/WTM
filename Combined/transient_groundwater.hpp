@@ -65,16 +65,16 @@ private:
     // INSTANCE VARIABLES //
     ////////////////////////
 
-    double transmissivityN;
-    double transmissivityS;
-    double transmissivityW;
-    double transmissivityE;
-
-    double headCenter;
-    double headN;
-    double headS;
-    double headW;
-    double headE;
+    // double transmissivityN;
+    // double transmissivityS;
+    // double transmissivityW;
+    // double transmissivityE;
+    
+    // double headCenter;
+    // double headN;
+    // double headS;
+    // double headW;
+    // double headE;
 
 //    double wtdCenter;
 //    double wtdN;
@@ -83,10 +83,10 @@ private:
 //    double wtdE;
 
     // These variables are used to monitor the state of the calculation
-    double total_changes  = 0.;
-    float max_total       = 0.;
-    float min_total       = 0.;
-    float max_change      = 0.;
+    // double total_changes  = 0.;
+    // float max_total       = 0.;
+    // float min_total       = 0.;
+    // float max_change      = 0.;
 
 
     ///////////////
@@ -157,11 +157,21 @@ private:
      * @brief Calculates water-table depth change in a cell that receives water,
      * given the change in the corresponding cell that gives water.
      */
-    double computeNewWTD(const float volume,
+    double computeNewWTDGain(const float volume,
                                           const float my_wtd,
                                           const int x,
                                           const int y,
-                                          const int direction,
+                                          const ArrayPack &arp);
+
+
+        /**
+     * @brief Calculates water-table depth change in a cell that receives water,
+     * given the change in the corresponding cell that gives water.
+     */
+    double computeNewWTDLoss(const float volume,
+                                          const float my_wtd,
+                                          const int x,
+                                          const int y,
                                           const ArrayPack &arp);
 
     /**
@@ -171,6 +181,7 @@ private:
      */
     void computeWTDchangeAtCell(const Parameters &params, ArrayPack &arp, int32_t x,
                                 int32_t y, double dt, std::array<double,5> &test);
+
 
     /**
      * @brief Updates the wtd_depth_total array at a cell(x,y) using the
