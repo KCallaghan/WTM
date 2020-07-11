@@ -94,8 +94,8 @@ template<class elev_t>
 
 int iter_count = 0;
 while(iter_count < params.maxiter){
-  
-  #pragma omp parallel for collapse(2)  
+
+  #pragma omp parallel for collapse(2)
   for(int y=1;y<params.ncells_y-1;y++)
   for(int x=1;x<params.ncells_x-1; x++){
     if(arp.land_mask(x,y) == 0)          //skip ocean cells
@@ -103,16 +103,16 @@ while(iter_count < params.maxiter){
     add_recharge(x, y, params, arp);
   }
 
-  gw.update(params, arp);
+  FanDarcyGroundwater::update(params, arp);
   iter_count +=1;
 }
- 
+
 
    now = time(0);
    dt = ctime(&now);
 
    std::cerr << "After GW time: " << dt << std::endl;
- 
+
   arp.wtd_mid = arp.wtd;
 
   //Move surface water
