@@ -13,6 +13,12 @@ namespace FanDarcyGroundwater {
 
 namespace details {
 
+/**
+ * @brief Returns the maximum stable time step with a 2x factor of safety
+ * @details Uses a 2D diffusion von Neumann stability analysis using the
+ *          "worst case" scenario highest transmissivity, combined with
+ *          a porosity-based amplification factor.
+ */
 double computeMaxStableTimeStep(const Parameters &params,
                                                      ArrayPack &arp,
                                                      uint32_t x,
@@ -54,6 +60,10 @@ double computeMaxStableTimeStep(const Parameters &params,
 }
 
 
+/**
+ * @brief Calculates the change in water volume that occurs between
+ * two cells, given the water-table depth flux between the two.
+ */
 double calculateWaterVolume(const float wtd_change,
                                                  const float center_wtd,
                                                  const float neighbour_wtd,
@@ -123,7 +133,10 @@ double calculateWaterVolume(const float wtd_change,
 }
 
 
-
+/**
+ * @brief Calculates water-table depth change in a cell that receives water,
+ * given the change in the corresponding cell that gives water.
+ */
 double computeNewWTDGain(const float volume,
                                               const float my_wtd,
                                               const int x,
@@ -163,6 +176,10 @@ double computeNewWTDGain(const float volume,
 }
 
 
+/**
+ * @brief Calculates water-table depth change in a cell that gives water,
+ * given the change in the corresponding cell that receives water.
+ */
 double computeNewWTDLoss(const float volume,
                                               const float my_wtd,
                                               const int x,
@@ -201,7 +218,11 @@ double computeNewWTDLoss(const float volume,
 }
 
 
-
+/**
+ * @brief Calculates water-table depth change at a cell (and associated
+ *        surrounding cells) and updates the class variables associated
+ *        with these.
+ */
 void computeWTDchangeAtCell( const Parameters &params,
                                                   ArrayPack &arp,
                                                   int32_t x, int32_t y,
@@ -314,7 +335,10 @@ void computeWTDchangeAtCell( const Parameters &params,
 }
 
 
-
+/**
+ * @brief Updates the wtd_depth_total array at a cell(x,y) using the
+ * pre-set time step and dynamic time stepping within this as needed.
+ */
 void updateCell( const Parameters &params, ArrayPack &arp,
                                       uint32_t x, uint32_t y ){
 
