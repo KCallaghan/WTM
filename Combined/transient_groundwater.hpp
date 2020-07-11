@@ -1,23 +1,23 @@
 #ifndef transient_groundwater_h
 #define transient_groundwater_h
 
-#include <stdint.h>
 #include "../common/netcdf.hpp"
 #include "ArrayPack.hpp"
 #include "parameters.hpp"
-#include <cassert>
-#include <cmath>
-#include <iomanip>
-#include <iostream>
+
 #include <richdem/common/Array2D.hpp>
 #include <richdem/common/timer.hpp>
 #include <richdem/common/ProgressBar.hpp>
+
+#include <cassert>
+#include <cmath>
+#include <cstdint>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <fstream>
-
-using namespace std;
 
 typedef std::vector<double> dvec;
 typedef rd::Array2D<float>  f2d;
@@ -97,6 +97,7 @@ double computeNewWTDGain(const float volume,
                                         const int x,
                                         const int y,
                                         const ArrayPack &arp);
+
 
 
     /**

@@ -3,7 +3,6 @@
 #include <thread>
 #include "transient_groundwater.hpp"
 
-
 const double FP_ERROR = 1e-4;
 
 ///////////////////////
@@ -419,6 +418,17 @@ void update(const Parameters &params, ArrayPack &arp){
       arp.wtd(x,y) = arp.wtd_changed(x,y);;
     }
   }
+<<<<<<< richard/fandarcydeclass
+=======
+}
+
+
+
+// This can be populated if we intend to run this module on its own.
+// Otherwise, will not be called
+void FanDarcyGroundwater::run(){
+
+>>>>>>> master
 }
 
 }
