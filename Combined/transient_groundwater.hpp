@@ -49,7 +49,7 @@ public:
     //void set_params(Parameters _params);
 
     void initialize();
-    void update(Parameters &params, ArrayPack &arp);
+    void update(const Parameters &params, ArrayPack &arp);
     void run();
     void finalize();
 
@@ -127,22 +127,12 @@ private:
     void computeNeighborTransmissivity(ArrayPack &arp, uint32_t x, uint32_t y);
 
     /**
-     * @brief Returns the maximum value in an array (max size 256 items)
-     */
-    double computeArrayMax(double *_val[], uint8_t size);
-
-    /**
-     * @brief Returns the minimum value in an array (max size 256 items)
-     */
-    float computeArrayMin(float *_val[], uint8_t size);
-
-    /**
      * @brief Returns the maximum stable time step with a 2x factor of safety
      * @details Uses a 2D diffusion von Neumann stability analysis using the
      *          "worst case" scenario highest transmissivity, combined with
      *          a porosity-based amplification factor.
      */
-    double computeMaxStableTimeStep(Parameters &params, ArrayPack &arp,
+    double computeMaxStableTimeStep(const Parameters &params, ArrayPack &arp,
                                     uint32_t x, uint32_t y);
 
 
@@ -189,14 +179,15 @@ private:
      *        surrounding cells) and updates the class variables associated
      *        with these.
      */
-    void computeWTDchangeAtCell(Parameters &params, ArrayPack &arp, int32_t x,
-                                int32_t y, double dt,double test[5]);
+    void computeWTDchangeAtCell(const Parameters &params, ArrayPack &arp, int32_t x,
+                                int32_t y, double dt, std::array<double,5> &test);
+
 
     /**
      * @brief Updates the wtd_depth_total array at a cell(x,y) using the
      * pre-set time step and dynamic time stepping within this as needed.
      */
-    void updateCell(Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
+    void updateCell(const Parameters &params, ArrayPack &arp, uint32_t x, uint32_t y);
 
 };
 
