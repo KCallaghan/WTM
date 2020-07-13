@@ -37,12 +37,21 @@ double that_one_equation(
   const double fdepth,
   const double wtd,
   const double volume,
-  const double capacity
+  const double capacity,
+  const bool gain
 ){
-  return
-      - fdepth
-      * std::log( std::exp(wtd / fdepth) - volume / capacity )
-      + wtd;
+  if(gain){
+    return
+      - fdepth;
+//      * std::log( std::exp(wtd / fdepth) - volume / capacity )
+//      + wtd;
+  }
+  else{
+    return
+      - fdepth;
+//      * std::log( std::exp(wtd / fdepth) + volume / capacity )
+//      + wtd;
+  }
 }
 
 
@@ -52,22 +61,25 @@ double that_equation6_thing(
   const double fdepth,
   const double ksat
 ){
-  //TODO(kerry): Put the 1.5 magic number in a constant
+  const float shallow = 1.5; 
+  //Global soil datasets include information for shallow soils. 
+  //if the water table is deeper than this, the permeability
+  //of the soil sees an exponential decay with depth. 
   if(fdepth<=0) {
     // If the fdepth is zero, there is no water transmission below the surface
     // soil layer.
     // If it is less than zero, it is incorrect -- but no water transmission
     // also seems an okay thing to do in this case.
     return 0;
-  } else if(wtd<-1.5){ // Equation S6 from the Fan paper
-    return fdepth * ksat * std::exp((wtd+1.5)/fdepth);
+  } else if(wtd < -shallow){ // Equation S6 from the Fan paper
+    return fdepth * ksat * std::exp((wtd + shallow)/fdepth);
   } else if(wtd > 0){
     // If wtd is greater than 0, max out rate of groundwater movement
     // as though wtd were 0. The surface water will get to move in
     // FillSpillMerge.
-    return ksat * (0+1.5+fdepth);
+    return ksat * (0 + shallow + fdepth);
   } else { //Equation S4 from the Fan paper
-    return ksat * (wtd + 1.5 + fdepth);
+    return ksat * (wtd + shallow + fdepth);
   }
 }
 
@@ -245,7 +257,7 @@ double computeNewWTDGain(
     //either all of the change is below the surface,
     //or it's a combination of above and below.
     //we start off assuming that it will all be below the surface:
-    change_in_wtd = that_one_equation(fdepth, my_wtd, volume, gw_storage_cap);
+    change_in_wtd = that_one_equation(fdepth, my_wtd, volume, gw_storage_cap, true);
 
     //TODO(kerry): Find names for this conditions
     const bool cond1 = my_wtd + change_in_wtd > 0;
@@ -263,7 +275,7 @@ double computeNewWTDGain(
       //-my_wtd because this was a negative number and we are getting the total change in wtd.
     }
   } else {
-    //at least some of the change is above the surface.
+    //all of the change is above the surface.
     change_in_wtd = volume / cell_area;
   }
 
@@ -297,13 +309,13 @@ double computeNewWTDLoss(
     const double SW_portion = my_wtd * cell_area;
     //this is the volume used in water above the surface.
     //The total volume minus this is left over to decrease groundwater.
-    change_in_wtd = that_one_equation(fdepth, my_wtd, volume-SW_portion, gw_storage_cap);
+    change_in_wtd = that_one_equation(fdepth, my_wtd, volume-SW_portion, gw_storage_cap, false);
     //the cell is losing water, and it's losing enough
     //that some of the change is below the surface and
     //so we need to take porosity into account.
   } else if(my_wtd < 0){
     //Since it's losing water, all of the change is below the surface.
-    change_in_wtd = that_one_equation(fdepth, my_wtd, volume, gw_storage_cap);
+    change_in_wtd = that_one_equation(fdepth, my_wtd, volume, gw_storage_cap, false);
   }
 
   return change_in_wtd;
@@ -378,14 +390,18 @@ void computeWTDchangeAtCell(
   const double headE      = c2d(fdp.topo, x+1, y  ) + local_wtd[3];
   const double headW      = c2d(fdp.topo, x-1, y  ) + local_wtd[4];
 
+  const double transmissivityN = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x  , y+1)) / 2.;
+  const double transmissivityS = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x  , y-1)) / 2.;
+  const double transmissivityE = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x+1, y  )) / 2.;
+  const double transmissivityW = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x-1, y  )) / 2.;
+
   double mycell_change = 0;
 
   // Then, compute the discharges
-  const auto cell_area = fdp.cellsize_n_s_metres * fdp.cellsize_e_w_metres[y];
-  const double QN = ((c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x  , y+1)) / 2.) * (headN - headCenter) / cell_area;
-  const double QS = ((c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x  , y-1)) / 2.) * (headS - headCenter) / cell_area;
-  const double QE = ((c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x+1, y  )) / 2.) * (headE - headCenter) / cell_area;
-  const double QW = ((c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x-1, y  )) / 2.) * (headW - headCenter) / cell_area;
+  const double QN = transmissivityN * (headN - headCenter) / fdp.cellsize_n_s_metres    * fdp.cellsize_e_w_metres[y];
+  const double QS = transmissivityS * (headS - headCenter) / fdp.cellsize_n_s_metres    * fdp.cellsize_e_w_metres[y];
+  const double QE = transmissivityE * (headE - headCenter) / fdp.cellsize_e_w_metres[y] * fdp.cellsize_n_s_metres;
+  const double QW = transmissivityW * (headW - headCenter) / fdp.cellsize_e_w_metres[y] * fdp.cellsize_n_s_metres;
 
   // Update water-table depth, but only in the "internal" variables to
   // handle internal time stepping to maintain stability.
@@ -526,9 +542,9 @@ void update(const Parameters &params, ArrayPack &arp){
 
 
 TEST_CASE("that_one_equation"){
-  CHECK(FanDarcyGroundwater::that_one_equation(1,2,3,4)==5);
-  CHECK(FanDarcyGroundwater::that_one_equation(1,4,3,4)==8);
-  CHECK(FanDarcyGroundwater::that_one_equation(1,2,3,6)==9);
+  CHECK(FanDarcyGroundwater::that_one_equation(1,1,1,2,true)==doctest::Approx(0.653983278399143));
+  CHECK(FanDarcyGroundwater::that_one_equation(1,4,3,4,true)==8);
+  CHECK(FanDarcyGroundwater::that_one_equation(1,2,3,6,true)==9);
 }
 
 TEST_CASE("that_equation6_thing"){
