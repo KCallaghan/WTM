@@ -33,7 +33,6 @@ struct FanDarcyPack {
 
 
 
-//TODO: Fix this equation
 double that_one_equation(
   const double fdepth,
   const double wtd,
@@ -43,15 +42,15 @@ double that_one_equation(
 ){
   if(gain){
     return
-      - fdepth;
-//      * std::log( std::exp(wtd / fdepth) - volume / capacity )
-//      + wtd;
+      - fdepth
+      * std::log( std::exp(wtd / fdepth) - volume / capacity )
+      + wtd;
   }
   else{
     return
-      - fdepth;
-//      * std::log( std::exp(wtd / fdepth) + volume / capacity )
-//      + wtd;
+      - fdepth
+      * std::log( std::exp(wtd / fdepth) + volume / capacity )
+      + wtd;
   }
 }
 
@@ -392,23 +391,29 @@ double2 computeWTDchangeWithNeighbour(
   const double wtd_n,
   const double dt,
   const std::array<double,5> &local_wtd,
+  const bool north_south,
   const FanDarcyPack &fdp
 ){
   const auto width = fdp.width;
+  double Q;
 
   const auto headCenter = c2d(fdp.topo, x,  y ) + wtd;
   const auto head_n     = c2d(fdp.topo, nx, ny) + wtd_n;
 
   const auto transmissivity = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, nx, ny)) / 2.;
 
-  const auto Q = transmissivity * (headCenter - head_n) / fdp.cellsize_n_s_metres * fdp.cellsize_e_w_metres[y];
+  if(north_south)
+    Q = transmissivity * (head_n - headCenter) / fdp.cellsize_n_s_metres    * fdp.cellsize_e_w_metres[y];
+  else
+    Q = transmissivity * (head_n - headCenter) / fdp.cellsize_e_w_metres[y] * fdp.cellsize_n_s_metres;
+
 
   const auto wtd_change = Q * dt / fdp.cell_area[ny];
 
   const auto volume = calculateWaterVolume(std::abs(wtd_change), wtd, wtd_n, x, y, nx, ny, fdp);
 
   if(volume > 0){
-    return GainLoss(x, y, x  , y+1, wtd_change, volume, local_wtd[1], local_wtd[0], fdp);
+    return GainLoss(x, y, nx  , ny, wtd_change, volume, wtd, wtd_n, fdp);
   } else {
     return {};
   }
