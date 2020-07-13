@@ -12,6 +12,7 @@ endif(CCACHE_FOUND)
 
 find_package(NetCDF REQUIRED)
 find_package(OpenMP)
+find_package(Sanitizers)
 # use -fsanitize=address (above) to check for memory errors
 
 
@@ -29,7 +30,7 @@ target_link_libraries(twsm.x PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_
 target_compile_features(twsm.x PRIVATE cxx_std_17)
 target_compile_options(twsm.x PRIVATE -Wall -pedantic)
 target_compile_definitions(twsm.x PRIVATE DOCTEST_CONFIG_DISABLE)
-
+add_sanitizers(twsm.x)
 
 
 add_executable(unittests.x
@@ -50,3 +51,4 @@ add_executable(dephier.x
 target_link_libraries(dephier.x PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_CXX)
 target_compile_features(dephier.x PRIVATE cxx_std_17)
 target_compile_options(dephier.x PRIVATE -Wall -pedantic)
+add_sanitizers(dephier.x)

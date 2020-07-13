@@ -73,6 +73,7 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
 make
 ```
+Use `-DSANITIZE_ADDRESS=On` to enable addressing sanitizing
 
 ## Running the code
 Ensure that all of the data files are located appropriately in a folder together. Edit the global.cfg configuration file as appropriate. The configuration file contains the following variables:
