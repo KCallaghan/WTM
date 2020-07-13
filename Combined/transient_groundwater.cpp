@@ -56,7 +56,7 @@ double that_one_equation(
 
 
 
-double that_equation6_thing(
+double depthIntegratedTransmissivity(
   const double wtd,
   const double fdepth,
   const double ksat
@@ -356,23 +356,23 @@ double2 GainLoss(
     local_wtd_n_change = computeNewWTDLoss(volume, local_wtd_neighbour,
                             c2d(fdp.fdepth,    nx, ny),
                             c2d(fdp.porosity,  nx, ny),
-                            c2d(fdp.cell_area, nx, ny)
+                            fdp.cell_area[ny]
                           );
     mycell_change      = computeNewWTDGain(volume, local_wtd_center,
                             c2d(fdp.fdepth,     x, y ),
                             c2d(fdp.porosity,   x, y ),
-                            c2d(fdp.cell_area,  x, y )
+                            fdp.cell_area[ny]
                           );
   } else {             // The neighbour is the receiving cell.
     local_wtd_n_change = computeNewWTDGain(volume, local_wtd_neighbour,
                             c2d(fdp.fdepth,    nx, ny),
                             c2d(fdp.porosity,  nx, ny),
-                            c2d(fdp.cell_area, nx, ny)
+                            fdp.cell_area[ny]
                           );
     mycell_change      = computeNewWTDLoss(volume, local_wtd_center,
                             c2d(fdp.fdepth,    x,  y ),
                             c2d(fdp.porosity,  x,  y ),
-                            c2d(fdp.cell_area, x,  y )
+                            fdp.cell_area[ny]
                           );
   }
 
@@ -576,7 +576,7 @@ void update(const Parameters &params, ArrayPack &arp){
   #pragma omp parallel for collapse(2) default(none) shared(arp,params)
   for(int32_t y=1; y<params.ncells_y-1; y++)
   for(int32_t x=1; x<params.ncells_x-1; x++){
-    arp.transmissivity(x,y) = that_equation6_thing(
+    arp.transmissivity(x,y) = depthIntegratedTransmissivity(
       arp.wtd(x,y),
       arp.fdepth(x,y),
       arp.ksat(x,y)
@@ -616,11 +616,11 @@ void update(const Parameters &params, ArrayPack &arp){
 
 
 TEST_CASE("that_one_equation"){
-  CHECK(FanDarcyGroundwater::that_one_equation(1,1,1,2,true)==doctest::Approx(0.653983278399143));
+  CHECK(FanDarcyGroundwater::that_one_equation(1,1,1,2,true)==doctest::Approx(0.203267054915195));
   CHECK(FanDarcyGroundwater::that_one_equation(1,4,3,4,true)==8);
   CHECK(FanDarcyGroundwater::that_one_equation(1,2,3,6,true)==9);
 }
 
-TEST_CASE("that_equation6_thing"){
-  CHECK(FanDarcyGroundwater::that_equation6_thing(1,3,6)==9);
+TEST_CASE("depthIntegratedTransmissivity"){
+  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(1,3,6)==9);
 }
