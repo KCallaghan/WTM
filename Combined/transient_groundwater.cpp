@@ -44,14 +44,14 @@ double that_one_equation(
   if(gain){
     return
       - fdepth;
-//      * std::log( std::exp(wtd / fdepth) - volume / capacity )
-//      + wtd;
+      * std::log( std::exp(wtd / fdepth) - volume / capacity )
+      + wtd;
   }
   else{
     return
       - fdepth;
-//      * std::log( std::exp(wtd / fdepth) + volume / capacity )
-//      + wtd;
+      * std::log( std::exp(wtd / fdepth) + volume / capacity )
+      + wtd;
   }
 }
 
