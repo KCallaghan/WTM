@@ -1191,7 +1191,7 @@ static dh_label_t OverflowInto(
       //though these should have been handled in the above section. 
       ){                              
   
-        this_dep.water_vol  = std::min(this_dep.water_vol + \    
+        this_dep.water_vol  = std::min(this_dep.water_vol + \
         extra_water,this_dep.wtd_vol);      
  //we should be using all of the extra water, but let's be careful about floating points.
         if(params.infiltration_on == true){
@@ -1267,7 +1267,7 @@ static dh_label_t OverflowInto(
   //Yes. Move the water geographically into that depression's leaf.
 
     if(this_dep.parent!=OCEAN && pdep.water_vol==0 
-    && odep.water_vol+extra_water>odep.wtd_vol &&  \ 
+    && odep.water_vol+extra_water>odep.wtd_vol &&  \
     (pdep.lchild == this_dep.dep_label || pdep.rchild == this_dep.dep_label) &&
     (pdep.lchild == odep.dep_label || pdep.rchild == odep.dep_label)) {
     //It might take a while, but our neighbour will overflow, 
@@ -1574,7 +1574,6 @@ static void FillDepressions(
   //for calculating the volume we've seen so far. (See explanation above or in
   //dephier.hpp TODO)
   double current_elevation = 0;
-  double previous_elevation = 0;
   double highest_elevation = arp.topo(deps.at(stdi.leaf_label).pit_cell);
   double highest_diff = 0;
 
@@ -1863,7 +1862,6 @@ static void FillDepressions(
       flood_q.emplace(c.x,c.y,arp.topo(c.x,c.y));
     }
 
-    previous_elevation = static_cast<double>(arp.topo(c.x,c.y));
   }
 
   //Since we're in this function we are supposed to be guaranteed to be able to
