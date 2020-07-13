@@ -12,12 +12,12 @@ const double FP_ERROR = 1e-4;
 
 namespace FanDarcyGroundwater {
 
+#define c2d(arr,x,y) arr[(y)*(width)+(x)] //Convert 2d coordinates into 1d coordinates assuming width
+
 typedef double* d2d_pointer;
 typedef float*  f2d_pointer;
 typedef double* d1d_pointer;
 typedef float*  f1d_pointer;
-
-#define c2d(arr,x,y) arr[(y)*(width)+(x)] //Convert 2d coordinates into 1d coordinates assuming width
 
 struct FanDarcyPack {
   int         width;
@@ -33,6 +33,7 @@ struct FanDarcyPack {
 
 
 
+//TODO: Fix this equation
 double that_one_equation(
   const double fdepth,
   const double wtd,
@@ -61,10 +62,10 @@ double that_equation6_thing(
   const double fdepth,
   const double ksat
 ){
-  const float shallow = 1.5; 
-  //Global soil datasets include information for shallow soils. 
+  constexpr float shallow = 1.5;
+  //Global soil datasets include information for shallow soils.
   //if the water table is deeper than this, the permeability
-  //of the soil sees an exponential decay with depth. 
+  //of the soil sees an exponential decay with depth.
   if(fdepth<=0) {
     // If the fdepth is zero, there is no water transmission below the surface
     // soil layer.
@@ -323,44 +324,96 @@ double computeNewWTDLoss(
 
 
 
-void GainLoss(
-  const int x,
+struct double2 {
+  double x = 0;
+  double y = 0;
+  double2() = default;
+  double2(double x, double y) : x(x), y(y) {}
+  double2& operator+=(const double2 &o) {
+    x+=o.x;
+    y+=o.y;
+    return *this;
+  }
+};
+
+
+
+double2 GainLoss(
+  const int x,  //Focal cell
   const int y,
-  const int x2,
-  const int y2,
+  const int nx, //Neighbour cell
+  const int ny,
   const double wtd_change,
   const double volume,
-  double &local_wtd_neighbour,
   const double local_wtd_center,
-  double &mycell_change,
+  const double local_wtd_neighbour,
   const FanDarcyPack &fdp
 ){
   const int width = fdp.width;
 
+  double local_wtd_n_change;
+  double mycell_change;
   if(wtd_change > 0){  // The current cell is giving water to the neighbour.
-    local_wtd_neighbour += computeNewWTDLoss(volume, local_wtd_neighbour,
-                              c2d(fdp.fdepth,    x2, y2),
-                              c2d(fdp.porosity,  x2, y2),
-                              c2d(fdp.cell_area, x2, y2)
-                            );
-    mycell_change       += computeNewWTDGain(volume, local_wtd_center,
-                              c2d(fdp.fdepth,     x, y ),
-                              c2d(fdp.porosity,   x, y ),
-                              c2d(fdp.cell_area,  x, y )
-                            );
+    local_wtd_n_change = computeNewWTDLoss(volume, local_wtd_neighbour,
+                            c2d(fdp.fdepth,    nx, ny),
+                            c2d(fdp.porosity,  nx, ny),
+                            c2d(fdp.cell_area, nx, ny)
+                          );
+    mycell_change      = computeNewWTDGain(volume, local_wtd_center,
+                            c2d(fdp.fdepth,     x, y ),
+                            c2d(fdp.porosity,   x, y ),
+                            c2d(fdp.cell_area,  x, y )
+                          );
   } else {             // The neighbour is the receiving cell.
-    local_wtd_neighbour += computeNewWTDGain(volume, local_wtd_neighbour,
-                              c2d(fdp.fdepth,    x2, y2),
-                              c2d(fdp.porosity,  x2, y2),
-                              c2d(fdp.cell_area, x2, y2)
-                            );
-    mycell_change       += computeNewWTDLoss(volume, local_wtd_center,
-                              c2d(fdp.fdepth,    x,  y ),
-                              c2d(fdp.porosity,  x,  y ),
-                              c2d(fdp.cell_area, x,  y )
-                            );
+    local_wtd_n_change = computeNewWTDGain(volume, local_wtd_neighbour,
+                            c2d(fdp.fdepth,    nx, ny),
+                            c2d(fdp.porosity,  nx, ny),
+                            c2d(fdp.cell_area, nx, ny)
+                          );
+    mycell_change      = computeNewWTDLoss(volume, local_wtd_center,
+                            c2d(fdp.fdepth,    x,  y ),
+                            c2d(fdp.porosity,  x,  y ),
+                            c2d(fdp.cell_area, x,  y )
+                          );
+  }
+
+  return double2(mycell_change, local_wtd_n_change);
+}
+
+
+
+//TODO: Maybe use this
+double2 computeWTDchangeWithNeighbour(
+  const int x,  //Focal cell coordinates
+  const int y,
+  const int nx, //Neighbour cell coordinates
+  const int ny,
+  const double wtd,
+  const double wtd_n,
+  const double dt,
+  const std::array<double,5> &local_wtd,
+  const FanDarcyPack &fdp
+){
+  const auto width = fdp.width;
+
+  const auto headCenter = c2d(fdp.topo, x,  y ) + wtd;
+  const auto head_n     = c2d(fdp.topo, nx, ny) + wtd_n;
+
+  const auto transmissivity = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, nx, ny)) / 2.;
+
+  const auto Q = transmissivity * (headCenter - head_n) / fdp.cellsize_n_s_metres * fdp.cellsize_e_w_metres[y];
+
+  const auto wtd_change = Q * dt / fdp.cell_area[ny];
+
+  const auto volume = calculateWaterVolume(std::abs(wtd_change), wtd, wtd_n, x, y, nx, ny, fdp);
+
+  if(volume > 0){
+    return GainLoss(x, y, x  , y+1, wtd_change, volume, local_wtd[1], local_wtd[0], fdp);
+  } else {
+    return {};
   }
 }
+
 
 
 /**
@@ -395,8 +448,6 @@ void computeWTDchangeAtCell(
   const double transmissivityE = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x+1, y  )) / 2.;
   const double transmissivityW = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x-1, y  )) / 2.;
 
-  double mycell_change = 0;
-
   // Then, compute the discharges
   const double QN = transmissivityN * (headN - headCenter) / fdp.cellsize_n_s_metres    * fdp.cellsize_e_w_metres[y];
   const double QS = transmissivityS * (headS - headCenter) / fdp.cellsize_n_s_metres    * fdp.cellsize_e_w_metres[y];
@@ -426,13 +477,31 @@ void computeWTDchangeAtCell(
 
   //The current cell is receiving water from the North, so (x,y+1) is the giving cell.
   //Target cell is the receiving cell.
-  if(volume_N > 0) GainLoss(x, y, x  , y+1, wtd_change_N, volume_N, local_wtd[1], local_wtd[0], mycell_change, fdp);
-  if(volume_S > 0) GainLoss(x, y, x  , y-1, wtd_change_S, volume_S, local_wtd[2], local_wtd[0], mycell_change, fdp);
-  if(volume_E > 0) GainLoss(x, y, x+1, y  , wtd_change_E, volume_E, local_wtd[3], local_wtd[0], mycell_change, fdp);
-  if(volume_W > 0) GainLoss(x, y, x-1, y  , wtd_change_W, volume_W, local_wtd[4], local_wtd[0], mycell_change, fdp);
+  double my_cell_change = 0;
+  if(volume_N > 0){
+    const auto change = GainLoss(x, y, x  , y+1, wtd_change_N, volume_N, local_wtd[0], local_wtd[1], fdp);
+    my_cell_change += change.x;
+    local_wtd[1]   += change.y;
+  }
+  if(volume_S > 0){
+    const auto change = GainLoss(x, y, x  , y-1, wtd_change_S, volume_S, local_wtd[0], local_wtd[2], fdp);
+    my_cell_change += change.x;
+    local_wtd[2]   += change.y;
+  }
+  if(volume_E > 0){
+    const auto change = GainLoss(x, y, x+1, y  , wtd_change_E, volume_E, local_wtd[0], local_wtd[3], fdp);
+    my_cell_change += change.x;
+    local_wtd[3]   += change.y;
+  }
+  if(volume_W > 0){
+    const auto change = GainLoss(x, y, x-1, y  , wtd_change_W, volume_W, local_wtd[0], local_wtd[4], fdp);
+    my_cell_change += change.x;
+    local_wtd[4]   += change.y;
+  }
+
   // Now we have the height changes that will take place in the target cell
   // and each of the four neighbours.
-  local_wtd[0] += mycell_change;
+  local_wtd[0] += my_cell_change;
 }
 
 
