@@ -70,7 +70,7 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 
   arp.slope_end         = LoadData<float>(params.surfdatadir + params.region + \
   params.time_end + "_slope.nc",  "value");  //Slope as a value from 0 to 1.
-  arp.land_mask         = LoadData<float>(params.surfdatadir + params.region + \
+  arp.land_mask         = LoadData<uint8_t>(params.surfdatadir + params.region + \
   params.time_end + "_mask.nc",   "value");  //A binary mask that is 1 where
   //there is land and 0 in the ocean
   arp.precip_end        = LoadData<float>(params.surfdatadir + params.region + \
@@ -163,7 +163,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
   arp.slope         = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_slope.nc",  "value");  //Slope as a value from 0 to 1.
-  arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + \
+  arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region + \
   params.time_start + "_mask.nc",   "value");
   //A binary mask that is 1 where there is land and 0 in the ocean
   arp.precip        = LoadData<float>(params.surfdatadir + params.region + \
@@ -244,7 +244,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
 
   arp.fdepth   = rd::Array2D<float>(arp.topo,500);
 
-  arp.land_mask = rd::Array2D<float>(arp.topo,1);
+  arp.land_mask = rd::Array2D<uint8_t>(arp.topo,1);
 
 
   for(int y=1;y<params.ncells_y;y++)
@@ -331,7 +331,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   //using `GetDepressionHierarchy()`.
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.label.size();i++){
-    if(arp.land_mask(i) == 0.0f){
+    if(arp.land_mask(i) == 0){
       arp.label(i) = dh::OCEAN;
       arp.final_label(i) = dh::OCEAN;
     }
@@ -500,7 +500,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   //using `GetDepressionHierarchy()`.
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.label.size();i++){
-    if(arp.land_mask(i) == 0.0f){
+    if(arp.land_mask(i) == 0){
       arp.label(i) = dh::OCEAN;
       arp.final_label(i) = dh::OCEAN;
     }
@@ -550,7 +550,7 @@ void UpdateTransientArrays(const Parameters &params, ArrayPack &arp){
 
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.label.size();i++){
-    if(arp.land_mask(i) == 0.0f){
+    if(arp.land_mask(i) == 0){
       arp.label(i) = dh::OCEAN;
       arp.final_label(i) = dh::OCEAN;
     }
