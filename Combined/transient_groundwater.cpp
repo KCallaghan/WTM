@@ -14,6 +14,16 @@ namespace FanDarcyGroundwater {
 
 #define c2d(arr,x,y) arr[(y)*(width)+(x)] //Convert 2d coordinates into 1d coordinates assuming width
 
+enum class Direction {
+  NorthSouth,
+  EastWest
+};
+
+struct double2 {
+  double x = 0;
+  double y = 0;
+};
+
 typedef double* d2d_pointer;
 typedef float*  f2d_pointer;
 typedef double* d1d_pointer;
@@ -38,20 +48,13 @@ double that_one_equation(
   const double wtd,
   const double volume,
   const double capacity,
-  const bool gain
+  const int pos_neg      //1 or -1
 ){
-  if(gain){
-    return
-        fdepth
-      * std::log( std::exp(wtd / fdepth) + volume / capacity )
-      - wtd;
-  }
-  else{
-    return
-        fdepth
-      * std::log( std::exp(wtd / fdepth) - volume / capacity )
-      - wtd;
-  }
+  assert(pos_neg==1 || pos_neg==-1);
+  return
+      fdepth
+    * std::log( std::exp(wtd / fdepth) + pos_neg * volume / capacity )
+    - wtd;
 }
 
 
@@ -137,15 +140,13 @@ double computeMaxStableTimeStep(
   // Porosity differences will AMPLIFY the WTD changes.
   // Let us choose a time step that is also based on the LOWEST porosity
   // (highest WTD change per water volume transfer)
-  const std::array<float,5> PhiArray = {
-    c2d(fdp.porosity, x  , y  ),
-    c2d(fdp.porosity, x+1, y  ),
-    c2d(fdp.porosity, x-1, y  ),
-    c2d(fdp.porosity, x  , y+1),
-    c2d(fdp.porosity, x  , y-1)
-  };
+  auto PhiMin =             c2d(fdp.porosity, x  , y  ) ;
+  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x+1, y  ));
+  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x-1, y  ));
+  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x  , y+1));
+  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x  , y-1));
+  PhiMin = std::max(PhiMin, 0.2f); //Yes, we do want max
 
-  const auto PhiMin = std::max(0.2f, *std::min_element(PhiArray.begin(), PhiArray.end()));
   // Porosity is a linear amplifier of WTD change, and it amplifies change
   // in both the giving and receiving cells.
   // Amplification goes as 1 / phi.
@@ -168,10 +169,10 @@ double calculateWaterVolume(
   const float wtd_change,
   const float center_wtd,
   const float neighbour_wtd,
-  const int x1,
-  const int y1,
-  const int x2,
-  const int y2,
+  const int x,  //Focal cell coordinates
+  const int y,
+  const int nx, //Neighbour cell coordinates
+  const int ny,
   const FanDarcyPack &fdp
 ){
   const int width = fdp.width;
@@ -184,10 +185,10 @@ double calculateWaterVolume(
   // This volume can then be used to calculate the actual
   // change in water table height in each of the two cells.
 
-  const float mean_wtd      = (             center_wtd + neighbour_wtd          ) / 2.;
-  const float mean_porosity = (c2d(fdp.porosity,x1,y1) + c2d(fdp.porosity,x2,y2)) / 2.;
-  const float mean_fdepth   = (c2d(fdp.fdepth,  x1,y1) + c2d(fdp.fdepth,  x2,y2)) / 2.;
-  const float mean_area     = (      fdp.cell_area[y1] + fdp.cell_area[y2]      ) / 2.;
+  const float mean_wtd      = (             center_wtd + neighbour_wtd        ) / 2.;
+  const float mean_porosity = (c2d(fdp.porosity,x,y) + c2d(fdp.porosity,nx,ny)) / 2.;
+  const float mean_fdepth   = (c2d(fdp.fdepth,  x,y) + c2d(fdp.fdepth,  nx,ny)) / 2.;
+  const float mean_area     = (      fdp.cell_area[y] + fdp.cell_area[ny]     ) / 2.;
 
   const float upper_edge = mean_wtd + wtd_change/2.;
   const float lower_edge = mean_wtd - wtd_change/2.;
@@ -227,7 +228,6 @@ double calculateWaterVolume(
   // So now we have the volume change that occurs in each of the two cells
   // as a positive value  whether it was all above ground, all below ground,
   // or a combination.
-
   return volume_change;
 }
 
@@ -243,7 +243,6 @@ double computeNewWTDGain(
   const float porosity,
   const float cell_area
 ){
-
   //We convert the known change in water volume to a change
   //change in water table depth for this cell.
 
@@ -257,7 +256,7 @@ double computeNewWTDGain(
     //either all of the change is below the surface,
     //or it's a combination of above and below.
     //we start off assuming that it will all be below the surface:
-    change_in_wtd = that_one_equation(fdepth, my_wtd, volume, gw_storage_cap, true);
+    change_in_wtd = that_one_equation(fdepth, my_wtd, volume, gw_storage_cap, 1);
 
     //TODO(kerry): Find names for this conditions
     const bool cond1 = my_wtd + change_in_wtd > 0;
@@ -309,31 +308,17 @@ double computeNewWTDLoss(
     const double SW_portion = my_wtd * cell_area;
     //this is the volume used in water above the surface.
     //The total volume minus this is left over to decrease groundwater.
-    change_in_wtd = that_one_equation(fdepth, 0, volume-SW_portion, gw_storage_cap, false) - my_wtd;
+    change_in_wtd = that_one_equation(fdepth, 0, volume-SW_portion, gw_storage_cap, -1) - my_wtd;
     //the cell is losing water, and it's losing enough
     //that some of the change is below the surface and
     //so we need to take porosity into account.
   } else if(my_wtd <= 0){
     //Since it's losing water, all of the change is below the surface.
-    change_in_wtd = that_one_equation(fdepth, my_wtd, volume, gw_storage_cap, false);
+    change_in_wtd = that_one_equation(fdepth, my_wtd, volume, gw_storage_cap, -1);
   }
 
   return change_in_wtd;
 }
-
-
-
-struct double2 {
-  double x = 0;
-  double y = 0;
-  double2() = default;
-  double2(double x, double y) : x(x), y(y) {}
-  double2& operator+=(const double2 &o) {
-    x+=o.x;
-    y+=o.y;
-    return *this;
-  }
-};
 
 
 
@@ -376,7 +361,7 @@ double2 GainLoss(
                           );
   }
 
-  return double2(mycell_change, local_wtd_n_change);
+  return {mycell_change, local_wtd_n_change};
 }
 
 
@@ -391,7 +376,7 @@ double2 computeWTDchangeWithNeighbour(
   const double wtd_n,
   const double dt,
   const std::array<double,5> &local_wtd,
-  const bool north_south,
+  const Direction direction,
   const FanDarcyPack &fdp
 ){
   const auto width = fdp.width;
@@ -402,7 +387,7 @@ double2 computeWTDchangeWithNeighbour(
 
   const auto transmissivity = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, nx, ny)) / 2.;
 
-  if(north_south)
+  if(direction==Direction::NorthSouth)
     Q = transmissivity * (head_n - headCenter) / fdp.cellsize_n_s_metres    * fdp.cellsize_e_w_metres[y];
   else
     Q = transmissivity * (head_n - headCenter) / fdp.cellsize_e_w_metres[y] * fdp.cellsize_n_s_metres;
@@ -611,115 +596,124 @@ void update(const Parameters &params, ArrayPack &arp){
 
 }
 
-}
-
 
 
 TEST_CASE("that_one_equation"){
-  CHECK(FanDarcyGroundwater::that_one_equation(300, -10 ,487.660600188348,30000 ,true)==doctest::Approx(5));
-  CHECK(FanDarcyGroundwater::that_one_equation(300, -10 ,877.789080339026,54000 ,true)==doctest::Approx(5));
-  CHECK(FanDarcyGroundwater::that_one_equation(300, -3  ,746.262468812392,75000 ,true)==doctest::Approx(3));
-  CHECK(FanDarcyGroundwater::that_one_equation(300, -2  ,1194.01552781598,360000,true)==doctest::Approx(1));
-  CHECK(FanDarcyGroundwater::that_one_equation(300, -100,215.318057232321,90000 ,true)==doctest::Approx(1));
-  CHECK(FanDarcyGroundwater::that_one_equation(100, -10 ,1391.76019394264,30000 ,true)==doctest::Approx(5));
-  CHECK(FanDarcyGroundwater::that_one_equation(1000,-10 ,1488.79363305426,300000,true)==doctest::Approx(5));
-  CHECK(FanDarcyGroundwater::that_one_equation(10,  -10 ,715.953655623573,3000  ,true)==doctest::Approx(5));
+  CHECK(that_one_equation(300, -10 ,487.660600188348,30000 , 1)==doctest::Approx(5));
+  CHECK(that_one_equation(300, -10 ,877.789080339026,54000 , 1)==doctest::Approx(5));
+  CHECK(that_one_equation(300, -3  ,746.262468812392,75000 , 1)==doctest::Approx(3));
+  CHECK(that_one_equation(300, -2  ,1194.01552781598,360000, 1)==doctest::Approx(1));
+  CHECK(that_one_equation(300, -100,215.318057232321,90000 , 1)==doctest::Approx(1));
+  CHECK(that_one_equation(100, -10 ,1391.76019394264,30000 , 1)==doctest::Approx(5));
+  CHECK(that_one_equation(1000,-10 ,1488.79363305426,300000, 1)==doctest::Approx(5));
+  CHECK(that_one_equation(10,  -10 ,715.953655623573,3000  , 1)==doctest::Approx(5));
 
-  CHECK(FanDarcyGroundwater::that_one_equation(300, -5  ,487.660600188348,30000 ,false)==doctest::Approx(-5));
-  CHECK(FanDarcyGroundwater::that_one_equation(300, -5  ,877.789080339026,54000 ,false)==doctest::Approx(-5));
-  CHECK(FanDarcyGroundwater::that_one_equation(300, -1  ,1194.01552781598,360000,false)==doctest::Approx(-1));
-  CHECK(FanDarcyGroundwater::that_one_equation(300, -99 ,215.318057232321,90000 ,false)==doctest::Approx(-1));
-  CHECK(FanDarcyGroundwater::that_one_equation(100, -5  ,1391.76019394264,30000 ,false)==doctest::Approx(-5));
-  CHECK(FanDarcyGroundwater::that_one_equation(1000,-5  ,1488.79363305426,300000,false)==doctest::Approx(-5));
-  CHECK(FanDarcyGroundwater::that_one_equation(10,  -5  ,715.953655623573,3000  ,false)==doctest::Approx(-5));
-
-
+  CHECK(that_one_equation(300, -5  ,487.660600188348,30000 , -1)==doctest::Approx(-5));
+  CHECK(that_one_equation(300, -5  ,877.789080339026,54000 , -1)==doctest::Approx(-5));
+  CHECK(that_one_equation(300, -1  ,1194.01552781598,360000, -1)==doctest::Approx(-1));
+  CHECK(that_one_equation(300, -99 ,215.318057232321,90000 , -1)==doctest::Approx(-1));
+  CHECK(that_one_equation(100, -5  ,1391.76019394264,30000 , -1)==doctest::Approx(-5));
+  CHECK(that_one_equation(1000,-5  ,1488.79363305426,300000, -1)==doctest::Approx(-5));
+  CHECK(that_one_equation(10,  -5  ,715.953655623573,3000  , -1)==doctest::Approx(-5));
 }
 
 TEST_CASE("depthIntegratedTransmissivity"){
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(5  ,100  ,0.01      ) ==doctest::Approx(1.015));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(0  ,100  ,0.01      ) ==doctest::Approx(1.015));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-1 ,100  ,0.01      ) ==doctest::Approx(1.005));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-2 ,100  ,0.01      ) ==doctest::Approx(0.995012479192682));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-3 ,100  ,0.1       ) ==doctest::Approx(9.85111939603063));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-4 ,100  ,0.0005    ) ==doctest::Approx(0.048765495601417));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-5 ,100  ,0.0001    ) ==doctest::Approx(0.009656054162576));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-6 ,200  ,0.0001    ) ==doctest::Approx(0.019555024743867));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-7 ,500  ,0.0001    ) ==doctest::Approx(0.049453013938769));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-8 ,1000 ,0.0001    ) ==doctest::Approx(0.099352107930345));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-9 ,10   ,0.0001    ) ==doctest::Approx(0.000472366552741));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-10,500  ,0.0001    ) ==doctest::Approx(0.049157184231746));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-10,10   ,0.0001    ) ==doctest::Approx(0.000427414931949));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-10,1000 ,0.0001    ) ==doctest::Approx(0.099153602286297));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-10,100  ,0.0001    ) ==doctest::Approx(0.009185122844015));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-10,300  ,0.0001    ) ==doctest::Approx(0.029161928740837));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-10,300  ,0.1       ) ==doctest::Approx(29.1619287408366));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-10,300  ,0.5       ) ==doctest::Approx(145.809643704183));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-10,300  ,1         ) ==doctest::Approx(291.619287408366));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-10,300  ,0.000001  ) ==doctest::Approx(0.000291619287408));
-  CHECK(FanDarcyGroundwater::depthIntegratedTransmissivity(-10,300  ,0.0000001 ) ==doctest::Approx(2.91619287408366E-05));
+  CHECK(depthIntegratedTransmissivity(5  ,100  ,0.01      ) ==doctest::Approx(1.015));
+  CHECK(depthIntegratedTransmissivity(0  ,100  ,0.01      ) ==doctest::Approx(1.015));
+  CHECK(depthIntegratedTransmissivity(-1 ,100  ,0.01      ) ==doctest::Approx(1.005));
+  CHECK(depthIntegratedTransmissivity(-2 ,100  ,0.01      ) ==doctest::Approx(0.995012479192682));
+  CHECK(depthIntegratedTransmissivity(-3 ,100  ,0.1       ) ==doctest::Approx(9.85111939603063));
+  CHECK(depthIntegratedTransmissivity(-4 ,100  ,0.0005    ) ==doctest::Approx(0.048765495601417));
+  CHECK(depthIntegratedTransmissivity(-5 ,100  ,0.0001    ) ==doctest::Approx(0.009656054162576));
+  CHECK(depthIntegratedTransmissivity(-6 ,200  ,0.0001    ) ==doctest::Approx(0.019555024743867));
+  CHECK(depthIntegratedTransmissivity(-7 ,500  ,0.0001    ) ==doctest::Approx(0.049453013938769));
+  CHECK(depthIntegratedTransmissivity(-8 ,1000 ,0.0001    ) ==doctest::Approx(0.099352107930345));
+  CHECK(depthIntegratedTransmissivity(-9 ,10   ,0.0001    ) ==doctest::Approx(0.000472366552741));
+  CHECK(depthIntegratedTransmissivity(-10,500  ,0.0001    ) ==doctest::Approx(0.049157184231746));
+  CHECK(depthIntegratedTransmissivity(-10,10   ,0.0001    ) ==doctest::Approx(0.000427414931949));
+  CHECK(depthIntegratedTransmissivity(-10,1000 ,0.0001    ) ==doctest::Approx(0.099153602286297));
+  CHECK(depthIntegratedTransmissivity(-10,100  ,0.0001    ) ==doctest::Approx(0.009185122844015));
+  CHECK(depthIntegratedTransmissivity(-10,300  ,0.0001    ) ==doctest::Approx(0.029161928740837));
+  CHECK(depthIntegratedTransmissivity(-10,300  ,0.1       ) ==doctest::Approx(29.1619287408366));
+  CHECK(depthIntegratedTransmissivity(-10,300  ,0.5       ) ==doctest::Approx(145.809643704183));
+  CHECK(depthIntegratedTransmissivity(-10,300  ,1         ) ==doctest::Approx(291.619287408366));
+  CHECK(depthIntegratedTransmissivity(-10,300  ,0.000001  ) ==doctest::Approx(0.000291619287408));
+  CHECK(depthIntegratedTransmissivity(-10,300  ,0.0000001 ) ==doctest::Approx(2.91619287408366E-05));
 }
 
 
 TEST_CASE("some_other_equation"){
-  CHECK(FanDarcyGroundwater::some_other_equation(30000  ,300, -10, -5      ) ==doctest::Approx(487.660600188348));
-
-
+  CHECK(some_other_equation(30000  ,300, -10, -5      ) ==doctest::Approx(487.660600188348));
 }
 
 
 TEST_CASE("computeNewWTDGain"){
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(487.660600188348  ,-10  ,300, 0.1, 1000      ) ==doctest::Approx(5));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(877.789080339026  ,-10  ,300, 0.2, 900       ) ==doctest::Approx(5));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(746.262468812392  ,-3   ,300, 0.5, 500       ) ==doctest::Approx(3));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(1194.01552781598  ,-2   ,300, 0.8, 1500      ) ==doctest::Approx(1));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(215.318057232321  ,-100 ,300, 0.3, 1000      ) ==doctest::Approx(1));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(1391.76019394264  ,-10  ,100, 0.3, 1000      ) ==doctest::Approx(5));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(1488.79363305426  ,-10  ,1000,0.3, 1000      ) ==doctest::Approx(5));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(715.953655623573  ,-10  ,10,  0.3, 1000      ) ==doctest::Approx(5));
+  CHECK(computeNewWTDGain(487.660600188348  ,-10  ,300, 0.1, 1000      ) ==doctest::Approx(5));
+  CHECK(computeNewWTDGain(877.789080339026  ,-10  ,300, 0.2, 900       ) ==doctest::Approx(5));
+  CHECK(computeNewWTDGain(746.262468812392  ,-3   ,300, 0.5, 500       ) ==doctest::Approx(3));
+  CHECK(computeNewWTDGain(1194.01552781598  ,-2   ,300, 0.8, 1500      ) ==doctest::Approx(1));
+  CHECK(computeNewWTDGain(215.318057232321  ,-100 ,300, 0.3, 1000      ) ==doctest::Approx(1));
+  CHECK(computeNewWTDGain(1391.76019394264  ,-10  ,100, 0.3, 1000      ) ==doctest::Approx(5));
+  CHECK(computeNewWTDGain(1488.79363305426  ,-10  ,1000,0.3, 1000      ) ==doctest::Approx(5));
+  CHECK(computeNewWTDGain(715.953655623573  ,-10  ,10,  0.3, 1000      ) ==doctest::Approx(5));
 
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(4000  ,1  ,300,  0.1, 1000      ) ==doctest::Approx(4));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(4500  ,0  ,300,  0.2, 900       ) ==doctest::Approx(5));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(5000  ,10 ,300,  0.5, 500       ) ==doctest::Approx(10));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(15000 ,0  ,300,  0.8, 1500      ) ==doctest::Approx(10));
+  CHECK(computeNewWTDGain(4000  ,1  ,300,  0.1, 1000      ) ==doctest::Approx(4));
+  CHECK(computeNewWTDGain(4500  ,0  ,300,  0.2, 900       ) ==doctest::Approx(5));
+  CHECK(computeNewWTDGain(5000  ,10 ,300,  0.5, 500       ) ==doctest::Approx(10));
+  CHECK(computeNewWTDGain(15000 ,0  ,300,  0.8, 1500      ) ==doctest::Approx(10));
 
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(5983.51698553982  ,-10  ,300,  0.1, 1000      ) ==doctest::Approx(15));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(6270.33057397168  ,-10  ,300,  0.2, 900       ) ==doctest::Approx(15));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(1246.26246881239  ,-3   ,300,  0.5, 500       ) ==doctest::Approx(4));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(3892.0177481876   ,-2   ,300,  0.8, 1500      ) ==doctest::Approx(3));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(125512.182048359  ,-100 ,300,  0.3, 1000      ) ==doctest::Approx(200));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(7854.87745892122  ,-10  ,100,  0.3, 1000      ) ==doctest::Approx(15));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(7985.04987524957  ,-10  ,1000, 0.3, 1000      ) ==doctest::Approx(15));
-  CHECK(FanDarcyGroundwater::computeNewWTDGain(6896.36167648567  ,-10  ,10,   0.3, 1000      ) ==doctest::Approx(15));
-
-
+  CHECK(computeNewWTDGain(5983.51698553982  ,-10  ,300,  0.1, 1000      ) ==doctest::Approx(15));
+  CHECK(computeNewWTDGain(6270.33057397168  ,-10  ,300,  0.2, 900       ) ==doctest::Approx(15));
+  CHECK(computeNewWTDGain(1246.26246881239  ,-3   ,300,  0.5, 500       ) ==doctest::Approx(4));
+  CHECK(computeNewWTDGain(3892.0177481876   ,-2   ,300,  0.8, 1500      ) ==doctest::Approx(3));
+  CHECK(computeNewWTDGain(125512.182048359  ,-100 ,300,  0.3, 1000      ) ==doctest::Approx(200));
+  CHECK(computeNewWTDGain(7854.87745892122  ,-10  ,100,  0.3, 1000      ) ==doctest::Approx(15));
+  CHECK(computeNewWTDGain(7985.04987524957  ,-10  ,1000, 0.3, 1000      ) ==doctest::Approx(15));
+  CHECK(computeNewWTDGain(6896.36167648567  ,-10  ,10,   0.3, 1000      ) ==doctest::Approx(15));
 }
 
 
 TEST_CASE("computeNewWTDLoss"){
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(487.660600188348  ,-5  ,300, 0.1, 1000      ) ==doctest::Approx(-5));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(877.789080339026  ,-5  ,300, 0.2, 900       ) ==doctest::Approx(-5));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(746.262468812392  ,0  ,300, 0.5, 500        ) ==doctest::Approx(-3));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(1194.01552781598  ,-1  ,300, 0.8, 1500      ) ==doctest::Approx(-1));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(215.318057232321  ,-99 ,300, 0.3, 1000      ) ==doctest::Approx(-1));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(1391.76019394264  ,-5  ,100, 0.3, 1000      ) ==doctest::Approx(-5));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(1488.79363305426  ,-5  ,1000,0.3, 1000      ) ==doctest::Approx(-5));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(715.953655623573  ,-5  ,10,  0.3, 1000      ) ==doctest::Approx(-5));
+  CHECK(computeNewWTDLoss(487.660600188348  ,-5  ,300, 0.1, 1000      ) ==doctest::Approx(-5));
+  CHECK(computeNewWTDLoss(877.789080339026  ,-5  ,300, 0.2, 900       ) ==doctest::Approx(-5));
+  CHECK(computeNewWTDLoss(746.262468812392  ,0  ,300, 0.5, 500        ) ==doctest::Approx(-3));
+  CHECK(computeNewWTDLoss(1194.01552781598  ,-1  ,300, 0.8, 1500      ) ==doctest::Approx(-1));
+  CHECK(computeNewWTDLoss(215.318057232321  ,-99 ,300, 0.3, 1000      ) ==doctest::Approx(-1));
+  CHECK(computeNewWTDLoss(1391.76019394264  ,-5  ,100, 0.3, 1000      ) ==doctest::Approx(-5));
+  CHECK(computeNewWTDLoss(1488.79363305426  ,-5  ,1000,0.3, 1000      ) ==doctest::Approx(-5));
+  CHECK(computeNewWTDLoss(715.953655623573  ,-5  ,10,  0.3, 1000      ) ==doctest::Approx(-5));
 
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(4000  ,5  ,300,  0.1, 1000      ) ==doctest::Approx(-4));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(4500  ,5  ,300,  0.2, 900       ) ==doctest::Approx(-5));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(5000  ,20 ,300,  0.5, 500       ) ==doctest::Approx(-10));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(15000 ,10 ,300,  0.8, 1500      ) ==doctest::Approx(-10));
+  CHECK(computeNewWTDLoss(4000  ,5  ,300,  0.1, 1000      ) ==doctest::Approx(-4));
+  CHECK(computeNewWTDLoss(4500  ,5  ,300,  0.2, 900       ) ==doctest::Approx(-5));
+  CHECK(computeNewWTDLoss(5000  ,20 ,300,  0.5, 500       ) ==doctest::Approx(-10));
+  CHECK(computeNewWTDLoss(15000 ,10 ,300,  0.8, 1500      ) ==doctest::Approx(-10));
 
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(5983.51698553982  ,5   ,300,  0.1, 1000      ) ==doctest::Approx(-15));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(6270.33057397168  ,5   ,300,  0.2, 900       ) ==doctest::Approx(-15));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(1246.26246881239  ,1   ,300,  0.5, 500       ) ==doctest::Approx(-4));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(3892.0177481876   ,1   ,300,  0.8, 1500      ) ==doctest::Approx(-3));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(125512.182048359  ,100 ,300,  0.3, 1000      ) ==doctest::Approx(-200));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(7854.87745892122  ,5   ,100,  0.3, 1000      ) ==doctest::Approx(-15));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(7985.04987524957  ,5   ,1000, 0.3, 1000      ) ==doctest::Approx(-15));
-  CHECK(FanDarcyGroundwater::computeNewWTDLoss(6896.36167648567  ,5   ,10,   0.3, 1000      ) ==doctest::Approx(-15));
-
-
+  CHECK(computeNewWTDLoss(5983.51698553982  ,5   ,300,  0.1, 1000      ) ==doctest::Approx(-15));
+  CHECK(computeNewWTDLoss(6270.33057397168  ,5   ,300,  0.2, 900       ) ==doctest::Approx(-15));
+  CHECK(computeNewWTDLoss(1246.26246881239  ,1   ,300,  0.5, 500       ) ==doctest::Approx(-4));
+  CHECK(computeNewWTDLoss(3892.0177481876   ,1   ,300,  0.8, 1500      ) ==doctest::Approx(-3));
+  CHECK(computeNewWTDLoss(125512.182048359  ,100 ,300,  0.3, 1000      ) ==doctest::Approx(-200));
+  CHECK(computeNewWTDLoss(7854.87745892122  ,5   ,100,  0.3, 1000      ) ==doctest::Approx(-15));
+  CHECK(computeNewWTDLoss(7985.04987524957  ,5   ,1000, 0.3, 1000      ) ==doctest::Approx(-15));
+  CHECK(computeNewWTDLoss(6896.36167648567  ,5   ,10,   0.3, 1000      ) ==doctest::Approx(-15));
 }
 
+
+//TODO: Example array test case
+TEST_CASE("calculateWaterVolume"){
+  f2d porosity = {{1,1,1},{2,2,2},{3,3,3}};
+  f2d fdepth = {{1,1,1},{2,2,2},{3,3,3}};
+  std::vector<float> cell_area = {1,2,3};
+
+  FanDarcyPack fdp;
+  fdp.porosity  = porosity.data();
+  fdp.fdepth    = porosity.data();
+  fdp.cell_area = cell_area.data();
+  fdp.width     = porosity.width();
+
+  //NOTE: Use SUBCASE if you need to reconstruct the arrays multiple times (e.g. if they get changed)
+  //See: https://github.com/onqtam/doctest/blob/master/doc/markdown/tutorial.md#test-cases-and-subcases
+  calculateWaterVolume(3, 4, 5, 1, 1, 2, 2, fdp);
+}
+
+}
