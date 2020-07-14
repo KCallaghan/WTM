@@ -1,5 +1,7 @@
 #include "irf.cpp"
 
+#include <richdem/common/timer.hpp>
+
 void initialise(Parameters &params, ArrayPack &arp){
   ofstream textfile;
   textfile.open (params.textfilename, std::ios_base::app);
@@ -52,8 +54,13 @@ void initialise(Parameters &params, ArrayPack &arp){
 
 
 template<class elev_t>
-  void update(Parameters &params, ArrayPack &arp, \
-  richdem::dephier::DepressionHierarchy<elev_t>   &deps){
+void update(
+  Parameters &params,
+  ArrayPack &arp,
+  richdem::dephier::DepressionHierarchy<elev_t> &deps
+){
+  richdem::Timer timer_overall;
+  timer_overall.start();
 
   ofstream textfile;
   textfile.open (params.textfilename, std::ios_base::app);
@@ -69,8 +76,7 @@ template<class elev_t>
 
   textfile<<"Cycles done: "<<params.cycles_done<<std::endl;
 
-//TODO: How should equilibrium know when to exit?
-
+  //TODO: How should equilibrium know when to exit?
   if((params.cycles_done % 100) == 0){
     textfile<<"saving partway result"<<std::endl;
     string cycles_str = to_string(params.cycles_done);
@@ -87,56 +93,60 @@ template<class elev_t>
 
   //Run the groundwater code to move water
 
-   time_t now = time(0);
-   char* dt = ctime(&now);
+  time_t now = time(0);
+  char* dt = ctime(&now);
 
-   std::cerr << "Before GW time: " << dt << std::endl;
+  std::cerr << "Before GW time: " << dt << std::endl;
 
-int iter_count = 0;
-while(iter_count < params.maxiter){
+  richdem::Timer time_groundwater;
+  time_groundwater.start();
+  int iter_count = 0;
+  while(iter_count++ < params.maxiter){
+    #pragma omp parallel for collapse(2)
+    for(int y=1;y<params.ncells_y-1;y++)
+    for(int x=1;x<params.ncells_x-1; x++){
+      if(arp.land_mask(x,y) == 0)          //skip ocean cells
+        continue;
+      add_recharge(x, y, params, arp);
+    }
 
-  #pragma omp parallel for collapse(2)
-  for(int y=1;y<params.ncells_y-1;y++)
-  for(int x=1;x<params.ncells_x-1; x++){
-    if(arp.land_mask(x,y) == 0)          //skip ocean cells
-      continue;
-    add_recharge(x, y, params, arp);
+    FanDarcyGroundwater::update(params, arp);
   }
 
-  FanDarcyGroundwater::update(params, arp);
-  iter_count +=1;
-}
-
-
-   now = time(0);
-   dt = ctime(&now);
-
-   std::cerr << "After GW time: " << dt << std::endl;
+  now = time(0);
+  dt = ctime(&now);
+  std::cerr << "t GW time = " << time_groundwater.lap() << std::endl;
+  std::cerr << "After GW time: " << dt << std::endl;
 
   arp.wtd_mid = arp.wtd;
 
   //Move surface water
+  richdem::Timer fsm_timer;
+  fsm_timer.start();
   dh::FillSpillMerge(params,deps,arp);
 
+  now = time(0);
+  dt = ctime(&now);
 
-   now = time(0);
-   dt = ctime(&now);
-
-   std::cerr << "After FSM time: " << dt << std::endl;
+  std::cerr << "t FSM time = " << fsm_timer.lap() << std::endl;
+  std::cerr << "After FSM time: " << dt << std::endl;
 
   //check to see where there is surface water, and adjust how evaporation works
   //at these locations.
+  richdem::Timer evaporation_timer;
+  evaporation_timer.start();
   evaporation_update(params,arp);
 
-     std::cerr << "After evaporation_update: " << dt << std::endl;
+  std::cerr << "t Evaporation time = " << evaporation_timer.lap() << std::endl;
+  std::cerr << "After evaporation_update: " << dt << std::endl;
 
   //Print values about the change in water table depth to the text file.
   PrintValues(params,arp);
 
   arp.wtd_old = arp.wtd;
   params.cycles_done += 1;
-     std::cerr << "Done time: " << dt << std::endl;
-
+  std::cerr << "Done time: " << dt << std::endl;
+  std::cerr << "t TWSM update time = " << timer_overall.lap() << std::endl;
 }
 
 
