@@ -30,15 +30,17 @@ typedef double* d1d_pointer;
 typedef float*  f1d_pointer;
 
 struct FanDarcyPack {
-  int         width;
-  double      cellsize_n_s_metres;
   d1d_pointer cell_area;
   d1d_pointer cellsize_e_w_metres;
+  double      cellsize_n_s_metres;
   f2d_pointer fdepth;
+  f2d_pointer land_mask;
   f2d_pointer porosity;
   f2d_pointer topo;
   f2d_pointer transmissivity;
   f2d_pointer wtd;
+  f2d_pointer wtd_changed;
+  int         width;
 };
 
 
@@ -508,6 +510,10 @@ double updateCell(
 ){
   const auto width = fdp.width;
 
+  // Skip ocean cells
+  if(c2d(fdp.land_mask,x,y) != 1)
+    return std::numeric_limits<double>::quiet_NaN();
+
   // Runs functions to compute time steps and update WTD for the center cell
   // and its neighbours until the outer time step has been completed
 
@@ -552,11 +558,13 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
   fdp.cellsize_e_w_metres = arp.cellsize_e_w_metres.data();
   fdp.cellsize_n_s_metres = params.cellsize_n_s_metres;
   fdp.fdepth              = arp.fdepth.data();
+  fdp.land_mask           = arp.land_mask.data();
   fdp.porosity            = arp.porosity.data();
   fdp.topo                = arp.topo.data();
   fdp.transmissivity      = arp.transmissivity.data();
   fdp.width               = arp.fdepth.width();
   fdp.wtd                 = arp.wtd.data();
+  fdp.wtd_changed         = arp.wtd_changed.data();
 
   #pragma omp parallel for collapse(2) default(none) shared(arp,params)
   for(int32_t y=1; y<params.ncells_y-1; y++)
@@ -572,11 +580,7 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
   #pragma omp parallel for collapse(2) default(none) shared(arp,params,fdp)
   for(int32_t y=1; y<params.ncells_y-1; y++)
   for(int32_t x=1; x<params.ncells_x-1; x++){
-    // Skip ocean cells
-    if(arp.land_mask(x,y) == 1){
-      // Otherwise, update the water-table depth change array
-      arp.wtd_changed(x,y) = updateCell(x, y, params.deltat, fdp);
-    }
+    arp.wtd_changed(x,y) = updateCell(x, y, params.deltat, fdp);
   }
 
 
@@ -708,7 +712,7 @@ TEST_CASE("computeNewWTDLoss"){
 TEST_CASE("calculateWaterVolume"){
   f2d porosity = {{1,1,1},{2,2,2},{3,3,3}};
   f2d fdepth = {{1,1,1},{2,2,2},{3,3,3}};
-  std::vector<float> cell_area = {1,2,3};
+  std::vector<double> cell_area = {1,2,3};
 
   FanDarcyPack fdp;
   fdp.porosity  = porosity.data();
