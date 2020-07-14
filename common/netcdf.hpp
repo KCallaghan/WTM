@@ -3,7 +3,10 @@
 
 #include <netcdf.h>
 #include <richdem/common/Array2D.hpp>
+
+#include <cstdint>
 #include <string>
+#include <type_traits>
 
 namespace rd = richdem;
 
@@ -43,7 +46,7 @@ rd::Array2D<T> LoadNetCDF(const std::string filename, const std::string datavar)
     throw std::runtime_error("Failed to get number of dimensions from file '" + filename + "'!");
 
   if(dim_count!=3)
-    throw std::runtime_error("File '" + filename + "' did not have 2 dimensions!");    
+    throw std::runtime_error("File '" + filename + "' did not have 2 dimensions!");
 
   int mywidth;
   int myheight;
@@ -52,7 +55,7 @@ rd::Array2D<T> LoadNetCDF(const std::string filename, const std::string datavar)
   GetDimLength(ncid, 2, mywidth, myheight);
 
   if(mywidth==-1 || myheight==-1)
-    throw std::runtime_error("File '" + filename + "' did not have a lat or lon dimension!");    
+    throw std::runtime_error("File '" + filename + "' did not have a lat or lon dimension!");
 
   rd::Array2D<T> dem(mywidth,myheight);
 
@@ -61,12 +64,15 @@ rd::Array2D<T> LoadNetCDF(const std::string filename, const std::string datavar)
     throw std::runtime_error("Failed to get dataset '"+datavar+"' from file '" + filename + "'!");
 
   /* Read the data. */
-  //TODO: Check data type
-  if ((retval = nc_get_var_float(ncid, varid, dem.data())))
-    throw std::runtime_error("Failed to read data from '"+datavar+" from file '" + filename + "'! Error: " + nc_strerror(retval));
-
- // for(int i=0;i<mywidth*myheight;i++)
-   // std::cout<<data[i]<<std::endl;
+  //TODO: Check data type from NetCDF file
+  if(std::is_same<T,float>::value){
+    if((retval = nc_get_var_float(ncid, varid, (float*)dem.data())))
+      throw std::runtime_error("Failed to read data from '"+datavar+" from file '" + filename + "'! Error: " + nc_strerror(retval));
+  } else if(std::is_same<T,uint8_t>::value){
+    if((retval = nc_get_var_uchar(ncid, varid, (uint8_t*)dem.data())))
+      throw std::runtime_error("Failed to read data from '"+datavar+" from file '" + filename + "'! Error: " + nc_strerror(retval));
+  } else
+    throw std::runtime_error(std::string("Unrecognized data type '") + typeid(T).name() + "' to LoadNetCDF!");
 
   /* Close the file, freeing all resources. */
   if ((retval = nc_close(ncid)))
