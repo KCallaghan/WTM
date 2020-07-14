@@ -61,7 +61,7 @@ int main(int argc, char **argv){
     arp.relhum_start        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_relhum.nc", "value");  //Units: proportion from 0 to 1.
 
     arp.slope_end         = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_slope.nc",  "value");  //Slope as a value from 0 to 1.
-    arp.land_mask         = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_mask.nc",   "value");  //A binary mask that is 1 where there is land and 0 in the ocean
+    arp.land_mask         = LoadData<uint8_t>(params.surfdatadir + params.region + params.time_end + "_coarser_mask.nc",   "value");  //A binary mask that is 1 where there is land and 0 in the ocean
     arp.precip_end        = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_precip.nc", "value");  //Units: m/yr.
     arp.temp_end          = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_temp.nc",   "value");  //Units: degress Celsius
     arp.topo_end          = LoadData<float>(params.surfdatadir + params.region + params.time_end + "_coarser_topo.nc",   "value");  //Units: metres
@@ -108,7 +108,7 @@ int main(int argc, char **argv){
     textfile<<"Initialise equilibrium"<<std::endl;
 
     arp.slope         = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_slope.nc",  "value");  //Slope as a value from 0 to 1.
-    arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_mask.nc",   "value"); //A binary mask that is 1 where there is land and 0 in the ocean
+    arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region + params.time_start + "_coarser_mask.nc",   "value"); //A binary mask that is 1 where there is land and 0 in the ocean
     arp.precip        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_precip.nc", "value");  //Units: m/yr.
     arp.temp          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_temp.nc",   "value");  //Units: degress Celsius
     arp.topo          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_coarser_topo.nc",   "value");  //Units: metres
@@ -243,7 +243,7 @@ int main(int argc, char **argv){
   //`GetDepressionHierarchy()`.
   #pragma omp parallel for
   for(unsigned int i=0;i<label.size();i++){
-    if(arp.land_mask(i) == 0.0f){
+    if(arp.land_mask(i) == 0){
       label(i) = dh::OCEAN;
       final_label(i) = dh::OCEAN;
     }
@@ -292,7 +292,7 @@ while(true){
 
     #pragma omp parallel for
     for(unsigned int i=0;i<label.size();i++){
-      if(arp.land_mask(i) == 0.0f){
+      if(arp.land_mask(i) == 0){
         label(i) = dh::OCEAN;
         final_label(i) = dh::OCEAN;
       }

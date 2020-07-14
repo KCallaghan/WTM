@@ -6,6 +6,7 @@
 namespace rd = richdem;
 
 typedef richdem::Array2D<float>  f2d;
+typedef richdem::Array2D<uint8_t>  ui82d;
 typedef std::vector<double> dvec;
 typedef int32_t dh_label_t;
 
@@ -14,7 +15,7 @@ class ArrayPack {
   f2d ksat;  
   f2d vert_ksat;  
   f2d porosity;  
-  f2d land_mask;
+  ui82d land_mask;
 
   f2d slope_start;
   f2d slope_end;

@@ -44,7 +44,7 @@ int main(int argc, char **argv){
   std::cout<<params.surfdatadir<<std::endl;
   arp.topo          = LoadData<float>(params.surfdatadir + params.region \
   + params.time_start + "_topo.nc",    "value");
-  arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + \
+  arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region + \
   params.time_start + "_mask.nc",   "value"); 
 
 //width and height in number of cells in the array
@@ -133,7 +133,7 @@ int main(int argc, char **argv){
   //`GetDepressionHierarchy()`.
   #pragma omp parallel for
   for(unsigned int i=0;i<label.size();i++){
-    if(arp.land_mask(i) == 0.0f){  
+    if(arp.land_mask(i) == 0){  
       label(i) = dh::OCEAN;
       final_label(i) = dh::OCEAN;
     }
