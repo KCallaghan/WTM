@@ -546,7 +546,7 @@ double updateCell(
 // PUBLIC FUNCTIONS //
 //////////////////////
 
-void update(const Parameters &params, ArrayPack &arp){
+void UpdateCPU(const Parameters &params, ArrayPack &arp){
   FanDarcyPack fdp;
   fdp.cell_area           = arp.cell_area.data();
   fdp.cellsize_e_w_metres = arp.cellsize_e_w_metres.data();
@@ -593,7 +593,12 @@ void update(const Parameters &params, ArrayPack &arp){
       arp.wtd(x,y) = arp.wtd_changed(x,y);;
     }
   }
+}
 
+
+
+void update(const Parameters &params, ArrayPack &arp){
+  UpdateCPU(params, arp);
 }
 
 
