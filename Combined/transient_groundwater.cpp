@@ -46,22 +46,6 @@ struct FanDarcyPack {
 
 
 
-double that_one_equation(
-  const double fdepth,
-  const double wtd,
-  const double volume,
-  const double capacity,
-  const int pos_neg      //1 or -1
-){
-  assert(pos_neg==1 || pos_neg==-1);
-  return
-      fdepth
-    * std::log( std::abs( std::exp(wtd / fdepth) + pos_neg * volume / capacity ))
-    - wtd;
-}
-
-
-
 double depthIntegratedTransmissivity(
   const double wtd,
   const double fdepth,
@@ -163,250 +147,73 @@ double computeMaxStableTimeStep(
 }
 
 
-
-/**
- * @brief Calculates the change in water volume that occurs between
- * two cells, given the water-table depth flux between the two.
- */
-double calculateWaterVolume(
-  const float wtd_change,
-  const float center_wtd,
-  const float neighbour_wtd,
-  const int x,  //Focal cell coordinates
-  const int y,
-  const int nx, //Neighbour cell coordinates
-  const int ny,
-  const FanDarcyPack &fdp
+double computeNewWTD(
+  const double volume_change,
+  const double initial_wtd,
+  const double fdepth,
+  const double porosity_at_surface,
+  const double cell_area
 ){
-  const int width = fdp.width;
-  double volume_change = 0;
+  // DEFINE VARIABLES
+  //std::cout << "Volume change: " << volume_change << "\n";
+  //std::cout << "Cell area: " << cell_area << "\n";
+  //std::cout << "dz surface equivalent: " << volume_change/cell_area << "\n";
+  //std::cout << "GT0 dz final_surface: " << initial_wtd + volume_change/cell_area << "\n";
 
-  // We have the change in the water table between the two cells.
-  // We will use this to calculate the volume that moves between the two,
-  // based on the average porosity and average water table depths
-  // of the two cells.
-  // This volume can then be used to calculate the actual
-  // change in water table height in each of the two cells.
+  // Total Groundwater Storage Capacity
+  const auto total_gw_storage_capacity = cell_area * porosity_at_surface * fdepth;
+  // New water-table depth: to return
+  double final_wtd;
 
-  const float mean_wtd      = (             center_wtd + neighbour_wtd        ) / 2.;
-  const float mean_porosity = (c2d(fdp.porosity,x,y) + c2d(fdp.porosity,nx,ny)) / 2.;
-  const float mean_fdepth   = (c2d(fdp.fdepth,  x,y) + c2d(fdp.fdepth,  nx,ny)) / 2.;
-  const float mean_area     = (      fdp.cell_area[y] + fdp.cell_area[ny]     ) / 2.;
-
-  const float upper_edge = mean_wtd + wtd_change/2.;
-  const float lower_edge = mean_wtd - wtd_change/2.;
-  //since I am using averages between the two cells, I have to take
-  //water both moving up or moving down into account.
-  //So, I treat the average wtd as the middle of where water is
-  //with respect to changing porosity.
-
-  const auto mean_capacity = mean_area * mean_porosity * mean_fdepth;
-
-  // First, we check to see if the mean wtd was above the surface.
-
-  if(lower_edge > 0){
-    // If wtd stays above 0 once the change has occurred, then no need to worry
-    // about porosity.
-
-    // The volume change is just the height change multiplied by the cell's
-    // area.
-    volume_change = wtd_change * mean_area;
-  } else if(lower_edge < 0 && upper_edge > 0){
-    // The water table drops below the surface during this iteration, so we
-    // need to consider porosity for part of the water.
-
-    //TODO: Can this be a named equation?
-
-    // There is a portion of the water that is above the land surface.
-    volume_change = upper_edge * mean_area;
-    // The portion that is below the land surface.
-    // -= because this comes out as a negative number.
-    volume_change -= mean_capacity * std::expm1(lower_edge / mean_fdepth);
-  } else{
-    // the water table is below the surface to start with, therefore it is
-    // below the surface the whole time and we need porosity for all the change.
-    volume_change = some_other_equation(mean_capacity, mean_fdepth, lower_edge, upper_edge);
-  }
-
-  // So now we have the volume change that occurs in each of the two cells
-  // as a positive value  whether it was all above ground, all below ground,
-  // or a combination.
-  return volume_change;
-}
-
-
-/**
- * @brief Calculates water-table depth change in a cell that receives water,
- * given the change in the corresponding cell that gives water.
- */
-double computeNewWTDGain(
-  const float volume,
-  const float my_wtd,
-  const float fdepth,
-  const float porosity,
-  const float cell_area
-){
-  //We convert the known change in water volume to a change
-  //change in water table depth for this cell.
-
-  //We have a volume, which is positive; we also know that this cell is gaining water.
-
-  const auto gw_storage_cap = cell_area * porosity * fdepth; //Groundwater Storage Capacity
-
-  double change_in_wtd;
-
-  if(my_wtd < 0){
-    //either all of the change is below the surface,
-    //or it's a combination of above and below.
-    //we start off assuming that it will all be below the surface:
-    change_in_wtd = that_one_equation(fdepth, my_wtd, volume, gw_storage_cap, 1);
-
-    //TODO(kerry): Find names for this conditions
-    const bool cond1 = my_wtd + change_in_wtd > 0;
-    const bool cond2 = std::exp(my_wtd / fdepth) < volume / gw_storage_cap; //TODO: Should this be expm1, like below?
-    if(cond1 || cond2){
-      //TODO: Should this be that_on_equation?
-
-      //it is gaining enough water that some will be above the surface.
-      //we want to calculate how much of the water is used up
-      //in the ground, i.e. the portion between the starting wtd and 0.
-      const double GW_portion = -gw_storage_cap * std::expm1(my_wtd/fdepth); //TODO: Should this be const? It's subtracted below
-      //this is the volume of water used up in filling in the ground.
-      //the volume minus GW_portion is left over to fill surface water.
-      change_in_wtd = (volume - GW_portion) / cell_area - my_wtd;
-      //-my_wtd because this was a negative number and we are getting the total change in wtd.
+  // IF THE CELL STARTS WITH SURFACE WATER
+  if ( initial_wtd > 0 ){
+    // Check if final water-table depth will also be > 0
+    const auto initial_surface_water_volume = initial_wtd * cell_area;
+    // Final water volume with respect to the land surface.
+    // Positive: above surface
+    // Negative: below surface
+    const auto Vfinal_surface = initial_surface_water_volume + volume_change;
+    //std::cout << "GT0 dz_final_surface: " << Vfinal_surface / cell_area << "\n";
+    if ( Vfinal_surface > 0 ){
+      final_wtd = Vfinal_surface/cell_area;
     }
-  } else {
-    //all of the change is above the surface.
-    change_in_wtd = volume / cell_area;
+    // Otherwise, if WTD <= 0 (i.e. subsurface)
+    else{
+      final_wtd = fdepth * std::log( Vfinal_surface/total_gw_storage_capacity );
+    }
   }
-
-  return change_in_wtd;
-}
-
-
-/**
- * @brief Calculates water-table depth change in a cell that gives water,
- * given the change in the corresponding cell that receives water.
- */
-double computeNewWTDLoss(
-  const float volume,
-  const float my_wtd,
-  const float fdepth,
-  const float porosity,
-  const float cell_area
-){
-  //We convert the known change in water volume to a change
-  //change in water table depth for this cell.
-
-  //We have a volume, which is positive; we also know that this cell is losing water.
-
-  const auto gw_storage_cap = cell_area * porosity * fdepth; //Groundwater Storage Capacity
-
-  double change_in_wtd = -volume / cell_area;
-
-  if((my_wtd > 0) && (my_wtd + change_in_wtd < 0)){
-    //at least some of the change is above the surface.
-    //how much of the volume is used up above the surface?
-    const double SW_portion = my_wtd * cell_area;
-    //this is the volume used in water above the surface.
-    //The total volume minus this is left over to decrease groundwater.
-    change_in_wtd = that_one_equation(fdepth, 0, volume-SW_portion, gw_storage_cap, -1) - my_wtd;
-    //the cell is losing water, and it's losing enough
-    //that some of the change is below the surface and
-    //so we need to take porosity into account.
-  } else if(my_wtd <= 0){
-    //Since it's losing water, all of the change is below the surface.
-    change_in_wtd = that_one_equation(fdepth, my_wtd, volume, gw_storage_cap, -1);
+  // OTHERWISE, IF THE CELL STARTS WITH WATER IN THE SUBSURFACE
+  else{
+    // Remaining subsurface dry pore volume
+    const auto initial_remaining_subsurface_pore_volume = total_gw_storage_capacity
+                                              * (1 - std::exp( initial_wtd/fdepth ));
+    //std::cout << "initial_wtd: " << initial_wtd << "\n";
+    //std::cout << "Vsubsurface: " << initial_remaining_subsurface_pore_volume << "\n";
+    // Final water volume with respect to the land surface.
+    // Positive: above surface
+    // Negative: below surface
+    const auto Vfinal_surface = volume_change - initial_remaining_subsurface_pore_volume;
+    //double _out = Vfinal_surface / cell_area;
+    //std::cout << "LE0 dz_final_surface: " << _out << "\n";
+    // If the volume stays below the surface for the whole time
+    if ( Vfinal_surface < 0 ){
+      //std::cout << "Groundwater levels staying below surface\n";
+      //std::cout << volume_change/total_gw_storage_capacity << "\n";
+      final_wtd = fdepth * std::log( volume_change/total_gw_storage_capacity
+                                     + std::exp(initial_wtd/fdepth) );
+    }
+    // Otherwise, if the water goes above the surface
+    else{
+      //std::cout << "Groundwater levels rising above surface\n";
+      final_wtd = Vfinal_surface/cell_area;
+    }
   }
-
-  return change_in_wtd;
+  //std::cout << "Final WTD: " << final_wtd << "\n";
+  //std::cout << "dWTD: " << final_wtd - initial_wtd << "\n";
+  //std::cout << !std::isnan(final_wtd) << "\n";
+  //assert ( !std::isnan(final_wtd) );
+  return final_wtd;
 }
-
-
-
-double2 GainLoss(
-  const int x,  //Focal cell
-  const int y,
-  const int nx, //Neighbour cell
-  const int ny,
-  const double wtd_change,
-  const double volume,
-  const double local_wtd_center,
-  const double local_wtd_neighbour,
-  const FanDarcyPack &fdp
-){
-  const int width = fdp.width;
-
-  double local_wtd_n_change;
-  double mycell_change;
-  if(wtd_change > 0){  // The current cell is giving water to the neighbour.
-    local_wtd_n_change = computeNewWTDLoss(volume, local_wtd_neighbour,
-                            c2d(fdp.fdepth,    nx, ny),
-                            c2d(fdp.porosity,  nx, ny),
-                            fdp.cell_area[ny]
-                          );
-    mycell_change      = computeNewWTDGain(volume, local_wtd_center,
-                            c2d(fdp.fdepth,     x, y ),
-                            c2d(fdp.porosity,   x, y ),
-                            fdp.cell_area[ny]
-                          );
-  } else {             // The neighbour is the receiving cell.
-    local_wtd_n_change = computeNewWTDGain(volume, local_wtd_neighbour,
-                            c2d(fdp.fdepth,    nx, ny),
-                            c2d(fdp.porosity,  nx, ny),
-                            fdp.cell_area[ny]
-                          );
-    mycell_change      = computeNewWTDLoss(volume, local_wtd_center,
-                            c2d(fdp.fdepth,    x,  y ),
-                            c2d(fdp.porosity,  x,  y ),
-                            fdp.cell_area[ny]
-                          );
-  }
-
-  return {mycell_change, local_wtd_n_change};
-}
-
-
-
-//TODO: Maybe use this
-double2 computeWTDchangeWithNeighbour(
-  const int x,  //Focal cell coordinates
-  const int y,
-  const int nx, //Neighbour cell coordinates
-  const int ny,
-  const double wtd,
-  const double wtd_n,
-  const double dt,
-  const std::array<double,5> &local_wtd,
-  const Direction direction,
-  const FanDarcyPack &fdp
-){
-  const auto width = fdp.width;
-  double Q;
-
-  const auto headCenter = c2d(fdp.topo, x,  y ) + wtd;
-  const auto head_n     = c2d(fdp.topo, nx, ny) + wtd_n;
-
-  const auto transmissivity = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, nx, ny)) / 2.;
-
-  if(direction==Direction::NorthSouth)
-    Q = transmissivity * (head_n - headCenter) / fdp.cellsize_n_s_metres    * fdp.cellsize_e_w_metres[y];
-  else
-    Q = transmissivity * (head_n - headCenter) / fdp.cellsize_e_w_metres[y] * fdp.cellsize_n_s_metres;
-
-
-  const auto wtd_change = Q * dt / fdp.cell_area[ny];
-
-  const auto volume = calculateWaterVolume(std::abs(wtd_change), wtd, wtd_n, x, y, nx, ny, fdp);
-
-  if(volume > 0){
-    return GainLoss(x, y, nx  , ny, wtd_change, volume, wtd, wtd_n, fdp);
-  } else {
-    return {};
-  }
-}
-
 
 
 /**
@@ -442,11 +249,13 @@ void computeWTDchangeAtCell(
   const double transmissivityW = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x-1, y  )) / 2.;
 
   // Then, compute the discharges
+  // Define Q such that + if center cell gaining, - if center cell losing
   const double QN = transmissivityN * (headN - headCenter) / fdp.cellsize_n_s_metres    * fdp.cellsize_e_w_metres[y];
   const double QS = transmissivityS * (headS - headCenter) / fdp.cellsize_n_s_metres    * fdp.cellsize_e_w_metres[y];
   const double QE = transmissivityE * (headE - headCenter) / fdp.cellsize_e_w_metres[y] * fdp.cellsize_n_s_metres;
   const double QW = transmissivityW * (headW - headCenter) / fdp.cellsize_e_w_metres[y] * fdp.cellsize_n_s_metres;
 
+  // ************ MAYBE CUT IF WE USE A GLOBAL TIME STEP! **************
   // Update water-table depth, but only in the "internal" variables to
   // handle internal time stepping to maintain stability.
   // dH = sum(discharges) times time step, divided by cell area,
@@ -456,45 +265,14 @@ void computeWTDchangeAtCell(
   const double wtd_change_W = QW * dt / fdp.cell_area[y  ];
   const double wtd_change_E = QE * dt / fdp.cell_area[y  ];
 
-  //We use the calculated wtd change fluxes to calculate a volume
-  //change between the 2 cells. This is based on average
-  //porosity, e-folding depth, wtd, and cell area of the 2 cells.
+  // Sum discharges and divide by the time step to compute the water volume
+  // added to the center cell
+  const double dVolume = (QN + QS + QW + QE) * dt;// / (fdp.cellsize_n_s_metres * fdp.cellsize_e_w_metres[y]);
+  //std::cout << QN << " " << QS << " " << QW << " " << QE << " " << dVolume << "\n";
 
-  const double volume_N = calculateWaterVolume(std::abs(wtd_change_N), local_wtd[0], local_wtd[1], x, y, x, y+1, fdp);
-  const double volume_S = calculateWaterVolume(std::abs(wtd_change_S), local_wtd[0], local_wtd[2], x, y, x, y-1, fdp);
-  const double volume_E = calculateWaterVolume(std::abs(wtd_change_E), local_wtd[0], local_wtd[3], x, y, x+1, y, fdp);
-  const double volume_W = calculateWaterVolume(std::abs(wtd_change_W), local_wtd[0], local_wtd[4], x, y, x-1, y, fdp);
-
-  //we now use these volumes to compute the actual changes in
-  //water table depths in the target cell and each of the neighbouring cells:
-
-  //The current cell is receiving water from the North, so (x,y+1) is the giving cell.
-  //Target cell is the receiving cell.
-  double my_cell_change = 0;
-  if(volume_N > 0){
-    const auto change = GainLoss(x, y, x  , y+1, wtd_change_N, volume_N, local_wtd[0], local_wtd[1], fdp);
-    my_cell_change += change.x;
-    local_wtd[1]   += change.y;
-  }
-  if(volume_S > 0){
-    const auto change = GainLoss(x, y, x  , y-1, wtd_change_S, volume_S, local_wtd[0], local_wtd[2], fdp);
-    my_cell_change += change.x;
-    local_wtd[2]   += change.y;
-  }
-  if(volume_E > 0){
-    const auto change = GainLoss(x, y, x+1, y  , wtd_change_E, volume_E, local_wtd[0], local_wtd[3], fdp);
-    my_cell_change += change.x;
-    local_wtd[3]   += change.y;
-  }
-  if(volume_W > 0){
-    const auto change = GainLoss(x, y, x-1, y  , wtd_change_W, volume_W, local_wtd[0], local_wtd[4], fdp);
-    my_cell_change += change.x;
-    local_wtd[4]   += change.y;
-  }
-
-  // Now we have the height changes that will take place in the target cell
-  // and each of the four neighbours.
-  local_wtd[0] += my_cell_change;
+  // Update the cell's WTD
+  local_wtd[0] = computeNewWTD( dVolume, local_wtd[0], c2d(fdp.fdepth, x, y), c2d(fdp.porosity, x, y), fdp.cell_area[y] );
+  //local_wtd[0] = computeNewWTD( dVolume, local_wtd[0], 150., 0.5, 1E8 );
 }
 
 
@@ -607,7 +385,7 @@ void update(const Parameters &params, ArrayPack &arp){
 }
 
 
-
+/*
 TEST_CASE("that_one_equation"){
   CHECK(that_one_equation(300, -10 ,487.660600188348,30000 , 1)==doctest::Approx(5));
   CHECK(that_one_equation(300, -10 ,877.789080339026,54000 , 1)==doctest::Approx(5));
@@ -626,6 +404,7 @@ TEST_CASE("that_one_equation"){
   CHECK(that_one_equation(1000,-5  ,1488.79363305426,300000, -1)==doctest::Approx(-5));
   CHECK(that_one_equation(10,  -5  ,715.953655623573,3000  , -1)==doctest::Approx(-5));
 }
+*/
 
 TEST_CASE("depthIntegratedTransmissivity"){
   CHECK(depthIntegratedTransmissivity(5  ,100  ,0.01      ) ==doctest::Approx(1.015));
@@ -656,7 +435,7 @@ TEST_CASE("some_other_equation"){
   CHECK(some_other_equation(30000  ,300, -10, -5      ) ==doctest::Approx(487.660600188348));
 }
 
-
+/*
 TEST_CASE("computeNewWTDGain"){
   CHECK(computeNewWTDGain(487.660600188348  ,-10  ,300, 0.1, 1000      ) ==doctest::Approx(5));
   CHECK(computeNewWTDGain(877.789080339026  ,-10  ,300, 0.2, 900       ) ==doctest::Approx(5));
@@ -707,7 +486,7 @@ TEST_CASE("computeNewWTDLoss"){
   CHECK(computeNewWTDLoss(7985.04987524957  ,5   ,1000, 0.3, 1000      ) ==doctest::Approx(-15));
   CHECK(computeNewWTDLoss(6896.36167648567  ,5   ,10,   0.3, 1000      ) ==doctest::Approx(-15));
 }
-
+*/
 
 //TODO: Example array test case
 //TEST_CASE("calculateWaterVolume"){
