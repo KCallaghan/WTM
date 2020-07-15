@@ -56,7 +56,7 @@ double that_one_equation(
   assert(pos_neg==1 || pos_neg==-1);
   return
       fdepth
-    * std::log( std::exp(wtd / fdepth) + pos_neg * volume / capacity )
+    * std::log( std::abs( std::exp(wtd / fdepth) + pos_neg * volume / capacity ))
     - wtd;
 }
 
@@ -710,20 +710,20 @@ TEST_CASE("computeNewWTDLoss"){
 
 
 //TODO: Example array test case
-TEST_CASE("calculateWaterVolume"){
-  f2d porosity = {{1,1,1},{2,2,2},{3,3,3}};
-  f2d fdepth = {{1,1,1},{2,2,2},{3,3,3}};
-  std::vector<double> cell_area = {1,2,3};
-
-  FanDarcyPack fdp;
-  fdp.porosity  = porosity.data();
-  fdp.fdepth    = porosity.data();
-  fdp.cell_area = cell_area.data();
-  fdp.width     = porosity.width();
-
-  //NOTE: Use SUBCASE if you need to reconstruct the arrays multiple times (e.g. if they get changed)
-  //See: https://github.com/onqtam/doctest/blob/master/doc/markdown/tutorial.md#test-cases-and-subcases
-  calculateWaterVolume(3, 4, 5, 1, 1, 2, 2, fdp);
-}
+//TEST_CASE("calculateWaterVolume"){
+//  f2d porosity = {{1,1,1},{2,2,2},{3,3,3}};
+//  f2d fdepth = {{1,1,1},{2,2,2},{3,3,3}};
+//  std::vector<double> cell_area = {1,2,3};
+//
+//  FanDarcyPack fdp;
+//  fdp.porosity  = porosity.data();
+//  fdp.fdepth    = porosity.data();
+//  fdp.cell_area = cell_area.data();
+//  fdp.width     = porosity.width();
+//
+//  //NOTE: Use SUBCASE if you need to reconstruct the arrays multiple times (e.g. if they get changed)
+//  //See: https://github.com/onqtam/doctest/blob/master/doc/markdown/tutorial.md#test-cases-and-subcases
+//  calculateWaterVolume(3, 4, 5, 1, 1, 2, 2, fdp);
+//}
 
 }
