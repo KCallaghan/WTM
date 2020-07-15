@@ -56,7 +56,7 @@ double that_one_equation(
   assert(pos_neg==1 || pos_neg==-1);
   return
       fdepth
-    * std::log( std::abs( std::exp(wtd / fdepth) + pos_neg * volume / capacity ))
+    * std::log( std::exp(wtd / fdepth) + pos_neg * volume / capacity )
     - wtd;
 }
 
