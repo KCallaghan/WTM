@@ -459,6 +459,8 @@ TEST_CASE("computeNewWTDLoss"){
   CHECK(computeNewWTDLoss(7854.87745892122  ,5   ,100,  0.3, 1000      ) ==doctest::Approx(-15));
   CHECK(computeNewWTDLoss(7985.04987524957  ,5   ,1000, 0.3, 1000      ) ==doctest::Approx(-15));
   CHECK(computeNewWTDLoss(6896.36167648567  ,5   ,10,   0.3, 1000      ) ==doctest::Approx(-15));
+
+ // CHECK(!std::isnan(computeNewWTDLoss(6593384, 0.1504694819450378418, 0.51312428712844848633,  0.45100000500679016113, 17265204) ));
 }
 */
 
