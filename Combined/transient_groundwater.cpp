@@ -159,6 +159,7 @@ double computeNewWTD(
   //std::cout << "Cell area: " << cell_area << "\n";
   //std::cout << "dz surface equivalent: " << volume_change/cell_area << "\n";
   //std::cout << "GT0 dz final_surface: " << initial_wtd + volume_change/cell_area << "\n";
+  //std::cout << "Initial WTD: " << initial_wtd << "\n";
 
   // Total Groundwater Storage Capacity
   const auto total_gw_storage_capacity = cell_area * porosity_at_surface * fdepth;
@@ -179,7 +180,7 @@ double computeNewWTD(
     }
     // Otherwise, if WTD <= 0 (i.e. subsurface)
     else{
-      final_wtd = fdepth * std::log( Vfinal_surface/total_gw_storage_capacity );
+      final_wtd = fdepth * std::log( Vfinal_surface/total_gw_storage_capacity + 1 );
     }
   }
   // OTHERWISE, IF THE CELL STARTS WITH WATER IN THE SUBSURFACE
@@ -199,6 +200,10 @@ double computeNewWTD(
     if ( Vfinal_surface < 0 ){
       //std::cout << "Groundwater levels staying below surface\n";
       //std::cout << volume_change/total_gw_storage_capacity << "\n";
+      auto _tmp_ = volume_change/total_gw_storage_capacity + std::exp(initial_wtd/fdepth);
+      if (_tmp_ <= 0){
+        std::cout << "\n\n***********************" << _tmp_ << "**********************\n\n";
+      }
       final_wtd = fdepth * std::log( volume_change/total_gw_storage_capacity
                                      + std::exp(initial_wtd/fdepth) );
     }
@@ -208,6 +213,7 @@ double computeNewWTD(
       final_wtd = Vfinal_surface/cell_area;
     }
   }
+  //std::cout << final_wtd << "\n";
   //std::cout << "Final WTD: " << final_wtd << "\n";
   //std::cout << "dWTD: " << final_wtd - initial_wtd << "\n";
   //std::cout << !std::isnan(final_wtd) << "\n";
@@ -255,15 +261,7 @@ void computeWTDchangeAtCell(
   const double QE = transmissivityE * (headE - headCenter) / fdp.cellsize_e_w_metres[y] * fdp.cellsize_n_s_metres;
   const double QW = transmissivityW * (headW - headCenter) / fdp.cellsize_e_w_metres[y] * fdp.cellsize_n_s_metres;
 
-  // ************ MAYBE CUT IF WE USE A GLOBAL TIME STEP! **************
-  // Update water-table depth, but only in the "internal" variables to
-  // handle internal time stepping to maintain stability.
-  // dH = sum(discharges) times time step, divided by cell area,
-  //      divided by porosity.
-  const double wtd_change_N = QN * dt / fdp.cell_area[y+1];
-  const double wtd_change_S = QS * dt / fdp.cell_area[y-1];
-  const double wtd_change_W = QW * dt / fdp.cell_area[y  ];
-  const double wtd_change_E = QE * dt / fdp.cell_area[y  ];
+  //std::cout << transmissivityW << "\n";
 
   // Sum discharges and divide by the time step to compute the water volume
   // added to the center cell
@@ -273,6 +271,14 @@ void computeWTDchangeAtCell(
   // Update the cell's WTD
   local_wtd[0] = computeNewWTD( dVolume, local_wtd[0], c2d(fdp.fdepth, x, y), c2d(fdp.porosity, x, y), fdp.cell_area[y] );
   //local_wtd[0] = computeNewWTD( dVolume, local_wtd[0], 150., 0.5, 1E8 );
+
+  if (std::isnan(local_wtd[0])){
+    std::cout << "\n\n============= " << x << "," << y << " ================\n\n";
+    exit(0);
+    exit(1);
+    exit(2);
+  }
+
 }
 
 
@@ -309,6 +315,7 @@ double updateCell(
   double dt_inner;
   while (time_remaining > 0){
     const double max_stable_time_step = computeMaxStableTimeStep(x, y, fdp);
+    //std::cout << max_stable_time_step << "\n";
     // Choose the inner-loop time step
     if(time_remaining <= max_stable_time_step){
       dt_inner = time_remaining;
