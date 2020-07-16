@@ -51,7 +51,7 @@ double depthIntegratedTransmissivity(
   const double fdepth,
   const double ksat
 ){
-  constexpr float shallow = 1.5;
+  constexpr double shallow = 1.5;
   //Global soil datasets include information for shallow soils.
   //if the water table is deeper than this, the permeability
   //of the soil sees an exponential decay with depth.
@@ -143,6 +143,7 @@ double computeMaxStableTimeStep(
   // In order to avoid operating at the very maximum time step possible,
   // we apply a factor of safety of 2
 
+  //std::cout << dt_max_diffusion_withPorosity << "\n";
   return dt_max_diffusion_withPorosity/2.;
 }
 
@@ -247,6 +248,12 @@ void computeWTDchangeAtCell(
   // Update the cell's WTD
   local_wtd[0] = computeNewWTD( dVolume, local_wtd[0], c2d(fdp.fdepth, x, y), c2d(fdp.porosity, x, y), fdp.cell_area[y] );
 
+  // For local dynamic time stepping (consider switching to global later),
+  // update the neighboring cell WTDs
+  local_wtd[1] = computeNewWTD( -QN*dt, local_wtd[1], c2d(fdp.fdepth, x, y+1), c2d(fdp.porosity, x, y+1), fdp.cell_area[y+1] );
+  local_wtd[2] = computeNewWTD( -QS*dt, local_wtd[2], c2d(fdp.fdepth, x, y-1), c2d(fdp.porosity, x, y-1), fdp.cell_area[y-1] );
+  local_wtd[3] = computeNewWTD( -QE*dt, local_wtd[3], c2d(fdp.fdepth, x+1, y), c2d(fdp.porosity, x+1, y), fdp.cell_area[y] );
+  local_wtd[4] = computeNewWTD( -QW*dt, local_wtd[4], c2d(fdp.fdepth, x-1, y), c2d(fdp.porosity, x-1, y), fdp.cell_area[y] );
 }
 
 
@@ -289,6 +296,7 @@ double updateCell(
     }
     else{
       dt_inner = max_stable_time_step;
+      std::cout << "***USING MAX STABLE TIME STEP***\n";
     }
 
     computeWTDchangeAtCell(x, y, dt_inner, local_wtd, fdp);
