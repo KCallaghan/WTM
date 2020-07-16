@@ -155,11 +155,6 @@ double computeNewWTD(
   const double cell_area
 ){
   // DEFINE VARIABLES
-  //std::cout << "Volume change: " << volume_change << "\n";
-  //std::cout << "Cell area: " << cell_area << "\n";
-  //std::cout << "dz surface equivalent: " << volume_change/cell_area << "\n";
-  //std::cout << "GT0 dz final_surface: " << initial_wtd + volume_change/cell_area << "\n";
-  //std::cout << "Initial WTD: " << initial_wtd << "\n";
 
   // Total Groundwater Storage Capacity
   const auto total_gw_storage_capacity = cell_area * porosity_at_surface * fdepth;
@@ -174,7 +169,6 @@ double computeNewWTD(
     // Positive: above surface
     // Negative: below surface
     const auto Vfinal_surface = initial_surface_water_volume + volume_change;
-    //std::cout << "GT0 dz_final_surface: " << Vfinal_surface / cell_area << "\n";
     if ( Vfinal_surface > 0 ){
       final_wtd = Vfinal_surface/cell_area;
     }
@@ -188,36 +182,21 @@ double computeNewWTD(
     // Remaining subsurface dry pore volume
     const auto initial_remaining_subsurface_pore_volume = total_gw_storage_capacity
                                               * (1 - std::exp( initial_wtd/fdepth ));
-    //std::cout << "initial_wtd: " << initial_wtd << "\n";
-    //std::cout << "Vsubsurface: " << initial_remaining_subsurface_pore_volume << "\n";
     // Final water volume with respect to the land surface.
     // Positive: above surface
     // Negative: below surface
     const auto Vfinal_surface = volume_change - initial_remaining_subsurface_pore_volume;
-    //double _out = Vfinal_surface / cell_area;
-    //std::cout << "LE0 dz_final_surface: " << _out << "\n";
     // If the volume stays below the surface for the whole time
     if ( Vfinal_surface < 0 ){
-      //std::cout << "Groundwater levels staying below surface\n";
-      //std::cout << volume_change/total_gw_storage_capacity << "\n";
       auto _tmp_ = volume_change/total_gw_storage_capacity + std::exp(initial_wtd/fdepth);
-      if (_tmp_ <= 0){
-        std::cout << "\n\n***********************" << _tmp_ << "**********************\n\n";
-      }
       final_wtd = fdepth * std::log( volume_change/total_gw_storage_capacity
                                      + std::exp(initial_wtd/fdepth) );
     }
     // Otherwise, if the water goes above the surface
     else{
-      //std::cout << "Groundwater levels rising above surface\n";
       final_wtd = Vfinal_surface/cell_area;
     }
   }
-  //std::cout << final_wtd << "\n";
-  //std::cout << "Final WTD: " << final_wtd << "\n";
-  //std::cout << "dWTD: " << final_wtd - initial_wtd << "\n";
-  //std::cout << !std::isnan(final_wtd) << "\n";
-  //assert ( !std::isnan(final_wtd) );
   return final_wtd;
 }
 
@@ -261,23 +240,12 @@ void computeWTDchangeAtCell(
   const double QE = transmissivityE * (headE - headCenter) / fdp.cellsize_e_w_metres[y] * fdp.cellsize_n_s_metres;
   const double QW = transmissivityW * (headW - headCenter) / fdp.cellsize_e_w_metres[y] * fdp.cellsize_n_s_metres;
 
-  //std::cout << transmissivityW << "\n";
-
   // Sum discharges and divide by the time step to compute the water volume
   // added to the center cell
   const double dVolume = (QN + QS + QW + QE) * dt;// / (fdp.cellsize_n_s_metres * fdp.cellsize_e_w_metres[y]);
-  //std::cout << QN << " " << QS << " " << QW << " " << QE << " " << dVolume << "\n";
 
   // Update the cell's WTD
   local_wtd[0] = computeNewWTD( dVolume, local_wtd[0], c2d(fdp.fdepth, x, y), c2d(fdp.porosity, x, y), fdp.cell_area[y] );
-  //local_wtd[0] = computeNewWTD( dVolume, local_wtd[0], 150., 0.5, 1E8 );
-
-  if (std::isnan(local_wtd[0])){
-    std::cout << "\n\n============= " << x << "," << y << " ================\n\n";
-    exit(0);
-    exit(1);
-    exit(2);
-  }
 
 }
 
@@ -315,7 +283,6 @@ double updateCell(
   double dt_inner;
   while (time_remaining > 0){
     const double max_stable_time_step = computeMaxStableTimeStep(x, y, fdp);
-    //std::cout << max_stable_time_step << "\n";
     // Choose the inner-loop time step
     if(time_remaining <= max_stable_time_step){
       dt_inner = time_remaining;
