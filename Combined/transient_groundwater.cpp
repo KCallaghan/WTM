@@ -184,21 +184,21 @@ double computeNewWTD(
     }
     // Otherwise, if WTD <= 0 (i.e. subsurface)
     else{
-      //if it's a losing cell, we need to make sure that it's not going to try 
-      //to lose more water than it has. 
+      //if it's a losing cell, we need to make sure that it's not going to try
+      //to lose more water than it has.
       if(Vfinal_surface < 0){
         assert(-Vfinal_surface <= total_gw_storage_capacity + 0.1);
         if(-Vfinal_surface > total_gw_storage_capacity)
-          Vfinal_surface = -total_gw_storage_capacity + 0.00001;
+          Vfinal_surface = -total_gw_storage_capacity + 0.00001; //TODO: Explain why this offset is here
       }
-      final_wtd = fdepth * std::log( Vfinal_surface/total_gw_storage_capacity + 1 );
+      final_wtd = fdepth * std::log1p(Vfinal_surface/total_gw_storage_capacity);
     }
   }
   // OTHERWISE, IF THE CELL STARTS WITH WATER IN THE SUBSURFACE
   else{
     // Remaining subsurface dry pore volume
-    const auto initial_remaining_subsurface_pore_volume = total_gw_storage_capacity - (total_gw_storage_capacity
-                                              * (1 - std::exp( initial_wtd/fdepth )));
+    const auto initial_remaining_subsurface_pore_volume =
+      total_gw_storage_capacity - (total_gw_storage_capacity * -std::expm1(initial_wtd/fdepth));
     // Final water volume with respect to the land surface.
     // Positive: above surface
     // Negative: below surface
@@ -206,11 +206,11 @@ double computeNewWTD(
     // If the volume stays below the surface for the whole time
     if ( Vfinal_surface < 0 ){
       //if it's a losing cell, we need to make sure that it's not going to try
-      //to lose more water than it has. 
+      //to lose more water than it has.
       if(volume_change < 0){
         assert(-volume_change <= initial_remaining_subsurface_pore_volume + 0.1);
         if(-volume_change > initial_remaining_subsurface_pore_volume)
-          volume_change = -initial_remaining_subsurface_pore_volume + 0.00001;
+          volume_change = -initial_remaining_subsurface_pore_volume + 0.00001; //TODO: Explain why this offset is here
       }
       final_wtd = fdepth * std::log( volume_change/total_gw_storage_capacity
                                      + std::exp(initial_wtd/fdepth) );
