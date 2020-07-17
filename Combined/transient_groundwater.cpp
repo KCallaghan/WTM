@@ -14,15 +14,11 @@ namespace FanDarcyGroundwater {
 
 #define c2d(arr,x,y) arr[(y)*(width)+(x)] //Convert 2d coordinates into 1d coordinates assuming width
 
-enum class Direction {
-  NorthSouth,
-  EastWest
-};
-
 struct double2 {
   double x = 0;
   double y = 0;
 };
+
 
 typedef double* d2d_pointer;
 typedef float*  f2d_pointer;
@@ -30,21 +26,21 @@ typedef double* d1d_pointer;
 typedef float*  f1d_pointer;
 typedef uint8_t* ui82d_pointer;
 
-struct FanDarcyPack {
-  d1d_pointer cell_area;
-  d1d_pointer cellsize_e_w_metres;
-  double      cellsize_n_s_metres;
-  f2d_pointer fdepth;
-  ui82d_pointer land_mask;
-  f2d_pointer porosity;
-  f2d_pointer topo;
-  f2d_pointer transmissivity;
-  f2d_pointer wtd;
-  f2d_pointer wtd_changed;
-  f2d_pointer ksat;
-  int         width;
-};
 
+struct FanDarcyPack {
+  d1d_pointer   cell_area;
+  d1d_pointer   cellsize_e_w_metres;
+  double        cellsize_n_s_metres;
+  f2d_pointer   fdepth;
+  ui82d_pointer land_mask;
+  f2d_pointer   porosity;
+  f2d_pointer   topo;
+  f2d_pointer   transmissivity;
+  f2d_pointer   wtd;
+  f2d_pointer   wtd_changed;
+  f2d_pointer   ksat;
+  int           width;
+};
 
 
 double depthIntegratedTransmissivity(
@@ -76,7 +72,28 @@ double depthIntegratedTransmissivity(
 
 
 
-double that_basic_diffusion_thing(
+void updateTransmissivity(
+  const int x,
+  const int y,
+  std::array<double,5> &local_wtd,
+  const FanDarcyPack &fdp
+){
+  const auto width = fdp.width;
+
+  c2d(fdp.transmissivity,x,y) = depthIntegratedTransmissivity(
+      local_wtd[0], c2d(fdp.fdepth,x,y), c2d(fdp.ksat,x,y));
+  c2d(fdp.transmissivity,x,y+1) = depthIntegratedTransmissivity(
+      local_wtd[1], c2d(fdp.fdepth,x,y+1), c2d(fdp.ksat,x,y+1));
+  c2d(fdp.transmissivity,x,y-1) = depthIntegratedTransmissivity(
+      local_wtd[2], c2d(fdp.fdepth,x,y-1), c2d(fdp.ksat,x,y-1));
+  c2d(fdp.transmissivity,x+1,y) = depthIntegratedTransmissivity(
+      local_wtd[3], c2d(fdp.fdepth,x+1,y), c2d(fdp.ksat,x+1,y));
+  c2d(fdp.transmissivity,x-1,y) = depthIntegratedTransmissivity(
+      local_wtd[4], c2d(fdp.fdepth,x-1,y), c2d(fdp.ksat,x-1,y));
+}
+
+
+double vonNeumannStability(
   const double Dmax,
   const double cell_width,
   const double cell_height
@@ -88,21 +105,11 @@ double that_basic_diffusion_thing(
 }
 
 
-
-double some_other_equation(
-  const double capacity,
-  const double fdepth,
-  const double lower_edge,
-  const double upper_edge
-){
-  return capacity * (std::exp(upper_edge / fdepth) - std::exp(lower_edge / fdepth));
-}
-
 /**
  * @brief Returns the maximum stable time step with a 2x factor of safety
  * @details Uses a 2D diffusion von Neumann stability analysis using the
- *          "worst case" scenario highest transmissivity, combined with
- *          a porosity-based amplification factor.
+ *          "worst case" scenario highest transmissivity, smallest cellsize, 
+ *          combined with a porosity-based amplification factor.
  */
 double computeMaxStableTimeStep(
   const int x,
@@ -130,7 +137,7 @@ double computeMaxStableTimeStep(
 
   const auto Dmax = *std::max_element(Tarray.begin(), Tarray.end());
   const auto sizeMin = *std::min_element(sizeArray.begin(), sizeArray.end());
-  const auto dt_max_diffusion_basic = that_basic_diffusion_thing(Dmax, sizeMin, fdp.cellsize_n_s_metres);
+  const auto dt_max_diffusion_basic = vonNeumannStability(Dmax, sizeMin, fdp.cellsize_n_s_metres);
 
   // Now let's add in the porosity differences
   // Porosity differences will AMPLIFY the WTD changes.
@@ -152,7 +159,6 @@ double computeMaxStableTimeStep(
   // In order to avoid operating at the very maximum time step possible,
   // we apply a factor of safety of 2
 
-  //std::cout << dt_max_diffusion_withPorosity << "\n";
   return dt_max_diffusion_withPorosity/2.;
 }
 
@@ -165,7 +171,7 @@ double computeNewWTD(
   const double cell_area
 ){
   // DEFINE VARIABLES
-
+  const double FP_ERROR = 0.00001;
   // Total Groundwater Storage Capacity
   const auto total_gw_storage_capacity = cell_area * porosity_at_surface * fdepth;
   // New water-table depth: to return
@@ -174,27 +180,30 @@ double computeNewWTD(
   // IF THE CELL STARTS WITH SURFACE WATER
   if ( initial_wtd > 0 ){
     // Check if final water-table depth will also be > 0
+    // If it is, then either the cell is gaining water, 
+    // or it is losing water, but it is losing less than the 
+    // amount of surface water it has. 
     const auto initial_surface_water_volume = initial_wtd * cell_area;
     // Final water volume with respect to the land surface.
     // Positive: above surface
     // Negative: below surface
     auto Vfinal_surface = initial_surface_water_volume + volume_change;
-    if ( Vfinal_surface > 0 ){
-      final_wtd = Vfinal_surface/cell_area;
+    if ( Vfinal_surface >= 0 ){
+      final_wtd = Vfinal_surface/cell_area;  //the cell still has surface water.
     }
     // Otherwise, if WTD <= 0 (i.e. subsurface)
     else{
       //if it's a losing cell, we need to make sure that it's not going to try
       //to lose more water than it has.
-      if(Vfinal_surface < 0){
-        assert(-Vfinal_surface <= total_gw_storage_capacity + 0.1);
-        if(-Vfinal_surface > total_gw_storage_capacity)
-          Vfinal_surface = -total_gw_storage_capacity + 0.00001; //TODO: Explain why this offset is here
-      }
+      assert(-Vfinal_surface <= total_gw_storage_capacity + FP_ERROR);
+      if(-Vfinal_surface > total_gw_storage_capacity)
+        Vfinal_surface = -total_gw_storage_capacity + FP_ERROR; 
+        //The volume moving may not be exactly equal to the volume available, or the 
+        //logarithm below will be undefined, so we add FP_ERROR to make it just slightly smaller.
       final_wtd = fdepth * std::log1p(Vfinal_surface/total_gw_storage_capacity);
     }
   }
-  // OTHERWISE, IF THE CELL STARTS WITH WATER IN THE SUBSURFACE
+  // OTHERWISE, IF THE CELL STARTS WITH WATER TABLE IN THE SUBSURFACE
   else{
     // Remaining subsurface dry pore volume
     const auto initial_remaining_subsurface_pore_volume =
@@ -208,9 +217,11 @@ double computeNewWTD(
       //if it's a losing cell, we need to make sure that it's not going to try
       //to lose more water than it has.
       if(volume_change < 0){
-        assert(-volume_change <= initial_remaining_subsurface_pore_volume + 0.1);
+        assert(-volume_change <= initial_remaining_subsurface_pore_volume + FP_ERROR);
         if(-volume_change > initial_remaining_subsurface_pore_volume)
-          volume_change = -initial_remaining_subsurface_pore_volume + 0.00001; //TODO: Explain why this offset is here
+          volume_change = -initial_remaining_subsurface_pore_volume + FP_ERROR; 
+        //The volume moving may not be exactly equal to the volume available, or the 
+        //logarithm below will be undefined, so we add FP_ERROR to make it just slightly smaller.
       }
       final_wtd = fdepth * std::log( volume_change/total_gw_storage_capacity
                                      + std::exp(initial_wtd/fdepth) );
@@ -294,7 +305,7 @@ double updateCell(
 
   // Skip ocean cells
   if(c2d(fdp.land_mask,x,y) != 1)
-    return std::numeric_limits<double>::quiet_NaN();
+    return 0;                     //the coastline represents a boundary condition where water table is at the land surface
 
   // Runs functions to compute time steps and update WTD for the center cell
   // and its neighbours until the outer time step has been completed
@@ -311,16 +322,7 @@ double updateCell(
   // Update water-table depths using dynamic time stepping
   double dt_inner;
   while (time_remaining > 0){
-    c2d(fdp.transmissivity,x,y) = depthIntegratedTransmissivity(
-      local_wtd[0], c2d(fdp.fdepth,x,y), c2d(fdp.ksat,x,y));
-    c2d(fdp.transmissivity,x,y+1) = depthIntegratedTransmissivity(
-      local_wtd[1], c2d(fdp.fdepth,x,y+1), c2d(fdp.ksat,x,y+1));
-    c2d(fdp.transmissivity,x,y-1) = depthIntegratedTransmissivity(
-      local_wtd[2], c2d(fdp.fdepth,x,y-1), c2d(fdp.ksat,x,y-1));
-    c2d(fdp.transmissivity,x+1,y) = depthIntegratedTransmissivity(
-      local_wtd[3], c2d(fdp.fdepth,x+1,y), c2d(fdp.ksat,x+1,y));
-    c2d(fdp.transmissivity,x-1,y) = depthIntegratedTransmissivity(
-      local_wtd[4], c2d(fdp.fdepth,x-1,y), c2d(fdp.ksat,x-1,y));
+    updateTransmissivity(x, y, local_wtd, fdp);
 
     const double max_stable_time_step = computeMaxStableTimeStep(x, y, fdp);
     // Choose the inner-loop time step
@@ -329,7 +331,6 @@ double updateCell(
     }
     else{
       dt_inner = max_stable_time_step;
-   //   std::cout << "***USING MAX STABLE TIME STEP***\n";
     }
 
     computeWTDchangeAtCell(x, y, dt_inner, local_wtd, fdp);
@@ -369,19 +370,15 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
     arp.wtd_changed(x,y) = updateCell(x, y, params.deltat, fdp);
   }
 
-
   // Once all the changes are known, update the WTD everywhere with the
   // difference array
   #pragma omp parallel for collapse(2) default(none) shared(arp,params)
   for(int32_t y=1; y<params.ncells_y-1; y++)
   for(int32_t x=1; x<params.ncells_x-1; x++){
-  // Skip ocean cells
-    if(arp.land_mask(x,y) == 1){
-      // Update the whole wtd array at once.
-      // This is the new water table after groundwater has moved
-      // for delta_t seconds.
-      arp.wtd(x,y) = arp.wtd_changed(x,y);;
-    }
+    // Update the whole wtd array at once.
+    // This is the new water table after groundwater has moved
+    // for delta_t seconds.
+    arp.wtd(x,y) = arp.wtd_changed(x,y);;
   }
 }
 
@@ -437,10 +434,6 @@ TEST_CASE("depthIntegratedTransmissivity"){
   CHECK(depthIntegratedTransmissivity(-10,300  ,0.0000001 ) ==doctest::Approx(2.91619287408366E-05));
 }
 
-
-TEST_CASE("some_other_equation"){
-  CHECK(some_other_equation(30000  ,300, -10, -5      ) ==doctest::Approx(487.660600188348));
-}
 
 /*
 TEST_CASE("computeNewWTDGain"){
