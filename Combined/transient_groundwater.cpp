@@ -178,7 +178,7 @@ double computeNewWTD(
   double final_wtd;
 
   // IF THE CELL STARTS WITH SURFACE WATER
-  if ( initial_wtd > 0 ){
+  if ( initial_wtd >= 0 ){
     // Check if final water-table depth will also be > 0
     // If it is, then either the cell is gaining water, 
     // or it is losing water, but it is losing less than the 
@@ -206,8 +206,7 @@ double computeNewWTD(
   // OTHERWISE, IF THE CELL STARTS WITH WATER TABLE IN THE SUBSURFACE
   else{
     // Remaining subsurface dry pore volume
-    const auto initial_remaining_subsurface_pore_volume =
-      total_gw_storage_capacity - (total_gw_storage_capacity * -std::expm1(initial_wtd/fdepth));
+    const auto initial_remaining_subsurface_pore_volume = total_gw_storage_capacity * -std::expm1(initial_wtd/fdepth);
     // Final water volume with respect to the land surface.
     // Positive: above surface
     // Negative: below surface
@@ -217,20 +216,22 @@ double computeNewWTD(
       //if it's a losing cell, we need to make sure that it's not going to try
       //to lose more water than it has.
       if(volume_change < 0){
-        assert(-volume_change <= initial_remaining_subsurface_pore_volume + FP_ERROR);
-        if(-volume_change > initial_remaining_subsurface_pore_volume)
-          volume_change = -initial_remaining_subsurface_pore_volume + FP_ERROR; 
+        assert(-volume_change <= (total_gw_storage_capacity - initial_remaining_subsurface_pore_volume + FP_ERROR));
+        if(-volume_change > (total_gw_storage_capacity - initial_remaining_subsurface_pore_volume))
+          volume_change = -(total_gw_storage_capacity - initial_remaining_subsurface_pore_volume - FP_ERROR); 
         //The volume moving may not be exactly equal to the volume available, or the 
         //logarithm below will be undefined, so we add FP_ERROR to make it just slightly smaller.
       }
       final_wtd = fdepth * std::log( volume_change/total_gw_storage_capacity
                                      + std::exp(initial_wtd/fdepth) );
+
     }
     // Otherwise, if the water goes above the surface
     else{
       final_wtd = Vfinal_surface/cell_area;
     }
   }
+
   return final_wtd;
 }
 
@@ -389,27 +390,6 @@ void update(const Parameters &params, ArrayPack &arp){
 }
 
 
-/*
-TEST_CASE("that_one_equation"){
-  CHECK(that_one_equation(300, -10 ,487.660600188348,30000 , 1)==doctest::Approx(5));
-  CHECK(that_one_equation(300, -10 ,877.789080339026,54000 , 1)==doctest::Approx(5));
-  CHECK(that_one_equation(300, -3  ,746.262468812392,75000 , 1)==doctest::Approx(3));
-  CHECK(that_one_equation(300, -2  ,1194.01552781598,360000, 1)==doctest::Approx(1));
-  CHECK(that_one_equation(300, -100,215.318057232321,90000 , 1)==doctest::Approx(1));
-  CHECK(that_one_equation(100, -10 ,1391.76019394264,30000 , 1)==doctest::Approx(5));
-  CHECK(that_one_equation(1000,-10 ,1488.79363305426,300000, 1)==doctest::Approx(5));
-  CHECK(that_one_equation(10,  -10 ,715.953655623573,3000  , 1)==doctest::Approx(5));
-
-  CHECK(that_one_equation(300, -5  ,487.660600188348,30000 , -1)==doctest::Approx(-5));
-  CHECK(that_one_equation(300, -5  ,877.789080339026,54000 , -1)==doctest::Approx(-5));
-  CHECK(that_one_equation(300, -1  ,1194.01552781598,360000, -1)==doctest::Approx(-1));
-  CHECK(that_one_equation(300, -99 ,215.318057232321,90000 , -1)==doctest::Approx(-1));
-  CHECK(that_one_equation(100, -5  ,1391.76019394264,30000 , -1)==doctest::Approx(-5));
-  CHECK(that_one_equation(1000,-5  ,1488.79363305426,300000, -1)==doctest::Approx(-5));
-  CHECK(that_one_equation(10,  -5  ,715.953655623573,3000  , -1)==doctest::Approx(-5));
-}
-*/
-
 TEST_CASE("depthIntegratedTransmissivity"){
   CHECK(depthIntegratedTransmissivity(5  ,100  ,0.01      ) ==doctest::Approx(1.015));
   CHECK(depthIntegratedTransmissivity(0  ,100  ,0.01      ) ==doctest::Approx(1.015));
@@ -435,60 +415,56 @@ TEST_CASE("depthIntegratedTransmissivity"){
 }
 
 
-/*
-TEST_CASE("computeNewWTDGain"){
-  CHECK(computeNewWTDGain(487.660600188348  ,-10  ,300, 0.1, 1000      ) ==doctest::Approx(5));
-  CHECK(computeNewWTDGain(877.789080339026  ,-10  ,300, 0.2, 900       ) ==doctest::Approx(5));
-  CHECK(computeNewWTDGain(746.262468812392  ,-3   ,300, 0.5, 500       ) ==doctest::Approx(3));
-  CHECK(computeNewWTDGain(1194.01552781598  ,-2   ,300, 0.8, 1500      ) ==doctest::Approx(1));
-  CHECK(computeNewWTDGain(215.318057232321  ,-100 ,300, 0.3, 1000      ) ==doctest::Approx(1));
-  CHECK(computeNewWTDGain(1391.76019394264  ,-10  ,100, 0.3, 1000      ) ==doctest::Approx(5));
-  CHECK(computeNewWTDGain(1488.79363305426  ,-10  ,1000,0.3, 1000      ) ==doctest::Approx(5));
-  CHECK(computeNewWTDGain(715.953655623573  ,-10  ,10,  0.3, 1000      ) ==doctest::Approx(5));
 
-  CHECK(computeNewWTDGain(4000  ,1  ,300,  0.1, 1000      ) ==doctest::Approx(4));
-  CHECK(computeNewWTDGain(4500  ,0  ,300,  0.2, 900       ) ==doctest::Approx(5));
-  CHECK(computeNewWTDGain(5000  ,10 ,300,  0.5, 500       ) ==doctest::Approx(10));
-  CHECK(computeNewWTDGain(15000 ,0  ,300,  0.8, 1500      ) ==doctest::Approx(10));
+TEST_CASE("computeNewWTD"){
+  CHECK(computeNewWTD(487.660600188348  ,-10  ,300, 0.1, 1000      ) ==doctest::Approx(-5));
+  CHECK(computeNewWTD(877.789080339026  ,-10  ,300, 0.2, 900       ) ==doctest::Approx(-5));
+  CHECK(computeNewWTD(746.262468812392  ,-3   ,300, 0.5, 500       ) ==doctest::Approx(0));
+  CHECK(computeNewWTD(1194.01552781598  ,-2   ,300, 0.8, 1500      ) ==doctest::Approx(-1));
+  CHECK(computeNewWTD(215.318057232321  ,-100 ,300, 0.3, 1000      ) ==doctest::Approx(-99));
+  CHECK(computeNewWTD(1391.76019394264  ,-10  ,100, 0.3, 1000      ) ==doctest::Approx(-5));
+  CHECK(computeNewWTD(1488.79363305426  ,-10  ,1000,0.3, 1000      ) ==doctest::Approx(-5));
+  CHECK(computeNewWTD(715.953655623573  ,-10  ,10,  0.3, 1000      ) ==doctest::Approx(-5));
 
-  CHECK(computeNewWTDGain(5983.51698553982  ,-10  ,300,  0.1, 1000      ) ==doctest::Approx(15));
-  CHECK(computeNewWTDGain(6270.33057397168  ,-10  ,300,  0.2, 900       ) ==doctest::Approx(15));
-  CHECK(computeNewWTDGain(1246.26246881239  ,-3   ,300,  0.5, 500       ) ==doctest::Approx(4));
-  CHECK(computeNewWTDGain(3892.0177481876   ,-2   ,300,  0.8, 1500      ) ==doctest::Approx(3));
-  CHECK(computeNewWTDGain(125512.182048359  ,-100 ,300,  0.3, 1000      ) ==doctest::Approx(200));
-  CHECK(computeNewWTDGain(7854.87745892122  ,-10  ,100,  0.3, 1000      ) ==doctest::Approx(15));
-  CHECK(computeNewWTDGain(7985.04987524957  ,-10  ,1000, 0.3, 1000      ) ==doctest::Approx(15));
-  CHECK(computeNewWTDGain(6896.36167648567  ,-10  ,10,   0.3, 1000      ) ==doctest::Approx(15));
+  CHECK(computeNewWTD(4000              ,1    ,300, 0.1, 1000      ) ==doctest::Approx(5));
+  CHECK(computeNewWTD(4500              ,0    ,300, 0.2, 900       ) ==doctest::Approx(5));  
+  CHECK(computeNewWTD(5000              ,10   ,300, 0.5, 500       ) ==doctest::Approx(20));  
+  CHECK(computeNewWTD(15000             ,0    ,300, 0.8, 1500      ) ==doctest::Approx(10));  
+
+  CHECK(computeNewWTD(5983.51698553982  ,-10  ,300,  0.1, 1000     ) ==doctest::Approx(5));  
+  CHECK(computeNewWTD(6270.33057397168  ,-10  ,300,  0.2, 900      ) ==doctest::Approx(5));  
+  CHECK(computeNewWTD(1246.26246881239  ,-3   ,300,  0.5, 500      ) ==doctest::Approx(1));  
+  CHECK(computeNewWTD(3892.0177481876   ,-2   ,300,  0.8, 1500     ) ==doctest::Approx(1));  
+  CHECK(computeNewWTD(125512.182048359  ,-100 ,300,  0.3, 1000     ) ==doctest::Approx(100));
+  CHECK(computeNewWTD(7854.87745892122  ,-10  ,100,  0.3, 1000     ) ==doctest::Approx(5));  
+  CHECK(computeNewWTD(7985.04987524957  ,-10  ,1000, 0.3, 1000     ) ==doctest::Approx(5));  
+  CHECK(computeNewWTD(6896.36167648567  ,-10  ,10,   0.3, 1000     ) ==doctest::Approx(5));  
+
+  CHECK(computeNewWTD(-487.660600188348  ,-5  ,300, 0.1, 1000      ) ==doctest::Approx(-10));
+  CHECK(computeNewWTD(-877.789080339026  ,-5  ,300, 0.2, 900       ) ==doctest::Approx(-10));
+  CHECK(computeNewWTD(-746.262468812392  ,0   ,300, 0.5, 500       ) ==doctest::Approx(-3));
+  CHECK(computeNewWTD(-1194.01552781598  ,-1  ,300, 0.8, 1500      ) ==doctest::Approx(-2));
+  CHECK(computeNewWTD(-215.318057232321  ,-99 ,300, 0.3, 1000      ) ==doctest::Approx(-100));
+  CHECK(computeNewWTD(-1391.76019394264  ,-5  ,100, 0.3, 1000      ) ==doctest::Approx(-10));
+  CHECK(computeNewWTD(-1488.79363305426  ,-5  ,1000,0.3, 1000      ) ==doctest::Approx(-10));
+  CHECK(computeNewWTD(-715.953655623573  ,-5  ,10,  0.3, 1000      ) ==doctest::Approx(-10));
+
+  CHECK(computeNewWTD(-4000              ,5   ,300, 0.1, 1000      ) ==doctest::Approx(1));
+  CHECK(computeNewWTD(-4500              ,5   ,300, 0.2, 900       ) ==doctest::Approx(0));
+  CHECK(computeNewWTD(-5000              ,20  ,300, 0.5, 500       ) ==doctest::Approx(10));
+  CHECK(computeNewWTD(-15000             ,10  ,300, 0.8, 1500      ) ==doctest::Approx(0));
+
+  CHECK(computeNewWTD(-5983.51698553982  ,5   ,300,  0.1, 1000     ) ==doctest::Approx(-10));
+  CHECK(computeNewWTD(-6270.33057397168  ,5   ,300,  0.2, 900      ) ==doctest::Approx(-10));
+  CHECK(computeNewWTD(-1246.26246881239  ,1   ,300,  0.5, 500      ) ==doctest::Approx(-3));
+  CHECK(computeNewWTD(-3892.0177481876   ,1   ,300,  0.8, 1500     ) ==doctest::Approx(-2));
+  CHECK(computeNewWTD(-125512.182048359  ,100 ,300,  0.3, 1000     ) ==doctest::Approx(-100));
+  CHECK(computeNewWTD(-7854.87745892122  ,5   ,100,  0.3, 1000     ) ==doctest::Approx(-10));
+  CHECK(computeNewWTD(-7985.04987524957  ,5   ,1000, 0.3, 1000     ) ==doctest::Approx(-10));
+  CHECK(computeNewWTD(-6896.36167648567  ,5   ,10,   0.3, 1000     ) ==doctest::Approx(-10));
+
 }
 
-
-TEST_CASE("computeNewWTDLoss"){
-  CHECK(computeNewWTDLoss(487.660600188348  ,-5  ,300, 0.1, 1000      ) ==doctest::Approx(-5));
-  CHECK(computeNewWTDLoss(877.789080339026  ,-5  ,300, 0.2, 900       ) ==doctest::Approx(-5));
-  CHECK(computeNewWTDLoss(746.262468812392  ,0  ,300, 0.5, 500        ) ==doctest::Approx(-3));
-  CHECK(computeNewWTDLoss(1194.01552781598  ,-1  ,300, 0.8, 1500      ) ==doctest::Approx(-1));
-  CHECK(computeNewWTDLoss(215.318057232321  ,-99 ,300, 0.3, 1000      ) ==doctest::Approx(-1));
-  CHECK(computeNewWTDLoss(1391.76019394264  ,-5  ,100, 0.3, 1000      ) ==doctest::Approx(-5));
-  CHECK(computeNewWTDLoss(1488.79363305426  ,-5  ,1000,0.3, 1000      ) ==doctest::Approx(-5));
-  CHECK(computeNewWTDLoss(715.953655623573  ,-5  ,10,  0.3, 1000      ) ==doctest::Approx(-5));
-
-  CHECK(computeNewWTDLoss(4000  ,5  ,300,  0.1, 1000      ) ==doctest::Approx(-4));
-  CHECK(computeNewWTDLoss(4500  ,5  ,300,  0.2, 900       ) ==doctest::Approx(-5));
-  CHECK(computeNewWTDLoss(5000  ,20 ,300,  0.5, 500       ) ==doctest::Approx(-10));
-  CHECK(computeNewWTDLoss(15000 ,10 ,300,  0.8, 1500      ) ==doctest::Approx(-10));
-
-  CHECK(computeNewWTDLoss(5983.51698553982  ,5   ,300,  0.1, 1000      ) ==doctest::Approx(-15));
-  CHECK(computeNewWTDLoss(6270.33057397168  ,5   ,300,  0.2, 900       ) ==doctest::Approx(-15));
-  CHECK(computeNewWTDLoss(1246.26246881239  ,1   ,300,  0.5, 500       ) ==doctest::Approx(-4));
-  CHECK(computeNewWTDLoss(3892.0177481876   ,1   ,300,  0.8, 1500      ) ==doctest::Approx(-3));
-  CHECK(computeNewWTDLoss(125512.182048359  ,100 ,300,  0.3, 1000      ) ==doctest::Approx(-200));
-  CHECK(computeNewWTDLoss(7854.87745892122  ,5   ,100,  0.3, 1000      ) ==doctest::Approx(-15));
-  CHECK(computeNewWTDLoss(7985.04987524957  ,5   ,1000, 0.3, 1000      ) ==doctest::Approx(-15));
-  CHECK(computeNewWTDLoss(6896.36167648567  ,5   ,10,   0.3, 1000      ) ==doctest::Approx(-15));
-
- // CHECK(!std::isnan(computeNewWTDLoss(6593384, 0.1504694819450378418, 0.51312428712844848633,  0.45100000500679016113, 17265204) ));
-}
-*/
 
 //TODO: Example array test case
 //TEST_CASE("calculateWaterVolume"){
