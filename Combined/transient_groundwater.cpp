@@ -95,6 +95,8 @@ void updateTransmissivity(
 
 double vonNeumannStability(
   const double Dmax,
+   // const double Hmax,
+
   const double cell_width,
   const double cell_height
 ){
@@ -129,26 +131,29 @@ double computeMaxStableTimeStep(
     c2d(fdp.transmissivity, x+1, y  )
   };
 
+  // Use the smallest cellsize of the cells examined for the time-step calculation
   const std::array<double,3> sizeArray = {
     fdp.cellsize_e_w_metres[y],
     fdp.cellsize_e_w_metres[y+1],
-    fdp.cellsize_e_w_metres[y-1],
+    fdp.cellsize_e_w_metres[y-1]
   };
 
   const auto Dmax = *std::max_element(Tarray.begin(), Tarray.end());
   const auto sizeMin = *std::min_element(sizeArray.begin(), sizeArray.end());
+
   const auto dt_max_diffusion_basic = vonNeumannStability(Dmax, sizeMin, fdp.cellsize_n_s_metres);
+
 
   // Now let's add in the porosity differences
   // Porosity differences will AMPLIFY the WTD changes.
   // Let us choose a time step that is also based on the LOWEST porosity
   // (highest WTD change per water volume transfer)
-  auto PhiMin =             c2d(fdp.porosity, x  , y  ) ;
-  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x+1, y  ));
-  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x-1, y  ));
-  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x  , y+1));
-  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x  , y-1));
-  PhiMin = std::max(PhiMin, 0.2f); //Yes, we do want max
+  auto PhiMin =             c2d(fdp.porosity, x  , y  );
+  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x  , y+1  ));
+  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x  , y-1  ));
+  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x+1  , y  ));
+  PhiMin = std::min(PhiMin, c2d(fdp.porosity, x-1  , y  ));
+  PhiMin = std::max(PhiMin, 0.2f); //Yes, we do want max - porosity should be a minumum of 0.2 in all cells.
 
   // Porosity is a linear amplifier of WTD change, and it amplifies change
   // in both the giving and receiving cells.
@@ -158,7 +163,6 @@ double computeMaxStableTimeStep(
   const auto dt_max_diffusion_withPorosity = dt_max_diffusion_basic * PhiMin / 2.;
   // In order to avoid operating at the very maximum time step possible,
   // we apply a factor of safety of 2
-
   return dt_max_diffusion_withPorosity/2.;
 }
 
@@ -167,68 +171,50 @@ double computeNewWTD(
   double volume_change,
   const double initial_wtd,
   const double fdepth,
-  const double porosity_at_surface,
+  const double porosity,
   const double cell_area
 ){
-  // DEFINE VARIABLES
-  const double FP_ERROR = 0.00001;
-  // Total Groundwater Storage Capacity
-  const auto total_gw_storage_capacity = cell_area * porosity_at_surface * fdepth;
-  // New water-table depth: to return
+  //Since we are using a vertically constant porosity, we can just convert the 
+  //volume to a height of water right away. 
+  //If above ground, this will be the actual change in height;
+  //If below ground, dividing this by porosity will give the height change.
+  const double porosity_one_height_change = volume_change/cell_area;
   double final_wtd;
 
-  // IF THE CELL STARTS WITH SURFACE WATER
-  if ( initial_wtd >= 0 ){
-    // Check if final water-table depth will also be > 0
-    // If it is, then either the cell is gaining water, 
-    // or it is losing water, but it is losing less than the 
-    // amount of surface water it has. 
-    const auto initial_surface_water_volume = initial_wtd * cell_area;
-    // Final water volume with respect to the land surface.
-    // Positive: above surface
-    // Negative: below surface
-    auto Vfinal_surface = initial_surface_water_volume + volume_change;
-    if ( Vfinal_surface >= 0 ){
-      final_wtd = Vfinal_surface/cell_area;  //the cell still has surface water.
-    }
-    // Otherwise, if WTD <= 0 (i.e. subsurface)
-    else{
-      //if it's a losing cell, we need to make sure that it's not going to try
-      //to lose more water than it has.
-      assert(-Vfinal_surface <= total_gw_storage_capacity + FP_ERROR);
-      if(-Vfinal_surface > total_gw_storage_capacity)
-        Vfinal_surface = -total_gw_storage_capacity + FP_ERROR; 
-        //The volume moving may not be exactly equal to the volume available, or the 
-        //logarithm below will be undefined, so we add FP_ERROR to make it just slightly smaller.
-      final_wtd = fdepth * std::log1p(Vfinal_surface/total_gw_storage_capacity);
-    }
-  }
-  // OTHERWISE, IF THE CELL STARTS WITH WATER TABLE IN THE SUBSURFACE
-  else{
-    // Remaining subsurface dry pore volume
-    const auto initial_remaining_subsurface_pore_volume = total_gw_storage_capacity * -std::expm1(initial_wtd/fdepth);
-    // Final water volume with respect to the land surface.
-    // Positive: above surface
-    // Negative: below surface
-    const auto Vfinal_surface = volume_change - initial_remaining_subsurface_pore_volume;
-    // If the volume stays below the surface for the whole time
-    if ( Vfinal_surface < 0 ){
-      //if it's a losing cell, we need to make sure that it's not going to try
-      //to lose more water than it has.
-      if(volume_change < 0){
-        assert(-volume_change <= (total_gw_storage_capacity - initial_remaining_subsurface_pore_volume + FP_ERROR));
-        if(-volume_change > (total_gw_storage_capacity - initial_remaining_subsurface_pore_volume))
-          volume_change = -(total_gw_storage_capacity - initial_remaining_subsurface_pore_volume - FP_ERROR); 
-        //The volume moving may not be exactly equal to the volume available, or the 
-        //logarithm below will be undefined, so we add FP_ERROR to make it just slightly smaller.
-      }
-      final_wtd = fdepth * std::log( volume_change/total_gw_storage_capacity
-                                     + std::exp(initial_wtd/fdepth) );
+  //either the cell starts with wtd above the surface, or with it below the surface. 
+  //If above the surface:
+  if(initial_wtd >= 0){
+    //Either the result after moving water still has water above the surface, 
+    //because it was gaining water, or because it was losing water but it 
+    //lost less than the total surface water, or
+    //the results after moving water has the water table below the surface. 
 
+    //Now, let's compare the initial wtd + the height change to the land surface:
+    //If positive, it is still above the surface, 
+    //if negative, it is below the surface. 
+    final_wtd = initial_wtd + porosity_one_height_change;  //if positive, this is the final answer.
+    if(final_wtd < 0){
+      //the water table will now be below the surface, so we have to take porosity into account.
+      //final_wtd currently represents where the water table would be if porosity were 1. 
+      //all we have to do is divide it by porosity to get the actual water table. 
+      final_wtd /= porosity;
     }
-    // Otherwise, if the water goes above the surface
-    else{
-      final_wtd = Vfinal_surface/cell_area;
+
+  }
+  else{
+    //Otherwise, if the cell starts with wtd below the surface:
+    //what height change would be enough to switch to above the surface?
+    //let's represent the dry height below-ground as it would have been with porosity = 1:
+    double porosity_one_below_ground_height = -initial_wtd * porosity;
+    if(porosity_one_height_change > porosity_one_below_ground_height){
+      //the final wtd will be greater than 0. Subtract the amount used up below ground
+      //to get the amount left above ground. 
+      final_wtd = porosity_one_height_change - porosity_one_below_ground_height;
+    }
+    else{ 
+      //the final wtd is still below ground; just divide the height change by 
+      //porosity to get the below-ground height change. 
+      final_wtd = initial_wtd + (porosity_one_height_change/porosity);
     }
   }
 
@@ -265,8 +251,8 @@ void computeWTDchangeAtCell(
 
   const double transmissivityN = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x  , y+1)) / 2.;
   const double transmissivityS = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x  , y-1)) / 2.;
-  const double transmissivityE = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x+1, y  )) / 2.;
-  const double transmissivityW = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x-1, y  )) / 2.;
+  const double transmissivityE = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x+1  , y)) / 2.;
+  const double transmissivityW = (c2d(fdp.transmissivity, x, y) + c2d(fdp.transmissivity, x-1  , y)) / 2.;
 
   // Then, compute the discharges
   // Define Q such that + if center cell gaining, - if center cell losing
@@ -277,7 +263,7 @@ void computeWTDchangeAtCell(
 
   // Sum discharges and divide by the time step to compute the water volume
   // added to the center cell
-  const double dVolume = (QN + QS + QW + QE) * dt;// / (fdp.cellsize_n_s_metres * fdp.cellsize_e_w_metres[y]);
+  const double dVolume = (QN + QS + QW + QE) * dt;
 
   // Update the cell's WTD
   local_wtd[0] = computeNewWTD( dVolume, local_wtd[0], c2d(fdp.fdepth, x, y), c2d(fdp.porosity, x, y), fdp.cell_area[y] );
