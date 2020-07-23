@@ -170,7 +170,6 @@ double computeMaxStableTimeStep(
 double computeNewWTD(
   double volume_change,
   const double initial_wtd,
-  const double fdepth,
   const double porosity,
   const double cell_area
 ){
@@ -266,14 +265,14 @@ void computeWTDchangeAtCell(
   const double dVolume = (QN + QS + QW + QE) * dt;
 
   // Update the cell's WTD
-  local_wtd[0] = computeNewWTD( dVolume, local_wtd[0], c2d(fdp.fdepth, x, y), c2d(fdp.porosity, x, y), fdp.cell_area[y] );
+  local_wtd[0] = computeNewWTD( dVolume, local_wtd[0], c2d(fdp.porosity, x, y), fdp.cell_area[y] );
 
   // For local dynamic time stepping (consider switching to global later),
   // update the neighboring cell WTDs
-  local_wtd[1] = computeNewWTD( -QN*dt, local_wtd[1], c2d(fdp.fdepth, x, y+1), c2d(fdp.porosity, x, y+1), fdp.cell_area[y+1] );
-  local_wtd[2] = computeNewWTD( -QS*dt, local_wtd[2], c2d(fdp.fdepth, x, y-1), c2d(fdp.porosity, x, y-1), fdp.cell_area[y-1] );
-  local_wtd[3] = computeNewWTD( -QE*dt, local_wtd[3], c2d(fdp.fdepth, x+1, y), c2d(fdp.porosity, x+1, y), fdp.cell_area[y] );
-  local_wtd[4] = computeNewWTD( -QW*dt, local_wtd[4], c2d(fdp.fdepth, x-1, y), c2d(fdp.porosity, x-1, y), fdp.cell_area[y] );
+  local_wtd[1] = computeNewWTD( -QN*dt, local_wtd[1], c2d(fdp.porosity, x, y+1), fdp.cell_area[y+1] );
+  local_wtd[2] = computeNewWTD( -QS*dt, local_wtd[2], c2d(fdp.porosity, x, y-1), fdp.cell_area[y-1] );
+  local_wtd[3] = computeNewWTD( -QE*dt, local_wtd[3], c2d(fdp.porosity, x+1, y), fdp.cell_area[y] );
+  local_wtd[4] = computeNewWTD( -QW*dt, local_wtd[4], c2d(fdp.porosity, x-1, y), fdp.cell_area[y] );
 }
 
 
@@ -403,51 +402,49 @@ TEST_CASE("depthIntegratedTransmissivity"){
 
 
 TEST_CASE("computeNewWTD"){
-  CHECK(computeNewWTD(487.660600188348  ,-10  ,300, 0.1, 1000      ) ==doctest::Approx(-5));
-  CHECK(computeNewWTD(877.789080339026  ,-10  ,300, 0.2, 900       ) ==doctest::Approx(-5));
-  CHECK(computeNewWTD(746.262468812392  ,-3   ,300, 0.5, 500       ) ==doctest::Approx(0));
-  CHECK(computeNewWTD(1194.01552781598  ,-2   ,300, 0.8, 1500      ) ==doctest::Approx(-1));
-  CHECK(computeNewWTD(215.318057232321  ,-100 ,300, 0.3, 1000      ) ==doctest::Approx(-99));
-  CHECK(computeNewWTD(1391.76019394264  ,-10  ,100, 0.3, 1000      ) ==doctest::Approx(-5));
-  CHECK(computeNewWTD(1488.79363305426  ,-10  ,1000,0.3, 1000      ) ==doctest::Approx(-5));
-  CHECK(computeNewWTD(715.953655623573  ,-10  ,10,  0.3, 1000      ) ==doctest::Approx(-5));
+  CHECK(computeNewWTD(6000,   5, 0.4, 1000 ) ==doctest::Approx(11));
+  CHECK(computeNewWTD(6000,   1, 0.4, 1000 ) ==doctest::Approx(7));
+  CHECK(computeNewWTD(6000,   1, 0.4, 10000) ==doctest::Approx(1.6));
+  CHECK(computeNewWTD(6000,   1, 0.4, 100  ) ==doctest::Approx(61));
+  CHECK(computeNewWTD(6000,   1, 0.2, 1000 ) ==doctest::Approx(7));
+  CHECK(computeNewWTD(6000,   1, 0.5, 1000 ) ==doctest::Approx(7));
+  CHECK(computeNewWTD(6000,   1, 0.8, 1000 ) ==doctest::Approx(7));
+  CHECK(computeNewWTD(100000, 1, 0.4, 1000 ) ==doctest::Approx(101));
+  CHECK(computeNewWTD(1000,   1, 0.4, 1000 ) ==doctest::Approx(2));
+  CHECK(computeNewWTD(  10,   1, 0.4, 1000 ) ==doctest::Approx(1.01));  
+  
+  CHECK(computeNewWTD(-6000,   5, 0.4, 1000 ) ==doctest::Approx(-2.5));
+  CHECK(computeNewWTD(-6000,   1, 0.4, 1000 ) ==doctest::Approx(-12.5));
+  CHECK(computeNewWTD(-6000,   1, 0.4, 10000) ==doctest::Approx(0.4));
+  CHECK(computeNewWTD(-6000,   1, 0.4, 100  ) ==doctest::Approx(-147.5));
+  CHECK(computeNewWTD(-6000,   1, 0.2, 1000 ) ==doctest::Approx(-25));
+  CHECK(computeNewWTD(-6000,   1, 0.5, 1000 ) ==doctest::Approx(-10));
+  CHECK(computeNewWTD(-6000,   1, 0.8, 1000 ) ==doctest::Approx(-6.25));
+  CHECK(computeNewWTD(-100000, 1, 0.4, 1000 ) ==doctest::Approx(-247.5));
+  CHECK(computeNewWTD(-1000,   1, 0.4, 1000 ) ==doctest::Approx(0));
+  CHECK(computeNewWTD(  -10,   1, 0.4, 1000 ) ==doctest::Approx(0.99));  
 
-  CHECK(computeNewWTD(4000              ,1    ,300, 0.1, 1000      ) ==doctest::Approx(5));
-  CHECK(computeNewWTD(4500              ,0    ,300, 0.2, 900       ) ==doctest::Approx(5));  
-  CHECK(computeNewWTD(5000              ,10   ,300, 0.5, 500       ) ==doctest::Approx(20));  
-  CHECK(computeNewWTD(15000             ,0    ,300, 0.8, 1500      ) ==doctest::Approx(10));  
+  CHECK(computeNewWTD(6000,   -5, 0.4, 1000 ) ==doctest::Approx(4));
+  CHECK(computeNewWTD(6000,   -1, 0.4, 1000 ) ==doctest::Approx(5.6));
+  CHECK(computeNewWTD(6000,   -1, 0.4, 10000) ==doctest::Approx(0.2));
+  CHECK(computeNewWTD(6000,   -1, 0.4, 100  ) ==doctest::Approx(59.6));
+  CHECK(computeNewWTD(6000,   -1, 0.2, 1000 ) ==doctest::Approx(5.8));
+  CHECK(computeNewWTD(6000,   -1, 0.5, 1000 ) ==doctest::Approx(5.5));
+  CHECK(computeNewWTD(6000,   -1, 0.8, 1000 ) ==doctest::Approx(5.2));
+  CHECK(computeNewWTD(100000, -1, 0.4, 1000 ) ==doctest::Approx(99.6));
+  CHECK(computeNewWTD(1000,   -1, 0.4, 1000 ) ==doctest::Approx(0.6));
+  CHECK(computeNewWTD(  10,   -1, 0.4, 1000 ) ==doctest::Approx(-0.975));  
 
-  CHECK(computeNewWTD(5983.51698553982  ,-10  ,300,  0.1, 1000     ) ==doctest::Approx(5));  
-  CHECK(computeNewWTD(6270.33057397168  ,-10  ,300,  0.2, 900      ) ==doctest::Approx(5));  
-  CHECK(computeNewWTD(1246.26246881239  ,-3   ,300,  0.5, 500      ) ==doctest::Approx(1));  
-  CHECK(computeNewWTD(3892.0177481876   ,-2   ,300,  0.8, 1500     ) ==doctest::Approx(1));  
-  CHECK(computeNewWTD(125512.182048359  ,-100 ,300,  0.3, 1000     ) ==doctest::Approx(100));
-  CHECK(computeNewWTD(7854.87745892122  ,-10  ,100,  0.3, 1000     ) ==doctest::Approx(5));  
-  CHECK(computeNewWTD(7985.04987524957  ,-10  ,1000, 0.3, 1000     ) ==doctest::Approx(5));  
-  CHECK(computeNewWTD(6896.36167648567  ,-10  ,10,   0.3, 1000     ) ==doctest::Approx(5));  
-
-  CHECK(computeNewWTD(-487.660600188348  ,-5  ,300, 0.1, 1000      ) ==doctest::Approx(-10));
-  CHECK(computeNewWTD(-877.789080339026  ,-5  ,300, 0.2, 900       ) ==doctest::Approx(-10));
-  CHECK(computeNewWTD(-746.262468812392  ,0   ,300, 0.5, 500       ) ==doctest::Approx(-3));
-  CHECK(computeNewWTD(-1194.01552781598  ,-1  ,300, 0.8, 1500      ) ==doctest::Approx(-2));
-  CHECK(computeNewWTD(-215.318057232321  ,-99 ,300, 0.3, 1000      ) ==doctest::Approx(-100));
-  CHECK(computeNewWTD(-1391.76019394264  ,-5  ,100, 0.3, 1000      ) ==doctest::Approx(-10));
-  CHECK(computeNewWTD(-1488.79363305426  ,-5  ,1000,0.3, 1000      ) ==doctest::Approx(-10));
-  CHECK(computeNewWTD(-715.953655623573  ,-5  ,10,  0.3, 1000      ) ==doctest::Approx(-10));
-
-  CHECK(computeNewWTD(-4000              ,5   ,300, 0.1, 1000      ) ==doctest::Approx(1));
-  CHECK(computeNewWTD(-4500              ,5   ,300, 0.2, 900       ) ==doctest::Approx(0));
-  CHECK(computeNewWTD(-5000              ,20  ,300, 0.5, 500       ) ==doctest::Approx(10));
-  CHECK(computeNewWTD(-15000             ,10  ,300, 0.8, 1500      ) ==doctest::Approx(0));
-
-  CHECK(computeNewWTD(-5983.51698553982  ,5   ,300,  0.1, 1000     ) ==doctest::Approx(-10));
-  CHECK(computeNewWTD(-6270.33057397168  ,5   ,300,  0.2, 900      ) ==doctest::Approx(-10));
-  CHECK(computeNewWTD(-1246.26246881239  ,1   ,300,  0.5, 500      ) ==doctest::Approx(-3));
-  CHECK(computeNewWTD(-3892.0177481876   ,1   ,300,  0.8, 1500     ) ==doctest::Approx(-2));
-  CHECK(computeNewWTD(-125512.182048359  ,100 ,300,  0.3, 1000     ) ==doctest::Approx(-100));
-  CHECK(computeNewWTD(-7854.87745892122  ,5   ,100,  0.3, 1000     ) ==doctest::Approx(-10));
-  CHECK(computeNewWTD(-7985.04987524957  ,5   ,1000, 0.3, 1000     ) ==doctest::Approx(-10));
-  CHECK(computeNewWTD(-6896.36167648567  ,5   ,10,   0.3, 1000     ) ==doctest::Approx(-10));
+  CHECK(computeNewWTD(-6000,   -5, 0.4, 1000 ) ==doctest::Approx(-20));
+  CHECK(computeNewWTD(-6000,   -1, 0.4, 1000 ) ==doctest::Approx(-16));
+  CHECK(computeNewWTD(-6000,   -1, 0.4, 10000) ==doctest::Approx(-2.5));
+  CHECK(computeNewWTD(-6000,   -1, 0.4, 100  ) ==doctest::Approx(-151));
+  CHECK(computeNewWTD(-6000,   -1, 0.2, 1000 ) ==doctest::Approx(-31));
+  CHECK(computeNewWTD(-6000,   -1, 0.5, 1000 ) ==doctest::Approx(-13));
+  CHECK(computeNewWTD(-6000,   -1, 0.8, 1000 ) ==doctest::Approx(-8.5));
+  CHECK(computeNewWTD(-100000, -1, 0.4, 1000 ) ==doctest::Approx(-251));
+  CHECK(computeNewWTD(-1000,   -1, 0.4, 1000 ) ==doctest::Approx(-3.5));
+  CHECK(computeNewWTD(  -10,   -1, 0.4, 1000 ) ==doctest::Approx(-1.025));  
 
 }
 
