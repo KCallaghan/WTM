@@ -15,7 +15,7 @@ find_package(OpenMP)
 # use -fsanitize=address (above) to check for memory errors
 
 
-add_subdirectory(common/richdem)
+add_subdirectory(common/richdem EXCLUDE_FROM_ALL)
 
 add_executable(twsm.x
   Combined/ArrayPack.cpp
