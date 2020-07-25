@@ -31,12 +31,9 @@ public:
 
     bool infiltration_on;
 
-    double     southern_edge       = std::numeric_limits<double>\
-                                         ::signaling_NaN();
-    double     deltat              = std::numeric_limits<double>\
-                                         ::signaling_NaN();
-    double    cellsize_n_s_metres  = std::numeric_limits<double>\
-                                         ::signaling_NaN();
+    double    southern_edge        = std::numeric_limits<double>::signaling_NaN();
+    double    deltat               = std::numeric_limits<double>::signaling_NaN();
+    double    cellsize_n_s_metres  = std::numeric_limits<double>::signaling_NaN();
     float     infiltration         = 0.;
     int32_t   cycles_done          = 0;
     float     total_wtd_change     = 0.;

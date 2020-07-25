@@ -61,7 +61,7 @@ int main(int argc, char **argv){
   params.ncells_x = arp.ksat.width();  //width and height in number of cells in the array
   params.ncells_y = arp.ksat.height();
 
-  arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
+  arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region + params.time_start + "_mask.nc", "value"); //A binary mask that is 1 where there is land and 0 in the ocean
   arp.fdepth        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_fdepth.nc", "value");  //fslope = 100/(1+150*slope), f>2.5 m. Note this is specific to a 30 arcsecond grid! Other grid resolutions should use different constants. 
   arp.precip        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_precip.nc",   "value");  //Units: m/yr. 
   arp.temp          = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_temp.nc",   "value");  //Units: degress Celsius
@@ -183,7 +183,7 @@ int main(int argc, char **argv){
   //`GetDepressionHierarchy()`.
   #pragma omp parallel for
   for(unsigned int i=0;i<label.size();i++){
-    if(arp.land_mask(i) == 0.0f){ 
+    if(arp.land_mask(i) == 0){ 
       label(i) = dh::OCEAN;
       final_label(i) = dh::OCEAN;
     }

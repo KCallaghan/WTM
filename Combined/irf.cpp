@@ -70,7 +70,7 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 
   arp.slope_end         = LoadData<float>(params.surfdatadir + params.region + \
   params.time_end + "_slope.nc",  "value");  //Slope as a value from 0 to 1.
-  arp.land_mask         = LoadData<float>(params.surfdatadir + params.region + \
+  arp.land_mask         = LoadData<uint8_t>(params.surfdatadir + params.region + \
   params.time_end + "_mask.nc",   "value");  //A binary mask that is 1 where
   //there is land and 0 in the ocean
   arp.precip_end        = LoadData<float>(params.surfdatadir + params.region + \
@@ -163,7 +163,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
   arp.slope         = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_slope.nc",  "value");  //Slope as a value from 0 to 1.
-  arp.land_mask     = LoadData<float>(params.surfdatadir + params.region + \
+  arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region + \
   params.time_start + "_mask.nc",   "value");
   //A binary mask that is 1 where there is land and 0 in the ocean
   arp.precip        = LoadData<float>(params.surfdatadir + params.region + \
@@ -244,7 +244,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
 
   arp.fdepth   = rd::Array2D<float>(arp.topo,500);
 
-  arp.land_mask = rd::Array2D<float>(arp.topo,1);
+  arp.land_mask = rd::Array2D<uint8_t>(arp.topo,1);
 
 
   for(int y=1;y<params.ncells_y;y++)
@@ -331,7 +331,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   //using `GetDepressionHierarchy()`.
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.label.size();i++){
-    if(arp.land_mask(i) == 0.0f){
+    if(arp.land_mask(i) == 0){
       arp.label(i) = dh::OCEAN;
       arp.final_label(i) = dh::OCEAN;
     }
@@ -352,7 +352,7 @@ void cell_size_area(Parameters &params, ArrayPack &arp){
 
 //distance between lines of latitude is a constant.
   params.cellsize_n_s_metres = (earth_radius*(M_PI/180.))\
-  /params.cells_per_degree;
+  /float(params.cells_per_degree);
 
 //initialise some arrays
   arp.latitude_radians.resize       (params.ncells_y);
@@ -371,8 +371,8 @@ void cell_size_area(Parameters &params, ArrayPack &arp){
 
   for(unsigned int j=0;j<arp.latitude_radians.size();j++){
     //latitude at the centre of a cell:
-    arp.latitude_radians[j] = (float(j)/params.cells_per_degree + \
-    params.southern_edge)*(M_PI/180.);
+    arp.latitude_radians[j] = (float(j)/float(params.cells_per_degree) + \
+    float(params.southern_edge))*(M_PI/180.);
     //southern edge of the domain in degrees, plus the number of cells up
     //from this location/the number of cells per degree, converted to radians.
 
@@ -385,27 +385,27 @@ void cell_size_area(Parameters &params, ArrayPack &arp){
 
     //latitude at the southern edge of a cell (subtract half a cell):
     double latitude_radians_S  = ((float(j) - 0.5)\
-      /params.cells_per_degree+params.southern_edge)*(M_PI/180.);
+      /float(params.cells_per_degree)+float(params.southern_edge))*(M_PI/180.);
     //latitude at the northern edge of a cell (add half a cell):
     double latitude_radians_N  = ((float(j) + 0.5)\
-      /params.cells_per_degree+params.southern_edge)*(M_PI/180.);
+      /float(params.cells_per_degree)+float(params.southern_edge))*(M_PI/180.);
 
     //distance between lines of longitude varies with latitude.
     //This is the distance at the centre of a cell for a given latitude:
     arp.cellsize_e_w_metres[j] = earth_radius* \
-    std::cos(arp.latitude_radians[j])*(M_PI/180.)/params.cells_per_degree;
+    std::cos(arp.latitude_radians[j])*(M_PI/180.)/float(params.cells_per_degree);
 
     //distance at the northern edge of the cell for the given latitude:
     arp.cellsize_e_w_metres_N[j] = earth_radius* \
-    std::cos(latitude_radians_N)*(M_PI/180.)/params.cells_per_degree;
+    std::cos(latitude_radians_N)*(M_PI/180.)/float(params.cells_per_degree);
     //distance at the southern edge of the cell for the given latitude:
     arp.cellsize_e_w_metres_S[j] = earth_radius* \
-    std::cos(latitude_radians_S)*(M_PI/180.)/params.cells_per_degree;
+    std::cos(latitude_radians_S)*(M_PI/180.)/float(params.cells_per_degree);
 
     //cell area computed as a trapezoid, using unchanging north-south distance,
     //and east-west distances at the northern and southern edges of the cell:
-    arp.cell_area[j] = params.cellsize_n_s_metres* \
-    (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j])/2;
+    arp.cell_area[j] = float(params.cellsize_n_s_metres)* \
+    (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j])/2.;
 
     if(arp.cell_area[j] < 0)
       std::cout<<"how can this be? ns size "<<params.cellsize_n_s_metres<<" ew size N "<<arp.cellsize_e_w_metres_N[j]<<" ew size S "<<arp.cellsize_e_w_metres_S[j]<<" area "<<arp.cell_area[j]<<std::endl;
@@ -500,7 +500,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   //using `GetDepressionHierarchy()`.
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.label.size();i++){
-    if(arp.land_mask(i) == 0.0f){
+    if(arp.land_mask(i) == 0){
       arp.label(i) = dh::OCEAN;
       arp.final_label(i) = dh::OCEAN;
     }
@@ -550,7 +550,7 @@ void UpdateTransientArrays(const Parameters &params, ArrayPack &arp){
 
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.label.size();i++){
-    if(arp.land_mask(i) == 0.0f){
+    if(arp.land_mask(i) == 0){
       arp.label(i) = dh::OCEAN;
       arp.final_label(i) = dh::OCEAN;
     }
