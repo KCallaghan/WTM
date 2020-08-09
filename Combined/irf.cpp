@@ -36,12 +36,13 @@ const double UNDEF  = -1.0e7;
 ///have differing cell size inputs? Should these be user-set values?
 void InitialiseTransient(Parameters &params, ArrayPack &arp){
 
-  arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + \
-  "vertical_ksat.nc", "value");   //Units of ksat are m/s.
+  arp.topo_start          = LoadData<float>(params.surfdatadir + params.region \
+  + params.time_start + "_topo.nc",   "value");  //Units: metres
+
 
 //width and height in number of cells in the array
-  params.ncells_x = arp.vert_ksat.width();
-  params.ncells_y = arp.vert_ksat.height();
+  params.ncells_x = arp.topo_start.width();
+  params.ncells_y = arp.topo_start.height();
 
 
   arp.slope_start         = LoadData<float>(params.surfdatadir + params.region \
@@ -53,16 +54,12 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   arp.ground_temp_start          = LoadData<float>(params.surfdatadir + \
     params.region + params.time_start + "_ground_temp.nc",   "value");
     //Units: degress Celsius
-  arp.topo_start          = LoadData<float>(params.surfdatadir + params.region \
-  + params.time_start + "_topo.nc",   "value");  //Units: metres
   arp.starting_evap_start = LoadData<float>(params.surfdatadir + params.region \
   + params.time_start + "_evap.nc",   "value");  //Units: m/yr
   arp.relhum_start        = LoadData<float>(params.surfdatadir + params.region \
   + params.time_start + "_relhum.nc", "value");  //Units: proportion from 0 to 1
   arp.wind_speed_start  = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_wind_speed.nc", "value");  //Units: m/s
-
-
   arp.winter_temp_start  = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_winter_temp.nc", "value");  //Units: degrees celsius
 
@@ -93,6 +90,11 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   arp.winter_temp_end    = LoadData<float>(params.surfdatadir + params.region + \
   params.time_end + "_winter_temp.nc", "value");  //Units: degrees Celsius
 
+
+  if(params.infiltration_on == true){
+    arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + \
+    "vertical_ksat.nc", "value");   //Units of ksat are m/s.
+  }
 
   //load in the wtd result from the previous time:
   arp.wtd    = LoadData<float>(params.surfdatadir + params.region + \
@@ -154,12 +156,12 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 ///have differing cell size inputs? Should these be user-set values?
 void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
-  arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + \
-  "vertical_ksat.nc", "value");   //Units of ksat are m/s.
+  arp.topo          = LoadData<float>(params.surfdatadir + params.region + \
+  params.time_start + "_topography.nc",   "value");  //Units: metres
 
 //width and height in number of cells in the array
-  params.ncells_x = arp.vert_ksat.width();
-  params.ncells_y = arp.vert_ksat.height();
+  params.ncells_x = arp.topo.width();
+  params.ncells_y = arp.topo.height();
 
   arp.slope         = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_slope.nc",  "value");  //Slope as a value from 0 to 1.
@@ -173,8 +175,6 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   arp.ground_temp          = LoadData<float>(params.surfdatadir + \
   params.region + params.time_start + "_ground_temperature.nc",   "value");
   //Units: degress Celsius
-  arp.topo          = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_topography.nc",   "value");  //Units: metres
   arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_evaporation.nc",   "value");  //Units: m/yr
   arp.relhum        = LoadData<float>(params.surfdatadir + params.region + \
@@ -186,6 +186,11 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   arp.winter_temp    = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_winter_temperature.nc", "value");  //Units: degrees Celsius
 
+
+  if(params.infiltration_on == false){
+    arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + \
+    "vertical_ksat.nc", "value");   //Units of ksat are m/s.
+  }
 
 
   arp.wtd           = rd::Array2D<float>(arp.topo,0.0);
@@ -225,8 +230,10 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.slope         = LoadData<float>(params.surfdatadir + params.region + \
   "slope.nc",  "value");  //Slope as a value from 0 to 1.
 
-  arp.vert_ksat = rd::Array2D<float>(arp.topo,0.00001);  //Units of ksat are m/s.
 
+  if(params.infiltration_on == true){
+    arp.vert_ksat = rd::Array2D<float>(arp.topo,0.00001);  //Units of ksat are m/s.
+  }
 //width and height in number of cells in the array
 
   //A binary mask that is 1 where there is land and 0 in the ocean
