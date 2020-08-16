@@ -528,11 +528,15 @@ if(wtd(x,y)>FP_ERROR)
     if(wtd(x,y) > 0)
       wtd(x,y) = 0.0;
 
-    deps[clabel].wtd_only -= arp.cell_area[y] * arp.porosity(x,y) * arp.fdepth(x,y) * (exp(arp.wtd(x,y)/arp.fdepth(x,y)) - 1);
+    //version for depth-variable porosity:
+    //deps[clabel].wtd_only -= arp.cell_area[y] * arp.porosity(x,y) * arp.fdepth(x,y) * (exp(arp.wtd(x,y)/arp.fdepth(x,y)) - 1);
+    deps[clabel].wtd_only -= arp.cell_area[y] * arp.porosity(x,y) * arp.wtd(x,y);
 
-    //- because wtd is negative. This records only 
-    //the below-ground volume available
-    deps[clabel].wtd_vol  -= arp.cell_area[y] * arp.porosity(x,y) * arp.fdepth(x,y) * (exp(arp.wtd(x,y)/arp.fdepth(x,y)) - 1);
+
+    //- because wtd is negative. This records only the below-ground volume available
+    //version for depth-variable porosity:
+    //deps[clabel].wtd_vol  -= arp.cell_area[y] * arp.porosity(x,y) * arp.fdepth(x,y) * (exp(arp.wtd(x,y)/arp.fdepth(x,y)) - 1);
+    deps[clabel].wtd_vol  -= arp.cell_area[y] * arp.porosity(x,y) * arp.wtd(x,y);
     //and this records the total volume - above and below ground - 
     //available to store water. 
     }
@@ -1628,7 +1632,9 @@ static void FillDepressions(
       assert(arp.wtd(c.x,c.y) <= FP_ERROR);
       if(arp.wtd(c.x,c.y) > 0)
         arp.wtd(c.x,c.y) = 0;
-      water_vol += arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1);
+      //version with depth-variable porosity:
+      //water_vol += arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1);
+      water_vol += arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.wtd(c.x,c.y);
 
       //We use += because wtd is less than or equal to zero
       arp.wtd(c.x,c.y)    = 0;             
@@ -1669,8 +1675,13 @@ static void FillDepressions(
     //sufficient topographic volume to hold all the water.
     //   In this case, the cell's water table is left unaffected.
 
-    if(water_vol - (current_volume - (arp.cell_area[c.y] * arp.porosity(c.x,c.y) * \
-      arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1) ) ) <= FP_ERROR){
+//depth-variable porosity version:
+//    if(water_vol - (current_volume - (arp.cell_area[c.y] * arp.porosity(c.x,c.y) * \
+  //    arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1) ) ) <= FP_ERROR){
+
+
+
+    if(water_vol - (current_volume - (arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.wtd(c.x,c.y) ) ) <= FP_ERROR){
 
       //The current scope of the depression plus the water storage capacity of
       //this cell is sufficient to store all of the water. We'll stop adding
@@ -1697,8 +1708,14 @@ static void FillDepressions(
    //     if(fill_amount < 0)
      //     fill_amount = 0; 
     
-        arp.wtd(c.x,c.y) = arp.fdepth(c.x,c.y) * log(exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) + \
-          fill_amount/(arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y)));
+
+    //depth-variable porosity version:
+    //    arp.wtd(c.x,c.y) = arp.fdepth(c.x,c.y) * log(exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) + \
+    //      fill_amount/(arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y)));
+
+
+        arp.wtd(c.x,c.y) += fill_amount/arp.cell_area[c.y]/arp.porosity(c.x,c.y);   
+
 
 
         water_vol -= fill_amount;   
@@ -1801,7 +1818,10 @@ static void FillDepressions(
       assert(arp.wtd(c.x,c.y) <= FP_ERROR);
       if(arp.wtd(c.x,c.y) > 0)
         arp.wtd(c.x,c.y) = 0;
-      water_vol += arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1);
+   
+   //  depth-variable porosity version
+   //   water_vol += arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1);
+      water_vol += arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.wtd(c.x,c.y);
 
       //We use += because wtd is less than or equal to zero
       arp.wtd(c.x,c.y)    = 0;             
