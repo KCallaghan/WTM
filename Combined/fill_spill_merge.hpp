@@ -935,7 +935,6 @@ static void MoveWaterInOverflow(
 
   while(extra_water > 0){
  
-  if(params.infiltration_on == true){
     distance = 0;
     int p_x,p_y;
     arp.topo.iToxy(previous_cell,p_x,p_y);              
@@ -963,7 +962,7 @@ static void MoveWaterInOverflow(
     extra_water -= params.infiltration;
     assert(arp.wtd(current_cell)<=FP_ERROR);
     assert(extra_water>=-FP_ERROR);
-  }
+  
 
     if(extra_water <= 0)
       break;
