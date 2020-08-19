@@ -61,6 +61,8 @@ class ArrayPack {
   f2d e_sat;
   f2d e_a;
   f2d surface_evap;
+  f2d open_water_evap;
+
 
   f2d infiltration_array;
   f2d transmissivity;

@@ -170,18 +170,19 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   //A binary mask that is 1 where there is land and 0 in the ocean
   arp.precip        = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_precipitation.nc", "value");  //Units: m/yr.
-  arp.temp          = LoadData<float>(params.surfdatadir + params.region + \
+//  arp.temp          = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_air_temperature.nc",   "value");  //Units: degress Celsius
-  arp.ground_temp          = LoadData<float>(params.surfdatadir + \
+//  arp.ground_temp          = LoadData<float>(params.surfdatadir + \
   params.region + params.time_start + "_ground_temperature.nc",   "value");
   //Units: degress Celsius
   arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_evaporation.nc",   "value");  //Units: m/yr
-  arp.relhum        = LoadData<float>(params.surfdatadir + params.region + \
+//  arp.relhum        = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_relhum.nc", "value");  //Units: proportion from 0 to 1.
-  arp.wind_speed    = LoadData<float>(params.surfdatadir + params.region + \
+//  arp.wind_speed    = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_wind_speed.nc", "value");  //Units: m/s
-
+  arp.open_water_evap = LoadData<float>(params.surfdatadir + params.region + \
+  params.time_start + "_open_water_evaporation.nc",   "value");  //Units: m/yr
 
   arp.winter_temp    = LoadData<float>(params.surfdatadir + params.region + \
   params.time_start + "_winter_temperature.nc", "value");  //Units: degrees Celsius
@@ -195,7 +196,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
   arp.wtd           = rd::Array2D<float>(arp.topo,0.0);
   //we start with a water table at the surface for equilibrium runs.
-  arp.evap          = arp.starting_evap;
+  //arp.evap          = arp.starting_evap;
 
   arp.fdepth   = rd::Array2D<float>(arp.topo,0);
   for(unsigned int i=0;i<arp.topo.size();i++){
@@ -238,12 +239,14 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
 
   //A binary mask that is 1 where there is land and 0 in the ocean
   arp.precip        = rd::Array2D<float>(arp.topo,0.03);  //Units: m/yr.
-  arp.temp          = rd::Array2D<float>(arp.topo,10);
-  arp.ground_temp   = rd::Array2D<float>(arp.topo,10);
+  //arp.temp          = rd::Array2D<float>(arp.topo,10);
+ // arp.ground_temp   = rd::Array2D<float>(arp.topo,10);
   //Units: degress Celsius
   arp.starting_evap = rd::Array2D<float>(arp.topo,0);
-  arp.relhum        = rd::Array2D<float>(arp.topo,0.5);
-  arp.wind_speed    = rd::Array2D<float>(arp.topo,1);
+  arp.open_water_evap = rd::Array2D<float>(arp.topo,0.5);
+
+ // arp.relhum        = rd::Array2D<float>(arp.topo,0.5);
+ // arp.wind_speed    = rd::Array2D<float>(arp.topo,1);
   arp.winter_temp    = rd::Array2D<float>(arp.topo,0);
   arp.wtd           = rd::Array2D<float>(arp.topo,0.0);
   //we start with a water table at the surface for equilibrium runs.
@@ -279,10 +282,10 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.head               = rd::Array2D<float>(arp.ksat,0);
 
   //Several arrays that are used for calculations of evaporation
-  arp.evap               = rd::Array2D<float>(arp.ksat,0);
-  arp.e_sat              = rd::Array2D<float>(arp.ksat,0);
-  arp.e_a                = rd::Array2D<float>(arp.ksat,0);
-  arp.surface_evap       = rd::Array2D<float>(arp.ksat,0);
+ // arp.evap               = rd::Array2D<float>(arp.ksat,0);
+ // arp.e_sat              = rd::Array2D<float>(arp.ksat,0);
+ // arp.e_a                = rd::Array2D<float>(arp.ksat,0);
+ // arp.surface_evap       = rd::Array2D<float>(arp.ksat,0);
 
   //These are used to see how much change occurred in infiltration
   //and updating lakes portions of the code. Just informational.
@@ -446,10 +449,10 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   arp.head               = rd::Array2D<float>(arp.ksat,0);
 
   //Several arrays that are used for calculations of evaporation
-  arp.evap               = rd::Array2D<float>(arp.ksat,0);
-  arp.e_sat              = rd::Array2D<float>(arp.ksat,0);
-  arp.e_a                = rd::Array2D<float>(arp.ksat,0);
-  arp.surface_evap       = rd::Array2D<float>(arp.ksat,0);
+  //arp.evap               = rd::Array2D<float>(arp.ksat,0);
+ // arp.e_sat              = rd::Array2D<float>(arp.ksat,0);
+ // arp.e_a                = rd::Array2D<float>(arp.ksat,0);
+ // arp.surface_evap       = rd::Array2D<float>(arp.ksat,0);
 
   //These are used to see how much change occurred in infiltration
   //and updating lakes portions of the code. Just informational.

@@ -135,7 +135,21 @@ void update(
   //at these locations.
   richdem::Timer evaporation_timer;
   evaporation_timer.start();
-  evaporation_update(params,arp);
+ // evaporation_update(params,arp);
+
+
+  #pragma omp parallel for 
+  for(unsigned int i=0;i<arp.topo.size();i++){
+    if(arp.wtd(i)>0)  //if there is surface water present
+      arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
+    else{              //water table is below the surface
+      arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
+      if(arp.rech(i) <0)    //Recharge is always positive. 
+        arp.rech(i) = 0.0f;
+    }
+  }
+
+
 
   std::cerr << "t Evaporation time = " << evaporation_timer.lap() << std::endl;
   std::cerr << "After evaporation_update: " << dt << std::endl;
