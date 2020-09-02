@@ -188,7 +188,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   params.time_start + "_winter_temperature.nc", "value");  //Units: degrees Celsius
 
 
-  if(params.infiltration_on == false){
+  if(params.infiltration_on == true){
     arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + \
     "vertical_ksat.nc", "value");   //Units of ksat are m/s.
   }
