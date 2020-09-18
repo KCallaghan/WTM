@@ -9,33 +9,34 @@ typedef richdem::Array2D<float>  f2d;
 typedef richdem::Array2D<uint8_t>  ui82d;
 typedef std::vector<double> dvec;
 typedef int32_t dh_label_t;
+typedef uint32_t flat_c_idx;
 
 class ArrayPack {
  public:
-  f2d ksat;  
-  f2d vert_ksat;  
-  f2d porosity;  
+  f2d ksat;
+  f2d vert_ksat;
+  f2d porosity;
   ui82d land_mask;
 
   f2d slope_start;
   f2d slope_end;
-  f2d fdepth_start; 
+  f2d fdepth_start;
   f2d fdepth_end;
-  f2d precip_start; 
+  f2d precip_start;
   f2d precip_end;
-  f2d temp_start; 
+  f2d temp_start;
   f2d temp_end;
-  f2d topo_start;   
+  f2d topo_start;
   f2d topo_end;
-  f2d winter_temp_start; 
+  f2d winter_temp_start;
   f2d winter_temp_end;
   f2d ground_temp_start;
   f2d ground_temp_end;
   f2d wind_speed_start;
   f2d wind_speed_end;
-  f2d starting_evap_start; 
+  f2d starting_evap_start;
   f2d starting_evap_end;
-  f2d relhum_start; 
+  f2d relhum_start;
   f2d relhum_end;
 
   f2d slope;
@@ -48,12 +49,12 @@ class ArrayPack {
   f2d wind_speed;
   f2d starting_evap;
   f2d relhum;
- 
+
   f2d wtd;
   f2d wtd_mid;
   f2d wtd_old;
   f2d wtd_changed;
- 
+
   f2d rech;
   f2d runoff;
   f2d head;
