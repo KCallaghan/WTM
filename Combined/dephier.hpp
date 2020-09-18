@@ -3,11 +3,12 @@
 
 #include "radix_heap.hpp"
 #include "DisjointDenseIntSet.hpp"
-#include "../common/netcdf.hpp"
 
 #include <richdem/common/Array2D.hpp>
 #include <richdem/common/constants.hpp>
 #include <richdem/common/grid_cell.hpp>
+#include <richdem/common/logger.hpp>
+//#include <richdem/common/math.hpp>
 #include <richdem/common/ProgressBar.hpp>
 #include <richdem/common/timer.hpp>
 
@@ -23,9 +24,6 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
-
-const double FP_ERROR = 1e-4;
-
 
 namespace richdem::dephier {
 
@@ -192,15 +190,64 @@ template<class elev_t>
 using PriorityQueue = radix_heap::pair_radix_heap<elev_t,uint64_t>;
 
 //Cell is not part of a depression
-const dh_label_t NO_DEP = -1;
+const dh_label_t NO_DEP = std::numeric_limits<dh_label_t>::max();
 //Cell is part of the ocean and a place from which we begin searching for
 //depressions.
 const dh_label_t OCEAN  = 0;
 
-
-
 template<typename elev_t>
 using DepressionHierarchy = std::vector<Depression<elev_t>>;
+
+
+
+template<class elev_t>
+std::ostream& operator<<(std::ostream &out, const DepressionHierarchy<elev_t> &deps){
+  std::vector<int> child_count;
+  std::vector<size_t> stack;
+
+  const std::function<void(const size_t root, const size_t depth)> print_helper = [&](const size_t root, const size_t depth) -> void {
+    const auto &dep = deps.at(root);
+    stack.push_back(root);
+    child_count.push_back( (dep.lchild!=NO_VALUE) + (dep.rchild!=NO_VALUE) + dep.ocean_linked.size() );
+
+    for(int i=0;i<depth;i++){
+      if(child_count.at(i)>1 && i==depth-1)
+        out<<(dep.ocean_parent?"╠═":"├─");
+      else if(child_count.at(i)==1 && i==depth-1)
+        out<<(dep.ocean_parent?"╚═":"└─");
+      else if(child_count.at(i)>2)
+        out<<"║ ";
+      else if(child_count.at(i)>1)
+        out<<"│ ";
+      else
+        out<<"  ";
+    }
+
+    out<<"Id="<<root
+       <<", dep_vol="<<dep.dep_vol
+       <<", water_vol="<<dep.water_vol
+       <<", pit_cell="<<dep.pit_cell
+       <<", out_cell="<<dep.out_cell
+       <<", out_elev="<<dep.out_elev
+       <<", parent="<<dep.parent
+       <<", odep="<<dep.odep
+       <<"\n";
+
+    if(dep.lchild!=NO_VALUE) { print_helper(dep.lchild,depth+1); child_count.back()--; }
+    if(dep.rchild!=NO_VALUE) { print_helper(dep.rchild,depth+1); child_count.back()--; }
+    for(const auto &x: dep.ocean_linked){
+      print_helper(x,depth+1);
+      child_count.back()--;
+    }
+    stack.pop_back();
+    child_count.pop_back();
+  };
+
+  print_helper(0, 0);
+
+  return out;
+}
+
 
 //Calculate the hierarchy of depressions. Takes as input a digital elevation
 //model and a set of labels. The labels should have `OCEAN` for cells
@@ -367,19 +414,11 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   std::sort(ocean_seeds.begin(), ocean_seeds.end());
   std::sort(land_seeds.begin(), land_seeds.end());
 
-
-
-
-//The priority queue ensures that cells are visited in order from lowest to
+  //The priority queue ensures that cells are visited in order from lowest to
   //highest. If two or more cells are of equal elevation then the one added last
   //(most recently) is returned from the queue first. This ensures that a single
   //depression gets all the cells within a flat area.
- // rd::GridCellZk_high_pq<elev_t> pq;
-
-
-
-
-PriorityQueue<elev_t> pq;
+  PriorityQueue<elev_t> pq;
 
   //Add all the seed cells to the PQ
   for(const auto &x: ocean_seeds)
@@ -435,30 +474,27 @@ PriorityQueue<elev_t> pq;
   progress.start(arp.topo.size());
   while(!pq.empty()){
     ++progress;
-    //Copy cell with lowest elevation from priority queue
-   // const auto c = pq.top();
 
     const auto ci    = pq.top_value();     //Copy cell with lowest elevation from priority queue
     const auto celev = pq.top_key();       //Elevation of focal cell
-    pq.pop();                   //Remove the copied cell from the priority queue
+    pq.pop();                              //Remove the copied cell from the priority queue
     auto clabel      = label(ci);          //Nominal label of cell
     int cx,cy;
     arp.topo.iToxy(ci,cx,cy);
 
 
     if(clabel==OCEAN){
-        //This cell is an ocean cell or a cell that flows into the ocean without
+      //This cell is an ocean cell or a cell that flows into the ocean without
       //encountering any depressions on the way. Upon encountering it we do not
       //need to do anything special.
     } else if(clabel==NO_DEP){
-       //Since cells label their neighbours and ocean cells are labeled in the
+      //Since cells label their neighbours and ocean cells are labeled in the
       //initialization, the only way to get to a cell that is still labeled as
       //not being part of a depression is if that cell were added as a pit cell.
       //For each pit cell we find, we make a new depression and label it
       //accordingly. Not all the pit cells originally added will form new
       //depressions as flat cells will relabel their neighbours and the first
       //cell found in a flat determines the label for the entirety of that flat.
-
       clabel            = depressions.size();         //In a 0-based indexing system, size is equal to the id of the next flat
       auto &newdep      = depressions.emplace_back(); //Add the next flat (increases size by 1)
       newdep.pit_cell   = arp.topo.xyToI(cx,cy);      //Make a note of the pit cell's location
@@ -779,25 +815,14 @@ PriorityQueue<elev_t> pq;
 
 
     total_areas[clabel] += arp.cell_area[y];
-    total_volumes[clabel] += (static_cast<double>(\
-    depressions[clabel].out_elev)-arp.topo(x,y))*arp.cell_area[y];
-
-
-  //  depressions[clabel].dep_area += arp.cell_area[y];
-     //We need to know the area of our child depressions when getting
-    //the total depression volumes below.
-//    depressions[clabel].dep_vol += (static_cast<double>(\
-    depressions[clabel].out_elev)-arp.topo(x,y))*arp.cell_area[y];
+    total_volumes[clabel] += (static_cast<double>(depressions[clabel].out_elev)-arp.topo(x,y))*arp.cell_area[y];
     //Add the area of one cell at a time - elevation difference between
-    //the outlet of this depression and the current cell,
-    //multiplied by the area of the current cell.
-
-
+    //the outlet of this depression and the current cell, multiplied by the area of the current cell.
   }
 
   //  #pragma omp critical
     for(unsigned int i=0;i<depressions.size();i++){
-      depressions[i].dep_area        += total_areas[i];
+      depressions[i].dep_area        += total_areas[i];     //We need to know the area of our child depressions when getting the total depression volumes below.
       depressions[i].dep_vol         += total_volumes[i];
     }
 
@@ -818,33 +843,24 @@ PriorityQueue<elev_t> pq;
       assert(dep.lchild<d);         //ID of child must be smaller than parent's
       assert(dep.rchild<d);         //ID of child must be smaller than parent's
 
-      dep.dep_vol += depressions.at(dep.lchild).dep_vol;
-      //Add the actual dep volume of the child
-      dep.dep_vol += (dep.out_elev - depressions.at(dep.lchild).out_elev)\
-      * depressions.at(dep.lchild).dep_area;
-      //add the water volume higher than the child depression's outlet,
-      //but on the same cells
+      dep.dep_vol += depressions.at(dep.lchild).dep_vol;      //Add the actual dep volume of the child
+      dep.dep_vol += (dep.out_elev - depressions.at(dep.lchild).out_elev) * depressions.at(dep.lchild).dep_area;
+      //add the water volume higher than the child depression's outlet, but on the same cells
 
       dep.dep_vol += depressions.at(dep.rchild).dep_vol;
-      dep.dep_vol += (dep.out_elev - depressions.at(dep.rchild).out_elev)\
-      * depressions.at(dep.rchild).dep_area;
+      dep.dep_vol += (dep.out_elev - depressions.at(dep.rchild).out_elev) * depressions.at(dep.rchild).dep_area;
 
       dep.dep_area += depressions.at(dep.lchild).dep_area;
-      //remember to add the area covered by child depression cells,
-      //so that our parent can also get the correct total dep_vol.
+      //remember to add the area covered by child depression cells, so that our parent can also get the correct total dep_vol.
       dep.dep_area += depressions.at(dep.rchild).dep_area;
     }
 
-
-    assert(dep.lchild==NO_VALUE || (depressions.at(dep.lchild).dep_vol + \
-      depressions.at(dep.rchild).dep_vol) - dep.dep_vol <= FP_ERROR);
-
+    assert(dep.lchild==NO_VALUE || fp_le(depressions.at(dep.lchild).dep_vol + depressions.at(dep.rchild).dep_vol,dep.dep_vol));
 
   }
   progress.stop();
 
-  std::cerr<<"t Depression Hierarchy Wall-Time = " \
-  <<timer_overall.stop()<<" s"<<std::endl;
+  std::cerr<<"t Depression Hierarchy Wall-Time = " <<timer_overall.stop()<<" s"<<std::endl;
 
   return depressions;
 }
