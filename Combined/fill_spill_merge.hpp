@@ -6,7 +6,9 @@
 #include "../common/netcdf.hpp"
 
 #include <richdem/common/Array2D.hpp>
+//#include <richdem/common/math.hpp>
 #include <richdem/common/ProgressBar.hpp>
+#include <richdem/common/logger.hpp>
 #include <richdem/common/timer.hpp>
 #include <richdem/depressions/depressions.hpp>
 
@@ -117,6 +119,19 @@ static void FillDepressions(
   ArrayPack                         &arp
 );
 
+//template<class wtd_t>
+double DetermineWaterLevel(
+  ArrayPack                         &arp,
+  const double water_vol,
+  const int cx,
+  const int cy,
+  const size_t cells_to_spread_across,
+  const double highest_elevation,
+  const double current_volume,
+  const double current_area,
+  const double area_times_elevation_total
+);
+
 
 ///////////////////////////////////
 //Implementations
@@ -212,7 +227,7 @@ if(!(dep.water_vol==0 || dep.water_vol - dep.wtd_vol <= FP_ERROR))
   //depression which will lie below its surface.
   FindDepressionsToFill(OCEAN,deps,arp);
   RDLOG_TIME_USE<<"t FlowInDepressionHierarchy: Fill time = "<<timer_filled.stop()<<" s";
-  RDLOG_TIME_USE<<"t FlowInDepressionHierarchy = "<<timer_overall.stop()<<" s"
+  RDLOG_TIME_USE<<"t FlowInDepressionHierarchy = "<<timer_overall.stop()<<" s";
 
 }
 
@@ -1477,14 +1492,11 @@ static void FillDepressions(
   //from which the water should be spread, and valid depressions across which
   //water can spread.
   SubtreeDepressionInfo             &stdi,
-  double                            water_vol,
-  //Amount of water to spread around this depression
+  double                            water_vol,  //Amount of water to spread around this depression
   const DepressionHierarchy<elev_t> &deps,      //Depression hierarchy
   ArrayPack                         &arp
 ){
   //Nothing to do if we have no water
-
-
   if(water_vol==0)
     return;
 
@@ -1494,7 +1506,6 @@ static void FillDepressions(
   //arbitrarily reserve enough space in the hashset for a few thousand items.
   //This should be large than most depressions while still being small by the
   //computer's standards.
-
   std::unordered_set<int> visited(2048);
 
   //Priority queue that sorts cells by lowest elevation first. If two cells are
@@ -1524,7 +1535,7 @@ static void FillDepressions(
   }
 
   //Cells whose wtd will be affected as we spread water around
-  std::vector<int> cells_affected;
+  std::vector<flat_c_idx> cells_affected;
 
   //Stores the sum of the elevations of all of the cells in cells_affected. Used
   //for calculating the volume we've seen so far. (See explanation above or in
@@ -1534,9 +1545,6 @@ static void FillDepressions(
   double highest_diff = 0;
 
 
-//Stores the sum of the elevations of all of the cells in cells_affected. Used
-  //for calculating the volume we've seen so far. (See explanation above or in
-  //dephier.hpp TODO)
   double total_elevation = 0;
   double area_times_elevation_total = 0;
   double current_volume = 0;
@@ -1615,8 +1623,7 @@ static void FillDepressions(
     //their cells are allowed to have wtd>0. Thus, we raise a warning if we are
     //looking at a cell in this unfilled depression with wtd>0.
     if(stdi.my_labels.count(arp.label(c.x,c.y))==1 && arp.wtd(c.x,c.y)>FP_ERROR)
-      throw std::runtime_error("A cell was discovered in an \
-        unfilled depression with wtd>0!");
+      throw std::runtime_error("A cell was discovered in an unfilled depression with wtd>0!");
 
     //There are two possibilities:
     //1. The virtual water level exceeds slightly the height of the cell.
@@ -1633,7 +1640,7 @@ static void FillDepressions(
 
 
 
-    if(water_vol - (current_volume - (arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.wtd(c.x,c.y) ) ) <= FP_ERROR){
+    if(water_vol - (current_volume - (arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.wtd(c.x,c.y) ) ) <= FP_ERROR ) {
 
       //The current scope of the depression plus the water storage capacity of
       //this cell is sufficient to store all of the water. We'll stop adding
@@ -1641,65 +1648,10 @@ static void FillDepressions(
 
       //We will fill the depression so that the surface of the water is at this
       //elevation.
-      double water_level;
 
-      if(current_volume<water_vol){
-      //TODO: Check stdi.my_labels.count(label(c.x,c.y))==0 ?
-        //The volume of water exceeds what we can hold above ground, so we will
-        //stash as much as we can in this cell's water table. This is okay
-        //because the above ground volume plus this cell's water table IS enough
-        //volume (per the if-clause above).
+      auto water_level = DetermineWaterLevel(arp, water_vol, c.x,  c.y, cells_affected.size(), highest_elevation, current_volume, current_area, area_times_elevation_total);
 
 
-        //Fill in as much of this cell's water table as we can
-        const double fill_amount = water_vol - current_volume;
-        //TODO is it needed to update wtd_vol here? I think the code can work
-        //without doing so, but it would be better for error checking if we did.
-        // If we do, best way to do so?
-        assert(fill_amount >= -FP_ERROR);
-   //     if(fill_amount < 0)
-     //     fill_amount = 0;
-
-
-    //depth-variable porosity version:
-    //    arp.wtd(c.x,c.y) = arp.fdepth(c.x,c.y) * log(exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) + \
-    //      fill_amount/(arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y)));
-
-
-        arp.wtd(c.x,c.y) += fill_amount/arp.cell_area[c.y]/arp.porosity(c.x,c.y);
-
-
-
-        water_vol -= fill_amount;
-
-        //Doesn't matter because we don't use water_vol anymore
-    //    water_level     = arp.topo(c.x,c.y);
-
-        water_level = highest_elevation;
-
-
-      } else if (current_volume==water_vol) {
-        //The volume of water is exactly equal to the above ground volume
-        //so we set the water level equal to this cell's elevation
-       //   water_level = arp.topo(c.x,c.y);
-        water_level = highest_elevation;
-        }
-      else {  //The water volume is less than this cell's elevation,
-        //so we calculate what the water level should be.
-        //Volume of water = sum(current_area*(water_level -
-        //cell_elevation))
-        //                = sum(current_area * water_level) -
-        //sum(current_area * cell_elevation)
-        //                = water_level * sum(current_area) -
-        //sum(current_area * cell_elevation)
-        //rearranging this gives us:
-
-
-        water_level = (water_vol / current_area) + \
-      (area_times_elevation_total / current_area);
-
-
-      }
       //Water level must be higher than (or equal to) the previous cell
       // we looked at, but lower than (or equal to) the highest cell
 
@@ -1850,6 +1802,85 @@ static void FillDepressions(
   assert(!flood_q.empty());
   throw std::runtime_error("PQ loop exited without filling a depression!");
 }
+
+
+
+///The Lake-Level Equation.
+///@param sill_wtd               Water table depth of the sill cell
+///@param water_vol              Volume of water to spread across the depression
+///@param sill_elevation         Elevation of the cell that dams the water into
+///                              the depression.
+///@param cells_to_spread_across How many cells the water is to be spread across
+///@param total_elevation        The sum of those cells' elevations
+///
+///@return The elevation of the water level
+//template<class wtd_t>
+double DetermineWaterLevel(
+  ArrayPack                         &arp,
+  double water_vol,
+  const int cx,
+  const int cy,
+  const size_t cells_to_spread_across,
+  const double highest_elevation,
+  const double current_volume,
+  const double current_area,
+  const double area_times_elevation_total
+){
+  //const double current_dep_volume = DepressionVolume(sill_elevation, cells_to_spread_across, total_elevation);
+
+      double water_level;
+      if(current_volume<water_vol){
+      //TODO: Check stdi.my_labels.count(label(c.x,c.y))==0 ?
+        //The volume of water exceeds what we can hold above ground, so we will
+        //stash as much as we can in this cell's water table. This is okay
+        //because the above ground volume plus this cell's water table IS enough
+        //volume (per the if-clause above).
+
+
+        //Fill in as much of this cell's water table as we can
+        const double fill_amount = water_vol - current_volume;
+        //TODO is it needed to update wtd_vol here? I think the code can work
+        //without doing so, but it would be better for error checking if we did.
+        // If we do, best way to do so?
+        assert(fill_amount >= -FP_ERROR);
+   //     if(fill_amount < 0)
+     //     fill_amount = 0;
+
+    //depth-variable porosity version:
+    //    arp.wtd(c.x,c.y) = arp.fdepth(c.x,c.y) * log(exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) + \
+    //      fill_amount/(arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y)));
+
+        arp.wtd(cx,cy) += fill_amount/arp.cell_area[cy]/arp.porosity(cx,cy);
+
+        water_level = highest_elevation;
+
+
+      } else if (current_volume==water_vol) {
+        //The volume of water is exactly equal to the above ground volume
+        //so we set the water level equal to this cell's elevation
+       //   water_level = arp.topo(c.x,c.y);
+        water_level = highest_elevation;
+        }
+      else {  //The water volume is less than this cell's elevation,
+        //so we calculate what the water level should be.
+        //Volume of water = sum(current_area*(water_level -
+        //cell_elevation))
+        //                = sum(current_area * water_level) -
+        //sum(current_area * cell_elevation)
+        //                = water_level * sum(current_area) -
+        //sum(current_area * cell_elevation)
+        //rearranging this gives us:
+
+
+        water_level = (water_vol / current_area) + (area_times_elevation_total / current_area);
+
+      }
+
+return water_level;
+}
+
+
+
 
 }
 
