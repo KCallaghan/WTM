@@ -2,3 +2,6 @@
 	path = common/richdem
 	url = https://github.com/r-barnes/richdem.git
 	branch = dev
+[submodule "build/richdem"]
+	path = build/richdem
+	url = https://github.com/r-barnes/richdem
