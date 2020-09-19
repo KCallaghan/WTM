@@ -69,7 +69,7 @@ void update(
     UpdateTransientArrays(params,arp);
     //linear interpolation of input data from start to end times.
     auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>\
-    (arp, arp.label, arp.final_label, arp.flowdirs);
+    (arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
     //with transient runs, we have to redo the depression hierarchy every time,
     //since the topography is changing.
   }
@@ -138,13 +138,13 @@ void update(
  // evaporation_update(params,arp);
 
 
-  #pragma omp parallel for 
+  #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
     if(arp.wtd(i)>0)  //if there is surface water present
       arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
     else{              //water table is below the surface
       arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
-      if(arp.rech(i) <0)    //Recharge is always positive. 
+      if(arp.rech(i) <0)    //Recharge is always positive.
         arp.rech(i) = 0.0f;
     }
   }
@@ -169,7 +169,7 @@ void run(Parameters &params, ArrayPack &arp){
   //Set the initial depression hierarchy.
   //For equilibrium runs, this is the only time this needs to be done.
   auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>\
-  (arp, arp.label, arp.final_label, arp.flowdirs);
+  (arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
   while(true){
     update(params,arp,deps);
