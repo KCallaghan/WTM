@@ -1,4 +1,3 @@
-[submodule "richdem"]
+[submodule "common/richdem"]
 	path = common/richdem
-	url = https://github.com/r-barnes/richdem.git
-	branch = dev
+	url = https://github.com/r-barnes/richdem
