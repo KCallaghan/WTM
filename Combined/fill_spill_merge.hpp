@@ -1373,9 +1373,8 @@ class SubtreeDepressionInfo {
 ///        contains, and its root node.
 template<class elev_t>
 static SubtreeDepressionInfo FindDepressionsToFill(
-  const int                         current_depression,
-  //Depression we are currently in
-  const DepressionHierarchy<elev_t> &deps,    //Depression hierarchy
+  const int                         current_depression,  //Depression we are currently in
+  const DepressionHierarchy<elev_t> &deps,               //Depression hierarchy
   ArrayPack                         &arp
 ){
   //Stop when we reach one level below the leaves
@@ -1400,23 +1399,18 @@ static SubtreeDepressionInfo FindDepressionsToFill(
 
   //We visit both of the children. We need to keep track of info from these
   //because we may spread water across them.
-  SubtreeDepressionInfo left_info  = FindDepressionsToFill(this_dep.lchild, \
-    deps, arp);
-  SubtreeDepressionInfo right_info = FindDepressionsToFill(this_dep.rchild, \
-    deps, arp );
+  SubtreeDepressionInfo left_info  = FindDepressionsToFill(this_dep.lchild, deps, arp);
+  SubtreeDepressionInfo right_info = FindDepressionsToFill(this_dep.rchild, deps, arp );
 
   SubtreeDepressionInfo combined;
   combined.my_labels.emplace(current_depression);
   combined.my_labels.merge(left_info.my_labels);
   combined.my_labels.merge(right_info.my_labels);
 
-  combined.leaf_label = left_info.leaf_label;
-  //Choose left because right is not guaranteed to exist
+  combined.leaf_label = left_info.leaf_label;  //Choose left because right is not guaranteed to exist
 
-  //If there's no label, then there was no child
-  if(combined.leaf_label==NO_VALUE)
-    combined.leaf_label = current_depression;
-    //Therefore, this is a leaf depression
+  if(combined.leaf_label==NO_VALUE)            //If there's no label, then there was no child
+    combined.leaf_label = current_depression;  //Therefore, this is a leaf depression
 
   combined.top_label = current_depression;
 
@@ -1424,56 +1418,16 @@ static SubtreeDepressionInfo FindDepressionsToFill(
   //otherwise we would have overflowed the water into the neighbouring
   //depression and moved the excess to the parent.
   assert(this_dep.water_vol - this_dep.wtd_vol <= FP_ERROR);
- // if(this_dep.water_vol > this_dep.wtd_vol)
-   // this_dep.water_vol = this_dep.wtd_vol;
-
-  //Since depressions store their marginal water volumes, if a parent depression
-  //has 0 marginal water volume, then both of its children have sufficient
-  //depression volume to store all of their water. TODO: is this always true?
-  //What about a metadepression that is the EXACT size of its two children,
-  //so it never has a marginal water volume?
-  // However, if our parent is an
-  //ocean-link then we are guaranteed to be able to fill now because excess
-  //water will have been transferred into the parent and we don't want to pool
-  //the parent's water with our own (it might be at the bottom of a cliff).
-
-//  if(this_dep.water_vol==this_dep.dep_vol
-//&& deps.at(this_dep.parent).water_vol==0){
-  //  std::cout<<"here is an exact equal depression"
-  //<<this_dep.dep_label<<std::endl;
-  //  for(int y=0;y<label.height();y++)
-    //  for(int x=0;x<label.width();x++){
-      //  if(label(x,y)==this_dep.dep_label){
-      //TODO: Will this catch everything that is part of this depression?
-        //  if(topo(x,y)<this_dep.out_elev){
-          //  assert(wtd(x,y)==0);
-       //     wtd(x,y) = this_dep.out_elev - topo(x,y);
-      //    }
-      //    }
-      //  }
-   // return SubtreeDepressionInfo();
-
-   // }
 
 
   if(this_dep.water_vol<this_dep.wtd_vol || this_dep.ocean_parent || \
-  (this_dep.water_vol==this_dep.dep_vol && \
-  deps.at(this_dep.parent).water_vol==0)){
+  (this_dep.water_vol==this_dep.dep_vol && deps.at(this_dep.parent).water_vol==0)){
   //TODO: Should there also be an OR if this dep's parent is the ocean?
     assert(this_dep.water_vol - this_dep.wtd_vol <= FP_ERROR);
 
 
- //   if(this_dep.water_vol > this_dep.wtd_vol)
-   //   this_dep.water_vol = this_dep.wtd_vol;
-  //  assert(deps.at(this_dep.parent).dep_label == OCEAN ||
-  //deps.at(this_dep.parent).water_vol == 0);
-     //I no longer understand the above assert.
-  //Why on earth would the parent of an ocean-linked depression not
-  //be allowed to have a non-zero water vol?
-
-
     //If both of a depression's children have already spread their water,
-    // we do notnwant to attempt to do so again in an empty parent depression.
+    //we do not want to attempt to do so again in an empty parent depression.
     //We check to see if both children have finished spreading water.
       FillDepressions(combined, this_dep.water_vol, deps,arp);
 
