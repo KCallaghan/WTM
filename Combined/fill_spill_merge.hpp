@@ -6,7 +6,7 @@
 #include "../common/netcdf.hpp"
 
 #include <richdem/common/Array2D.hpp>
-//#include <richdem/common/math.hpp>
+#include <richdem/common/math.hpp>
 #include <richdem/common/ProgressBar.hpp>
 #include <richdem/common/logger.hpp>
 #include <richdem/common/timer.hpp>
@@ -117,6 +117,14 @@ static void FillDepressions(
   double                            water_vol,
   const DepressionHierarchy<elev_t> &deps,
   ArrayPack                         &arp
+);
+
+template<class elev_t, class wtd_t>
+void BackfillDepression(
+  double water_level,
+  const Array2D<elev_t>   &topo,
+  Array2D<wtd_t>          &wtd,
+  std::vector<flat_c_idx> &cells_affected
 );
 
 //template<class wtd_t>
@@ -1640,7 +1648,7 @@ static void FillDepressions(
 
 
 
-    if(water_vol - (current_volume - (arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.wtd(c.x,c.y) ) ) <= FP_ERROR ) {
+    if(fp_le(water_vol,(current_volume - (arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.wtd(c.x,c.y) ) ) ) ) {
 
       //The current scope of the depression plus the water storage capacity of
       //this cell is sufficient to store all of the water. We'll stop adding
@@ -1655,40 +1663,21 @@ static void FillDepressions(
       //Water level must be higher than (or equal to) the previous cell
       // we looked at, but lower than (or equal to) the highest cell
 
-      assert(cells_affected.size()==0 || arp.topo(cells_affected.back()) - \
-        water_level <= FP_ERROR);
+      assert(cells_affected.size()==0 || fp_le(arp.topo(cells_affected.back()),water_level) );
         if(highest_elevation - water_level < -FP_ERROR){
           std::cout<<"highest_elevation "<<highest_elevation<<" water level "<<water_level<<std::endl;
           std::cout<<"water vol "<<water_vol<<" current area "<<current_area<<" area_times_elevation_total "<<area_times_elevation_total<<std::endl;
         }
-      assert(highest_elevation-water_level >= -FP_ERROR);
+      assert(fp_ge(highest_elevation, water_level));
 
 
-      for(const auto c: cells_affected){
-        assert(arp.wtd(c) >= -FP_ERROR);
-        //This should be true since we have been filling wtds as we go.
-        if(arp.wtd(c) < 0)
-          arp.wtd(c) = 0;
+
+      BackfillDepression(water_level, arp.topo, arp.wtd, cells_affected);
 
 
-        assert(water_level - arp.topo(c) >= -FP_ERROR);
-        if(water_level < arp.topo(c))
-          water_level = arp.topo(c);
-
-        arp.wtd(c) = water_level - arp.topo(c);
 
 
-        //only change the wtd if it is an increase, here.
-        //We can't take water away from cells that already have it
-        //(ie reduce groundwater in saddle cells within a metadepression.)
-        if(-FP_ERROR<=arp.wtd(c) && arp.wtd(c)<0)
-          arp.wtd(c) = 0;
-        assert(arp.wtd(c)>= -FP_ERROR);
-        if(arp.wtd(c) < 0)
-          arp.wtd(c) = 0;
 
-
-      }
       //We've spread the water, so we're done
 
       return;
@@ -1802,6 +1791,45 @@ static void FillDepressions(
   assert(!flood_q.empty());
   throw std::runtime_error("PQ loop exited without filling a depression!");
 }
+
+
+///Once a set of cells sufficient to hold the water in a depression has been
+///found, we use this function to spread the water across those cells.
+///@param water_level    Elevation of the water's surface
+///@param topo           Elevations of cells
+///@param wtd            Water table depth
+///@param cells_affected Queue of cells to add water to
+template<class elev_t, class wtd_t>
+void BackfillDepression(
+  double water_level,
+  const Array2D<elev_t>   &topo,
+  Array2D<wtd_t>          &wtd,
+  std::vector<flat_c_idx> &cells_affected
+){
+
+
+  for(const auto c: cells_affected){
+    assert(fp_ge(wtd(c),0));
+    //This should be true since we have been filling wtds as we go.
+    if(wtd(c) < 0)
+      wtd(c) = 0;
+
+
+    assert(fp_ge(water_level,topo(c)) );
+    if(water_level < topo(c))
+      water_level = topo(c);
+
+    wtd(c) = water_level - topo(c);
+
+    //The water table must have been zero when we added the water, but there's a
+    //chance floating point effects will make it negative. Therefore, we make
+    //sure that it's >=0. This is most likely to be necessary when considering
+    //saddle cells within a metadepression.
+    wtd(c) = std::max(static_cast<wtd_t>(0), wtd(c));
+    assert(wtd(c)>=0);
+  }
+}
+
 
 
 
