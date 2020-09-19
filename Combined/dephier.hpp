@@ -363,7 +363,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   }
 
 
-  std::cerr<<"p Finding pit cells..."<<std::endl;
+  RDLOG_PROGRESS<<"p Finding pit cells...";
 
   //Here we find the pit cells of internally-draining regions. We define these
   //to be cells without any downstream neighbours. Note that this means we will
@@ -380,7 +380,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   for(int y=0;y<dem.height();y++)  //Look at all the cells
   for(int x=0;x<dem.width() ;x++){ //Yes, all of them
     ++progress;
-    if(label(x,y)==OCEAN)  //Already in priority queue
+    if(label(x,y)==OCEAN)          //Already in priority queue
       continue;
     const auto my_elev = dem(x,y); //Focal cell's elevation
     bool has_lower     = false;    //Pretend we have no lower neighbours
@@ -511,17 +511,17 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     //Consider the cell's neighbours
     for(int n=1;n<=neighbours;n++){
 
-      const int nx = cx + dx[n]; //Get neighbour's y-coordinate using an offset
-      const int ny = cy + dy[n]; //Get neighbour's y-coordinate using an offset
-      if(!dem.inGrid(nx,ny))                         //Is this cell in the grid?
-        continue;                                         //Nope: out of bounds.
-      const auto ni     = dem.xyToI(nx,ny);          //Flat index of neighbour
-      const auto nlabel = label(ni);                      //Label of neighbour
+      const int nx = cx + dx[n];                      //Get neighbour's y-coordinate using an offset
+      const int ny = cy + dy[n];                      //Get neighbour's y-coordinate using an offset
+      if(!dem.inGrid(nx,ny))                          //Is this cell in the grid?
+        continue;                                     //Nope: out of bounds.
+      const auto ni     = dem.xyToI(nx,ny);           //Flat index of neighbour
+      const auto nlabel = label(ni);                  //Label of neighbour
 
-      if(nlabel==NO_DEP){                                 //Neighbour has not been visited yet
-        label(ni) = clabel;                               //Give the neighbour my label
-        pq.emplace(dem(ni), dem.xyToI(nx,ny));  //Add the neighbour to the priority queue
-        flowdirs(nx,ny) = dinverse[n];                    //Neighbour flows in the direction of this cell
+      if(nlabel==NO_DEP){                             //Neighbour has not been visited yet
+        label(ni) = clabel;                           //Give the neighbour my label
+        pq.emplace(dem(ni), dem.xyToI(nx,ny));        //Add the neighbour to the priority queue
+        flowdirs(nx,ny) = dinverse[n];                //Neighbour flows in the direction of this cell
        } else if (nlabel==clabel) {
         //Skip because we are not interested in ourself. That would be vain.
         //Note that this case will come up frequently as we traverse flats since
@@ -701,19 +701,19 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       assert(dep.odep==NO_VALUE);
 
       //Point this depression to the ocean through Depression B Label
-      dep.parent       = outlet.depb;       //Set Depression Meta(A) parent
-      dep.out_elev     = outlet.out_elev;   //Set Depression Meta(A) outlet elevation
-      dep.out_cell     = outlet.out_cell;   //Set Depression Meta(A) outlet cell index
-      dep.odep         = depb_set;          //Depression Meta(A) overflows into Depression B
+      dep.parent       = outlet.depb;        //Set Depression Meta(A) parent
+      dep.out_elev     = outlet.out_elev;    //Set Depression Meta(A) outlet elevation
+      dep.out_cell     = outlet.out_cell;    //Set Depression Meta(A) outlet cell index
+      dep.odep         = depb_set;           //Depression Meta(A) overflows into Depression B
       dep.ocean_parent = true;
-      dep.geolink      = outlet.depb;       //Metadepression(A) overflows, geographically, into Depression B
+      dep.geolink      = outlet.depb;        //Metadepression(A) overflows, geographically, into Depression B
       depressions.at(outlet.depb).ocean_linked.emplace_back(depa_set);
       djset.mergeAintoB(depa_set,OCEAN); //Make a note that Depression A MetaLabel has a path to the ocean
     } else {
       //Neither depression has found the ocean, so we merge the two depressions
       //into a new depression.
-      auto &depa          = depressions.at(depa_set);      //Reference to Depression A MetaLabel
-      auto &depb          = depressions.at(depb_set);      //Reference to Depression B MetaLabel
+      auto &depa          = depressions.at(depa_set); //Reference to Depression A MetaLabel
+      auto &depb          = depressions.at(depb_set); //Reference to Depression B MetaLabel
 
       //Ensure we haven't already given these depressions outlet information
       assert(depa.odep==NO_VALUE);
@@ -769,8 +769,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //The labels array has been modified in place. The depression hierarchy is
   //returned.
 
- Timer timer_volumes;
- timer_volumes.start();
+  Timer timer_volumes;
+  timer_volumes.start();
 
   CalculateMarginalVolumes(depressions, cell_area, dem, label,final_label);
 
