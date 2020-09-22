@@ -191,12 +191,14 @@ void FillSpillMerge(
     timer_overflow.start();
     std::unordered_map<dh_label_t, dh_label_t> jump_table;
 
-    //calculate the wtd_vol of depressions, in order to be able to know which
+    //Calculate the wtd_vol of depressions, in order to be able to know which
     //need to overflow and which can accommodate more water:
     //the reason for only calculating it here is that it's better to do this
     //after MoveWaterIntoPits, when a lot of the infiltration
-    //that would occur has already happened, so we didn't have to constantly
-    //update wtd_vol during MoveWaterIntoPits.
+    //that would occur has already happened (if the user has infiltration turned on),
+    //so we didn't have to constantly update wtd_vol during MoveWaterIntoPits.
+    //wtd_vol is the total water that a depression can accommodate, including the
+    //above ground depression volume plus any below-ground groundwater space.
 
     CalculateWtdVol(arp.wtd,arp.topo,arp.final_label,deps,arp);
 
@@ -206,7 +208,6 @@ void FillSpillMerge(
     //routed to the ocean.
     MoveWaterInDepHier(OCEAN, deps,jump_table,params,arp);
 
-
     RDLOG_TIME_USE<<"FlowInDepressionHierarchy: Overflow time = "<<timer_overflow.stop();
   }
 
@@ -214,16 +215,12 @@ void FillSpillMerge(
   for(int d=1;d<(int)deps.size();d++){
     const auto &dep = deps.at(d);
 
-if(!(dep.water_vol==0 || dep.water_vol - dep.wtd_vol <= FP_ERROR))
-  std::cout<<"water vol "<<dep.water_vol<<" wtd vol "<<dep.wtd_vol<<" dep label "<<dep.dep_label<<std::endl;
+    assert(dep.water_vol==0 || fp_le(dep.water_vol,dep.wtd_vol) );
+    assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) \
+      || (dep.lchild!=NO_VALUE && fp_le(deps.at(dep.lchild).water_vol,dep.water_vol) ));
+    assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) \
+      || (dep.rchild!=NO_VALUE && fp_le(deps.at(dep.rchild).water_vol,dep.water_vol) ));
 
-    assert(dep.water_vol==0 || dep.water_vol - dep.wtd_vol <= FP_ERROR);
-    assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) \
-      || (dep.lchild!=NO_VALUE && deps.at(dep.lchild).water_vol - dep.water_vol\
-        < FP_ERROR));
-    assert(dep.water_vol==0 || (dep.lchild==NO_VALUE && dep.rchild==NO_VALUE) \
-      || (dep.rchild!=NO_VALUE && deps.at(dep.rchild).water_vol - dep.water_vol\
-       < FP_ERROR));
     if(dep.lchild != NO_VALUE && deps.at(dep.lchild).water_vol > dep.water_vol && dep.water_vol > FP_ERROR)
       deps.at(dep.lchild).water_vol = dep.water_vol;
     if(dep.rchild != NO_VALUE && deps.at(dep.rchild).water_vol > dep.water_vol  && dep.water_vol > FP_ERROR)
@@ -277,64 +274,59 @@ static void MoveWaterIntoPits(
   rd::ProgressBar progress;
   timer.start();
 
-
   //Our first step is to move all of the water downstream into pit cells. To do
   //so, we use the steepest-descent flow directions provided by the depression
   //hierarchy code
 
   RDLOG_PROGRESS<<"Moving surface water downstream...";
 
-  #pragma omp parallel for
-  for(unsigned int i=0;i<arp.topo.size();i++){
-    if(arp.wtd(i)>0){
-      //Move any surface water into a separate array.
-      //This is to allow us to have infiltration into wtd, that does not
-      //necessarily fill all the way to the surface,
-      //and still have water continue moving downslope.
-      arp.runoff(i) = arp.wtd(i);
-      arp.wtd(i) = 0;
-      //And we reset any cells that contained surface water to 0.
-      arp.infiltration_array(i) = 0;
-    }
-  }
 
-  for(int d=0;d<(int)deps.size();d++){
-  //reset all of the water volumes to 0 for each time we iterate
-    //through the surface water.
-    auto &dep = deps.at(d);
-    dep.water_vol = 0;
-    dep.wtd_vol = 0;
+  //Move any surface water into a separate array.
+  //This is to allow us to have infiltration into wtd, that does not
+  //necessarily fill all the way to the surface,
+  //and still have water continue moving downslope.
+  //This is only needed if the user wants infiltration to happen.
+  if(params.infiltration_on == true){
+    #pragma omp parallel for
+    for(unsigned int i=0;i<arp.topo.size();i++){
+      if(arp.wtd(i)>0){
+        arp.runoff(i) = arp.wtd(i);
+        arp.wtd(i) = 0;
+        //And we reset any cells that contained surface water to 0.
+        arp.infiltration_array(i) = 0;
+      }
+    }
   }
 
 
   if(params.infiltration_on == false){
     //move the water to the appropriate depression's water_vol.
-  //  #pragma omp parallel for collapse(2)
+    //#pragma omp parallel for collapse(2)
     for(int y=0;y<arp.topo.height();y++)
     for(int x=0;x<arp.topo.width(); x++){
-      if(arp.runoff(x,y)>0){
+      if(arp.wtd(x,y)>0){          //There is surface water in the cell.
         //If downstream neighbour is the ocean, we drop our water into it
         //and the ocean is unaffected.
         if(arp.label(x,y) == OCEAN){
-          arp.runoff(x,y) = 0.0;
+          deps.at(OCEAN).dep_vol += arp.wtd(x,y)*arp.cell_area[y]; //recording the volume that has ended up in the ocean.
+          arp.wtd(x,y) = 0.0;
         }
         else{
 
-        deps[arp.label(x,y)].water_vol += arp.runoff(x,y)*arp.cell_area[y];
+        deps[arp.label(x,y)].water_vol += arp.wtd(x,y)*arp.cell_area[y];
 
-        //runoff is a depth of water and water_vol is a volume,
-        //so multiply by the area of the pit cell to convert.
-        assert(deps[arp.label(x,y)].water_vol >= -FP_ERROR);
+        //wtd is a depth of water and water_vol is a volume, so multiply by the area of the cell to convert.
+        assert(fp_ge(deps[arp.label(x,y)].water_vol,0));
         if(deps[arp.label(x,y)].water_vol < 0)
           deps[arp.label(x,y)].water_vol = 0.0;
-        arp.runoff(x,y) = 0; //Clean up as we go
+        arp.wtd(x,y) = 0; //Clean up as we go
         }
       }
     }
   }
 
 
-  else{
+  else{   //infiltration is turned on, so we have to move water cell by cell and calculate how much will infiltrate as we go.
 
     double distance = 0;
 
@@ -343,13 +335,13 @@ static void MoveWaterIntoPits(
     #pragma omp parallel for collapse(2)
     for(int y=0;y<arp.topo.height();y++)
     for(int x=0;x<arp.topo.width(); x++)
-    for(int n=1;n<=neighbours;n++){     //Loop through neighbours
-      const int nx = x+dx[n];           //Identify coordinates of neighbour
+    for(int n=1;n<=neighbours;n++){         //Loop through neighbours
+      const int nx = x+dx[n];               //Identify coordinates of neighbour
       const int ny = y+dy[n];
       if(!arp.topo.inGrid(nx,ny))
         continue;
       if(arp.flowdirs(nx,ny)==dinverse[n])  //Does my neighbour flow into me?
-        dependencies(x,y)++;            //Increment my dependencies
+        dependencies(x,y)++;                //Increment my dependencies
     }
 
 
@@ -359,61 +351,52 @@ static void MoveWaterIntoPits(
     //they just pass flow downstream. From the peaks, we
     //can begin a breadth-first traversal in the downstream direction by adding
     //each cell to the frontier/queue as its dependency count drops to zero.
-    std::queue<int> q;
+    std::queue<flat_c_idx> q;
     for(unsigned int i=0;i<arp.topo.size();i++){
-      if(dependencies(i)==0)// && flowdirs(i)!=NO_FLOW)  //Is it a peak?
+      if(dependencies(i)==0)                //Is it a peak?
         q.emplace(i);
     }  //Yes.
-
 
     //Starting with the peaks, pass flow downstream
     progress.start(arp.topo.size());
     while(!q.empty()){
-
       ++progress;
 
       const auto c = q.front();          //Copy focal cell from queue
       q.pop();                           //Clear focal cell from queue
 
       //Coordinates of downstream neighbour, if any
-      const auto ndir = arp.flowdirs(c);
-      int x,y,nx,ny;
+      const auto ndir = arp.flowdirs(c); //Neighbour direction
+      int n = NO_FLOW;                  //Neighbour address
+      int x, y, nx, ny;
       arp.topo.iToxy(c,x,y);
-      nx = -1;
-      ny = -1;
-
-      int n = NO_FLOW;
-      if(ndir!=NO_FLOW){  //TODO: Fix this monkey patching
+      if(ndir!=NO_FLOW){
         nx = x+dx[ndir];
         ny = y+dy[ndir];
         n            = arp.topo.xyToI(nx,ny);
         assert(n>=0);
       }
 
-      //If downstream neighbour is the ocean, we drop our water into it
-      //and the ocean is unaffected.
-      if(arp.label(c) == OCEAN){
-        arp.runoff(c) = 0;
-      }
-
-      //if this is a pit cell, move the water to the appropriate
-      //depression's water_vol.
+      //if this is a pit cell, move the water to the appropriate depression's water_vol.
       if(n == NO_FLOW){
+        //Note that OCEAN cells have NO_FLOW so this will route water to the OCEAN
+        //depression. This can be used to find out how much total run-off made it
+        //into the ocean.
+
         if(arp.runoff(c)>0){
           deps[arp.label(c)].water_vol += arp.runoff(c)*arp.cell_area[y];
           //runoff is a depth of water and water_vol is a volume,
           //so multiply by the area of the pit cell to convert.
-          assert(deps[arp.label(c)].water_vol >= -FP_ERROR);
+          assert(fp_ge(deps[arp.label(c)].water_vol,0) );
           if(deps[arp.label(c)].water_vol < 0)
             deps[arp.label(c)].water_vol = 0.0;
           arp.runoff(c) = 0; //Clean up as we go
         }
-      }else {                               //not a pit cell
+      } else {                               //not a pit cell
 
-        if(arp.runoff(c)>0){  //if there is water available
-
-  //some infiltration happens as the water flows from cell to cell.
-  //To do this, we need to first calculate the distance that the water travels.
+        if(arp.runoff(c)>0){  //if there is water available, pass it downstream.
+          //some infiltration happens as the water flows from cell to cell.
+          //To do this, we need to first calculate the distance that the water travels.
           distance = 0;
 
           if(x == nx)      //same x means use e-w direction
@@ -432,8 +415,8 @@ static void MoveWaterIntoPits(
           //add infiltration to the water table
           arp.runoff(c) -= params.infiltration;
           //and subtract the infiltration from the available surface water.
-          assert(arp.wtd(c)<=FP_ERROR);
-          assert(arp.runoff(c)>=-FP_ERROR);
+          assert(fp_le(arp.wtd(c),0));
+          assert(fp_ge(arp.runoff(c),0));
           if(arp.wtd(c) > 0 )
             arp.wtd(c) = 0;
           if(arp.runoff(c)<0)
@@ -443,28 +426,26 @@ static void MoveWaterIntoPits(
           //from its edge that it receives along, to its centre.
           if(arp.runoff(c) > 0){
           //check again if there is water available since it's possible
-            //the infiltration above used it up.
+          //the infiltration above used it up.
           CalculateInfiltration(n,distance,arp.runoff(c),params,arp);
-          arp.wtd(n) += params.infiltration;
+          arp.wtd(n)    += params.infiltration;
           arp.runoff(c) -= params.infiltration;
           }
 
-          assert(arp.wtd(n)<=FP_ERROR);
-          assert(arp.runoff(c)>=-FP_ERROR);
+          assert(fp_le(arp.wtd(n),0));
+          assert(fp_ge(arp.runoff(c),0));
           if(arp.wtd(n) > 0 )
             arp.wtd(n) = 0;
           if(arp.runoff(c)<0)
             arp.runoff(c) = 0;
         }
 
-
         //If we still have water, pass it downstream.
         if(arp.runoff(c)>0){
           //We use cell areas because the depth will change if we are moving
           //to a cell on a different latitude.
           arp.runoff(n) += arp.runoff(c)*arp.cell_area[y]/arp.cell_area[ny];
-          //Add water to downstream neighbour. This might result in filling up
-          //the groundwater table, which could have been negative
+          //Add water to downstream neighbour.
           arp.runoff(c)  = 0;       //Clean up as we go
         }
 
@@ -479,8 +460,7 @@ static void MoveWaterIntoPits(
 
     progress.stop();
 
-  RDLOG_TIME_USE<<"t FlowInDepressionHierarchy: Surface water = "<<timer.stop()<<" s";
-
+    RDLOG_TIME_USE<<"t FlowInDepressionHierarchy: Surface water = "<<timer.stop()<<" s";
   }
 }
 
@@ -1776,6 +1756,7 @@ template<class elev_t>
 void ResetDH(DepressionHierarchy<elev_t> &deps){
   for(auto &dep: deps){
     dep.water_vol = 0;
+    dep.wtd_vol = 0;
   }
 }
 
