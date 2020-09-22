@@ -76,9 +76,7 @@ class Depression {
   //are not subdepressions. That is, these ocean-linked depressions may be at
   //the top of high cliffs and spilling into this depression.
   std::vector<dh_label_t> ocean_linked;
-  //indicates everything that is a subdepression of this one:
-  std::unordered_set<int> my_subdepressions;
-  std::vector<dh_label_t> my_subdepressions_vec;
+
   //the label of the depression, for calling it up again
   dh_label_t dep_label = 0;
   //Total area of the cells in the depression. Used to help keep track of
@@ -741,18 +739,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       newdep.rchild    = depb_set;
       newdep.dep_label = newlabel;
       newdep.pit_cell  = depa_pitcell_temp;
-
-
-      newdep.my_subdepressions.emplace(depa_set);
-      newdep.my_subdepressions.emplace(depb_set);
-      newdep.my_subdepressions.insert(depressions.at(depa_set).my_subdepressions.begin(),depressions.at(depa_set).my_subdepressions.end());
-      newdep.my_subdepressions.insert(depressions.at(depb_set).my_subdepressions.begin(),depressions.at(depb_set).my_subdepressions.end());
-
-
-      newdep.my_subdepressions_vec.resize(newdep.my_subdepressions.size());
-      std::copy(newdep.my_subdepressions.begin(),newdep.my_subdepressions.end(),newdep.my_subdepressions_vec.begin());
-      newdep.my_subdepressions.erase(newdep.my_subdepressions.begin(),newdep.my_subdepressions.end());
-//this kind of looks like I'm just immediately erasing all of the info from my_subdepressions. I strongly suspect this is not working correctly: look into an alternative.  TODO
 
       djset.mergeAintoB(depa_set, newlabel); //A has a parent now
       djset.mergeAintoB(depb_set, newlabel); //B has a parent now
