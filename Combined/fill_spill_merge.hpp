@@ -40,6 +40,9 @@ const double FP_ERROR = 1e-4;
 ///////////////////////////////////
 
 template<class elev_t>
+void ResetDH(DepressionHierarchy<elev_t> &deps);
+
+template<class elev_t>
 void FillSpillMerge(
   Parameters                    &params,
   DepressionHierarchy<elev_t>   &deps,
@@ -173,6 +176,12 @@ void FillSpillMerge(
   timer_overall.start();
 
   RDLOG_ALG_NAME<<"FillSpillMerge";
+
+
+  //If we're using the DH more than once we need to reset its water variables
+  //between uses.
+  ResetDH(deps);
+
   //We move standing water downhill to the pit cells of each depression
   MoveWaterIntoPits(params, deps, arp);
   {
@@ -981,7 +990,6 @@ static void MoveWaterInOverflow(
     if(extra_water <= 0)
       break;
 
-
     my_label = arp.label(move_to_cell);
 
     while(my_label != arp.final_label(move_to_cell)){
@@ -1644,12 +1652,6 @@ static void FillDepressions(
   //Therefore, if we've reached this point, something has gone horribly wrong
   //somewhere. :-(
 
-  std::cerr<<"E PQ loop exited without filling a depression!"<<std::endl;
-  std::cerr<<"water vol "<<water_vol<<" current vol "\
-  <<current_volume<<std::endl;
-  std::cerr<<"dep vol "<<deps.at(stdi.top_label).dep_vol<<" dep label "<<stdi.top_label<<std::endl;
-
-
   assert(!flood_q.empty());
   throw std::runtime_error("PQ loop exited without filling a depression!");
 }
@@ -1767,6 +1769,15 @@ double DetermineWaterLevel(
 return water_level;
 }
 
+///Reset water volumes in the Depression Hierarchy to zero
+///
+///@param deps Depression Hierarchy to reset
+template<class elev_t>
+void ResetDH(DepressionHierarchy<elev_t> &deps){
+  for(auto &dep: deps){
+    dep.water_vol = 0;
+  }
+}
 
 
 
