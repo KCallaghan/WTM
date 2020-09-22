@@ -514,35 +514,30 @@ static void CalculateWtdVol(
   //when it is not actually supposed to overflow!
   //When we do overflow, we will also have to keep track of changes to the wtd
   //in the overflow depression, and associated changes in wtd_vol.
-  //When a depression
-  //is completely saturated in groundwater, we will have wtd_vol == dep_vol.
+  //When a depression is completely saturated in groundwater, we will have wtd_vol == dep_vol.
 
   for(int y=0;y<wtd.height();y++)
   for(int x=0;x<wtd.width();x++){
-  //cycle through the domain and add up all of the
+    //cycle through the domain and add up all of the
     //below-ground water storage space available
     auto clabel        = final_label(x,y);
 
     if(clabel==OCEAN)
       continue;
 
-if(wtd(x,y)>FP_ERROR)
-  std::cout<<"there is wtd where there shouldn't be "<<wtd(x,y)<<" x "<<x<<" y "<<y<<std::endl;
-
-
-    assert(wtd(x,y) <= FP_ERROR);
-    //because all wtds get set to 0 when doing movewaterintopits -
-    //surface water is now gathered in the pits and has not yet been
-    //distributed.
+    assert(fp_le(wtd(x,y),0) );
+    //because all wtds get set to max 0 when doing movewaterintopits -
+    //surface water is now gathered in the pits and has not yet been distributed.
     if(wtd(x,y) > 0)
       wtd(x,y) = 0.0;
 
     //version for depth-variable porosity:
     //deps[clabel].wtd_only -= arp.cell_area[y] * arp.porosity(x,y) * arp.fdepth(x,y) * (exp(arp.wtd(x,y)/arp.fdepth(x,y)) - 1);
     deps[clabel].wtd_only -= arp.cell_area[y] * arp.porosity(x,y) * arp.wtd(x,y);
+    //this records the space that is only in the ground - not including above-ground space. This is needed to obtain the
+    //appropriate total wtd_vols for metadepressions, below.
+    //- because wtd is negative.
 
-
-    //- because wtd is negative. This records only the below-ground volume available
     //version for depth-variable porosity:
     //deps[clabel].wtd_vol  -= arp.cell_area[y] * arp.porosity(x,y) * arp.fdepth(x,y) * (exp(arp.wtd(x,y)/arp.fdepth(x,y)) - 1);
     deps[clabel].wtd_vol  -= arp.cell_area[y] * arp.porosity(x,y) * arp.wtd(x,y);
@@ -555,36 +550,35 @@ if(wtd(x,y)>FP_ERROR)
     auto &dep = deps.at(d);
     if(dep.dep_label==OCEAN)
       continue;
-    if(dep.lchild!=NO_VALUE){
+    if(dep.lchild!=NO_VALUE){  //if it has children, it is a metadepression and we need to add the groundwater space from the children.
 
       dep.wtd_vol      += deps.at(dep.lchild).wtd_only;
       //store the total wtd_vols with all of your children included.
       dep.wtd_vol      += deps.at(dep.rchild).wtd_only;
 
-      dep.wtd_only      += deps.at(dep.lchild).wtd_only;
-      dep.wtd_only      += deps.at(dep.rchild).wtd_only;
-
+      dep.wtd_only     += deps.at(dep.lchild).wtd_only;
+      dep.wtd_only     += deps.at(dep.rchild).wtd_only;
     }
 
-    assert(dep.wtd_vol >= -FP_ERROR);
+    assert(fp_ge(dep.wtd_vol,0) );
     if(dep.wtd_vol < 0)
       dep.wtd_vol = 0.0;
-    assert(dep.wtd_vol - dep.dep_vol >= -FP_ERROR);
+    assert(fp_ge(dep.wtd_vol, dep.dep_vol) );
     if(dep.wtd_vol < dep.dep_vol)
       dep.wtd_vol = dep.dep_vol;
   }
 
 
-for(int d=0;d<(int)deps.size();d++){
-//Just checking that nothing went horribly wrong.
+  for(int d=0;d<(int)deps.size();d++){
+    //Just checking that nothing went horribly wrong.
     auto &dep = deps.at(d);
     if(dep.dep_label==OCEAN)
       continue;
     if(dep.lchild!=NO_VALUE){
-      assert(dep.dep_vol>= deps.at(dep.lchild).dep_vol);
-      assert(dep.dep_vol>= deps.at(dep.lchild).dep_vol);
-      assert(dep.wtd_vol>= deps.at(dep.lchild).wtd_vol);
-      assert(dep.wtd_vol>= deps.at(dep.rchild).wtd_vol);
+      assert(fp_ge(dep.dep_vol, deps.at(dep.lchild).dep_vol));
+      assert(fp_ge(dep.dep_vol, deps.at(dep.rchild).dep_vol));
+      assert(fp_ge(dep.wtd_vol, deps.at(dep.lchild).wtd_vol));
+      assert(fp_ge(dep.wtd_vol, deps.at(dep.rchild).wtd_vol));
     }
   }
 }
