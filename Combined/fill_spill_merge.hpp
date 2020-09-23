@@ -1,9 +1,6 @@
-#ifndef _df_flow_hpp_
-#define _df_flow_hpp_
+#pragma once
 
 #include "dephier.hpp"
-#include "DisjointDenseIntSet.hpp"
-#include "../common/netcdf.hpp"
 
 #include <richdem/common/Array2D.hpp>
 #include <richdem/common/math.hpp>
@@ -624,25 +621,21 @@ static void CalculateWtdVol(
   float slope = std::max(arp.slope(cell), 0.000001f);
   //assigning a small minimum slope, since otherwise in cells with zero slope,
   //the delta_t will be infinity.
-  float bracket = std::pow(h_0,(5.0/3.0)) - (vert_ksat * distance * \
-    (mannings_n/std::pow(slope,0.5)) * (5/3));
+  float bracket = std::pow(h_0,(5.0/3.0)) - (vert_ksat * distance * (mannings_n/std::pow(slope,0.5)) * (5/3));
   float numerator = h_0 - std::pow(bracket,(3.0/5.0));
   float delta_t = numerator/vert_ksat;
   //delta_t is the amount of time it will take the given amount of
   //water to cross the given distance.
 
-//if it's a normal case, the water is not running out and the cell is not
-  //becoming saturated.
-//we calculate the infiltration using the delta_t from above,
-  //and ksat as a coefficient for infiltration amount.
+  //if it's a normal case, the water is not running out and the cell is not becoming saturated.
+  //we calculate the infiltration using the delta_t from above, and ksat as a coefficient for infiltration amount.
     params.infiltration = vert_ksat*(delta_t);
 
-  if(bracket < 0){  //all of the water is getting used up.
-    //We have to limit the infiltration to be equal to the available water, h0.
-    params.infiltration =  h_0;
+  if(bracket < 0){               //all of the water is getting used up.
+    params.infiltration =  h_0;  //We have to limit the infiltration to be equal to the available water, h0.
   }
-//if the cell is getting saturated partway.
-  if(arp.wtd(cell) > -params.infiltration){
+
+  if(arp.wtd(cell) > -params.infiltration){  //if the cell is getting saturated partway.
     params.infiltration = std::min(params.infiltration,-arp.wtd(cell));
     //But, we must check for the case where both the cell becomes saturated
     //and the water gets used up.
@@ -705,8 +698,8 @@ static void MoveWaterInDepHier(
 
   //Visit child depressions. When these both overflow, then we spread water
   //across them by spreading water across their common metadepression
-  MoveWaterInDepHier(this_dep.lchild, deps, jump_table,params,arp);
-  MoveWaterInDepHier(this_dep.rchild, deps, jump_table,params,arp);
+  MoveWaterInDepHier(this_dep.lchild, deps, jump_table, params, arp);
+  MoveWaterInDepHier(this_dep.rchild, deps, jump_table, params, arp);
 
   //Catch depressions that link to the ocean through this one. These are special
   //cases because we will never spread water across the union of these
@@ -1758,4 +1751,3 @@ void ResetDH(DepressionHierarchy<elev_t> &deps){
 
 }
 
-#endif
