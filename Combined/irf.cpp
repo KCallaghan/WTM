@@ -248,7 +248,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
  // arp.relhum        = rd::Array2D<float>(arp.topo,0.5);
  // arp.wind_speed    = rd::Array2D<float>(arp.topo,1);
   arp.winter_temp    = rd::Array2D<float>(arp.topo,0);
-  arp.wtd           = rd::Array2D<float>(arp.topo,0.0);
+  arp.wtd           = rd::Array2D<float>(arp.topo,-2.0);
   //we start with a water table at the surface for equilibrium runs.
   arp.evap          = arp.starting_evap;
 

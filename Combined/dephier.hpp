@@ -7,7 +7,7 @@
 #include <richdem/common/constants.hpp>
 #include <richdem/common/grid_cell.hpp>
 #include <richdem/common/logger.hpp>
-//#include <richdem/common/math.hpp>
+#include <richdem/common/math.hpp>
 #include <richdem/common/ProgressBar.hpp>
 #include <richdem/common/timer.hpp>
 
@@ -802,6 +802,8 @@ void CalculateMarginalVolumes(
 
 
     final_label(x,y) = clabel;
+ //   if(label(x,y) == 927 || label(x,y) == 970)
+  //    std::cout<<"clabel "<<clabel<<" out elev "<<deps.at(clabel).out_elev<<" topo "<<dem(x,y)<<" x "<<x<<" y "<<y<<std::endl;
     //I want another layer that contains the labels of which depressions these
     //immediately belong to, even when it is a parent depression.
     //This is so that I can change the wtd_vol in the correct place
@@ -811,8 +813,13 @@ void CalculateMarginalVolumes(
       continue;
 
 
-    total_areas[clabel] += cell_area[y];
-    total_volumes[clabel] += (static_cast<double>(deps[clabel].out_elev)-dem(x,y))*cell_area[y];
+    total_areas[clabel] += static_cast<double>(cell_area[y]);
+    total_volumes[clabel] += (static_cast<double>(deps[clabel].out_elev)-static_cast<double>(dem(x,y)))*static_cast<double>(cell_area[y]);
+
+    //   if(label(x,y) == 927 || label(x,y) == 970)
+      //    std::cout<<clabel<<" total vol "<<total_volumes[clabel]<<std::endl;
+
+
     //Add the area of one cell at a time - elevation difference between
     //the outlet of this depression and the current cell, multiplied by the area of the current cell.
   }
@@ -850,12 +857,34 @@ void CalculateTotalVolumes(
       assert(dep.lchild<d);         //ID of child must be smaller than parent's
       assert(dep.rchild<d);         //ID of child must be smaller than parent's
 
+//if(dep.dep_label == 18405){
+//  std::cout<<std::setprecision(15)<<"my vol "<<dep.dep_vol<<" lchild vol "<<deps.at(dep.lchild).dep_vol<<" rchild vol "<<deps.at(dep.rchild).dep_vol<<std::endl;
+//  std::cout<<"my out elev "<<dep.out_elev<<" lchild out elev "<<deps.at(dep.lchild).out_elev<<" rchild out elev "<<deps.at(dep.rchild).out_elev<<std::endl;
+//  std::cout<<"lchild label "<<deps.at(dep.lchild).dep_label<<" rchild label "<<deps.at(dep.rchild).dep_label<<std::endl;
+//}
+
       dep.dep_vol += deps.at(dep.lchild).dep_vol;      //Add the actual dep volume of the child
-      dep.dep_vol += (dep.out_elev - deps.at(dep.lchild).out_elev) * deps.at(dep.lchild).dep_area;
+ //     if(dep.dep_label == 18405)
+ // std::cout<<std::setprecision(15)<<"lchild started my vol "<<dep.dep_vol<<" lchild vol "<<deps.at(dep.lchild).dep_vol<<" rchild vol "<<deps.at(dep.rchild).dep_vol<<std::endl;
+
+
+      dep.dep_vol += (static_cast<double>(dep.out_elev) - static_cast<double>(deps.at(dep.lchild).out_elev)) * deps.at(dep.lchild).dep_area;
+//      float check = (dep.out_elev - deps.at(dep.lchild).out_elev) * deps.at(dep.lchild).dep_area;
       //add the water volume higher than the child depression's outlet, but on the same cells
+//if(dep.dep_label == 18405)
+  //std::cout<<std::setprecision(15)<<"lchild done my vol "<<dep.dep_vol<<" lchild vol "<<deps.at(dep.lchild).dep_vol<<" lchild  area "<<deps.at(dep.lchild).dep_area<<" check "<<check<<std::endl;
+
 
       dep.dep_vol += deps.at(dep.rchild).dep_vol;
-      dep.dep_vol += (dep.out_elev - deps.at(dep.rchild).out_elev) * deps.at(dep.rchild).dep_area;
+    //  if(dep.dep_label == 18405)
+ // std::cout<<std::setprecision(15)<<"rchild started my vol "<<dep.dep_vol<<" lchild vol "<<deps.at(dep.lchild).dep_vol<<" rchild vol "<<deps.at(dep.rchild).dep_vol<<std::endl;
+
+
+      dep.dep_vol += (static_cast<double>(dep.out_elev) - static_cast<double>(deps.at(dep.rchild).out_elev)) * deps.at(dep.rchild).dep_area;
+
+//if(dep.dep_label == 18405)
+  //std::cout<<std::setprecision(15)<<"rchild done my vol "<<dep.dep_vol<<" lchild vol "<<deps.at(dep.lchild).dep_vol<<" rchild area "<<deps.at(dep.rchild).dep_area<<std::endl;
+
 
       dep.dep_area += deps.at(dep.lchild).dep_area;
       //remember to add the area covered by child depression cells, so that our parent can also get the correct total dep_vol.
