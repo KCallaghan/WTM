@@ -4,8 +4,8 @@
 
 #include <richdem/common/Array2D.hpp>
 #include <richdem/common/math.hpp>
-#include <richdem/common/ProgressBar.hpp>
 #include <richdem/common/logger.hpp>
+#include <richdem/common/ProgressBar.hpp>
 #include <richdem/common/timer.hpp>
 #include <richdem/depressions/depressions.hpp>
 
@@ -70,7 +70,6 @@ static float CalculateInfiltration(
   ArrayPack                     &arp
 );
 
-
 template<class elev_t>
 static void MoveWaterInDepHier(
   int                                        current_depression,
@@ -79,7 +78,6 @@ static void MoveWaterInDepHier(
   Parameters                                 &params,
   ArrayPack                                  &arp
 );
-
 
 template<class elev_t>
 static void MoveWaterInOverflow(
@@ -108,7 +106,7 @@ class SubtreeDepressionInfo;
 template<class elev_t>
 static SubtreeDepressionInfo FindDepressionsToFill(
   const int                         current_depression,
-  DepressionHierarchy<elev_t> &deps,
+  DepressionHierarchy<elev_t>       &deps,
   ArrayPack                         &arp
 );
 
@@ -116,7 +114,7 @@ template<class elev_t>
 static void FillDepressions(
   SubtreeDepressionInfo             &stdi,
   double                            water_vol,
-  DepressionHierarchy<elev_t> &deps,
+  DepressionHierarchy<elev_t>       &deps,
   ArrayPack                         &arp
 );
 
@@ -130,10 +128,10 @@ void BackfillDepression(
 
 //template<class wtd_t>
 double DetermineWaterLevel(
-  ArrayPack                         &arp,
+  ArrayPack    &arp,
   const double water_vol,
-  const int cx,
-  const int cy,
+  const int    cx,
+  const int    cy,
   const double current_volume,
   const double current_area,
   const double area_times_elevation_total
@@ -1321,7 +1319,7 @@ class SubtreeDepressionInfo {
 template<class elev_t>
 static SubtreeDepressionInfo FindDepressionsToFill(
   const int                         current_depression,  //Depression we are currently in
-  DepressionHierarchy<elev_t> &deps,               //Depression hierarchy
+  DepressionHierarchy<elev_t>       &deps,               //Depression hierarchy
   ArrayPack                         &arp
 ){
   //Stop when we reach one level below the leaves
@@ -1425,7 +1423,7 @@ static void FillDepressions(
   //water can spread.
   SubtreeDepressionInfo             &stdi,
   double                            water_vol,  //Amount of water to spread around this depression
-  DepressionHierarchy<elev_t> &deps,      //Depression hierarchy
+  DepressionHierarchy<elev_t>       &deps,      //Depression hierarchy
   ArrayPack                         &arp
 ){
 
@@ -1679,7 +1677,7 @@ static void FillDepressions(
 ///@param cells_affected Queue of cells to add water to
 template<class elev_t, class wtd_t>
 void BackfillDepression(
-  double water_level,
+  double                  water_level,
   const Array2D<elev_t>   &topo,
   Array2D<wtd_t>          &wtd,
   std::vector<flat_c_idx> &cells_affected
@@ -1722,10 +1720,10 @@ void BackfillDepression(
 ///@return The elevation of the water level
 //template<class wtd_t>
 double DetermineWaterLevel(
-  ArrayPack                         &arp,
-  double water_vol,
-  const int cx,
-  const int cy,
+  ArrayPack    &arp,
+  double       water_vol,
+  const int    cx,
+  const int    cy,
   const double current_volume,
   const double current_area,
   const double area_times_elevation_total
