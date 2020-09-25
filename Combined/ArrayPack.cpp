@@ -18,9 +18,9 @@ void ArrayPack::check() const {
   assert( topo.width()==runoff.         width() && topo.height()==runoff.         height() );
 
   if(fdepth_end.size()>0){
-    assert( topo.width()==fdepth_end.width()  && topo.height()==fdepth_end.   height()   );
-    assert( topo.width()==topo_end.  width()  && topo.height()==topo_end.     height()   );
-    assert( topo.width()==temp_end.  width()  && topo.height()==temp_end.     height()   );
-    assert( topo.width()==precip_end.width()  && topo.height()==precip_end.   height()   );
+    assert( topo.width()==fdepth_end.     width()  && topo.height()==fdepth_end.     height()   );
+    assert( topo.width()==topo_end.       width()  && topo.height()==topo_end.       height()   );
+    assert( topo.width()==winter_temp_end.width()  && topo.height()==winter_temp_end.height()   );
+    assert( topo.width()==precip_end.     width()  && topo.height()==precip_end.     height()   );
   }
 }
