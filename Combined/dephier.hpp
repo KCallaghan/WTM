@@ -787,11 +787,11 @@ void CalculateMarginalVolumes(
   ProgressBar progress;
   RDLOG_PROGRESS<<"p Calculating depression marginal volumes...";
 
-  //Get the marginal depression cell counts and total elevations
+  //Get the marginal depression cell counts and total areas and volumes
   progress.start(dem.size());
  // #pragma omp parallel default(none) shared(progress,depressions,arp,label,final_label)
   //{
-  //  std::vector<uint32_t> cell_counts     (deps.size(), 0);
+    std::vector<uint32_t> cell_counts  (deps.size(), 0);
     std::vector<double>   total_volumes(deps.size(), 0);
     std::vector<double>   total_areas  (deps.size(), 0);
 
@@ -805,10 +805,9 @@ void CalculateMarginalVolumes(
     while(clabel!=OCEAN && my_elev>deps.at(clabel).out_elev)
       clabel = deps[clabel].parent;
 
-
     final_label(x,y) = clabel;
 
-     //I want another layer that contains the labels of which depressions these
+    //I want another layer that contains the labels of which depressions these
     //immediately belong to, even when it is a parent depression.
     //This is so that I can change the wtd_vol in the correct place
     //when we have infiltration and wtd_vol of a depression changes.
@@ -818,6 +817,7 @@ void CalculateMarginalVolumes(
 
     total_areas[clabel] += static_cast<double>(cell_area[y]);
     total_volumes[clabel] += (static_cast<double>(deps[clabel].out_elev)-static_cast<double>(dem(x,y)))*static_cast<double>(cell_area[y]);
+    cell_counts[clabel]++;
 
      //Add the area of one cell at a time - elevation difference between
     //the outlet of this depression and the current cell, multiplied by the area of the current cell.
@@ -827,6 +827,8 @@ void CalculateMarginalVolumes(
     for(unsigned int i=0;i<deps.size();i++){
       deps[i].dep_area        += total_areas[i];     //We need to know the area of our child depressions when getting the total depression volumes below.
       deps[i].dep_vol         += total_volumes[i];
+      deps[i].cell_count      += cell_counts[i];
+
     }
 
 //}
@@ -843,8 +845,6 @@ void CalculateTotalVolumes(
   ProgressBar progress;
 
   RDLOG_PROGRESS<<"p Calculating depression total volumes...";
-
-  std::cerr<<"p Calculating depression total volumes..."<<std::endl;
   //Calculate total depression volumes and areas
   progress.start(deps.size());
   for(int d=0;d<(int)deps.size();d++){
@@ -856,18 +856,17 @@ void CalculateTotalVolumes(
       assert(dep.lchild<d);         //ID of child must be smaller than parent's
       assert(dep.rchild<d);         //ID of child must be smaller than parent's
 
-
+      dep.cell_count      += deps.at(dep.lchild).cell_count;
       dep.dep_vol += deps.at(dep.lchild).dep_vol;      //Add the actual dep volume of the child
-
       dep.dep_vol += (static_cast<double>(dep.out_elev) - static_cast<double>(deps.at(dep.lchild).out_elev)) * deps.at(dep.lchild).dep_area;
       //add the water volume higher than the child depression's outlet, but on the same cells
 
+      dep.cell_count      += deps.at(dep.rchild).cell_count;
       dep.dep_vol += deps.at(dep.rchild).dep_vol;
-
       dep.dep_vol += (static_cast<double>(dep.out_elev) - static_cast<double>(deps.at(dep.rchild).out_elev)) * deps.at(dep.rchild).dep_area;
 
-      dep.dep_area += deps.at(dep.lchild).dep_area;
       //remember to add the area covered by child depression cells, so that our parent can also get the correct total dep_vol.
+      dep.dep_area += deps.at(dep.lchild).dep_area;
       dep.dep_area += deps.at(dep.rchild).dep_area;
     }
 
