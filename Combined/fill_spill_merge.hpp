@@ -551,6 +551,10 @@ static void CalculateWtdVol(
   for(int x=0;x<wtd.width();x++){
     //cycle through the domain and add up all of the below-ground water storage space available
     auto clabel        = final_label(x,y);
+    //We should use final_label because a leaf depression will contain cells which are above its
+    //outlet elevation. The groundwater space in these cells should not count towards the
+    //wtd_vol of the leaf depression, but will be a part of a higher metadepression.
+    //Final_label indicates the highest-level depression to which the cell belongs.
 
     if(clabel==OCEAN)  //We don't need to calculate ocean depression size.
       continue;
@@ -571,8 +575,7 @@ static void CalculateWtdVol(
     //version for depth-variable porosity:
     //deps[clabel].wtd_vol  -= arp.cell_area[y] * arp.porosity(x,y) * arp.fdepth(x,y) * (exp(arp.wtd(x,y)/arp.fdepth(x,y)) - 1);
     deps[clabel].wtd_vol  -= cell_area[y] * porosity(x,y) * wtd(x,y);
-    //and this records the total volume - above and below ground -
-    //available to store water.
+    //and this records the total volume, both above and below ground, available to store water.
 
     }
 
@@ -583,11 +586,10 @@ static void CalculateWtdVol(
       continue;
     if(dep.lchild!=NO_VALUE){  //if it has children, it is a metadepression and we need to add the groundwater space from the children.
 
-      dep.wtd_vol      += deps.at(dep.lchild).wtd_only;
-      //store the total wtd_vols with all of your children included.
+      dep.wtd_vol      += deps.at(dep.lchild).wtd_only;     //store the total wtd_vols with all of your children included.
       dep.wtd_vol      += deps.at(dep.rchild).wtd_only;
 
-      dep.wtd_only     += deps.at(dep.lchild).wtd_only;
+      dep.wtd_only     += deps.at(dep.lchild).wtd_only;     //add this so that we know how much to add to the parent of this depression.
       dep.wtd_only     += deps.at(dep.rchild).wtd_only;
     }
 
