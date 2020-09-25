@@ -209,12 +209,9 @@ void FillSpillMerge(
 
   //If we're using the DH more than once we need to reset its water variables
   //between uses.
-  std::cerr<<"about to reset dh"<<std::endl;
   ResetDH(deps);
 
   //We move standing water downhill to the pit cells of each depression
-    std::cerr<<"about to move water into pits"<<std::endl;
-
   MoveWaterIntoPits(params, deps, arp);
 
   //Calculate the wtd_vol of depressions, in order to be able to know which
@@ -225,8 +222,6 @@ void FillSpillMerge(
   //so we didn't have to constantly update wtd_vol during MoveWaterIntoPits.
   //wtd_vol is the total water that a depression can accommodate, including the
   //above ground depression volume plus any below-ground groundwater space.
-    std::cerr<<"about to calculate wtd vol"<<std::endl;
-
   CalculateWtdVol(arp.wtd, arp.cell_area, arp.porosity, arp.final_label, deps);
 
   {
@@ -239,8 +234,6 @@ void FillSpillMerge(
     //depressions which contain too much water overflow into depressions that
     //have less water. If enough overflow happens, then the water is ultimately
     //routed to the ocean.
-      std::cerr<<"about to move water in dephier"<<std::endl;
-
     MoveWaterInDepHier(OCEAN, deps,jump_table,params,arp);
     RDLOG_TIME_USE<<"FlowInDepressionHierarchy: Overflow time = "<<timer_overflow.stop();
   }
@@ -266,8 +259,6 @@ void FillSpillMerge(
   //determine which depressions or metadepressions contain standing water. We
   //then modify `wtd` in order to distribute this water across the cells of the
   //depression which will lie below its surface.
-    std::cerr<<"about to find depressions to fill "<<std::endl;
-
   FindDepressionsToFill(OCEAN,deps,arp);
   RDLOG_TIME_USE<<"t FlowInDepressionHierarchy: Fill time = "<<timer_filled.stop()<<" s";
   RDLOG_TIME_USE<<"t FlowInDepressionHierarchy = "<<timer_overall.stop()<<" s";
@@ -563,9 +554,6 @@ static void CalculateWtdVol(
     //cycle through the domain and add up all of the below-ground water storage space available
     auto clabel        = final_label(x,y);
 
-    if(clabel == 880732)
-      std::cout<<"when calculating wtd vol, the cell is x "<<x<<" y "<<y<<std::endl;
-
     if(clabel==OCEAN)  //We don't need to calculate ocean depression size.
       continue;
 
@@ -588,10 +576,6 @@ static void CalculateWtdVol(
     //and this records the total volume - above and below ground -
     //available to store water.
 
-        if(clabel == 880732){
-           std::cout<<"wtd vol so far is "<<deps[clabel].wtd_vol<<" cell area was "<<cell_area[y]<<" porosity was "<<porosity(x,y)<<" and wtd was "<<wtd(x,y)<<std::endl;
-
-         }
     }
 
 
@@ -608,10 +592,6 @@ static void CalculateWtdVol(
       dep.wtd_only     += deps.at(dep.lchild).wtd_only;
       dep.wtd_only     += deps.at(dep.rchild).wtd_only;
     }
-
-      if(dep.dep_label == 880732)
-        std::cout<<"wtd vol at the end is  "<<deps.at(880732).wtd_vol<<std::endl;
-
 
     assert(fp_ge(dep.wtd_vol,0) );
     if(dep.wtd_vol < 0)
@@ -1396,8 +1376,6 @@ static SubtreeDepressionInfo FindDepressionsToFill(
     //If both of a depression's children have already spread their water,
     //we do not want to attempt to do so again in an empty parent depression.
     //We check to see if both children have finished spreading water.
-      if(this_dep.dep_label == 1166761)
-        std::cerr<<"about to fill the depression, dep vol "<<this_dep.dep_vol<<" wtd vol "<<this_dep.wtd_vol<<" water vol "<<this_dep.water_vol<<std::endl;
 
       FillDepressions(combined, this_dep.water_vol, deps,arp);
     //At this point there should be no more water all the way up the tree until
@@ -1450,8 +1428,8 @@ static void FillDepressions(
   DepressionHierarchy<elev_t> &deps,      //Depression hierarchy
   ArrayPack                         &arp
 ){
-if(stdi.top_label == 1166761)
-std::cerr<<"filling depression number "<<stdi.top_label<<std::endl;
+
+
     assert(deps.at(stdi.top_label).water_vol - deps.at(stdi.top_label).wtd_vol <= FP_ERROR);
 
   //Nothing to do if we have no water
@@ -1529,23 +1507,10 @@ std::cerr<<"filling depression number "<<stdi.top_label<<std::endl;
     //current_volume = cells_affected.size()*static_cast<double>(topo(c.x,c.y))
     // - total_elevation;
 
-if(arp.wtd(c.x,c.y)>0)
-  std::cerr<<std::setprecision(15)<<"wtd has water "<<arp.wtd(c.x,c.y)<<" label "<<arp.label(c.x,c.y)<<" cell x "<<c.x<<" y "<<c.y<<" top label "<<stdi.top_label<<std::endl;
-
     assert(fp_le(arp.wtd(c.x,c.y),0));
 
 
     current_volume += (current_elevation-previous_elevation)*current_area; //- arp.wtd(c.x,c.y)*arp.cell_area[c.y];
-
-if( stdi.top_label == 1166761){
-  std::cerr<<std::setprecision(15)<<"label "<<arp.label(c.x,c.y)<<" top label "<<arp.final_label(c.x,c.y)<<" water vol "<<water_vol<<" current vol "<<current_volume<<" cells_affected "<<cells_affected.size()<<" current elev "<<current_elevation<<" previous_elevation "<<previous_elevation<<std::endl;
-  std::cerr<<std::setprecision(15)<<"dep vol "<<deps.at(arp.label(c.x,c.y)).dep_vol<<" wtd vol "<<deps.at(arp.label(c.x,c.y)).wtd_vol<<std::endl;
-  std::cerr<<std::setprecision(15)<<"total dep vol "<<deps.at(arp.final_label(c.x,c.y)).dep_vol<<" total wtd vol "<<deps.at(arp.final_label(c.x,c.y)).wtd_vol<<std::endl;
-  std::cerr<<std::setprecision(15)<<"wtd "<<arp.wtd(c.x,c.y)<<" x "<<c.x<<" y "<<c.y<<std::endl;
-  std::cerr<<std::setprecision(15)<<"cell area "<<arp.cell_area[c.y]<<std::endl;
-}
-
-
 
     assert(water_vol >= - FP_ERROR);
     if(water_vol < 0)
@@ -1574,7 +1539,6 @@ if( stdi.top_label == 1166761){
   //    arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1) ) ) <= FP_ERROR){
 
 
-
     if( (((water_vol - (current_volume - (arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.wtd(c.x,c.y) ) ) )<=FP_ERROR) && stdi.my_labels.count(arp.label(c.x,c.y))==1) || water_vol-current_volume < FP_ERROR ) {
       //The current scope of the depression plus the water storage capacity of
       //this cell is sufficient to store all of the water. We'll stop adding
@@ -1583,25 +1547,9 @@ if( stdi.top_label == 1166761){
       //We will fill the depression so that the surface of the water is at this
       //elevation.
 
-
-  //  if(current_volume<water_vol){
-//
-//  //      const double fill_amount = water_vol - current_volume;
-//  //      assert(fill_amount >= -FP_ERROR);
-//  //      arp.wtd(c.x,c.y) += fill_amount/arp.cell_area[c.y]/arp.porosity(c.x,c.y);
-//  //      deps.at(arp.label(c.x,c.y)).wtd_vol -= fill_amount;
-//
-  //    }
-
-
-
-
-
       auto water_level = DetermineWaterLevel(arp, water_vol, c.x,  c.y, current_volume, current_area, area_times_elevation_total);
 
-      if(stdi.top_label == 1166761)
-        std::cerr<<std::setprecision(15)<<"enough space to fill depression "<<stdi.top_label<<" water level "<<water_level<<std::endl;
-      //Water level must be higher than (or equal to) the previous cell
+       //Water level must be higher than (or equal to) the previous cell
       // we looked at, but lower than (or equal to) the highest cell
 
       assert(cells_affected.size()==0 || fp_le(arp.topo(cells_affected.back()),water_level) );
@@ -1616,8 +1564,6 @@ if( stdi.top_label == 1166761){
     }  else {
 
 
-            if(stdi.top_label == 1166761)
-std::cerr<<"not enough space yet "<<std::endl;
       //We haven't found enough volume for the water yet.
 
       //During the adding of neighbours neighbours might get added that are
@@ -1640,8 +1586,6 @@ std::cerr<<"not enough space yet "<<std::endl;
 
     if(arp.topo.xyToI(c.x,c.y) != deps.at(stdi.top_label).out_cell ){
 
-      if(stdi.top_label == 1166761)
-        std::cerr<<"in the if statement, and should be able to adjust the wtd and water vol. wtd is "<<arp.wtd(c.x,c.y)<<" water vol "<<water_vol<<std::endl;
       cells_affected.emplace_back(arp.topo.xyToI(c.x,c.y));
 
       //Fill in cells' water tables as we go
@@ -1666,9 +1610,6 @@ std::cerr<<"not enough space yet "<<std::endl;
       //Don't want to include the area of the target cell.
       area_times_elevation_total += arp.topo(c.x,c.y)*arp.cell_area[c.y];
 
-           if(stdi.top_label == 1166761)
-        std::cerr<<"in the if statement, post adjustment. wtd is "<<arp.wtd(c.x,c.y)<<" water vol "<<water_vol<<std::endl;
-
 
     }
 
@@ -1687,11 +1628,8 @@ std::cerr<<"not enough space yet "<<std::endl;
         if(stdi.my_labels.count(arp.label(ni))==0 && ni!=deps.at(stdi.top_label).out_cell )
           continue;
 
-        if(arp.topo(nx,ny) > deps.at(stdi.top_label).out_elev){
-          if(stdi.my_labels.count(arp.label(ni)) != 0 && stdi.top_label == 1166761)
-            std::cout<<"$$$$$$$$$$$$$$$$$$$$$$$$$$$ "<<arp.label(ni)<<" final label "<<arp.final_label(ni)<<" topo "<<arp.topo(ni)<<std::endl;
+        if(arp.topo(nx,ny) > deps.at(stdi.top_label).out_elev)
           continue;
-        }
 
 
         //Ocean cells may be found at the edge of a depression. They might get
@@ -1712,13 +1650,10 @@ std::cerr<<"not enough space yet "<<std::endl;
         }
       }
     if(flood_q.empty()){
-
-
       int x,y;
       arp.topo.iToxy(deps.at(stdi.top_label).out_cell , x, y);
       flood_q.emplace(x, y, arp.topo(deps.at(stdi.top_label).out_cell ));
       visited.emplace(deps.at(stdi.top_label).out_cell );
-      std::cerr<<"adding the outcell, x "<<x<<" y "<<y<<" top label "<<stdi.top_label<<std::endl;
     }
   }
 

@@ -52,7 +52,8 @@ class Depression {
   //parent depression is the one which will contain the overflow.
   dh_label_t parent   = NO_PARENT;
   //Outlet depression. The metadepression into which this one overflows. Usually
-  //its neighbour depression, but sometimes the ocean.
+  //its neighbour depression, but sometimes the ocean or a depression linked
+  //to the ocean.
   dh_label_t odep     = NO_VALUE;
   //When a metadepression overflows it does so into the metadepression indicated
   //by `odep`. However, odep must flood from the bottom up. Therefore, we keep
@@ -76,20 +77,25 @@ class Depression {
   //are not subdepressions. That is, these ocean-linked depressions may be at
   //the top of high cliffs and spilling into this depression.
   std::vector<dh_label_t> ocean_linked;
-
   //the label of the depression, for calling it up again
   dh_label_t dep_label = 0;
+  //Number of cells contained within the depression and its children
+  uint32_t cell_count = 0;
   //Total area of the cells in the depression. Used to help keep track of
   //total dep_vols.
   double dep_area = 0;
-  //Volume of the depression and its children. Used in the Water Level Equation (see below).
+  //Volume of the depression and its children.
+  //Used in the Water Level Equation (see below).
   double   dep_vol    = 0;
-  //Water currently contained within the depression. Used in the Water Level Equation (see below).
+  //Water currently contained within the depression.
+  //Used in the Water Level Equation (see below).
   double   water_vol  = 0;
   //wtd_vol is the dep_vol plus any additional water which may be stored
   //as groundwater. When groundwater is fully saturated, wtd_vol == dep_vol.
   double wtd_vol = 0;
-  //extra parameter used to help calculate wtd_vol.
+  //extra parameter used to help calculate wtd_vol. This is the difference
+  //between wtd_vol and dep_vol, i.e. the amount of below-ground
+  //storage space available.
   double wtd_only = 0;
 };
 
@@ -143,7 +149,7 @@ class Outlet {
   //determine if we've already found an outlet for a depression. We'll look at
   //outlets from lowest to highest, so if an outlet already exists for a
   //depression, it is that depression's lowest outlet.
-  bool operator==(const Outlet &o) const {                                                                                              //so beyond just checking, is this somehow preventing it from being recorded if one already exists? How does this work?
+  bool operator==(const Outlet &o) const {
     //Outlets are the same if they link two depressions, regardless of the
     //depressions' labels storage order within this class.
     return depa==o.depa && depb==o.depb;
@@ -164,7 +170,6 @@ struct OutletHash {
     return out.depa^(out.depb + 0x9e3779b9 + (out.depa << 6) + (out.depa >> 2));
   }
 };
-
 
 
 //The regular mod function allows negative numbers to stay negative. This mod
@@ -345,7 +350,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
     }
   }
   //But maybe the user didn't specify any cells! We'll assume this was mistake
-  //and throw an exception. The user can always catch it if they want to.
+  //and throw an exception.
   if(ocean_cells==0){
     throw std::runtime_error("No OCEAN cells found, could not make a DepressionHierarchy!");
   }
@@ -488,7 +493,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //cell found in a flat determines the label for the entirety of that flat.
       clabel            = depressions.size();         //In a 0-based indexing system, size is equal to the id of the next flat
       auto &newdep      = depressions.emplace_back(); //Add the next flat (increases size by 1)
-      newdep.pit_cell   = dem.xyToI(cx,cy);      //Make a note of the pit cell's location
+      newdep.pit_cell   = dem.xyToI(cx,cy);           //Make a note of the pit cell's location
       newdep.pit_elev   = celev;                      //Make a note of the pit cell's elevation
       newdep.dep_label  = clabel;                     //I am storing the label in the object so that I can find it later and call up the number of cells and volume
       label(ci)         = clabel;                     //Update cell with new label
@@ -583,7 +588,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //other depressions. That is, we need to build a hierarchy of depressions.
 
   //Since outlets link two depressions, any time we have an outlet we can form a
-  //meta-depression whose two children most both fill before the meta-depression
+  //meta-depression whose two children must both fill before the meta-depression
   //itself can spill. This meta-depression has an outlet which differs from
   //either of its children.
 
@@ -802,9 +807,8 @@ void CalculateMarginalVolumes(
 
 
     final_label(x,y) = clabel;
- //   if(label(x,y) == 927 || label(x,y) == 970)
-  //    std::cout<<"clabel "<<clabel<<" out elev "<<deps.at(clabel).out_elev<<" topo "<<dem(x,y)<<" x "<<x<<" y "<<y<<std::endl;
-    //I want another layer that contains the labels of which depressions these
+
+     //I want another layer that contains the labels of which depressions these
     //immediately belong to, even when it is a parent depression.
     //This is so that I can change the wtd_vol in the correct place
     //when we have infiltration and wtd_vol of a depression changes.
@@ -812,15 +816,10 @@ void CalculateMarginalVolumes(
     if(clabel==OCEAN)
       continue;
 
-
     total_areas[clabel] += static_cast<double>(cell_area[y]);
     total_volumes[clabel] += (static_cast<double>(deps[clabel].out_elev)-static_cast<double>(dem(x,y)))*static_cast<double>(cell_area[y]);
 
-    //   if(label(x,y) == 927 || label(x,y) == 970)
-      //    std::cout<<clabel<<" total vol "<<total_volumes[clabel]<<std::endl;
-
-
-    //Add the area of one cell at a time - elevation difference between
+     //Add the area of one cell at a time - elevation difference between
     //the outlet of this depression and the current cell, multiplied by the area of the current cell.
   }
 
@@ -857,34 +856,15 @@ void CalculateTotalVolumes(
       assert(dep.lchild<d);         //ID of child must be smaller than parent's
       assert(dep.rchild<d);         //ID of child must be smaller than parent's
 
-//if(dep.dep_label == 18405){
-//  std::cout<<std::setprecision(15)<<"my vol "<<dep.dep_vol<<" lchild vol "<<deps.at(dep.lchild).dep_vol<<" rchild vol "<<deps.at(dep.rchild).dep_vol<<std::endl;
-//  std::cout<<"my out elev "<<dep.out_elev<<" lchild out elev "<<deps.at(dep.lchild).out_elev<<" rchild out elev "<<deps.at(dep.rchild).out_elev<<std::endl;
-//  std::cout<<"lchild label "<<deps.at(dep.lchild).dep_label<<" rchild label "<<deps.at(dep.rchild).dep_label<<std::endl;
-//}
 
       dep.dep_vol += deps.at(dep.lchild).dep_vol;      //Add the actual dep volume of the child
- //     if(dep.dep_label == 18405)
- // std::cout<<std::setprecision(15)<<"lchild started my vol "<<dep.dep_vol<<" lchild vol "<<deps.at(dep.lchild).dep_vol<<" rchild vol "<<deps.at(dep.rchild).dep_vol<<std::endl;
-
 
       dep.dep_vol += (static_cast<double>(dep.out_elev) - static_cast<double>(deps.at(dep.lchild).out_elev)) * deps.at(dep.lchild).dep_area;
-//      float check = (dep.out_elev - deps.at(dep.lchild).out_elev) * deps.at(dep.lchild).dep_area;
       //add the water volume higher than the child depression's outlet, but on the same cells
-//if(dep.dep_label == 18405)
-  //std::cout<<std::setprecision(15)<<"lchild done my vol "<<dep.dep_vol<<" lchild vol "<<deps.at(dep.lchild).dep_vol<<" lchild  area "<<deps.at(dep.lchild).dep_area<<" check "<<check<<std::endl;
-
 
       dep.dep_vol += deps.at(dep.rchild).dep_vol;
-    //  if(dep.dep_label == 18405)
- // std::cout<<std::setprecision(15)<<"rchild started my vol "<<dep.dep_vol<<" lchild vol "<<deps.at(dep.lchild).dep_vol<<" rchild vol "<<deps.at(dep.rchild).dep_vol<<std::endl;
-
 
       dep.dep_vol += (static_cast<double>(dep.out_elev) - static_cast<double>(deps.at(dep.rchild).out_elev)) * deps.at(dep.rchild).dep_area;
-
-//if(dep.dep_label == 18405)
-  //std::cout<<std::setprecision(15)<<"rchild done my vol "<<dep.dep_vol<<" lchild vol "<<deps.at(dep.lchild).dep_vol<<" rchild area "<<deps.at(dep.rchild).dep_area<<std::endl;
-
 
       dep.dep_area += deps.at(dep.lchild).dep_area;
       //remember to add the area covered by child depression cells, so that our parent can also get the correct total dep_vol.
