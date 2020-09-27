@@ -65,8 +65,7 @@ static void CalculateWtdVol(
 static float CalculateInfiltration(
   int                           cell,
   double                        distance,
-  double                        h_0,
-  Parameters                    &params,
+  float                         h_0,
   ArrayPack                     &arp
 );
 
@@ -342,13 +341,13 @@ static void MoveWaterIntoPits(
         assert(fp_ge(deps[arp.label(x,y)].water_vol,0));
         if(deps[arp.label(x,y)].water_vol < 0)
           deps[arp.label(x,y)].water_vol = 0.0;
-        arp.wtd(x,y) = 0; //Clean up as we go: all surface water from the cell has now flowed into the ocean.
+        arp.wtd(x,y) = 0; //Clean up as we go: all surface water from the cell has now been recorded in the depression hierarchy.
         }
       }
     }
   }
 
-  //If infiltration is turned on, the we need to move all of the water
+  //If infiltration is turned on, then we need to move all of the water
   //downstream into pit cells. To do so, we use the steepest-descent
   //flow directions provided by the depression hierarchy code.
 
@@ -394,7 +393,7 @@ static void MoveWaterIntoPits(
     }  //Yes.
 
 
-    double distance = 0;
+    double distance = 0;  //this is used below when calculating how much infiltration will occur.
     //Starting with the peaks, pass flow downstream
     progress.start(arp.topo.size());
     while(!q.empty()){
@@ -448,7 +447,7 @@ static void MoveWaterIntoPits(
           //from the cell centre to the edge of the cell in the direction
           //of the neighbour.
 
-          float my_infiltration = CalculateInfiltration(c,distance,arp.runoff(c),params,arp);
+          float my_infiltration = CalculateInfiltration(c,distance,arp.runoff(c),arp);
           arp.wtd(c) += my_infiltration;
           //add infiltration to the water table
           arp.runoff(c) -= my_infiltration;
@@ -465,7 +464,7 @@ static void MoveWaterIntoPits(
           if(arp.runoff(c) > 0){
             //check again if there is water available since it's possible
             //the infiltration above used it up.
-            my_infiltration = CalculateInfiltration(n,distance,arp.runoff(c),params,arp);
+            my_infiltration = CalculateInfiltration(n,distance,arp.runoff(c),arp);
             arp.wtd(n)    += my_infiltration;
             arp.runoff(c) -= my_infiltration;
 
@@ -550,7 +549,7 @@ static void CalculateWtdVol(
   for(int y=0;y<wtd.height();y++)
   for(int x=0;x<wtd.width();x++){
     //cycle through the domain and add up all of the below-ground water storage space available
-    auto clabel        = final_label(x,y);
+    auto clabel = final_label(x,y);
     //We should use final_label because a leaf depression will contain cells which are above its
     //outlet elevation. The groundwater space in these cells should not count towards the
     //wtd_vol of the leaf depression, but will be a part of a higher metadepression.
@@ -571,12 +570,6 @@ static void CalculateWtdVol(
     //this records the space that is only in the ground - not including above-ground space. This is needed to obtain the
     //appropriate total wtd_vols for metadepressions, below.
     //- because wtd is negative.
-
-    //version for depth-variable porosity:
-    //deps[clabel].wtd_vol  -= arp.cell_area[y] * arp.porosity(x,y) * arp.fdepth(x,y) * (exp(arp.wtd(x,y)/arp.fdepth(x,y)) - 1);
-    deps[clabel].wtd_vol  -= cell_area[y] * porosity(x,y) * wtd(x,y);
-    //and this records the total volume, both above and below ground, available to store water.
-
     }
 
 
@@ -584,6 +577,9 @@ static void CalculateWtdVol(
     auto &dep = deps.at(d);
     if(dep.dep_label==OCEAN)
       continue;
+
+    dep.wtd_vol = dep.dep_vol + dep.wtd_only;  //this records the total volume, both above and below ground, available to store water.
+
     if(dep.lchild!=NO_VALUE){  //if it has children, it is a metadepression and we need to add the groundwater space from the children.
 
       dep.wtd_vol      += deps.at(dep.lchild).wtd_only;     //store the total wtd_vols with all of your children included.
@@ -596,7 +592,7 @@ static void CalculateWtdVol(
     assert(fp_ge(dep.wtd_vol,0) );
     if(dep.wtd_vol < 0)
       dep.wtd_vol = 0.0;
-    assert(fp_ge(dep.wtd_vol, dep.dep_vol) );
+    assert(fp_ge(dep.wtd_vol, dep.dep_vol) );  //wtd_vol cannot be smaller than dep_vol.
     if(dep.wtd_vol < dep.dep_vol)
       dep.wtd_vol = dep.dep_vol;
   }
@@ -629,24 +625,26 @@ static void CalculateWtdVol(
 ///                (i.e. from one cell to the other)
 ///@param h_0      The amount of surface water available in the cell.
 ///
-///@param params   Global paramaters - we store infiltration results here
-///
-///@param arp      Global arrays - we access ksat, slope, and wtd.
-///                wtd is the water table depth. At this stage of the code it is
-///                always negative, and needed to see if there is space
-///                available for infiltration to occur.
-///                ksat is a representation of hydraulic conductivity based
-///                on soil types, used as an indicator for how rapidly
-///                infiltration can occur.
-///                slope is the topographic slope
-///
-///@return Calculates the amount of infiltration that will happen within
+///@param arp      ArrayPack consisting of all of the various arrays used by this
+///                and the other portions of the code. Here we use:
+///                - arp.vert_ksat: The vertical hydraulic conductivity in the cell.
+///                  This should differ from horizontal hydraulic conductivity,
+///                  depending on local anisotropy. In the absence of better
+///                  data, we recommend using soil types and a simple pedotransfer
+///                  function to estimate this input.
+///                - arp.slope: terrain slope, based on the topography data used.
+///                - arp.wtd: The depth to water table. Here, we use it to check
+///                  to see whether the cell is becoming fully saturated in
+///                  groundwater during infiltration.
+///                - arp.infiltration_array: This is an informational array,
+///                  that records the total amount of infiltration that happens
+///                  in each cell, should the user want this information.
+///@return Calculates the amount of infiltration that will happen in this cell within
 ///        the time it takes the amount of  water to travel the given distance.
 static float CalculateInfiltration(
   int         cell,
   double      distance,
-  double      h_0,
-  Parameters  &params,
+  float       h_0,
   ArrayPack   &arp
 ){
   float mannings_n = 0.05; //TODO: is this the best value?
@@ -657,6 +655,8 @@ static float CalculateInfiltration(
   float slope = std::max(arp.slope(cell), 0.000001f);
   //assigning a small minimum slope, since otherwise in cells with zero slope,
   //the delta_t will be infinity.
+
+  //Manning's equation is rearranged to compute the amount of time it will take the given amount of water to cross the cell.
   float bracket = std::pow(h_0,(5.0/3.0)) - (vert_ksat * distance * (mannings_n/std::pow(slope,0.5)) * (5/3));
   float numerator = h_0 - std::pow(bracket,(3.0/5.0));
   float delta_t = numerator/vert_ksat;
@@ -665,10 +665,10 @@ static float CalculateInfiltration(
 
   //if it's a normal case, the water is not running out and the cell is not becoming saturated.
   //we calculate the infiltration using the delta_t from above, and ksat as a coefficient for infiltration amount.
-    my_infiltration = vert_ksat*(delta_t);
+  my_infiltration = vert_ksat*(delta_t);
 
-  if(bracket < 0){               //all of the water is getting used up.
-    my_infiltration =  h_0;  //We have to limit the infiltration to be equal to the available water, h0.
+  if(bracket < 0){           //all of the water is getting used up.
+    my_infiltration =  std::min(my_infiltration,h_0);  //We have to limit the infiltration to be equal to the available water, h0.
   }
 
   if(arp.wtd(cell) > -my_infiltration){  //if the cell is getting saturated partway.
@@ -679,6 +679,7 @@ static float CalculateInfiltration(
   }
 
   arp.infiltration_array(cell) += my_infiltration;
+
   return my_infiltration;
 }
 
@@ -984,7 +985,7 @@ static void MoveWaterInOverflow(
         std::pow(params.cellsize_n_s_metres,2.0)), 0.5))/2.0;
 
     float my_infiltration;
-    my_infiltration = CalculateInfiltration(previous_cell,distance,extra_water,params,arp);
+    my_infiltration = CalculateInfiltration(previous_cell,distance,extra_water,arp);
     arp.wtd(previous_cell) += my_infiltration;
     extra_water -= my_infiltration;
     assert(arp.wtd(previous_cell)<=FP_ERROR);
@@ -1791,10 +1792,6 @@ void ResetDH(DepressionHierarchy<elev_t> &deps){
   for(auto &dep: deps){
     dep.water_vol = 0;
     dep.wtd_only = 0;  //used later in wtd_vol calculations
-    dep.wtd_vol = dep.dep_vol;
-    //We start off with the depression volume and then just
-    //have to add the additional below-ground volume to this,
-    //in the CalculateWTDVol function.
   }
 }
 
