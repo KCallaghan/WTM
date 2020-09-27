@@ -816,7 +816,7 @@ void CalculateMarginalVolumes(
       continue;
 
     total_areas[clabel] += static_cast<double>(cell_area[y]);
-    total_volumes[clabel] += (static_cast<double>(deps[clabel].out_elev)-static_cast<double>(dem(x,y)))*static_cast<double>(cell_area[y]);
+    total_volumes[clabel] += (deps[clabel].out_elev-static_cast<double>(dem(x,y)))*static_cast<double>(cell_area[y]);
     cell_counts[clabel]++;
 
      //Add the area of one cell at a time - elevation difference between
@@ -858,12 +858,12 @@ void CalculateTotalVolumes(
 
       dep.cell_count      += deps.at(dep.lchild).cell_count;
       dep.dep_vol += deps.at(dep.lchild).dep_vol;      //Add the actual dep volume of the child
-      dep.dep_vol += (static_cast<double>(dep.out_elev) - static_cast<double>(deps.at(dep.lchild).out_elev)) * deps.at(dep.lchild).dep_area;
+      dep.dep_vol += (dep.out_elev - static_cast<double>(deps.at(dep.lchild).out_elev)) * deps.at(dep.lchild).dep_area;
       //add the water volume higher than the child depression's outlet, but on the same cells
 
       dep.cell_count      += deps.at(dep.rchild).cell_count;
       dep.dep_vol += deps.at(dep.rchild).dep_vol;
-      dep.dep_vol += (static_cast<double>(dep.out_elev) - static_cast<double>(deps.at(dep.rchild).out_elev)) * deps.at(dep.rchild).dep_area;
+      dep.dep_vol += (dep.out_elev - static_cast<double>(deps.at(dep.rchild).out_elev)) * deps.at(dep.rchild).dep_area;
 
       //remember to add the area covered by child depression cells, so that our parent can also get the correct total dep_vol.
       dep.dep_area += deps.at(dep.lchild).dep_area;
