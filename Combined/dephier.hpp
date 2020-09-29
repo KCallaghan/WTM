@@ -97,6 +97,11 @@ class Depression {
   //between wtd_vol and dep_vol, i.e. the amount of below-ground
   //storage space available.
   double wtd_only = 0;
+
+
+
+  std::vector<int> my_cells;
+
 };
 
 
@@ -497,6 +502,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       newdep.pit_elev   = celev;                      //Make a note of the pit cell's elevation
       newdep.dep_label  = clabel;                     //I am storing the label in the object so that I can find it later and call up the number of cells and volume
       label(ci)         = clabel;                     //Update cell with new label
+      newdep.my_cells.emplace_back(ci);
+
     } else {
 
       //Cell has already been assigned to a depression. In this case, one of two
