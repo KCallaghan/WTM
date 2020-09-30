@@ -31,7 +31,7 @@ namespace richdem::dephier {
 
 //Some special values
 const dh_label_t NO_PARENT = std::numeric_limits<dh_label_t>::max();
-const dh_label_t NO_VALUE  = std::numeric_limits<dh_label_t>::max();//-1;
+const dh_label_t NO_VALUE  = std::numeric_limits<dh_label_t>::max();
 
 //This class holds information about a depression. Its pit cell and outlet cell
 //(in flat-index form) as well as the elevations of these cells. It also notes
@@ -80,28 +80,27 @@ class Depression {
   //the label of the depression, for calling it up again
   dh_label_t dep_label = 0;
   //Number of cells contained within the depression and its children
-  uint32_t cell_count = 0;
+  uint32_t  cell_count = 0;
   //Total area of the cells in the depression. Used to help keep track of
   //total dep_vols.
-  double dep_area = 0;
+  double    dep_area   = 0;
   //Volume of the depression and its children.
   //Used in the Water Level Equation (see below).
-  double   dep_vol    = 0;
+  double    dep_vol    = 0;
   //Water currently contained within the depression.
   //Used in the Water Level Equation (see below).
-  double   water_vol  = 0;
+  double    water_vol  = 0;
   //wtd_vol is the dep_vol plus any additional water which may be stored
   //as groundwater. When groundwater is fully saturated, wtd_vol == dep_vol.
-  double wtd_vol = 0;
+  double    wtd_vol    = 0;
   //extra parameter used to help calculate wtd_vol. This is the difference
   //between wtd_vol and dep_vol, i.e. the amount of below-ground
   //storage space available.
-  double wtd_only = 0;
-
-
-
-  std::vector<int> my_cells;
-
+  double    wtd_only   = 0;
+  //list of all of the cells contained within this depression.
+  //This is populated only for leaf depressions, since they contain
+  //all cells within the grid.
+  std::vector<flat_c_idx> my_cells;
 };
 
 
@@ -189,7 +188,6 @@ template<class elev_t>
 using PriorityQueue = radix_heap::pair_radix_heap<elev_t,uint64_t>;
 
 
-
 //Cell is not part of a depression
 const dh_label_t NO_DEP = std::numeric_limits<dh_label_t>::max();
 //Cell is part of the ocean and a place from which we begin searching for
@@ -200,7 +198,12 @@ template<typename elev_t>
 using DepressionHierarchy = std::vector<Depression<elev_t>>;
 
 template<class elev_t>
-void CalculateMarginalVolumes(DepressionHierarchy<elev_t> &deps, const std::vector<double> &cell_area, const Array2D<elev_t> &dem, const Array2D<dh_label_t> &label, Array2D<dh_label_t>  &final_label);
+void CalculateMarginalVolumes(
+         DepressionHierarchy<elev_t> &deps,
+         const std::vector<double>   &cell_area,
+         const Array2D<elev_t>       &dem,
+         const Array2D<dh_label_t>   &label,
+         Array2D<dh_label_t>         &final_label);
 
 template<class elev_t>
 void CalculateTotalVolumes(DepressionHierarchy<elev_t> &deps);
@@ -262,13 +265,18 @@ std::ostream& operator<<(std::ostream &out, const DepressionHierarchy<elev_t> &d
 //representing the "ocean" (the place to which depressions drain) and `NO_DEP`
 //for all other cells.
 //
-//@param  dem   - 2D array of elevations. May be in any data format.
+//@param  dem      - 2D array of elevations. May be in any data format.
 //
-//@return label - A label indiciate which depression the cell belongs to.
-//                The indicated label is always the leaf of the depression
-//                hierarchy, or the OCEAN.
+//@param cell_area - vector indicating the cell areas based on latitude
+//                   throughout the array.
+//@return label    - A label indiciating which depression the cell belongs to.
+//                   The indicated label is always the leaf of the depression
+//                   hierarchy, or the OCEAN.
 //
-//        flowdirs - A value [0,7] indicated which direction water from the cell
+//   final_label   - A label indicating which is the highest metadepression
+//                   to which the cell belongs.
+//
+//   flowdirs      - A value [0,7] indicating which direction water from the cell
 //                   flows in order to go "downhill". All cells have a flow
 //                   direction (even flats) except for pit cells.
 template<class elev_t,  Topology topo>
@@ -502,7 +510,8 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       newdep.pit_elev   = celev;                      //Make a note of the pit cell's elevation
       newdep.dep_label  = clabel;                     //I am storing the label in the object so that I can find it later and call up the number of cells and volume
       label(ci)         = clabel;                     //Update cell with new label
-      newdep.my_cells.emplace_back(ci);
+      newdep.my_cells.emplace_back(ci);               //because we are going through the priority queue in order from lowest to highest cells,
+                                                      //the ordering of cells in my_cells should automatically be from lowest to highest.
 
     } else {
 
@@ -514,9 +523,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       //neighbours will have already been seen and added to the priority queue.
       //However, it is harmless to check on them again.
     }
-
-
-
 
     //Consider the cell's neighbours
     for(int n=1;n<=neighbours;n++){
@@ -714,7 +720,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       dep.parent       = outlet.depb;        //Set Depression Meta(A) parent
       dep.out_elev     = outlet.out_elev;    //Set Depression Meta(A) outlet elevation
       dep.out_cell     = outlet.out_cell;    //Set Depression Meta(A) outlet cell index
-      dep.odep         = depb_set;           //Depression Meta(A) overflows into Depression B
+      dep.odep         = NO_VALUE;           //Since this is an ocean link, A has no overflow depression
       dep.ocean_parent = true;
       dep.geolink      = outlet.depb;        //Metadepression(A) overflows, geographically, into Depression B
       depressions.at(outlet.depb).ocean_linked.emplace_back(depa_set);
@@ -837,10 +843,7 @@ void CalculateMarginalVolumes(
       deps[i].cell_count      += cell_counts[i];
 
     }
-
-//}
   progress.stop();
-
 }
 
 
@@ -863,18 +866,18 @@ void CalculateTotalVolumes(
       assert(dep.lchild<d);         //ID of child must be smaller than parent's
       assert(dep.rchild<d);         //ID of child must be smaller than parent's
 
-      dep.cell_count      += deps.at(dep.lchild).cell_count;
-      dep.dep_vol += deps.at(dep.lchild).dep_vol;      //Add the actual dep volume of the child
-      dep.dep_vol += (dep.out_elev - static_cast<double>(deps.at(dep.lchild).out_elev)) * deps.at(dep.lchild).dep_area;
+      dep.cell_count += deps.at(dep.lchild).cell_count;
+      dep.dep_vol    += deps.at(dep.lchild).dep_vol;      //Add the actual dep volume of the child
+      dep.dep_vol    += (dep.out_elev - static_cast<double>(deps.at(dep.lchild).out_elev)) * deps.at(dep.lchild).dep_area;
       //add the water volume higher than the child depression's outlet, but on the same cells
 
-      dep.cell_count      += deps.at(dep.rchild).cell_count;
-      dep.dep_vol += deps.at(dep.rchild).dep_vol;
-      dep.dep_vol += (dep.out_elev - static_cast<double>(deps.at(dep.rchild).out_elev)) * deps.at(dep.rchild).dep_area;
+      dep.cell_count += deps.at(dep.rchild).cell_count;
+      dep.dep_vol    += deps.at(dep.rchild).dep_vol;
+      dep.dep_vol    += (dep.out_elev - static_cast<double>(deps.at(dep.rchild).out_elev)) * deps.at(dep.rchild).dep_area;
 
       //remember to add the area covered by child depression cells, so that our parent can also get the correct total dep_vol.
-      dep.dep_area += deps.at(dep.lchild).dep_area;
-      dep.dep_area += deps.at(dep.rchild).dep_area;
+      dep.dep_area   += deps.at(dep.lchild).dep_area;
+      dep.dep_area   += deps.at(dep.rchild).dep_area;
     }
 
     assert(dep.lchild==NO_VALUE || fp_le(deps.at(dep.lchild).dep_vol + deps.at(dep.rchild).dep_vol,dep.dep_vol));
@@ -905,7 +908,7 @@ void LastLayer(rd::Array2D<dh_label_t> &label, const rd::Array2D<float> &dem, \
     label(x,y) = mylabel;
     //TODO: Is label now the same as final_label? Is one better to use than
     //the other? Are both being used in later code?
-    //They appear to be the same thing - possibly can remove final_label.
+    //They appear to be the same thing - possibly can remove this function since it is anyway not used.
   }
 }
 
