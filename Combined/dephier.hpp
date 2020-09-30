@@ -31,7 +31,7 @@ namespace richdem::dephier {
 
 //Some special values
 const dh_label_t NO_PARENT = std::numeric_limits<dh_label_t>::max();
-const dh_label_t NO_VALUE  = -1;
+const dh_label_t NO_VALUE  = std::numeric_limits<dh_label_t>::max();//-1;
 
 //This class holds information about a depression. Its pit cell and outlet cell
 //(in flat-index form) as well as the elevations of these cells. It also notes

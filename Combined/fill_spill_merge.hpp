@@ -1255,12 +1255,12 @@ class SubtreeDepressionInfo {
  public:
   //One of the depressions at the bottom of the meta-depression. We use this to
   //identify a pit cell from which to start flooding.
-  int   leaf_label = -1;
+  int   leaf_label = NO_VALUE;
   //The metadepression containing all of the children. This metadepression is
   //guaranteed to be large enough to hold all of the water of its children plus
   //whatever exists only in the metadepression itself. We use this to determine
   //the water and depression volumes.
-  int   top_label = -1;
+  int   top_label = NO_VALUE;
   //Here we keep track of which depressions are contained within the
   //metadepression. This allows us to limit the spreading function to cells
   //within the metadepression.
