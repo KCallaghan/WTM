@@ -1708,20 +1708,23 @@ void BackfillDepression(
   Array2D<wtd_t>          &wtd,
   std::vector<flat_c_idx> &cells_affected
 ){
-
-
   for(const auto c: cells_affected){
+    //While searching for cells to fill, we simulated infiltration. The result
+    //is that surface water should now be covering cells whose water table is
+    //flush with the surface.
     assert(fp_ge(wtd(c),0));
-    //This should be true since we have been filling wtds as we go.
     if(wtd(c) < 0)
       wtd(c) = 0;
 
+    //Water level should be equal to or greater than the elevation of each cell
+    //to be filled
     assert(fp_ge(water_level,topo(c)) );
     if(water_level < topo(c))
       water_level = topo(c);
 
+    //Raise the cell's water table so that it is flush with the water's surface
+    //(Note that the elevation of the surface is topo+wtd)
     wtd(c) = water_level - topo(c);
-
     //The water table must have been zero when we added the water, but there's a
     //chance floating point effects will make it negative. Therefore, we make
     //sure that it's >=0. This is most likely to be necessary when considering
@@ -1730,7 +1733,6 @@ void BackfillDepression(
     assert(wtd(c)>=0);
   }
 }
-
 
 
 
