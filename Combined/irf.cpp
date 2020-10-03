@@ -89,7 +89,7 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   }
 
   //load in the wtd result from the previous time:
-  arp.wtd    = LoadData<float>(params.surfdatadir + params.region + \
+  arp.wtd    = LoadData<double>(params.surfdatadir + params.region + \
   params.time_start + "_wtd.nc", "value");  //units are metres relative to land surface.
 
   //calculate the fdepth (e-folding depth, representing rate of decay of the
@@ -176,7 +176,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   }
 
 
-  arp.wtd           = rd::Array2D<float>(arp.topo,0.0);
+  arp.wtd           = rd::Array2D<double>(arp.topo,0.0);
   //we start with a water table at the surface for equilibrium runs.
 
   arp.fdepth   = rd::Array2D<float>(arp.topo,0);
@@ -223,7 +223,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.open_water_evap = rd::Array2D<float>(arp.topo,0.5); //Units: m/yr.
 
   arp.winter_temp     = rd::Array2D<float>(arp.topo,0);    //Units: deg C
-  arp.wtd             = rd::Array2D<float>(arp.topo,-2.0);
+  arp.wtd             = rd::Array2D<double>(arp.topo,-2.0);
   //we start with a water table below the surface for testing.
   arp.evap            = arp.starting_evap;
   arp.fdepth          = rd::Array2D<float>(arp.topo,500);
@@ -259,7 +259,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
 
   //This array is used to store the values of how much the water table will
   //change in one iteration, then adding it to wtd gets the new wtd.
-  arp.wtd_changed        = rd::Array2D<float>(arp.ksat,0.0f);
+  arp.wtd_changed        = rd::Array2D<double>(arp.ksat,0.0f);
 
   //These are populated during the calculation of the depression hierarchy:
   arp.label              = rd::Array2D<dh_label_t>   \
@@ -293,7 +293,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
     if(arp.land_mask(i) == 0){
-      arp.wtd  (i) = 0;
+      arp.wtd  (i) = 0.;
     }
   }
 
@@ -417,7 +417,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 
   //This array is used to store the values of how much the water table will
   //change in one iteration, then adding it to wtd gets the new wtd.
-  arp.wtd_changed        = rd::Array2D<float>(arp.ksat,0.0f);
+  arp.wtd_changed        = rd::Array2D<double>(arp.ksat,0.0f);
 
   //These are populated during the calculation of the depression hierarchy:
   arp.label              = rd::Array2D<dh_label_t>   \
@@ -451,7 +451,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
     if(arp.land_mask(i) == 0){
-      arp.wtd  (i) = 0;
+      arp.wtd  (i) = 0.;
     }
   }
 
