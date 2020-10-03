@@ -65,7 +65,7 @@ static void CalculateWtdVol(
 static double CalculateInfiltration(
   int                           cell,
   double                        distance,
-  double                         h_0,
+  double                        h_0,
   ArrayPack                     &arp
 );
 
@@ -80,7 +80,7 @@ static void MoveWaterInDepHier(
 
 template<class elev_t>
 static void MoveWaterInOverflow(
-  double                          extra_water,
+  double                         extra_water,
   const dh_label_t               current_dep,
   const dh_label_t               previous_dep,
   DepressionHierarchy<elev_t>    &deps,
@@ -346,12 +346,12 @@ static void MoveWaterIntoPits(
           arp.wtd(x,y) = 0.0;         //all surface water from the cell has flowed into the ocean.
         }
         else{
-        deps[arp.label(x,y)].water_vol += arp.wtd(x,y)*arp.cell_area[y];
-        //wtd is a depth of water and water_vol is a volume, so multiply by the area of the cell to convert.
-        assert(fp_ge(deps[arp.label(x,y)].water_vol,0));
-        if(deps[arp.label(x,y)].water_vol < 0)
-          deps[arp.label(x,y)].water_vol = 0.0;
-        arp.wtd(x,y) = 0; //Clean up as we go: all surface water from the cell has now been recorded in the depression hierarchy.
+          deps[arp.label(x,y)].water_vol += arp.wtd(x,y)*arp.cell_area[y];
+          //wtd is a depth of water and water_vol is a volume, so multiply by the area of the cell to convert.
+          assert(fp_ge(deps[arp.label(x,y)].water_vol,0));
+          if(deps[arp.label(x,y)].water_vol < 0)
+            deps[arp.label(x,y)].water_vol = 0.0;
+          arp.wtd(x,y) = 0; //Clean up as we go: all surface water from the cell has now been recorded in the depression hierarchy.
         }
       }
     }
@@ -544,7 +544,6 @@ static void CalculateWtdVol(
   DepressionHierarchy<elev_t>   &deps
 ){
 
-
   //We need to create yet another measure of volume, wtd_vol.
   //This will be the dep_vol plus the additional
   //volume allowed in the depression through storage as groundwater.
@@ -582,11 +581,7 @@ static void CalculateWtdVol(
     //this records the space that is only in the ground - not including above-ground space. This is needed to obtain the
     //appropriate total wtd_vols for metadepressions, below.
     //- because wtd is negative.
-
-if(clabel == 59563)
-  std::cout<<"cell had wtd "<<wtd(x,y)<<std::endl;
-
-    }
+  }
 
 
   for(int d=0;d<(int)deps.size();d++){
@@ -662,7 +657,7 @@ if(clabel == 59563)
 static double CalculateInfiltration(
   int         cell,
   double      distance,
-  double       h_0,
+  double      h_0,
   ArrayPack   &arp
 ){
   double mannings_n = 0.05; //TODO: is this the best value?
@@ -1395,7 +1390,6 @@ static SubtreeDepressionInfo FindDepressionsToFill(
     //we do not want to attempt to do so again in an empty parent depression.
     //We check to see if both children have finished spreading water.
     else{
-//std::cout<<"fill depression "<<combined.top_label<<std::endl;
       FillDepressions(deps.at(combined.leaf_label).pit_cell,
                       deps.at(combined.top_label).out_cell,
                       deps.at(combined.top_label).out_elev,
@@ -1607,8 +1601,7 @@ static void FillDepressions(
 
 
 //depth-variable porosity version:
-//    if(water_vol - (current_volume - (arp.cell_area[c.y] * arp.porosity(c.x,c.y) *
-  //    arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1) ) ) <= FP_ERROR){
+//    if(water_vol - (current_volume - (arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1) ) ) <= FP_ERROR){
 
 
     if( (((water_vol - (current_volume - (static_cast<double>(arp.cell_area[c.y]) * static_cast<double>(arp.porosity(c.x,c.y)) * \
@@ -1639,10 +1632,6 @@ static void FillDepressions(
 
     }
 
-
-if(dep_labels.count(59563)==1){
-  std::cerr<<"not enough space yet "<<current_volume<<" water vol of "<<water_vol<<" cells_affected "<<cells_affected.size()<<std::endl;
-}
     //We haven't found enough volume for the water yet.
 
     //The outlet cell never impacts the amount of water the depression can hold
@@ -1657,10 +1646,6 @@ if(dep_labels.count(59563)==1){
       assert(fp_le(arp.wtd(c.x,c.y),0) );
       if(arp.wtd(c.x,c.y) > 0)
         arp.wtd(c.x,c.y) = 0;
-
-if(dep_labels.count(59563)==1){
-  std::cout<<"the wtd in cell x "<<c.x<<" y "<<c.y<<" is "<<arp.wtd(c.x,c.y)<<std::endl;
-}
 
 
    //  depth-variable porosity version
@@ -1788,55 +1773,43 @@ double DetermineWaterLevel(
   const double current_area,
   const double area_times_elevation_total
 ){
-      double water_level;
-      if(current_volume<water_vol){
-      //TODO: Check stdi.my_labels.count(label(c.x,c.y))==0 ?
-        //The volume of water exceeds what we can hold above ground, so we will
-        //stash as much as we can in this cell's water table. This is okay
-        //because the above ground volume plus this cell's water table IS enough
-        //volume (per the if-clause above).
+  double water_level;
+  if(current_volume<water_vol){
+    //The volume of water exceeds what we can hold above ground, so we will
+    //stash as much as we can in this cell's water table. This is okay
+    //because the above ground volume plus this cell's water table IS enough
+    //volume (per the if-clause above).
 
-
-        //Fill in as much of this cell's water table as we can
-        const double fill_amount = water_vol - current_volume;
-        //TODO is it needed to update wtd_vol here? I think the code can work
-        //without doing so, but it would be better for error checking if we did.
-        // If we do, best way to do so?
-        assert(fp_ge(fill_amount,0));
-   //     if(fill_amount < 0)
-     //     fill_amount = 0;
+    //Fill in as much of this cell's water table as we can
+    const double fill_amount = water_vol - current_volume;
+    assert(fp_ge(fill_amount,0));
 
     //depth-variable porosity version:
     //    arp.wtd(c.x,c.y) = arp.fdepth(c.x,c.y) * log(exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) +
     //      fill_amount/(arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y)));
 
-        arp.wtd(cx,cy) += fill_amount/arp.cell_area[cy]/arp.porosity(cx,cy);
+    arp.wtd(cx,cy) += fill_amount/arp.cell_area[cy]/arp.porosity(cx,cy);
 
-        water_level = arp.topo(cx,cy);
-
-
-      } else if (current_volume==water_vol) {
-        //The volume of water is exactly equal to the above ground volume
-        //so we set the water level equal to this cell's elevation
-       //   water_level = arp.topo(c.x,c.y);
-        water_level = arp.topo(cx,cy);
-        }
-      else {  //The water volume is less than this cell's elevation,
-        //so we calculate what the water level should be.
-        //Volume of water = sum(current_area*(water_level -
-        //cell_elevation))
-        //                = sum(current_area * water_level) -
-        //sum(current_area * cell_elevation)
-        //                = water_level * sum(current_area) -
-        //sum(current_area * cell_elevation)
-        //rearranging this gives us:
+    water_level = arp.topo(cx,cy);
 
 
-        water_level = (water_vol / current_area) + (area_times_elevation_total / current_area);
+  } else if (current_volume==water_vol) {
+    //The volume of water is exactly equal to the above ground volume
+    //so we set the water level equal to this cell's elevation
+    water_level = arp.topo(cx,cy);
+  } else {  //The water volume is less than this cell's elevation,
+    //so we calculate what the water level should be.
+    //Volume of water = sum(current_area*(water_level -
+    //cell_elevation))
+    //                = sum(current_area * water_level) -
+    //sum(current_area * cell_elevation)
+    //                = water_level * sum(current_area) -
+    //sum(current_area * cell_elevation)
+    //rearranging this gives us:
 
-      }
-
-return water_level;
+    water_level = (water_vol / current_area) + (area_times_elevation_total / current_area);
+  }
+  return water_level;
 }
 
 ///Reset water volumes in the Depression Hierarchy to zero
@@ -1849,8 +1822,6 @@ void ResetDH(DepressionHierarchy<elev_t> &deps){
     dep.wtd_only = 0;  //used later in wtd_vol calculations
   }
 }
-
-
 
 }
 
