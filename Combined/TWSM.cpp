@@ -45,8 +45,6 @@ void initialise(Parameters &params, ArrayPack &arp){
       Please choose transient or equilibrium.");
   }
 
-
-
   arp.check();
   textfile.close();
 }
@@ -78,19 +76,17 @@ void update(
 
   //TODO: How should equilibrium know when to exit?
   if((params.cycles_done % 100) == 0){
-    textfile<<"saving partway result. wtd in cell 50, 50 is"<<arp.wtd(50,50)<<std::endl;
+    textfile<<"saving partway result."<<std::endl;
     //arp.wtd.printAll();
     string cycles_str = to_string(params.cycles_done);
     arp.wtd.saveGDAL(params.outfilename + cycles_str +".tif");
 
-    //Save the output every 10 iterations, under a new filename
+    //Save the output every 100 iterations, under a new filename
     //so we can compare how the water table has changed through time.
   }
 
   arp.wtd_old = arp.wtd;  //These are used to see how much change occurs
   arp.wtd_mid = arp.wtd;  //in FSM vs in the groundwater portion.
-
-
 
 
   //Run the groundwater code to move water
