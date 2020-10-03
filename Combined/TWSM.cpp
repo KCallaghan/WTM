@@ -78,9 +78,11 @@ void update(
 
   //TODO: How should equilibrium know when to exit?
   if((params.cycles_done % 100) == 0){
-    textfile<<"saving partway result"<<std::endl;
+    textfile<<"saving partway result. wtd in cell 50, 50 is"<<arp.wtd(50,50)<<std::endl;
+    //arp.wtd.printAll();
     string cycles_str = to_string(params.cycles_done);
-    SaveAsNetCDF(arp.wtd,params.outfilename + cycles_str +".nc","value");
+    arp.wtd.saveGDAL(params.outfilename + cycles_str +".tif");
+
     //Save the output every 10 iterations, under a new filename
     //so we can compare how the water table has changed through time.
   }
