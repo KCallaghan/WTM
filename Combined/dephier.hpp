@@ -510,11 +510,14 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       newdep.pit_elev   = celev;                      //Make a note of the pit cell's elevation
       newdep.dep_label  = clabel;                     //I am storing the label in the object so that I can find it later and call up the number of cells and volume
       label(ci)         = clabel;                     //Update cell with new label
+
       newdep.my_cells.emplace_back(ci);               //because we are going through the priority queue in order from lowest to highest cells,
                                                       //the ordering of cells in my_cells should automatically be from lowest to highest.
 
     } else {
 
+
+      depressions.at(clabel).my_cells.emplace_back(ci);
       //Cell has already been assigned to a depression. In this case, one of two
       //things is true. (1) This cell is on the frontier of our search, in which
       //case the cell has neighbours which have not yet been seen. (2) This cell
@@ -815,8 +818,12 @@ void CalculateMarginalVolumes(
     const auto my_elev = dem(x,y);
     auto clabel        = label(x,y);
 
-    while(clabel!=OCEAN && my_elev>deps.at(clabel).out_elev)
-      clabel = deps[clabel].parent;
+    while(clabel!=OCEAN && my_elev>deps.at(clabel).out_elev){
+      if(deps.at(clabel).ocean_parent)
+        clabel = OCEAN;
+      else
+        clabel = deps[clabel].parent;
+    }
 
     final_label(x,y) = clabel;
 
@@ -831,6 +838,9 @@ void CalculateMarginalVolumes(
     total_areas[clabel] += static_cast<double>(cell_area[y]);
     total_volumes[clabel] += (deps[clabel].out_elev-static_cast<double>(dem(x,y)))*static_cast<double>(cell_area[y]);
     cell_counts[clabel]++;
+
+  //  deps.at(label(x,y)).my_cells.emplace_back(dem.xyToI(x,y));
+
 
      //Add the area of one cell at a time - elevation difference between
     //the outlet of this depression and the current cell, multiplied by the area of the current cell.
