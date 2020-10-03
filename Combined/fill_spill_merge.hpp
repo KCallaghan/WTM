@@ -62,10 +62,10 @@ static void CalculateWtdVol(
   DepressionHierarchy<elev_t>   &deps
 );
 
-static float CalculateInfiltration(
+static double CalculateInfiltration(
   int                           cell,
   double                        distance,
-  float                         h_0,
+  double                         h_0,
   ArrayPack                     &arp
 );
 
@@ -80,7 +80,7 @@ static void MoveWaterInDepHier(
 
 template<class elev_t>
 static void MoveWaterInOverflow(
-  float                          extra_water,
+  double                          extra_water,
   const dh_label_t               current_dep,
   const dh_label_t               previous_dep,
   DepressionHierarchy<elev_t>    &deps,
@@ -265,7 +265,7 @@ void FillSpillMerge(
   //determine which depressions or metadepressions contain standing water. We
   //then modify `wtd` in order to distribute this water across the cells of the
   //depression which will lie below its surface.
-  std::cerr<<"FindDepressionsToFill"<<std::endl;
+  std::cout<<"find depressions"<<std::endl;
   FindDepressionsToFill(OCEAN,deps,arp);
   RDLOG_TIME_USE<<"t FlowInDepressionHierarchy: Fill time = "<<timer_filled.stop()<<" s";
   RDLOG_TIME_USE<<"t FlowInDepressionHierarchy = "<<timer_overall.stop()<<" s";
@@ -457,8 +457,8 @@ static void MoveWaterIntoPits(
           //from the cell centre to the edge of the cell in the direction
           //of the neighbour.
 
-          float my_infiltration = CalculateInfiltration(c,distance,arp.runoff(c),arp);
-          arp.wtd(c) += my_infiltration;
+          double my_infiltration = CalculateInfiltration(c,distance,static_cast<double>(arp.runoff(c)),arp);
+          arp.wtd(c) += my_infiltration / static_cast<double>(arp.porosity(c));
           //add infiltration to the water table
           arp.runoff(c) -= my_infiltration;
           //and subtract the infiltration from the available surface water.
@@ -474,9 +474,10 @@ static void MoveWaterIntoPits(
           if(arp.runoff(c) > 0){
             //check again if there is water available since it's possible
             //the infiltration above used it up.
-            my_infiltration = CalculateInfiltration(n,distance,arp.runoff(c),arp);
-            arp.wtd(n)    += my_infiltration;
+            my_infiltration = CalculateInfiltration(n,distance,static_cast<double>(arp.runoff(c)),arp);
+            arp.wtd(n)    += my_infiltration / static_cast<double>(arp.porosity(n));
             arp.runoff(c) -= my_infiltration;
+
 
             assert(fp_le(arp.wtd(n),0));
             assert(fp_ge(arp.runoff(c),0));
@@ -558,6 +559,7 @@ static void CalculateWtdVol(
 
   for(int y=0;y<wtd.height();y++)
   for(int x=0;x<wtd.width();x++){
+
     //cycle through the domain and add up all of the below-ground water storage space available
     auto clabel = final_label(x,y);
     //We should use final_label because a leaf depression will contain cells which are above its
@@ -580,6 +582,10 @@ static void CalculateWtdVol(
     //this records the space that is only in the ground - not including above-ground space. This is needed to obtain the
     //appropriate total wtd_vols for metadepressions, below.
     //- because wtd is negative.
+
+if(clabel == 59563)
+  std::cout<<"cell had wtd "<<wtd(x,y)<<std::endl;
+
     }
 
 
@@ -653,26 +659,26 @@ static void CalculateWtdVol(
 ///                  in each cell, should the user want this information.
 ///@return Calculates the amount of infiltration that will happen in this cell within
 ///        the time it takes the amount of  water to travel the given distance.
-static float CalculateInfiltration(
+static double CalculateInfiltration(
   int         cell,
   double      distance,
-  float       h_0,
+  double       h_0,
   ArrayPack   &arp
 ){
-  float mannings_n = 0.05; //TODO: is this the best value?
-  float my_infiltration = 0.0;
+  double mannings_n = 0.05; //TODO: is this the best value?
+  double my_infiltration = 0.0;
 
-  float vert_ksat = std::max(arp.vert_ksat(cell),0.000001f);
+  double vert_ksat = std::max(static_cast<double>(arp.vert_ksat(cell)),0.000001);
   //assigning a small minimum vertical ksat, since otherwise in cells with zero vert_ksat, the delta_t will be infinity.
 
-  float slope = std::max(arp.slope(cell), 0.000001f);
+  double slope = std::max(static_cast<double>(arp.slope(cell)), 0.000001);
   //assigning a small minimum slope, since otherwise in cells with zero slope, the delta_t will be infinity.
 
 
   //Manning's equation is rearranged to compute the amount of time it will take the given amount of water to cross the cell.
-  float bracket = std::pow(h_0,(5.0/3.0)) - (vert_ksat * distance * (mannings_n/std::pow(slope,0.5)) * (5/3));
-  float numerator = h_0 - std::pow(bracket,(3.0/5.0));
-  float delta_t = numerator/vert_ksat;
+  double bracket = std::pow(h_0,(5.0/3.0)) - (vert_ksat * distance * (mannings_n/std::pow(slope,0.5)) * (5/3));
+  double numerator = h_0 - std::pow(bracket,(3.0/5.0));
+  double delta_t = numerator/vert_ksat;
   //delta_t is the amount of time it will take the given amount of
   //water to cross the given distance.
 
@@ -684,8 +690,8 @@ static float CalculateInfiltration(
     my_infiltration =  h_0;  //We have to limit the infiltration to be equal to the available water, h0.
   }
 
-  if(arp.wtd(cell) > -my_infiltration){  //if the cell is getting saturated partway.
-    my_infiltration = std::min(my_infiltration,-arp.wtd(cell));
+  if( (arp.wtd(cell)*static_cast<double>(arp.porosity(cell)) )  > -my_infiltration){  //if the cell is getting saturated partway.
+    my_infiltration = std::min(my_infiltration,static_cast<double>(-arp.wtd(cell))*static_cast<double>(arp.porosity(cell)) );
     //But, we must check for the case where both the cell becomes saturated
     //and the water gets used up.
     //sometimes the water may run out before the saturation occurred.
@@ -889,7 +895,7 @@ static void MoveWaterInDepHier(
 ///         amount of water contained in each depression.
 template<class elev_t>
 static void MoveWaterInOverflow(
-  float                          extra_water,
+  double                          extra_water,
   const dh_label_t               current_dep,
   const dh_label_t               previous_dep,
   DepressionHierarchy<elev_t>    &deps,
@@ -897,7 +903,6 @@ static void MoveWaterInOverflow(
   ArrayPack                      &arp
 
   ){
-
   auto &this_dep = deps.at(current_dep);
   auto &last_dep = deps.at(previous_dep);
   int move_to_cell = NO_VALUE;  //the cell that will be the next to receive the extra water
@@ -909,16 +914,18 @@ static void MoveWaterInOverflow(
   double distance = 0;
 
   //convert extra water to a height
-  extra_water = extra_water/arp.cell_area[y];
+ // extra_water = extra_water/arp.cell_area[y];
   //it was easier to have extra_water as a volume when calling this function,
   //since it was calculated from the volumes of the depressions and the water.
   //however, inside this function it is easier to have as a height,
   //since infilatration is happening and will be calculated as a height.
 
+
   assert(extra_water > 0);
 
-  int nx;
+  int nx;  //the neighbour cells to check
   int ny;
+
   //The water must move downslope but we must also check that it moves
   //towards this_dep and doesn't flow back into last_dep
   for(int n=1;n<=neighbours;n++){ //Check out our neighbours
@@ -926,109 +933,122 @@ static void MoveWaterInOverflow(
     ny = y+dy[n];                 //Use offset to get neighbour y coordinate
     if(!arp.topo.inGrid(nx,ny))   //Is cell outside grid (too far North/South)?
       continue;                   //Yup: skip it.
-    //
-    if( ( this_dep.dep_label == arp.label(nx,ny)) && ( move_to_cell == NO_VALUE || arp.topo(nx,ny)<arp.topo(move_to_cell)))
+    //we will choose this neighbour cell if it has the label of this_dep, so we are not going back into the
+    //giving dep or any other adjacent deps. This is okay to do since we will only ever call
+    //this function on a leaf depression: either when an ocean-linked depression overflows into
+    //its leaf parent, or when we pass water to a geolinked neighbour.
+    //We will also only choose this neighbour if its elevation is lower than any previously selected neighbour,
+    //so that we can find the steepest downslope direction. We can't just use flowdirs here since we
+    //need to ensure we choose a cell with the correct label.
+
+    // THIS COULD BE GOING IN THE WRONG DIRECTION! If there are multiple cells with the correct label and EQUAL topo, then we could follow flowdirs
+    //after that from one down into the wrong depression!
+    //Even if we get the right cell, if it's equal to the outlet, its flowdir could be towards the outlet.
+    if( ( this_dep.dep_label == arp.label(nx,ny)) && ( move_to_cell == NO_VALUE || arp.topo(nx,ny)<arp.topo(move_to_cell))){
       move_to_cell = arp.topo.xyToI(nx,ny);
+    }
 
   }  //so now we know which is the correct starting cell.
   assert(move_to_cell != NO_VALUE);
 
+  //we don't want to infiltrate in last_dep.out_cell if it does not share this depression's label,
+  //because we have already done the overflow from that depression, so it could lead to an overfull depression if we do.
+  //For simplicity, I am choosing not to infiltrate in the out_cell even if it shares this depression's label. TODO: fix this.
+
   while(extra_water > 0){
-    distance = 0;
-    int p_x,p_y;
-    arp.topo.iToxy(previous_cell,p_x,p_y);
-    //same x means use e-w direction
-    if(p_x == x)
-      distance += arp.cellsize_e_w_metres[y]/2.0;
-    else if(p_y == y) //this means use n-s direction
-      distance += params.cellsize_n_s_metres/2.0;
-    else
-      distance += (std::pow( (std::pow(arp.cellsize_e_w_metres[y], 2.0) + \
-        std::pow(params.cellsize_n_s_metres,2.0)), 0.5))/2.0;
+    assert(arp.label(move_to_cell) == this_dep.dep_label);
 
-    if(x == nx)
-      distance += arp.cellsize_e_w_metres[ny]/2.0;
-    else if(y == ny) //this means use n-s direction
-      distance += params.cellsize_n_s_metres/2.0;
-    else
-      distance += (std::pow( (std::pow(arp.cellsize_e_w_metres[ny], 2.0) + \
-        std::pow(params.cellsize_n_s_metres,2.0)), 0.5))/2.0;
+    int move_to_cell_x, move_to_cell_y;
+    double this_cell_wtd = static_cast<double>(arp.wtd(move_to_cell));
+    arp.topo.iToxy(move_to_cell,move_to_cell_x,move_to_cell_y);
 
-    float my_infiltration;
-    my_infiltration = CalculateInfiltration(previous_cell,distance,extra_water,arp);
-    arp.wtd(previous_cell) += my_infiltration;
-    extra_water -= my_infiltration;
+ //   extra_water = extra_water/arp.cell_area[y]*arp.cell_area[move_to_cell_y];
+
+    if(x == move_to_cell_x)      //this means use e-w direction
+      distance = arp.cellsize_e_w_metres[move_to_cell_y];  //distance travelled for infiltration
+    else if(y == move_to_cell_y) //this means use n-s direction
+      distance = params.cellsize_n_s_metres;
+    else                         //diagonal, use pythagoras.
+      distance = (std::pow( (std::pow(arp.cellsize_e_w_metres[move_to_cell_y], 2.0) + std::pow(params.cellsize_n_s_metres,2.0)), 0.5));
+
+    double my_infiltration = CalculateInfiltration(move_to_cell,distance,(extra_water/arp.cell_area[move_to_cell_y]),arp);
 
 
+//This is a precision issue. If I calculate it based on the infiltration amount vs on the remaining wtd, I get different answers.
+    //everything coming out of CalculateInfiltration is a double. But, either it's not precise enough or something else isn't.
+    //maybe the wtd array itself?
+    //I THINK IT'S THE WTD ARRAY ITSELF! After the first time infiltration happens in this cell, it doesn't store the new value precisely enough.
 
-    assert(fp_le(arp.wtd(previous_cell),0));
-    assert(fp_ge(extra_water,0));
+
+    if(my_infiltration > 0){
+
+      assert(fp_ge(-(this_cell_wtd ), ( my_infiltration/ static_cast<double>(arp.porosity(move_to_cell))   ) ) );
 
 
-    if(extra_water <= 0)
-      break;
 
-    my_label = arp.label(move_to_cell);
+      arp.wtd(move_to_cell) += my_infiltration / static_cast<double>(arp.porosity(move_to_cell));  //infiltrate into the cell
 
-    while(my_label != arp.final_label(move_to_cell)){
-    //adjust the wtd_vol of me and all my parents
-      if(arp.topo(last_dep.out_cell)<deps.at(my_label).out_elev){
-        deps.at(my_label).wtd_vol -= my_infiltration*arp.cell_area[ny];
-        deps.at(my_label).water_vol -= my_infiltration*arp.cell_area[ny];
+      if(-(this_cell_wtd) < (my_infiltration/ static_cast<double>(arp.porosity(move_to_cell)) )){
+        my_infiltration = -this_cell_wtd * static_cast<double>(arp.porosity(move_to_cell));
+        arp.wtd(move_to_cell) = 0.;
+
       }
+      this_cell_wtd         += my_infiltration / static_cast<double>(arp.porosity(move_to_cell));
+      extra_water           -= my_infiltration *arp.cell_area[move_to_cell_y] ;  //and that much of the water has been used up.
 
-      assert(fp_ge(deps.at(my_label).wtd_vol, deps.at(my_label).dep_vol));
-      if(deps.at(my_label).wtd_vol < deps.at(my_label).dep_vol)
-        deps.at(my_label).wtd_vol = deps.at(my_label).dep_vol;
+      assert(fp_le(arp.wtd(move_to_cell),0));
+      if(arp.wtd(move_to_cell)>=0)
+        arp.wtd(move_to_cell) = 0;
 
-      if(deps.at(my_label).water_vol < 0)
-        deps.at(my_label).water_vol = 0;
-        //because we might be adjusting a water_vol of a higher depression
-      //that doesn't yet have water, so we have to switch that back to 0.
+      assert(fp_ge(extra_water,0));
 
-      my_label = deps.at(my_label).parent;
+
+
+      my_label = arp.label(move_to_cell);
+
+      while(my_label != OCEAN ){
+      //adjust the wtd_vol of me and all my parents
+
+        //only if it's below the outlet elevation do we modify wtd vol and water vol.
+        if(arp.topo(move_to_cell)<=deps.at(my_label).out_elev){
+          deps.at(my_label).wtd_vol   -= my_infiltration*static_cast<double>(arp.cell_area[move_to_cell_y]);//*static_cast<double>(arp.porosity(move_to_cell));
+
+          if(deps.at(my_label).water_vol > 0)  //only adjust the water_vol in depressions where this is > 0, since some parents may not yet have received the water volumes of their descendents.
+            deps.at(my_label).water_vol -= my_infiltration*static_cast<double>(arp.cell_area[move_to_cell_y]);//*static_cast<double>(arp.porosity(move_to_cell));
+        }
+
+        assert(deps.at(my_label).wtd_vol - deps.at(my_label).dep_vol >= -FP_ERROR);
+        if(deps.at(my_label).wtd_vol < deps.at(my_label).dep_vol)
+          deps.at(my_label).wtd_vol = deps.at(my_label).dep_vol;
+
+        assert(fp_ge(deps.at(my_label).water_vol, 0));
+        if(deps.at(my_label).water_vol < 0)
+          deps.at(my_label).water_vol = 0;
+
+        if(deps.at(my_label).ocean_parent)
+          break;
+
+        my_label = deps.at(my_label).parent;
+      }
+      if(extra_water <= 0)
+        break;
     }
 
-    this_dep = deps.at(current_dep);
-    //I needed to reset this because seemingly the above while loops
-    //could mess it up somehow?
-
-    assert(fp_le(arp.wtd(move_to_cell),0));
-    if(arp.wtd(move_to_cell)>=0)
-      arp.wtd(move_to_cell) = 0;
-
-    if(extra_water<=0)
-      break;
-
-    assert(extra_water > 0);
 
     const auto ndir = arp.flowdirs(move_to_cell);
-
-
-    if(ndir == NO_FLOW)   //we've reached a pit cell, so we can stop.
-      extra_water = 0;
-      //TODO: check that I can still just do it this way.
-    //Infiltration in this cell should still happen when I go to spread water?
-    // (check that we do infiltrate in the starting cell!)
-      //TODO: confirm whether the water_vol for this depression
-    //knows about the remaining extra_water.
-
-    else{                                   //we need to keep moving downslope.
+    if(ndir == NO_FLOW){   //we've reached a pit cell, so we can stop.
+      extra_water = 0;    //No need to worry about infiltration in the pit cell: this will happen down in FillDepressions.
+      break;
+    }
+    else{                 //we need to keep moving downslope.
       previous_cell = move_to_cell;
-      int x1,y1;
-      arp.topo.iToxy(move_to_cell,x1,y1);
-       //then we can use flowdirs to move the water all
-      //the way down to this_dep's pit cell.
-      nx = x1+dx[ndir];
-      ny = y1+dy[ndir];
+      arp.topo.iToxy(move_to_cell,x,y);
+      //then we can use flowdirs to move the water all the way down to this_dep's pit cell.
+      nx = x+dx[ndir];
+      ny = y+dy[ndir];
       move_to_cell = arp.topo.xyToI(nx,ny);  //get the new move_to_cell
       assert(move_to_cell>=0);
     }
-
-    if(arp.topo(move_to_cell)>arp.topo(previous_cell))
-      extra_water = 0;
-
-    assert(fp_ge(extra_water,0));
 
   }
 }
@@ -1375,6 +1395,7 @@ static SubtreeDepressionInfo FindDepressionsToFill(
     //we do not want to attempt to do so again in an empty parent depression.
     //We check to see if both children have finished spreading water.
     else{
+//std::cout<<"fill depression "<<combined.top_label<<std::endl;
       FillDepressions(deps.at(combined.leaf_label).pit_cell,
                       deps.at(combined.top_label).out_cell,
                       deps.at(combined.top_label).out_elev,
@@ -1494,7 +1515,6 @@ static void FillDepressions(
   DepressionHierarchy<elev_t>          &deps,
   ArrayPack                            &arp
 ){
-
   //Nothing to do if we have no water
   if(water_vol==0)
     return;
@@ -1619,6 +1639,10 @@ static void FillDepressions(
 
     }
 
+
+if(dep_labels.count(59563)==1){
+  std::cerr<<"not enough space yet "<<current_volume<<" water vol of "<<water_vol<<" cells_affected "<<cells_affected.size()<<std::endl;
+}
     //We haven't found enough volume for the water yet.
 
     //The outlet cell never impacts the amount of water the depression can hold
@@ -1633,6 +1657,11 @@ static void FillDepressions(
       assert(fp_le(arp.wtd(c.x,c.y),0) );
       if(arp.wtd(c.x,c.y) > 0)
         arp.wtd(c.x,c.y) = 0;
+
+if(dep_labels.count(59563)==1){
+  std::cout<<"the wtd in cell x "<<c.x<<" y "<<c.y<<" is "<<arp.wtd(c.x,c.y)<<std::endl;
+}
+
 
    //  depth-variable porosity version
    //   water_vol += arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y) * (exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) - 1);
