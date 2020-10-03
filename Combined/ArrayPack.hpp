@@ -6,6 +6,8 @@
 namespace rd = richdem;
 
 typedef richdem::Array2D<float>  f2d;
+typedef richdem::Array2D<double>  d2d;
+
 typedef richdem::Array2D<uint8_t>  ui82d;
 typedef std::vector<double> dvec;
 typedef int32_t dh_label_t;
@@ -41,10 +43,10 @@ class ArrayPack {
   f2d winter_temp;
   f2d fdepth;
 
-  f2d wtd;
+  d2d wtd;
   f2d wtd_mid;
   f2d wtd_old;
-  f2d wtd_changed;
+  d2d wtd_changed;
 
   f2d rech;
   f2d runoff;
