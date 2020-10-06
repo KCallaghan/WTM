@@ -1431,10 +1431,11 @@ static void FillAFullDepression(
     //for each one, check through all of the cells contained within the
     //depression with that label (only leaf depressions store this information)
     for(const auto cell: deps.at(label).my_cells){
+      std::cout<<"fill label "<<label<<" cell "<<cell<<std::endl;
       //if the cell is lower than the outlet elevation, it is affected
       //by the depression fill on this level, so we update the wtd in this cell.
       if(arp.topo(cell) > deps.at(stdi.top_label).out_elev)
-        break;
+        std::cout<<"wtf"<<std::endl;
       else
         arp.wtd(cell) = deps.at(stdi.top_label).out_elev - arp.topo(cell);
     }
