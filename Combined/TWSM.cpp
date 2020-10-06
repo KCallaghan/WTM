@@ -105,7 +105,7 @@ void update(
     for(int x=1;x<params.ncells_x-1; x++){
       if(arp.land_mask(x,y) == 0)          //skip ocean cells
         continue;
-      add_recharge(x, y, params, arp);
+      arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
     }
 
     FanDarcyGroundwater::update(params, arp);
