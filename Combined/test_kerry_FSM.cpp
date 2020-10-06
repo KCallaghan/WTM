@@ -270,7 +270,7 @@ TEST_CASE("Fill a full depression"){
       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
   };
 
-  auto DH = GetDepressionHierarchy<double,Topology::D8>(dem, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
+  auto DH = GetDepressionHierarchy<double,Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
   FillAFullDepression(my_stdi, DH, arp);
 
