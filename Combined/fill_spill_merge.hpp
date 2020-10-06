@@ -135,8 +135,12 @@ void BackfillDepression(
   std::vector<flat_c_idx> &cells_affected
 );
 
+template<class elev_t, class wtd_t>
 double DetermineWaterLevel(
-  ArrayPack    &arp,
+  const Array2D<elev_t>     &topo,
+  const Array2D<float>      &porosity,
+  const std::vector<double> &cell_area,
+  Array2D<wtd_t>            &wtd,
   const double water_vol,
   const int    cx,
   const int    cy,
@@ -1600,7 +1604,7 @@ static void FillDepressions(
       //this cell is sufficient to store all of the water. We'll stop adding
       //cells and fill things now.
 
-      auto water_level = DetermineWaterLevel(arp, water_vol, c.x,  c.y, current_volume, current_area, area_times_elevation_total);
+      auto water_level = DetermineWaterLevel(arp.topo,arp.porosity,arp.cell_area,arp.wtd, water_vol, c.x,  c.y, current_volume, current_area, area_times_elevation_total);
 
       //Water level must be higher than (or equal to) the previous cell we looked at, but lower than (or equal to) the current cell
       assert(cells_affected.size()==0 || fp_le(arp.topo(cells_affected.back()),water_level) );
@@ -1744,9 +1748,12 @@ void BackfillDepression(
 ///@param cells_to_spread_across How many cells the water is to be spread across
 ///
 ///@return The elevation of the water level
-//template<class wtd_t>
+template<class elev_t, class wtd_t>
 double DetermineWaterLevel(
-  ArrayPack    &arp,
+  const Array2D<elev_t>     &topo,
+  const Array2D<float>      &porosity,
+  const std::vector<double> &cell_area,
+  Array2D<wtd_t>            &wtd,
   double       water_vol,
   const int    cx,
   const int    cy,
@@ -1769,15 +1776,15 @@ double DetermineWaterLevel(
     //    arp.wtd(c.x,c.y) = arp.fdepth(c.x,c.y) * log(exp(arp.wtd(c.x,c.y)/arp.fdepth(c.x,c.y)) +
     //      fill_amount/(arp.cell_area[c.y] * arp.porosity(c.x,c.y) * arp.fdepth(c.x,c.y)));
 
-    arp.wtd(cx,cy) += fill_amount/arp.cell_area[cy]/arp.porosity(cx,cy);
+    wtd(cx,cy) += fill_amount/cell_area[cy]/porosity(cx,cy);
 
-    water_level = arp.topo(cx,cy);
+    water_level = topo(cx,cy);
 
 
   } else if (current_volume==water_vol) {
     //The volume of water is exactly equal to the above ground volume
     //so we set the water level equal to this cell's elevation
-    water_level = arp.topo(cx,cy);
+    water_level = topo(cx,cy);
   } else {  //The water volume is less than this cell's elevation,
     //so we calculate what the water level should be.
     //Volume of water = sum(current_area*(water_level -
