@@ -53,3 +53,14 @@ add_executable(dephier.x
 target_link_libraries(dephier.x PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_CXX)
 target_compile_features(dephier.x PRIVATE cxx_std_17)
 add_sanitizers(dephier.x)
+
+
+add_executable(fsm_unittests.exe
+  Combined/test_main.cpp
+  Combined/test_kerry_FSM.cpp
+)
+target_link_libraries(fsm_unittests.exe PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_CXX)
+target_compile_features(fsm_unittests.exe PUBLIC cxx_auto_type cxx_std_17)
+
+
+
