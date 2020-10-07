@@ -295,9 +295,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   RDLOG_ALG_NAME<<"DepressionHierarchy";
 
 
-
-std::cout<<"dem"<<std::endl;
-  dem.printAll();
   //A D4 or D8 topology can be used.
   const int    *dx;
   const int    *dy;
@@ -553,7 +550,6 @@ std::cout<<"dem"<<std::endl;
         //the priority queue later and, in looking at their neighbours, reach
         //this point.
       } else {
-        std::cout<<"we are on cell "<<ci<<" which has elevation "<<celev<<std::endl;
         //We've found a neighbouring depression!
 
         //Determine whether the focal cell or this neighbour is the outlet of
@@ -856,11 +852,6 @@ void CalculateMarginalVolumes(
       deps[i].dep_area        += total_areas[i];     //We need to know the area of our child depressions when getting the total depression volumes below.
       deps[i].dep_vol         += total_volumes[i];
       deps[i].cell_count      += cell_counts[i];
-      std::sort(deps[i].my_cells.begin(), deps[i].my_cells.end());
-
-      for(const auto cell: deps[i].my_cells)
-        std::cout<<"label "<<i<<" cell "<<cell<<std::endl;
-      std::cout<<"label "<<i<<" out elev "<<deps[i].out_elev<<"out cell "<<deps[i].out_cell<<std::endl;
     }
   progress.stop();
 }
