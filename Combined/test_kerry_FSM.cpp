@@ -219,77 +219,191 @@ TEST_CASE("Fill a full depression"){
 
   ArrayPack arp;
 
-  arp.wtd = Array2D<double>(10,10,0);
-  arp.topo.resize(arp.wtd.width(),arp.wtd.height(),2);
-  arp.topo.setEdges(-9);
-  arp.topo(4,2) = 1;
-  arp.topo(4,3) = 1;
-  arp.topo(4,4) = 1;
-  arp.topo(4,5) = 1;
-  arp.topo(4,6) = 1;
+  SUBCASE("A very basic depression"){
+
+    arp.topo.resize(10,10,2);
+    arp.topo.setEdges(-9);
 
 
+    arp.topo(4,2) = 1;
+    arp.topo(4,3) = 1;
+    arp.topo(4,4) = 1;
+    arp.topo(4,5) = 1;
+    arp.topo(4,6) = 1;
+    arp.topo(3,6) = 3;
 
-  std::cout<<"topo"<<std::endl;
-  arp.topo.printAll();
+    arp.wtd = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
+    arp.label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
+    arp.label.setEdges(OCEAN);
 
-  const Array2D<double> dem = {
-      {-9,-9,-9,-9,-9,-9,-9,-9,-9, -9},
-      {-9, 2, 2, 2, 2, 2, 2, 2, 2, -9},
-      {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},
-      {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},
-      {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},
-      {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},
-      {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},
-      {-9, 2, 2, 2, 2, 2, 2, 2, 2, -9},
-      {-9, 2, 2, 2, 2, 2, 2, 2, 2, -9},
-      {-9,-9,-9,-9,-9,-9,-9,-9,-9, -9},
-  };
+    arp.final_label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
+    arp.final_label.setEdges(OCEAN);
 
- //not sure why passing dem to GetDepressionHierarchy below works, and passing arp.topo doesn't?? So weird
-  arp.wtd = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
-  arp.label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
-  arp.label.setEdges(OCEAN);
+    arp.flowdirs = Array2D<flowdir_t>  (arp.topo.width(), arp.topo.height(), NO_FLOW);
+    arp.cell_area = std::vector<double> (arp.topo.height(), 1.);
 
-  arp.final_label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
-  arp.final_label.setEdges(OCEAN);
+    const Array2D<double> wtd_good = {
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    };
 
-  arp.flowdirs = Array2D<flowdir_t>  (arp.topo.width(), arp.topo.height(), NO_FLOW);
-  arp.cell_area = std::vector<double> (arp.topo.height(), 1.);
+    auto DH = GetDepressionHierarchy<float,Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
-  const Array2D<double> wtd_good = {
-      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-  };
-
-  auto DH = GetDepressionHierarchy<double,Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
-
-  FillAFullDepression(my_stdi, DH, arp);
-
-std::cout<<"labels"<<std::endl;
-  arp.label.printAll();
-
-std::cout<<"wtd"<<std::endl;
-  arp.wtd.printAll();
+    FillAFullDepression(my_stdi, DH, arp);
 
 
+    CHECK(ArrayValuesEqual(arp.wtd,wtd_good));
+  }
+  SUBCASE("Depression with a little more going on"){
+  	arp.wtd = Array2D<double>(10,10,0);
+    arp.topo.resize(arp.wtd.width(),arp.wtd.height(),4);
+    arp.topo.setEdges(-9);
 
 
-  CHECK(ArrayValuesEqual(arp.wtd,wtd_good));
+    arp.topo = {
+        {-9,-9,-9,-9,-9,-9,-9,-9,-9, -9},
+        {-9, 4, 4, 3, 3, 3, 3, 3, 4, -9},
+        {-9, 4, 3, 3, 1, 2, 0, 3, 4, -9},
+        {-9, 3, 3, 3, 1, 2, 0, 1, 4, -9},
+        {-9, 3, 4, 3, 1, 0, 0, 1, 4, -9},
+        {-9, 4, 5, 4, 1, 2, 0, 2, 4, -9},
+        {-9, 4, 5, 5, 1, 2, 0, 2, 4, -9},
+        {-9, 4, 5, 6, 6, 3, 3, 3, 4, -9},
+        {-9, 4, 4, 6, 6, 3, 3, 3, 4, -9},
+        {-9,-9,-9,-9,-9,-9,-9,-9,-9, -9},
+    };
+
+
+    arp.wtd = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
+    arp.label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
+    arp.label.setEdges(OCEAN);
+
+    arp.final_label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
+    arp.final_label.setEdges(OCEAN);
+
+    arp.flowdirs = Array2D<flowdir_t>  (arp.topo.width(), arp.topo.height(), NO_FLOW);
+    arp.cell_area = std::vector<double> (arp.topo.height(), 1.);
+
+    const Array2D<double> wtd_good = {
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 2, 1, 3, 0, 0, 0},
+        {0, 0, 0, 0, 2, 1, 3, 2, 0, 0},
+        {0, 0, 0, 0, 2, 3, 3, 2, 0, 0},
+        {0, 0, 0, 0, 2, 1, 3, 1, 0, 0},
+        {0, 0, 0, 0, 2, 1, 3, 1, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    };
+
+    auto DH = GetDepressionHierarchy<float,Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
+
+    FillAFullDepression(my_stdi, DH, arp);
+
+    CHECK(ArrayValuesEqual(arp.wtd,wtd_good));
+  }
+
 
 }
 
 
 
 
+
+
+
+//This is hard to make work correctly: we need to know which depressions are contained within which for the function.
+//void RandomizedFullDepressionVsPriorityFlood(const int count, const int min_size, const int max_size){
+//  for(int i=0;i<count;i++){
+//  std::stringstream oss;
+//
+//  ArrayPack arp;
+//
+//    Array2D<double> topo;
+//
+//  {
+//    oss<<gen;
+//    topo = random_terrain(gen, min_size, max_size);
+//    std::cerr<<"Randomized Full Depression vs Priority-Flood #"<<i<<std::endl;
+//  }
+////topo.printAll("topo before");
+//
+// arp.topo.resize(topo.width(),topo.height(),0);
+//    for (int i=0;i<arp.topo.size();++i)
+//        arp.topo(i)=static_cast<float> (topo(i));
+////arp.topo.printAll("topo arp");
+//
+//
+//    arp.topo.setEdges(-9);
+//    arp.label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
+//    arp.label.setEdges(OCEAN);
+//    arp.final_label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
+//    arp.final_label.setEdges(OCEAN);
+//    arp.flowdirs = Array2D<flowdir_t>  (arp.topo.width(), arp.topo.height(), NO_FLOW);
+//    arp.cell_area = std::vector<double> (arp.topo.height(), 1.);
+//    arp.wtd = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
+//std::cerr<<"ive set all of those"<<std::endl;
+//
+//    auto DH = GetDepressionHierarchy<float,Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
+//    std::cerr<<"DH done"<<std::endl;
+//
+//
+//    for(i=1;i<arp.label.size();i++){
+//      SubtreeDepressionInfo my_stdi;
+//      my_stdi.my_labels.emplace(arp.label(i));
+//      my_stdi.top_label = arp.label(i);
+//      FillAFullDepression(my_stdi, DH, arp);
+//std::cerr<<std::setprecision(15)<<"and set the labels, "<<arp.label(i)<<" my out cell is "<<DH.at(my_stdi.top_label).out_elev<<std::endl;
+//    	}
+//
+//
+//arp.label.printAll("label");
+//arp.topo.printAll("topo");
+//
+//
+//
+//std::cerr<<"full depression done"<<std::endl;
+//std::cerr<<std::setprecision(15)<<"test mine before adding "<<arp.topo(5,5)<<std::endl;
+//
+//    //show the filled topo
+//    for(auto i=arp.topo.i0(); i<arp.topo.size(); i++){
+//      if(!arp.topo.isNoData(i))
+//        arp.topo(i) += arp.wtd(i);
+//    }
+//
+//
+//
+//
+//
+//    auto comparison_dem = arp.topo;
+//    PriorityFlood_Zhou2016(comparison_dem);
+//
+//arp.topo.printAll("wtd");
+//comparison_dem.printAll("priority flood dem");
+//
+//std::cerr<<std::setprecision(15)<<"test mine "<<arp.topo(5,5)<<std::endl;
+//std::cerr<<std::setprecision(15)<<"test priority "<<comparison_dem(5,5)<<std::endl;
+//std::cerr<<std::setprecision(15)<<"test wtd "<<arp.wtd(5,5)<<std::endl;
+//
+//
+//    CHECK_MESSAGE(MaxArrayDiff(comparison_dem,arp.topo)<1e-6, "Randomized full depression vs Priority-Flood failed with width = "+std::to_string(arp.topo.width())+" height = "+std::to_string(arp.topo.height())+" state = " + oss.str());
+//  }
+//}
+//
+//
+//TEST_CASE("Randomized Full depression vs Priority-Flood"){
+//  RandomizedFullDepressionVsPriorityFlood(number_of_small_tests,  10,  30);
+//  RandomizedFullDepressionVsPriorityFlood(number_of_large_tests, 100, 300);
+//}
 
 //void RandomizedHeavyFloodingVsPriorityFlood(const int count, const int min_size, const int max_size){
 //  #pragma omp parallel for
