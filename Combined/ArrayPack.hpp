@@ -44,8 +44,8 @@ class ArrayPack {
   f2d fdepth;
 
   d2d wtd;
-  f2d wtd_mid;
-  f2d wtd_old;
+  d2d wtd_mid;
+  d2d wtd_old;
   d2d wtd_changed;
 
   f2d rech;
