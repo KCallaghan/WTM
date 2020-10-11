@@ -176,7 +176,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   }
 
 
-  arp.wtd           = rd::Array2D<double>(arp.topo,0.);
+  arp.wtd           = rd::Array2D<double>(arp.topo,-1.);
   //we start with a water table at the surface for equilibrium runs.
 
   arp.fdepth   = rd::Array2D<float>(arp.topo,0);
@@ -537,8 +537,8 @@ void PrintValues(Parameters &params, ArrayPack &arp){
   for(int y=1;y<params.ncells_y-1;y++)
   for(int x=1;x<params.ncells_x-1; x++){
     params.abs_total_wtd_change += fabs(arp.wtd(x,y)     - arp.wtd_old(x,y));
-    params.abs_GW_wtd_change    += fabs(arp.wtd(x,y)     - arp.wtd_mid(x,y));
-    params.abs_wtd_mid_change   += fabs(arp.wtd_mid(x,y) - arp.wtd_old(x,y));
+    params.abs_wtd_mid_change   += fabs(arp.wtd(x,y)     - arp.wtd_mid(x,y));
+    params.abs_GW_wtd_change    += fabs(arp.wtd_mid(x,y) - arp.wtd_old(x,y));
     params.total_wtd_change     += (arp.wtd(x,y)         - arp.wtd_old(x,y));
     params.wtd_mid_change       += (arp.wtd(x,y)         - arp.wtd_mid(x,y));
     params.GW_wtd_change        += (arp.wtd_mid(x,y)     - arp.wtd_old(x,y));
