@@ -59,14 +59,14 @@ double depthIntegratedTransmissivity(
     // also seems an okay thing to do in this case.
     return 0;
   } else if(wtd < -shallow){ // Equation S6 from the Fan paper
-    return std::max(0,fdepth * ksat * std::exp((wtd + shallow)/fdepth));
+    return std::max(0.0,fdepth * ksat * std::exp((wtd + shallow)/fdepth));
   } else if(wtd > 0){
     // If wtd is greater than 0, max out rate of groundwater movement
     // as though wtd were 0. The surface water will get to move in
     // FillSpillMerge.
-    return std::max(0,ksat * (0 + shallow + fdepth));
+    return std::max(0.0,ksat * (0 + shallow + fdepth));
   } else { //Equation S4 from the Fan paper
-    return std::max(0,ksat * (wtd + shallow + fdepth));  //max because you can't have a negative transmissivity.
+    return std::max(0.0,ksat * (wtd + shallow + fdepth));  //max because you can't have a negative transmissivity.
   }
 }
 
