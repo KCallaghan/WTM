@@ -69,6 +69,8 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   arp.land_mask         = LoadData<uint8_t>(params.surfdatadir + params.region + \
   params.time_end + "_mask.nc",   "value");  //A binary mask that is 1 where
   //there is land and 0 in the ocean
+  arp.land_mask.setEdges(0);
+
 
   arp.precip_end        = LoadData<float>(params.surfdatadir + params.region + \
   params.time_end + "_precip.nc", "value");  //Units: m/yr.
@@ -156,6 +158,8 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
   arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region + \
   params.time_start + "_mask.nc",   "value");
+  arp.land_mask.setEdges(0);
+
   //A binary mask that is 1 where there is land and 0 in the ocean
 
   arp.precip        = LoadData<float>(params.surfdatadir + params.region + \
@@ -216,6 +220,8 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   }
 
   arp.land_mask = rd::Array2D<uint8_t>(arp.topo,1);
+  arp.land_mask.setEdges(0);
+
   //A binary mask that is 1 where there is land and 0 in the ocean
 
   arp.precip          = rd::Array2D<float>(arp.topo,0.03);  //Units: m/yr.
@@ -223,10 +229,10 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.open_water_evap = rd::Array2D<float>(arp.topo,0.5); //Units: m/yr.
 
   arp.winter_temp     = rd::Array2D<float>(arp.topo,0);    //Units: deg C
-  arp.wtd             = rd::Array2D<double>(arp.topo,-2.0);
+  arp.wtd             = rd::Array2D<double>(arp.topo,0.0);
   //we start with a water table below the surface for testing.
   arp.evap            = arp.starting_evap;
-  arp.fdepth          = rd::Array2D<float>(arp.topo,500);
+  arp.fdepth          = rd::Array2D<float>(arp.topo,100);
 
   for(int y=1;y<params.ncells_y;y++)
   for(int x=1;x<params.ncells_x; x++){
