@@ -139,6 +139,7 @@ void update(
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
     if(arp.wtd(i)>0)  //if there is surface water present
+//arp.wtd(i) = 0;   //use this option when testing GW component alone
       arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
     else{              //water table is below the surface
       arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
