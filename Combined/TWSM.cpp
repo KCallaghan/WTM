@@ -45,8 +45,6 @@ void initialise(Parameters &params, ArrayPack &arp){
       Please choose transient or equilibrium.");
   }
 
-
-
   arp.check();
   textfile.close();
 }
@@ -69,7 +67,7 @@ void update(
     UpdateTransientArrays(params,arp);
     //linear interpolation of input data from start to end times.
     auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>\
-    (arp, arp.label, arp.final_label, arp.flowdirs);
+    (arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
     //with transient runs, we have to redo the depression hierarchy every time,
     //since the topography is changing.
   }
@@ -78,17 +76,17 @@ void update(
 
   //TODO: How should equilibrium know when to exit?
   if((params.cycles_done % 100) == 0){
-    textfile<<"saving partway result"<<std::endl;
+    textfile<<"saving partway result."<<std::endl;
+    //arp.wtd.printAll();
     string cycles_str = to_string(params.cycles_done);
-    SaveAsNetCDF(arp.wtd,params.outfilename + cycles_str +".nc","value");
-    //Save the output every 10 iterations, under a new filename
+    arp.wtd.saveGDAL(params.outfilename + cycles_str +".tif");
+
+    //Save the output every 100 iterations, under a new filename
     //so we can compare how the water table has changed through time.
   }
 
   arp.wtd_old = arp.wtd;  //These are used to see how much change occurs
   arp.wtd_mid = arp.wtd;  //in FSM vs in the groundwater portion.
-
-
 
 
   //Run the groundwater code to move water
@@ -107,7 +105,7 @@ void update(
     for(int x=1;x<params.ncells_x-1; x++){
       if(arp.land_mask(x,y) == 0)          //skip ocean cells
         continue;
-      add_recharge(x, y, params, arp);
+      arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
     }
 
     FanDarcyGroundwater::update(params, arp);
@@ -138,13 +136,14 @@ void update(
  // evaporation_update(params,arp);
 
 
-  #pragma omp parallel for 
+  #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
     if(arp.wtd(i)>0)  //if there is surface water present
+//arp.wtd(i) = 0;   //use this option when testing GW component alone
       arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
     else{              //water table is below the surface
       arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
-      if(arp.rech(i) <0)    //Recharge is always positive. 
+      if(arp.rech(i) <0)    //Recharge is always positive.
         arp.rech(i) = 0.0f;
     }
   }
@@ -169,7 +168,7 @@ void run(Parameters &params, ArrayPack &arp){
   //Set the initial depression hierarchy.
   //For equilibrium runs, this is the only time this needs to be done.
   auto deps = dh::GetDepressionHierarchy<float,rd::Topology::D8>\
-  (arp, arp.label, arp.final_label, arp.flowdirs);
+  (arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
   while(true){
     update(params,arp,deps);

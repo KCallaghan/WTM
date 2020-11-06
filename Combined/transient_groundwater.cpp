@@ -36,8 +36,8 @@ struct FanDarcyPack {
   f2d_pointer   porosity;
   f2d_pointer   topo;
   f2d_pointer   transmissivity;
-  f2d_pointer   wtd;
-  f2d_pointer   wtd_changed;
+  d2d_pointer   wtd;
+  d2d_pointer   wtd_changed;
   f2d_pointer   ksat;
   int           width;
 };
@@ -59,14 +59,14 @@ double depthIntegratedTransmissivity(
     // also seems an okay thing to do in this case.
     return 0;
   } else if(wtd < -shallow){ // Equation S6 from the Fan paper
-    return fdepth * ksat * std::exp((wtd + shallow)/fdepth);
+    return std::max(0.0,fdepth * ksat * std::exp((wtd + shallow)/fdepth));
   } else if(wtd > 0){
     // If wtd is greater than 0, max out rate of groundwater movement
     // as though wtd were 0. The surface water will get to move in
     // FillSpillMerge.
-    return ksat * (0 + shallow + fdepth);
+    return std::max(0.0,ksat * (0 + shallow + fdepth));
   } else { //Equation S4 from the Fan paper
-    return ksat * (wtd + shallow + fdepth);
+    return std::max(0.0,ksat * (wtd + shallow + fdepth));  //max because you can't have a negative transmissivity.
   }
 }
 
@@ -110,7 +110,7 @@ double vonNeumannStability(
 /**
  * @brief Returns the maximum stable time step with a 2x factor of safety
  * @details Uses a 2D diffusion von Neumann stability analysis using the
- *          "worst case" scenario highest transmissivity, smallest cellsize, 
+ *          "worst case" scenario highest transmissivity, smallest cellsize,
  *          combined with a porosity-based amplification factor.
  */
 double computeMaxStableTimeStep(
@@ -173,29 +173,29 @@ double computeNewWTD(
   const double porosity,
   const double cell_area
 ){
-  //Since we are using a vertically constant porosity, we can just convert the 
-  //volume to a height of water right away. 
+  //Since we are using a vertically constant porosity, we can just convert the
+  //volume to a height of water right away.
   //If above ground, this will be the actual change in height;
   //If below ground, dividing this by porosity will give the height change.
   const double porosity_one_height_change = volume_change/cell_area;
   double final_wtd;
 
-  //either the cell starts with wtd above the surface, or with it below the surface. 
+  //either the cell starts with wtd above the surface, or with it below the surface.
   //If above the surface:
   if(initial_wtd >= 0){
-    //Either the result after moving water still has water above the surface, 
-    //because it was gaining water, or because it was losing water but it 
+    //Either the result after moving water still has water above the surface,
+    //because it was gaining water, or because it was losing water but it
     //lost less than the total surface water, or
-    //the results after moving water has the water table below the surface. 
+    //the results after moving water has the water table below the surface.
 
     //Now, let's compare the initial wtd + the height change to the land surface:
-    //If positive, it is still above the surface, 
-    //if negative, it is below the surface. 
+    //If positive, it is still above the surface,
+    //if negative, it is below the surface.
     final_wtd = initial_wtd + porosity_one_height_change;  //if positive, this is the final answer.
     if(final_wtd < 0){
       //the water table will now be below the surface, so we have to take porosity into account.
-      //final_wtd currently represents where the water table would be if porosity were 1. 
-      //all we have to do is divide it by porosity to get the actual water table. 
+      //final_wtd currently represents where the water table would be if porosity were 1.
+      //all we have to do is divide it by porosity to get the actual water table.
       final_wtd /= porosity;
     }
 
@@ -207,12 +207,12 @@ double computeNewWTD(
     double porosity_one_below_ground_height = -initial_wtd * porosity;
     if(porosity_one_height_change > porosity_one_below_ground_height){
       //the final wtd will be greater than 0. Subtract the amount used up below ground
-      //to get the amount left above ground. 
+      //to get the amount left above ground.
       final_wtd = porosity_one_height_change - porosity_one_below_ground_height;
     }
-    else{ 
-      //the final wtd is still below ground; just divide the height change by 
-      //porosity to get the below-ground height change. 
+    else{
+      //the final wtd is still below ground; just divide the height change by
+      //porosity to get the below-ground height change.
       final_wtd = initial_wtd + (porosity_one_height_change/porosity);
     }
   }
@@ -411,8 +411,8 @@ TEST_CASE("computeNewWTD"){
   CHECK(computeNewWTD(6000,   1, 0.8, 1000 ) ==doctest::Approx(7));
   CHECK(computeNewWTD(100000, 1, 0.4, 1000 ) ==doctest::Approx(101));
   CHECK(computeNewWTD(1000,   1, 0.4, 1000 ) ==doctest::Approx(2));
-  CHECK(computeNewWTD(  10,   1, 0.4, 1000 ) ==doctest::Approx(1.01));  
-  
+  CHECK(computeNewWTD(  10,   1, 0.4, 1000 ) ==doctest::Approx(1.01));
+
   CHECK(computeNewWTD(-6000,   5, 0.4, 1000 ) ==doctest::Approx(-2.5));
   CHECK(computeNewWTD(-6000,   1, 0.4, 1000 ) ==doctest::Approx(-12.5));
   CHECK(computeNewWTD(-6000,   1, 0.4, 10000) ==doctest::Approx(0.4));
@@ -422,7 +422,7 @@ TEST_CASE("computeNewWTD"){
   CHECK(computeNewWTD(-6000,   1, 0.8, 1000 ) ==doctest::Approx(-6.25));
   CHECK(computeNewWTD(-100000, 1, 0.4, 1000 ) ==doctest::Approx(-247.5));
   CHECK(computeNewWTD(-1000,   1, 0.4, 1000 ) ==doctest::Approx(0));
-  CHECK(computeNewWTD(  -10,   1, 0.4, 1000 ) ==doctest::Approx(0.99));  
+  CHECK(computeNewWTD(  -10,   1, 0.4, 1000 ) ==doctest::Approx(0.99));
 
   CHECK(computeNewWTD(6000,   -5, 0.4, 1000 ) ==doctest::Approx(4));
   CHECK(computeNewWTD(6000,   -1, 0.4, 1000 ) ==doctest::Approx(5.6));
@@ -433,7 +433,7 @@ TEST_CASE("computeNewWTD"){
   CHECK(computeNewWTD(6000,   -1, 0.8, 1000 ) ==doctest::Approx(5.2));
   CHECK(computeNewWTD(100000, -1, 0.4, 1000 ) ==doctest::Approx(99.6));
   CHECK(computeNewWTD(1000,   -1, 0.4, 1000 ) ==doctest::Approx(0.6));
-  CHECK(computeNewWTD(  10,   -1, 0.4, 1000 ) ==doctest::Approx(-0.975));  
+  CHECK(computeNewWTD(  10,   -1, 0.4, 1000 ) ==doctest::Approx(-0.975));
 
   CHECK(computeNewWTD(-6000,   -5, 0.4, 1000 ) ==doctest::Approx(-20));
   CHECK(computeNewWTD(-6000,   -1, 0.4, 1000 ) ==doctest::Approx(-16));
@@ -444,7 +444,7 @@ TEST_CASE("computeNewWTD"){
   CHECK(computeNewWTD(-6000,   -1, 0.8, 1000 ) ==doctest::Approx(-8.5));
   CHECK(computeNewWTD(-100000, -1, 0.4, 1000 ) ==doctest::Approx(-251));
   CHECK(computeNewWTD(-1000,   -1, 0.4, 1000 ) ==doctest::Approx(-3.5));
-  CHECK(computeNewWTD(  -10,   -1, 0.4, 1000 ) ==doctest::Approx(-1.025));  
+  CHECK(computeNewWTD(  -10,   -1, 0.4, 1000 ) ==doctest::Approx(-1.025));
 
 }
 
