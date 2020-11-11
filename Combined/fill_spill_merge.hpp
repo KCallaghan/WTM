@@ -667,7 +667,8 @@ static double CalculateInfiltration(
   double mannings_n = 0.05; //TODO: is this the best value?
   double my_infiltration = 0.0;
 
-  double vert_ksat = std::max(static_cast<double>(arp.vert_ksat(cell)),0.000001);
+ // double vert_ksat = std::max(static_cast<double>(arp.vert_ksat(cell)),0.000001);
+   double vert_ksat = static_cast<double>(arp.vert_ksat(cell));
   //assigning a small minimum vertical ksat, since otherwise in cells with zero vert_ksat, the delta_t will be infinity.
 
   double slope = std::max(static_cast<double>(arp.slope(cell)), 0.000001);
@@ -680,6 +681,9 @@ static double CalculateInfiltration(
   double delta_t = numerator/vert_ksat;
   //delta_t is the amount of time it will take the given amount of
   //water to cross the given distance.
+  if(vert_ksat == 0){
+    return 0; //no infiltration can occur if there is zero vertical hydraulic conductivity.
+  }
 
   //if it's a normal case, the water is not running out and the cell is not becoming saturated.
   //we calculate the infiltration using the delta_t from above, and ksat as a coefficient for infiltration amount.
