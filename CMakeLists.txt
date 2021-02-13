@@ -30,6 +30,7 @@ add_executable(twsm.x
   Combined/transient_groundwater.cpp
   Combined/TWSM.cpp
 )
+target_include_directories(twsm.x PRIVATE ${NETCDF_INCLUDES})
 target_link_libraries(twsm.x PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_CXX)
 target_compile_features(twsm.x PRIVATE cxx_std_17)
 target_compile_definitions(twsm.x PRIVATE DOCTEST_CONFIG_DISABLE)
@@ -40,6 +41,7 @@ add_executable(unittests.x
   Combined/test_main.cpp
   Combined/transient_groundwater.cpp
 )
+target_include_directories(unittests.x PRIVATE ${NETCDF_INCLUDES})
 target_link_libraries(unittests.x PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_CXX)
 target_compile_features(unittests.x PRIVATE cxx_std_17)
 
@@ -50,6 +52,7 @@ add_executable(dephier.x
   Combined/parameters.cpp
   Combined/ArrayPack.cpp
 )
+target_include_directories(dephier.x PRIVATE ${NETCDF_INCLUDES})
 target_link_libraries(dephier.x PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_CXX)
 target_compile_features(dephier.x PRIVATE cxx_std_17)
 add_sanitizers(dephier.x)
@@ -59,8 +62,6 @@ add_executable(fsm_unittests.exe
   Combined/test_main.cpp
   Combined/test_kerry_FSM.cpp
 )
+target_include_directories(fsm_unittests.exe PRIVATE ${NETCDF_INCLUDES})
 target_link_libraries(fsm_unittests.exe PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_CXX)
 target_compile_features(fsm_unittests.exe PUBLIC cxx_auto_type cxx_std_17)
-
-
-
