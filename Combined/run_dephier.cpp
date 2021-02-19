@@ -2,7 +2,7 @@
 #include "fill_spill_merge.hpp"
 //#include "evaporation.hpp"
 
-#include "../common/netcdf.hpp"
+//#include "../common/netcdf.hpp"
 #include "ArrayPack.hpp"
 #include "parameters.hpp"
 #include <cassert>
@@ -42,9 +42,17 @@ int main(int argc, char **argv){
 //load in the data files: topography and mask.
 
   std::cout<<params.surfdatadir<<std::endl;
-  arp.topo          = LoadData<float>(params.surfdatadir + params.region \
+
+  arp.topo = rd::Array2D<float>(params.surfdatadir + params.region + \
+  params.time_start + "_topography.tif");
+
+  arp.land_mask = rd::Array2D<float>(params.surfdatadir + params.region + \
+  params.time_start + "_mask.tif");
+
+
+//  arp.topo          = LoadData<float>(params.surfdatadir + params.region \
   + params.time_start + "_topo.nc",    "value");
-  arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region + \
+//  arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region + \
   params.time_start + "_mask.nc",   "value");
 
 //width and height in number of cells in the array
