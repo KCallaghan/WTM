@@ -189,6 +189,7 @@ void finalise(Parameters &params, ArrayPack &arp){
   textfile.open (params.textfilename, std::ios_base::app);
 
   textfile<<"done with processing"<<std::endl;
+  string cycles_str = to_string(params.cycles_done);
   arp.wtd.saveGDAL(params.outfilename + cycles_str +".tif");
   //save the final answer for water table depth.
 
