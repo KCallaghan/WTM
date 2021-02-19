@@ -1,7 +1,7 @@
 #ifndef transient_groundwater_h
 #define transient_groundwater_h
 
-#include "../common/netcdf.hpp"
+//#include "../common/netcdf.hpp"
 #include "ArrayPack.hpp"
 #include "parameters.hpp"
 
