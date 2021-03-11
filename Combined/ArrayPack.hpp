@@ -18,7 +18,7 @@ class ArrayPack {
   f2d ksat;
   f2d vert_ksat;
   f2d porosity;
-  ui82d land_mask;
+  f2d land_mask;
 
   f2d topo_start;
   f2d topo_end;
