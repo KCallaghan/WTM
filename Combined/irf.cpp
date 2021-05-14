@@ -256,7 +256,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   }
 
 
-  arp.wtd           = rd::Array2D<double>(arp.topo,-1.);
+  arp.wtd           = rd::Array2D<double>(arp.topo,100.);
   //we start with a water table at the surface for equilibrium runs.
 
   arp.fdepth   = rd::Array2D<float>(arp.topo,0);
