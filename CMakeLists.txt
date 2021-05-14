@@ -12,9 +12,9 @@ if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache) # Less useful to do it for linking, see edit2
 endif(CCACHE_FOUND)
 
-find_package(NetCDF REQUIRED)
 find_package(OpenMP)
 find_package(Sanitizers)
+find_package(GDAL)
 # use -fsanitize=address (above) to check for memory errors
 
 
@@ -23,43 +23,45 @@ add_subdirectory(common/richdem EXCLUDE_FROM_ALL)
 
 
 
-
-add_executable(twsm.x
-  Combined/ArrayPack.cpp
-  Combined/parameters.cpp
-  Combined/transient_groundwater.cpp
-  Combined/TWSM.cpp
-)
-target_link_libraries(twsm.x PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_CXX)
-target_compile_features(twsm.x PRIVATE cxx_std_17)
-target_compile_definitions(twsm.x PRIVATE DOCTEST_CONFIG_DISABLE)
-add_sanitizers(twsm.x)
-
-
-add_executable(unittests.x
-  Combined/test_main.cpp
-  Combined/transient_groundwater.cpp
-)
-target_link_libraries(unittests.x PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_CXX)
-target_compile_features(unittests.x PRIVATE cxx_std_17)
+if(USE_GDAL AND GDAL_FOUND)
+  add_executable(twsm.x
+    Combined/ArrayPack.cpp
+    Combined/parameters.cpp
+    Combined/transient_groundwater.cpp
+    Combined/TWSM.cpp
+  )
+  target_link_libraries(twsm.x PRIVATE richdem OpenMP::OpenMP_CXX)
+  target_compile_features(twsm.x PRIVATE cxx_std_17)
+  target_compile_definitions(twsm.x PRIVATE DOCTEST_CONFIG_DISABLE)
+  add_sanitizers(twsm.x)
 
 
+  add_executable(unittests.x
+    Combined/test_main.cpp
+    Combined/transient_groundwater.cpp
+  )
+  target_link_libraries(unittests.x PRIVATE richdem OpenMP::OpenMP_CXX)
+  target_compile_features(unittests.x PRIVATE cxx_std_17)
 
-add_executable(dephier.x
-  Combined/run_dephier.cpp
-  Combined/parameters.cpp
-  Combined/ArrayPack.cpp
-)
-target_link_libraries(dephier.x PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_CXX)
-target_compile_features(dephier.x PRIVATE cxx_std_17)
-add_sanitizers(dephier.x)
 
+
+  add_executable(dephier.x
+    Combined/run_dephier.cpp
+    Combined/parameters.cpp
+    Combined/ArrayPack.cpp
+  )
+  target_link_libraries(dephier.x PRIVATE richdem OpenMP::OpenMP_CXX)
+  target_compile_features(dephier.x PRIVATE cxx_std_17)
+  add_sanitizers(dephier.x)
+else()
+  message(WARNING "GDAL is needed to build some of the FSM performance tests and example programs; it is not needed to use the FSM library in another project.")
+endif()
 
 add_executable(fsm_unittests.exe
   Combined/test_main.cpp
   Combined/test_kerry_FSM.cpp
 )
-target_link_libraries(fsm_unittests.exe PRIVATE richdem ${NETCDF_LIBRARIES} OpenMP::OpenMP_CXX)
+target_link_libraries(fsm_unittests.exe PRIVATE richdem OpenMP::OpenMP_CXX)
 target_compile_features(fsm_unittests.exe PUBLIC cxx_auto_type cxx_std_17)
 
 
