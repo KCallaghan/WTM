@@ -51,19 +51,19 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   params.time_start + "_slope.tif");
 
   arp.precip_start = rd::Array2D<float>(params.surfdatadir + params.region + \
-  params.time_start + "_precip.tif");
+  params.time_start + "_precipitation.tif");
 
   arp.starting_evap_start = rd::Array2D<float>(params.surfdatadir + params.region + \
-  params.time_start + "_evap.tif");
+  params.time_start + "_evaporation.tif");
 
   arp.open_water_evap_start = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start + "_open_water_evaporation.tif");
 
   arp.winter_temp_start = rd::Array2D<float>(params.surfdatadir + params.region + \
-  params.time_start + "_winter_temp.tif");
+  params.time_start + "_winter_temperature.tif");
 
   arp.topo_end = rd::Array2D<float>(params.surfdatadir + params.region + \
-  params.time_end + "_topo.tif");
+  params.time_end + "_topography.tif");
 
   arp.slope_end = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_end + "_slope.tif");
@@ -104,16 +104,16 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 
 
   arp.precip_end = rd::Array2D<float>(params.surfdatadir + params.region + \
-  params.time_end + "_precip.tif");
+  params.time_end + "_precipitation.tif");
 
   arp.starting_evap_end = rd::Array2D<float>(params.surfdatadir + params.region + \
-  params.time_end + "_evap.tif");
+  params.time_end + "_evaporation.tif");
 
   arp.open_water_evap_end = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_end + "_open_water_evaporation.tif");
 
   arp.winter_temp_end = rd::Array2D<float>(params.surfdatadir + params.region + \
-  params.time_end + "_winter_temp.tif");
+  params.time_end + "_winter_temperature.tif");
 
 
 
