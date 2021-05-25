@@ -43,6 +43,7 @@ Parameters::Parameters(const std::string config_file){
     else if(key=="fdepth_a")           ss>>fdepth_a;
     else if(key=="fdepth_b")           ss>>fdepth_b;
     else if(key=="fdepth_fmin")        ss>>fdepth_fmin;
+    else if(key=="supplied_wt")        ss>>supplied_wt;
 
 
     else
@@ -64,5 +65,7 @@ void Parameters::print() const {
   std::cout<<"c time_end         = "<<time_end         <<std::endl;
   std::cout<<"c time_start       = "<<time_start       <<std::endl;
   std::cout<<"c total_cycles     = "<<total_cycles     <<std::endl;
+  std::cout<<"c supplied_wt      = "<<supplied_wt      <<std::endl;
+
   //TODO: Synchronize with structure
 }

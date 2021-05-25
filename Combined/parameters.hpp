@@ -30,6 +30,7 @@ public:
     double UNDEF  = -1.0e7;
 
     bool infiltration_on;
+    bool supplied_wt;
 
     double    southern_edge        = std::numeric_limits<double>::signaling_NaN();
     double    deltat               = std::numeric_limits<double>::signaling_NaN();

@@ -255,8 +255,13 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
     "vertical_ksat.nc", "value");   //Units of ksat are m/s.
   }
 
-
-  arp.wtd           = rd::Array2D<double>(arp.topo,100.);
+  if(params.supplied_wt == true){
+    arp.wtd = rd::Array2D<double>(params.surfdatadir + params.region + \
+  params.time_start + "_starting_wt.tif");
+  }
+  else{
+    arp.wtd           = rd::Array2D<double>(arp.topo,100.);
+  }
   //we start with a water table at the surface for equilibrium runs.
 
   arp.fdepth   = rd::Array2D<float>(arp.topo,0);
