@@ -15,15 +15,29 @@ typedef uint32_t flat_c_idx;
 
 class ArrayPack {
  public:
-  f2d ksat;
-  f2d vert_ksat;
   f2d porosity;
   f2d land_mask;
 
+  f2d ksat;
+  f2d vert_ksat;
+
+  d2d head;
+  d2d transmissivity;
+
   f2d topo_start;
   f2d topo_end;
+
+  f2d topo;
+
+  d2d runoff;
+  d2d rech;
+  d2d evap;
+  d2d infiltration_array;
+
   f2d slope_start;
   f2d slope_end;
+  d2d fdepth_start;
+  d2d fdepth_end;
   f2d precip_start;
   f2d precip_end;
   f2d starting_evap_start;
@@ -32,29 +46,18 @@ class ArrayPack {
   f2d open_water_evap_end;
   f2d winter_temp_start;
   f2d winter_temp_end;
-  f2d fdepth_start;
-  f2d fdepth_end;
 
-  f2d topo;
   f2d slope;
+  d2d fdepth;
+  f2d open_water_evap;
   f2d precip;
   f2d starting_evap;
-  f2d open_water_evap;
   f2d winter_temp;
-  f2d fdepth;
 
   d2d wtd;
   d2d wtd_mid;
   d2d wtd_old;
   d2d wtd_changed;
-
-  f2d rech;
-  f2d runoff;
-  f2d head;
-  f2d evap;
-
-  f2d infiltration_array;
-  f2d transmissivity;
 
   dh_label_t flowdir_t;
 

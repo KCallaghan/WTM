@@ -12,25 +12,21 @@
 using namespace std;
 
 
-typedef std::vector<double> dvec;
-typedef rd::Array2D<float>  f2d;
-
-
 ///update the amount of evaporation that occurs in each cell. 
 ///We use Dalton's Law to calculate evaporation
 ///in cells that contain surface water. 
 void evaporation_update(Parameters &params, ArrayPack &arp){
-  float atm_p = 101.3;
-  float p_a = 1.220;
-  float p_w = 1000;
-  float k = 0.4;
-  float z = 2;
-  float z_d = 0;
-  float z_0 = 2.3*(std::pow(10,-4));
+  double atm_p = 101.3;
+  double p_a = 1.220;
+  double p_w = 1000;
+  double k = 0.4;
+  double z = 2;
+  double z_d = 0;
+  double z_0 = 2.3*(std::pow(10,-4));
 
-  float log_bracket = log((z-z_d)/z_0);
+  double log_bracket = log((z-z_d)/z_0);
 
-  float K_e = (0.622*p_a*k*k)/(atm_p*p_w*std::pow(log_bracket,2));
+  double K_e = (0.622*p_a*k*k)/(atm_p*p_w*std::pow(log_bracket,2));
 
   #pragma omp parallel for 
   for(unsigned int i=0;i<arp.topo.size();i++){

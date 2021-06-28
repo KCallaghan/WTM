@@ -36,17 +36,17 @@ public:
     double    deltat               = std::numeric_limits<double>::signaling_NaN();
     double    cellsize_n_s_metres  = std::numeric_limits<double>::signaling_NaN();
     int32_t   cycles_done          = 0;
-    float     total_wtd_change     = 0.;
-    float     wtd_mid_change       = 0.;
-    float     GW_wtd_change        = 0.;
-    float     abs_total_wtd_change = 0.;
-    float     abs_wtd_mid_change   = 0.;
-    float     abs_GW_wtd_change    = 0.;
-    float     infiltration_change  = 0.;
+    double    total_wtd_change     = 0.;
+    double    wtd_mid_change       = 0.;
+    double    GW_wtd_change        = 0.;
+    double    abs_total_wtd_change = 0.;
+    double    abs_wtd_mid_change   = 0.;
+    double    abs_GW_wtd_change    = 0.;
+    double    infiltration_change  = 0.;
     int32_t   total_cycles         = -1;
-    float     fdepth_a             = 0.;
-    float     fdepth_b             = 0.;
-    float     fdepth_fmin          = 0.;
+    double    fdepth_a             = 0.;
+    double    fdepth_b             = 0.;
+    double    fdepth_fmin          = 0.;
 
 
     //Set for convenience within the code

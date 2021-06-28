@@ -139,7 +139,7 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   }
 
   //load in the wtd result from the previous time:
-  arp.wtd = rd::Array2D<float>(params.surfdatadir + params.region + \
+  arp.wtd = rd::Array2D<double>(params.surfdatadir + params.region + \
   params.time_start + "_wtd.tif");
 
 //  arp.wtd    = LoadData<double>(params.surfdatadir + params.region + \
@@ -147,8 +147,8 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 
   //calculate the fdepth (e-folding depth, representing rate of decay of the
   //hydraulic conductivity with depth) arrays:
-  arp.fdepth_start = rd::Array2D<float>(arp.topo_start,0);
-  arp.fdepth_end   = rd::Array2D<float>(arp.topo_start,0);
+  arp.fdepth_start = rd::Array2D<double>(arp.topo_start,0);
+  arp.fdepth_end   = rd::Array2D<double>(arp.topo_start,0);
   //TODO: allow user to vary these calibration constants depending on their
   //input cellsize? Or do some kind of auto variation of them?
   for(unsigned int i=0;i<arp.topo_start.size();i++){
@@ -264,7 +264,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   }
   //we start with a water table at the surface for equilibrium runs.
 
-  arp.fdepth   = rd::Array2D<float>(arp.topo,0);
+  arp.fdepth   = rd::Array2D<double>(arp.topo,0);
   for(unsigned int i=0;i<arp.topo.size();i++){
     //TODO: allow user to vary these calibration constants depending on their
     //input cellsize? Or do some kind of auto variation of them?
@@ -309,19 +309,21 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   //A binary mask that is 1 where there is land and 0 in the ocean
 
   arp.precip          = rd::Array2D<float>(arp.topo,0.03);  //Units: m/yr.
-  arp.starting_evap   = rd::Array2D<float>(arp.topo,0);     //Units: m/yr.
+  arp.starting_evap   = rd::Array2D<float>(arp.topo,0.);     //Units: m/yr.
   arp.open_water_evap = rd::Array2D<float>(arp.topo,0.5); //Units: m/yr.
 
   arp.winter_temp     = rd::Array2D<float>(arp.topo,0);    //Units: deg C
   arp.wtd             = rd::Array2D<double>(arp.topo,0.0);
   //we start with a water table below the surface for testing.
   arp.evap            = arp.starting_evap;
-  arp.fdepth          = rd::Array2D<float>(arp.topo,100);
+  arp.fdepth          = rd::Array2D<double>(arp.topo,100);
 
   for(int y=1;y<params.ncells_y;y++)
   for(int x=1;x<params.ncells_x; x++){
     if(x==1 || y==1 || x==params.ncells_x || y==params.ncells_y)
       arp.land_mask(x,y) = 0;
+    else
+      arp.land_mask(x,y) = 1;
     //border of 'ocean' with land everywhere else
   }
 
@@ -337,15 +339,15 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.wtd_old            = arp.wtd;
   arp.wtd_mid            = arp.wtd;
 
-  arp.runoff             = rd::Array2D<float>(arp.ksat,0);
-  arp.head               = rd::Array2D<float>(arp.ksat,0);
+  arp.runoff             = rd::Array2D<double>(arp.ksat,0);
+  arp.head               = rd::Array2D<double>(arp.ksat,0);
 
   //This is used to see how much change occurred in infiltration
   //portion of the code. Just informational.
-  arp.infiltration_array = rd::Array2D<float>(arp.ksat,0);
+  arp.infiltration_array = rd::Array2D<double>(arp.ksat,0);
 
-  arp.rech               = rd::Array2D<float>(arp.ksat,0);
-  arp.transmissivity     = rd::Array2D<float>(arp.ksat,0);
+  arp.rech               = rd::Array2D<double>(arp.ksat,0);
+  arp.transmissivity     = rd::Array2D<double>(arp.ksat,0);
 
   //This array is used to store the values of how much the water table will
   //change in one iteration, then adding it to wtd gets the new wtd.
@@ -480,7 +482,7 @@ void cell_size_area(Parameters &params, ArrayPack &arp){
 ///values, as well as the label, final_label, and flowdirs arrays.
 void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 
-  arp.ksat = rd::Array2D<float>(params.surfdatadir + params.region + \
+  arp.ksat = rd::Array2D<double>(params.surfdatadir + params.region + \
   "horizontal_ksat.tif");
 
   arp.porosity = rd::Array2D<float>(params.surfdatadir + params.region + \
@@ -503,15 +505,15 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   arp.wtd_old            = arp.wtd;
   arp.wtd_mid            = arp.wtd;
 
-  arp.runoff             = rd::Array2D<float>(arp.ksat,0);
-  arp.head               = rd::Array2D<float>(arp.ksat,0);
+  arp.runoff             = rd::Array2D<double>(arp.ksat,0);
+  arp.head               = rd::Array2D<double>(arp.ksat,0);
 
   //These are used to see how much change occurred in infiltration
   //and updating lakes portions of the code. Just informational.
-  arp.infiltration_array = rd::Array2D<float>(arp.ksat,0);
+  arp.infiltration_array = rd::Array2D<double>(arp.ksat,0);
 
-  arp.rech               = rd::Array2D<float>(arp.ksat,0);
-  arp.transmissivity     = rd::Array2D<float>(arp.ksat,0);
+  arp.rech               = rd::Array2D<double>(arp.ksat,0);
+  arp.transmissivity     = rd::Array2D<double>(arp.ksat,0);
 
   //This array is used to store the values of how much the water table will
   //change in one iteration, then adding it to wtd gets the new wtd.

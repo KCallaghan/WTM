@@ -31,13 +31,13 @@ struct FanDarcyPack {
   d1d_pointer   cell_area;
   d1d_pointer   cellsize_e_w_metres;
   double        cellsize_n_s_metres;
-  f2d_pointer   fdepth;
+  d2d_pointer   fdepth;
  // ui82d_pointer land_mask;
   f2d_pointer   land_mask;
  
   f2d_pointer   porosity;
   f2d_pointer   topo;
-  f2d_pointer   transmissivity;
+  d2d_pointer   transmissivity;
   d2d_pointer   wtd;
   d2d_pointer   wtd_changed;
   f2d_pointer   ksat;
