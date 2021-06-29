@@ -482,7 +482,7 @@ void cell_size_area(Parameters &params, ArrayPack &arp){
 ///values, as well as the label, final_label, and flowdirs arrays.
 void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 
-  arp.ksat = rd::Array2D<double>(params.surfdatadir + params.region + \
+  arp.ksat = rd::Array2D<float>(params.surfdatadir + params.region + \
   "horizontal_ksat.tif");
 
   arp.porosity = rd::Array2D<float>(params.surfdatadir + params.region + \
