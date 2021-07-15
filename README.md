@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4265369.svg)](https://doi.org/10.5281/zenodo.4265369)
+
 # The Water Table Model (WTM)
 
 ***This model combines groundwater and surface water flow to output the elevation of the water table relative to the land surface at a given time.***
