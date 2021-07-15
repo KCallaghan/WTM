@@ -104,8 +104,13 @@ Other parameters include:
 
 Once the configuration file has been set up appropriately, simply open a terminal and type
 ```
+# Optionally:
+# export OMP_NUM_THREADS=N
+# Required
 ./twsm.x Config_file.cfg
 ```
+Here, N is the number of CPU threads you want the parallel processing for the groundwater-flow step to use. In the above line, you are setting an environment variable that will define this until you exit the terminal window.
+
 There will be some on-screen outputs to indicate the first steps through the code, after which values of interest will be output to the text file and an updated geoTiff output file will be saved every 100 iterations.
 
 ## Outputs
