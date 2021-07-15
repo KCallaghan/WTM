@@ -4,7 +4,7 @@
 
 The model is intended for determining the depth or elevation of the water table, given a certain topography and set of climate inputs. Water table can be below ground (groundwater) or above ground (lake surfaces).
 
-The model works by coupling groundwater and surface water components. The groundwater component moves water cell-to-cell using Darcy's Law with a finite-difference approach in a single layer of vertically integrated hydraulic conductivity. 
+The model works by coupling groundwater and surface water components. The groundwater component moves water cell-to-cell using Darcy's Law with a finite-difference approach in a single layer of vertically integrated hydraulic conductivity.
 
 The surface-water component was collaboratively written by R Barnes and KL Callaghan. It works by creating a hierarchy of depressions for the topography, and then allowing water to move across the land surface, filling depressions and spilling from one depression into another. For more details on the depression hierarchy, see:
 
@@ -65,7 +65,7 @@ To build with `cmake` use:
 ```
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DUSE_GDAL=ON ..
 make
 ```
 Use `-DSANITIZE_ADDRESS=On` to enable addressing sanitizing
@@ -94,7 +94,7 @@ Other parameters include:
 * deltat             {Number of seconds per time step, e.g. 315360000 for a 10-year time step}
 * southern_edge      {Southern-most latitude of your domain in decimal degrees, e.g. 5}
 * maxiter            500                  {How many times GW should run before FSM runs}
-* total_cycles       1000                 {how many times FSM should run before completion} 
+* total_cycles       1000                 {how many times FSM should run before completion}
 * infiltration_on    0                    {true is 1, false is 0. Only recommend true for high-resolution input data.}
 * fdepth_a           200                  {e-folding depth coefficients}
 * fdepth_b           150                  {e-folding depth coefficients}
