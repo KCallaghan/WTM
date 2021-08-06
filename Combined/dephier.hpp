@@ -358,7 +358,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
         break;
       }
     }
-    if(has_non_ocean){       //If they are ocean cells, put them in the priority queue
+    if(has_non_ocean && label(x,y)==OCEAN){       //If they are ocean cells, put them in the priority queue
       ocean_seeds.emplace_back(dem.xyToI(x,y));
       ocean_cells++;
     }
