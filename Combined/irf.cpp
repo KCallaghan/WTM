@@ -71,7 +71,8 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   arp.land_mask = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_end + "_mask.tif");
 
-
+  arp.ice_mask = rd::Array2D<float>(params.surfdatadir + params.region + \
+  params.time_end + "_ice_mask.tif");
 
 
 //  arp.slope_start         = LoadData<float>(params.surfdatadir + params.region \
@@ -213,6 +214,9 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   arp.land_mask = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start + "_mask.tif");
 
+  arp.ice_mask = rd::Array2D<float>(params.surfdatadir + params.region + \
+  params.time_end + "_ice_mask.tif");
+
   arp.precip = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start + "_precipitation.tif");
 
@@ -305,8 +309,11 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
 
   arp.land_mask = rd::Array2D<uint8_t>(arp.topo,1);
   arp.land_mask.setEdges(0);
-
   //A binary mask that is 1 where there is land and 0 in the ocean
+
+  arp.ice_mask = rd::Array2D<uint8_t>(arp.topo,0); //binary mask that is 0 where there is no ice and 1 where there is ice
+
+
 
   arp.precip          = rd::Array2D<float>(arp.topo,0.03);  //Units: m/yr.
   arp.starting_evap   = rd::Array2D<float>(arp.topo,0.);     //Units: m/yr.
@@ -316,14 +323,18 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.wtd             = rd::Array2D<double>(arp.topo,0.0);
   //we start with a water table below the surface for testing.
   arp.evap            = arp.starting_evap;
-  arp.fdepth          = rd::Array2D<double>(arp.topo,100);
+  arp.fdepth          = rd::Array2D<double>(arp.topo,2.5);
 
   for(int y=1;y<params.ncells_y;y++)
   for(int x=1;x<params.ncells_x; x++){
     if(x==1 || y==1 || x==params.ncells_x || y==params.ncells_y)
       arp.land_mask(x,y) = 0;
-    else
+    else{
       arp.land_mask(x,y) = 1;
+      if(!(arp.topo(x,y)<0 || arp.topo(x,y)>=0))
+        arp.topo(x,y) = 0;
+    }
+
     //border of 'ocean' with land everywhere else
   }
 
@@ -381,10 +392,10 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
       arp.porosity(i) = 0.0000001; //not sure why it is sometimes processing cells with 0 porosity?
   }
 
-  //Wtd is 0 in the ocean:
+  //Wtd is 0 in the ocean and under the ice:
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
-    if(arp.land_mask(i) == 0){
+    if(arp.land_mask(i) == 0 || arp.ice_mask(i) == 1){
       arp.wtd  (i) = 0.;
     }
   }
@@ -547,10 +558,10 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
       arp.porosity(i) = 0.0000001; //not sure why it is sometimes processing cells with 0 porosity?
   }
 
-//Wtd is 0 in the ocean:
+//Wtd is 0 in the ocean and under the ice:
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
-    if(arp.land_mask(i) == 0){
+    if(arp.land_mask(i) == 0 || arp.ice_mask ==1){
       arp.wtd  (i) = 0.;
     }
   }
