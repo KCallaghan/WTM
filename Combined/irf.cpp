@@ -561,7 +561,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 //Wtd is 0 in the ocean and under the ice:
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
-    if(arp.land_mask(i) == 0 || arp.ice_mask ==1){
+    if(arp.land_mask(i) == 0 || arp.ice_mask(i) ==1){
       arp.wtd  (i) = 0.;
     }
   }
