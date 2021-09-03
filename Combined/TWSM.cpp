@@ -75,7 +75,7 @@ void update(
   textfile<<"Cycles done: "<<params.cycles_done<<std::endl;
 
   //TODO: How should equilibrium know when to exit?
-  if((params.cycles_done % 100) == 0){
+  if((params.cycles_done % 50) == 0){
     textfile<<"saving partway result."<<std::endl;
     //arp.wtd.printAll();
     string cycles_str = to_string(params.cycles_done);
@@ -87,7 +87,6 @@ void update(
 
   arp.wtd_old = arp.wtd;  //These are used to see how much change occurs
   arp.wtd_mid = arp.wtd;  //in FSM vs in the groundwater portion.
-
 
   //Run the groundwater code to move water
 
@@ -107,9 +106,9 @@ void update(
         continue;
       arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
     }
-
     FanDarcyGroundwater::update(params, arp);
   }
+
 
   now = time(0);
   dt = ctime(&now);
