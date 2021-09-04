@@ -308,7 +308,7 @@ double updateCell(
   const auto width = fdp.width;
 
   // Skip ocean cells
-  if(c2d(fdp.land_mask,x,y) != 1 || c2d(fdp.land_mask,x,y) != 0)
+  if(c2d(fdp.land_mask,x,y) != 1 || c2d(fdp.ice_mask,x,y) != 0)
     return 0;                     //the coastline represents a boundary condition where water table is at the land surface
 
   // Runs functions to compute time steps and update WTD for the center cell
