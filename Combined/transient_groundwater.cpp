@@ -1,9 +1,17 @@
+#define EIGEN_DONT_PARALLELIZE
+
+#include <eigen3/Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
 #include "doctest.h"
 #include <algorithm>
 #include <chrono>
 #include <thread>
 #include "transient_groundwater.hpp"
 #include "mat_mult.cpp"
+
+using namespace Eigen;
+
+typedef Eigen::SparseMatrix<double> SpMat; // declares a column-major sparse matrix type of double
+typedef Eigen::Triplet<double> T;
 
 const double FP_ERROR = 1e-4;
 
@@ -92,24 +100,168 @@ void updateTransmissivity(
 
 
 void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &arp){
+
+  std::vector<T> coefficients;
+  Eigen::VectorXd b(params.ncells_x*params.ncells_y);
+  Eigen::VectorXd vec_x(params.ncells_x*params.ncells_y);
+
+  SpMat A(params.ncells_x*params.ncells_y,params.ncells_x*params.ncells_y);
+  double entry;
+
+    std::cout<<"populate b"<<std::endl;
+
+  //populate the known vector b. This is the current wtd, which is the 'guess' that we are using to get our answer, x.
   for(int y=0;y<params.ncells_y;y++)
-  for(int x=0;x<params.ncells_x; x++){  //not sure why it is ncells-1. Should it just be ncells?
+  for(int x=0;x<params.ncells_x; x++){
+    b(x+(y*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
+  }
 
-    //populate the diagonal matrix
-    arp.diagonal_matrix(x+(y*params.ncells_y),x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(-4 * arp.transmissivity(x,y)) + 1;  //which direction of cellsize am I supposed to use here?
-    if(x!=0 && x != params.ncells_x-1){ //what happens in the corner cells? I can't add data because we need both T_i+1 and T_i-1??
-      arp.diagonal_matrix(x+(y*params.ncells_y)-1,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x-1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
-      arp.diagonal_matrix(x+(y*params.ncells_y)+1,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x+1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
-    }
-    if(x!=0 && x!=1 && y!=0 &&y!=params.ncells_y-1) //what happens in the corner cells? I can't add data because we need both T_i+1 and T_i-1??
-      arp.diagonal_matrix(x+(y*params.ncells_y)-2,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x,y-1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
-    if(x != params.ncells_x-2 && x!=params.ncells_x-1 && y!=0 &&y!=params.ncells_y-1)
-      arp.diagonal_matrix(x+(y*params.ncells_y)+2,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x,y+1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
+    std::cout<<"populate triplet"<<std::endl;
+
+  //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
+  for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x; x++){
+    //start with the central diagonal:
+    entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(-4 * arp.transmissivity(x,y)) + 1;
+    coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y, entry));
+
+    //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      if(y==0 && !(x+params.ncells_x*y+1 == params.ncells_y*params.ncells_x)){
+        entry = (-2*params.deltat/(arp.porosity(x,y+1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+1,entry ));
+      }
+      else if(y== params.ncells_y-1 && !(x+params.ncells_x*y+1 == params.ncells_y*params.ncells_x)){
+        entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y)-arp.transmissivity(x,y-1))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+1,entry ));
+      }
+      else if(!(x+params.ncells_x*y+1 == params.ncells_y*params.ncells_x)){
+        entry = (-2*params.deltat/(arp.porosity(x,y+1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+1,entry ));
+      }
 
 
-    //populate the starting guess vector for the wtd
-    arp.wtd_1D(x+(y*params.ncells_y)) = arp.wtd(x,y);
-    }
+  //Next is the West diagonal. Opposite of the East.
+      if(y==0 && !(x+params.ncells_x*y == 0)){
+        entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-1,entry ));
+      }
+      else if(y== params.ncells_y-1 && !(x+params.ncells_x*y == 0)){
+        entry = (-2*params.deltat/(arp.porosity(x,y-1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y)-arp.transmissivity(x,y-1))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-1,entry ));
+      }
+      else if(!(x+params.ncells_x*y == 0)){
+        entry = (-2*params.deltat/(arp.porosity(x,y-1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-1,entry ));
+      }
+
+
+
+  //Now let's do the North diagonal. Offset by -ncells_y.
+      if(x==0 && !(x+params.ncells_x*y-params.ncells_y < 0)){
+        entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x,y))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-params.ncells_y, entry));
+      }
+      else if(x==params.ncells_x-1 && !(x+params.ncells_x*y-params.ncells_y < 0)){
+        entry = (-2*params.deltat/(arp.porosity(x-1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y)-arp.transmissivity(x-1,y))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-params.ncells_y, entry));
+      }
+      else if(!(x+params.ncells_x*y-params.ncells_y < 0)){
+        entry =  (-2*params.deltat/(arp.porosity(x-1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-params.ncells_y, entry));
+    //    std::cout<<"entry "<<entry<<" location "<<x+params.ncells_x*y <<"    "<<x+params.ncells_x*y-params.ncells_y<<std::endl;
+      }
+
+    //finally, do the South diagonal, offset by +ncells_y-1.
+      if(x==0 && !(x+params.ncells_x*y+params.ncells_y >= params.ncells_y*params.ncells_x)){
+        entry = (-2*params.deltat/(arp.porosity(x+1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x,y))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+params.ncells_y, entry));
+      }
+      else if(x==params.ncells_x-1 && !(x+params.ncells_x*y+params.ncells_y >= params.ncells_y*params.ncells_x)){
+        entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y)-arp.transmissivity(x-1,y))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+params.ncells_y, entry));
+      }
+      else if(!(x+params.ncells_x*y+params.ncells_y >= params.ncells_y*params.ncells_x)){
+        entry = (-2*params.deltat/(arp.porosity(x+1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
+        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+params.ncells_y, entry));
+      }
+
+
+  }
+
+      std::cout<<"set A"<<std::endl;
+
+  //use the triplet vector to populate the matrix, A.
+  A.setFromTriplets(coefficients.begin(),coefficients.end());
+
+//  SpMat::makeCompressed(A);
+
+//  Eigen::SimplicialCholesky<SpMat> chol(A);  // performs a Cholesky factorization of A
+//  vec_x = chol.solve(b);
+    std::cout<<"set solver"<<std::endl;
+//  Eigen::SparseQR<SpMat, Eigen::COLAMDOrdering<int> > qr(A);
+//Eigen::LeastSquaresConjugateGradient<SpMat> lscg(A);
+Eigen::BiCGSTAB<SpMat> solver;
+
+      std::cout<<"compute"<<std::endl;
+
+  solver.compute(A);
+      std::cout<<"check"<<std::endl;
+
+ // if(solver.info() != Eigen::Success) {
+    // decomposition failed
+   // std::cout<<"first failed"<<std::endl;
+  //  return;
+ // }
+
+    std::cout<<"solve"<<std::endl;
+
+
+  vec_x = solver.solve(b);
+
+
+    std::cout<<"all donnneeeee"<<std::endl;
+
+//SolverClassName<SparseMatrix<double> > solver;
+//solver.compute(A);
+//if(solver.info()!=Success) {
+//  // decomposition failed
+//  std::cout<<"first fail"<<std::endl;
+//  return;
+//}
+//vec_x = solver.solve(b);
+//if(solver.info()!=Success) {
+//  // solving failed
+//  std::cout<<"second fail"<<std::endl;
+//  return;
+//}
+
+
+//copy result into the wtd array:
+  for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x; x++){
+    arp.wtd(x,y) = vec_x(x+(y*params.ncells_y)) - arp.topo(x,y);
+  }
+
+
+
+ // for(int y=0;y<params.ncells_y;y++)
+ // for(int x=0;x<params.ncells_x; x++){  //not sure why it is ncells-1. Should it just be ncells?
+//
+// //   //populate the diagonal matrix
+// //   arp.diagonal_matrix(x+(y*params.ncells_y),x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(-4 * arp.transmissivity(x,y)) + 1;  //which direction of cellsize am I supposed to use here?
+// //   if(x!=0 && x != params.ncells_x-1){ //what happens in the corner cells? I can't add data because we need both T_i+1 and T_i-1??
+// //     arp.diagonal_matrix(x+(y*params.ncells_y)-1,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x-1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
+// //     arp.diagonal_matrix(x+(y*params.ncells_y)+1,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x+1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
+// //   }
+// //   if(x>params.ncells_x && x<(params.ncells_x*params.ncells_y-params.ncells_x) && x!= 2 && y!=0 &&y!=params.ncells_y-1) //what happens in the corner cells? I can't add data because we need both T_i+1 and T_i-1??
+// //     arp.diagonal_matrix(x+(y*params.ncells_y)-params.ncells_x,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x,y-1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
+// //   if(x != params.ncells_x-2 && x!=params.ncells_x-1 && x!=params.ncells_x && y!=0 &&y!=params.ncells_y-1)
+// //     arp.diagonal_matrix(x+(y*params.ncells_y)+params.ncells_x,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x,y+1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
+//
+//
+// //   //populate the starting guess vector for the wtd
+// //   arp.wtd_1D(x+(y*params.ncells_y)) = arp.wtd(x,y);
+ //   }
 
 
 
@@ -144,22 +296,26 @@ updateTransmissivity(params,fdp,arp);
 std::cout<<"populateArrays"<<std::endl;
 populateArrays(params,fdp,arp);
 
-std::cout<<"mat_mult"<<std::endl;
-mat_mult(params.ncells_x*params.ncells_y,params.ncells_x*params.ncells_y, params.ncells_x*params.ncells_y,1, arp.diagonal_matrix,arp.wtd_1D,arp.wtd_1D_out);
+
+//std::cout<<"solve the matrix"<<std::endl;
+//solveMatrix(params,fdp,arp);
+
+//std::cout<<"mat_mult"<<std::endl;
+//mat_mult(params.ncells_x*params.ncells_y,params.ncells_x*params.ncells_y, params.ncells_x*params.ncells_y,1, arp.diagonal_matrix,arp.wtd_1D,arp.wtd_1D_out);
 
 
-std::cout<<"update wtd"<<std::endl;
-  // Once all the changes are known, update the WTD everywhere with the
-  // difference array
-  #pragma omp parallel for collapse(2) default(none) shared(arp,params)
-  for(int32_t y=0; y<params.ncells_y; y++)
-  for(int32_t x=0; x<params.ncells_x; x++){
-    // Update the whole wtd array at once.
-    // This is the new water table after groundwater has moved
-    // for delta_t seconds.
-    arp.wtd(x,y) = arp.wtd_1D_out(x+y*params.ncells_y);;
-  }
-arp.wtd.printAll("answer so far - after");
+//std::cout<<"update wtd"<<std::endl;
+//  // Once all the changes are known, update the WTD everywhere with the
+//  // difference array
+//  #pragma omp parallel for collapse(2) default(none) shared(arp,params)
+//  for(int32_t y=0; y<params.ncells_y; y++)
+//  for(int32_t x=0; x<params.ncells_x; x++){
+//    // Update the whole wtd array at once.
+//    // This is the new water table after groundwater has moved
+//    // for delta_t seconds.
+//    arp.wtd(x,y) = arp.wtd_1D_out(x+y*params.ncells_y);;
+//  }
+//arp.wtd.printAll("answer so far - after");
 }
 
 

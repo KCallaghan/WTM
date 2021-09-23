@@ -16,10 +16,6 @@ typedef uint32_t flat_c_idx;
 class ArrayPack {
  public:
 
-  d2d diagonal_matrix;
-  d2d wtd_1D;
-  d2d wtd_1D_out;
-
   f2d porosity;
   f2d land_mask;
   f2d ice_mask;

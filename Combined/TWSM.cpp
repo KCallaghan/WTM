@@ -25,12 +25,17 @@ void initialise(Parameters &params, ArrayPack &arp){
     InitialiseEquilibrium(params,arp);
     //compute changing cell size and distances between cells as
     //these change with latitude:
+    std::cout<<"initialised equilibrium"<<std::endl;
+
     cell_size_area(params,arp);
     textfile<<"computed distances, areas, and latitudes"<<std::endl;
+    std::cout<<"computed distances, areas, and latitudes"<<std::endl;
 
     //finalise some setup for runoff, labels, etc that is the
     //same for both run types.
     InitialiseBoth(params,arp);
+        textfile<<"initialised both"<<std::endl;
+
   }
   else if(params.run_type == "test"){
     textfile<<"Initialise test"<<std::endl;
@@ -44,7 +49,7 @@ void initialise(Parameters &params, ArrayPack &arp){
     throw std::runtime_error("That was not a recognised run type! \
       Please choose transient or equilibrium.");
   }
-
+std::cout<<"done with initialisation"<<std::endl;
   arp.check();
   textfile.close();
 }
@@ -75,7 +80,7 @@ void update(
   textfile<<"Cycles done: "<<params.cycles_done<<std::endl;
 
   //TODO: How should equilibrium know when to exit?
-  if((params.cycles_done % 50) == 0){
+  if((params.cycles_done % 3) == 0){
     textfile<<"saving partway result."<<std::endl;
     //arp.wtd.printAll();
     string cycles_str = to_string(params.cycles_done);

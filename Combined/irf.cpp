@@ -360,10 +360,6 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.rech               = rd::Array2D<double>(arp.ksat,0);
   arp.transmissivity     = rd::Array2D<double>(arp.ksat,0);
 
-  arp.diagonal_matrix = rd::Array2D<double>(params.ncells_x * params.ncells_y,params.ncells_x * params.ncells_y,0.);
-  arp.wtd_1D = rd::Array2D<double>(params.ncells_x * params.ncells_y,1,0.);
-  arp.wtd_1D_out = rd::Array2D<double>(params.ncells_x * params.ncells_y,1,0.);
-
 
   //This array is used to store the values of how much the water table will
   //change in one iteration, then adding it to wtd gets the new wtd.
@@ -531,9 +527,6 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   arp.rech               = rd::Array2D<double>(arp.ksat,0);
   arp.transmissivity     = rd::Array2D<double>(arp.ksat,0);
 
-  arp.diagonal_matrix = rd::Array2D<double>(params.ncells_x * params.ncells_y,params.ncells_x * params.ncells_y,0.);
-  arp.wtd_1D = rd::Array2D<double>(params.ncells_x * params.ncells_y,1,0.);
-  arp.wtd_1D_out = rd::Array2D<double>(params.ncells_x * params.ncells_y,1,0.);
 
   //This array is used to store the values of how much the water table will
   //change in one iteration, then adding it to wtd gets the new wtd.
