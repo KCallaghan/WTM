@@ -1,6 +1,7 @@
 #define EIGEN_DONT_PARALLELIZE
 
 #include <eigen3/Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
+//#include <eigen3/Eigen/SPQRSupport>
 #include "doctest.h"
 #include <algorithm>
 #include <chrono>
@@ -43,7 +44,7 @@ struct FanDarcyPack {
   d2d_pointer   fdepth;
  // ui82d_pointer land_mask;
   f2d_pointer   land_mask;
-  f2d_pointer   ice_mask;
+  //f2d_pointer   ice_mask;
  
   f2d_pointer   porosity;
   f2d_pointer   topo;
@@ -65,19 +66,23 @@ double depthIntegratedTransmissivity(
   //if the water table is deeper than this, the permeability
   //of the soil sees an exponential decay with depth.
   if(fdepth<=0) {
+    std::cout<<"if"<<std::endl;
     // If the fdepth is zero, there is no water transmission below the surface
     // soil layer.
     // If it is less than zero, it is incorrect -- but no water transmission
     // also seems an okay thing to do in this case.
     return 0;
   } else if(wtd < -shallow){ // Equation S6 from the Fan paper
+//    std::cout<<"else if 1"<<std::endl;
     return std::max(0.0,fdepth * ksat  * std::exp((wtd + shallow)/fdepth));
   } else if(wtd > 0){
+//    std::cout<<"else if 2 ksat "<<std::endl;
     // If wtd is greater than 0, max out rate of groundwater movement
     // as though wtd were 0. The surface water will get to move in
     // FillSpillMerge.
     return std::max(0.0,ksat * (0 + shallow + fdepth));
   } else { //Equation S4 from the Fan paper
+//    std::cout<<"else"<<std::endl;
     return std::max(0.0,ksat * (wtd + shallow + fdepth));  //max because you can't have a negative transmissivity.
   }
 }
@@ -113,76 +118,96 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
   //populate the known vector b. This is the current wtd, which is the 'guess' that we are using to get our answer, x.
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
-    b(x+(y*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
+    if(arp.land_mask(x+(y*params.ncells_x)) == 0.f)
+      b(x+(y*params.ncells_x)) = 0.;
+    else
+      b(x+(y*params.ncells_x)) = arp.wtd(x,y) + arp.topo(x,y);
   }
 
     std::cout<<"populate triplet"<<std::endl;
 
+    std::cout<<"cells x "<<params.ncells_x<<" cells y "<<params.ncells_y<<std::endl;
+
+  int main_cell = 0;
   //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
+    main_cell = x+params.ncells_x*y;
     //start with the central diagonal:
     entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(-4 * arp.transmissivity(x,y)) + 1;
-    coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y, entry));
+    coefficients.push_back(T(main_cell,main_cell, entry));
 
-    //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-      if(y==0 && !(x+params.ncells_x*y+1 == params.ncells_y*params.ncells_x)){
+//std::cout<<std::setprecision(5)<<"main entry is "<<entry<<" porosity "<<arp.porosity(x,y)<<" cellsize "<<fdp.cellsize_e_w_metres[y]<<" transmissivity "<<arp.transmissivity(x,y)<<std::endl;
+     //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      if(y==0 && !(main_cell+1 == params.ncells_y*params.ncells_x)){
         entry = (-2*params.deltat/(arp.porosity(x,y+1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+1,entry ));
+        coefficients.push_back(T(main_cell,main_cell+1,entry ));
+  //      std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
       }
-      else if(y== params.ncells_y-1 && !(x+params.ncells_x*y+1 == params.ncells_y*params.ncells_x)){
+      else if(y== params.ncells_y-1 && !(main_cell+1 == params.ncells_y*params.ncells_x)){
         entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y)-arp.transmissivity(x,y-1))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+1,entry ));
+     //   std::cout<<"the entry is "<<entry<<std::endl;
+        coefficients.push_back(T(main_cell,main_cell+1,entry ));
+    //    std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
       }
-      else if(!(x+params.ncells_x*y+1 == params.ncells_y*params.ncells_x)){
+      else if(!(main_cell+1 == params.ncells_y*params.ncells_x)){
         entry = (-2*params.deltat/(arp.porosity(x,y+1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+1,entry ));
+        coefficients.push_back(T(main_cell,main_cell+1,entry ));
+      //  std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
       }
 
 
   //Next is the West diagonal. Opposite of the East.
-      if(y==0 && !(x+params.ncells_x*y == 0)){
+      if(y==0 && !(main_cell == 0)){
         entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-1,entry ));
+        coefficients.push_back(T(main_cell,main_cell-1,entry ));
+//        std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
       }
-      else if(y== params.ncells_y-1 && !(x+params.ncells_x*y == 0)){
+      else if(y== params.ncells_y-1 && !(main_cell == 0)){
         entry = (-2*params.deltat/(arp.porosity(x,y-1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y)-arp.transmissivity(x,y-1))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-1,entry ));
+        coefficients.push_back(T(main_cell,main_cell-1,entry ));
+  //      std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
       }
-      else if(!(x+params.ncells_x*y == 0)){
+      else if(!(main_cell == 0)){
         entry = (-2*params.deltat/(arp.porosity(x,y-1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-1,entry ));
+        coefficients.push_back(T(main_cell,main_cell-1,entry ));
+    //    std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
       }
 
 
 
   //Now let's do the North diagonal. Offset by -ncells_y.
-      if(x==0 && !(x+params.ncells_x*y-params.ncells_y < 0)){
+      if(x==0 && !(main_cell-params.ncells_x < 0)){
         entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x,y))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-params.ncells_y, entry));
-      }
-      else if(x==params.ncells_x-1 && !(x+params.ncells_x*y-params.ncells_y < 0)){
+        coefficients.push_back(T(main_cell,main_cell-params.ncells_x, entry));
+      //std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
+    }
+      else if(x==params.ncells_x-1 && !(main_cell-params.ncells_x < 0)){
         entry = (-2*params.deltat/(arp.porosity(x-1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y)-arp.transmissivity(x-1,y))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-params.ncells_y, entry));
+        coefficients.push_back(T(main_cell,main_cell-params.ncells_x, entry));
+//        std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
       }
-      else if(!(x+params.ncells_x*y-params.ncells_y < 0)){
-        entry =  (-2*params.deltat/(arp.porosity(x-1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y-params.ncells_y, entry));
-    //    std::cout<<"entry "<<entry<<" location "<<x+params.ncells_x*y <<"    "<<x+params.ncells_x*y-params.ncells_y<<std::endl;
+      else if(!(main_cell-params.ncells_x < 0)){
+        entry = (-2*params.deltat/(arp.porosity(x-1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
+        coefficients.push_back(T(main_cell,main_cell-params.ncells_x, entry));
+  //      std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
       }
 
     //finally, do the South diagonal, offset by +ncells_y-1.
-      if(x==0 && !(x+params.ncells_x*y+params.ncells_y >= params.ncells_y*params.ncells_x)){
+      if(x==0 && !(main_cell+params.ncells_x >= params.ncells_y*params.ncells_x)){
         entry = (-2*params.deltat/(arp.porosity(x+1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x,y))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+params.ncells_y, entry));
+        coefficients.push_back(T(main_cell,main_cell+params.ncells_x, entry));
+    //    std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
       }
-      else if(x==params.ncells_x-1 && !(x+params.ncells_x*y+params.ncells_y >= params.ncells_y*params.ncells_x)){
+      else if(x==params.ncells_x-1 && !(main_cell+params.ncells_x >= params.ncells_y*params.ncells_x)){
         entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y)-arp.transmissivity(x-1,y))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+params.ncells_y, entry));
+        coefficients.push_back(T(main_cell,main_cell+params.ncells_x, entry));
+      //  std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
       }
-      else if(!(x+params.ncells_x*y+params.ncells_y >= params.ncells_y*params.ncells_x)){
+      else if(!(main_cell+params.ncells_x >= params.ncells_y*params.ncells_x)){
         entry = (-2*params.deltat/(arp.porosity(x+1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
-        coefficients.push_back(T(x+params.ncells_x*y,x+params.ncells_x*y+params.ncells_y, entry));
+        coefficients.push_back(T(main_cell,main_cell+params.ncells_x, entry));
+        //std::cout<<std::setprecision(5)<<"entry is "<<entry<<std::endl;
       }
 
 
@@ -198,13 +223,30 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
 //  Eigen::SimplicialCholesky<SpMat> chol(A);  // performs a Cholesky factorization of A
 //  vec_x = chol.solve(b);
     std::cout<<"set solver"<<std::endl;
+
+
+
+//Eigen::SparseLU<SparseMatrix<double>, COLAMDOrdering<int> >   solver;
+// fill A and b;
+// Compute the ordering permutation vector from the structural pattern of A
+//solver.analyzePattern(A);
+// Compute the numerical factorization
+//solver.factorize(A);
+//Use the factors to solve the linear system
+//vec_x = solver.solve(b);
+
+
 //  Eigen::SparseQR<SpMat, Eigen::COLAMDOrdering<int> > qr(A);
-//Eigen::LeastSquaresConjugateGradient<SpMat> lscg(A);
-Eigen::BiCGSTAB<SpMat> solver;
-
+Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
+ //   Eigen::SPQR<SpMat> lscg(A);
+//Eigen::BiCGSTAB<SpMat> solver;
       std::cout<<"compute"<<std::endl;
-
-  solver.compute(A);
+lscg.compute(A);
+//if(lscg.info()!=Eigen::Success)
+  //std::cout<<"failed 222 "<<lscg.info()<<std::endl;
+//Eigen::SimplicialLDLT
+//lscg.setTolerance(1e-14);
+  //solver.compute(A);
       std::cout<<"check"<<std::endl;
 
  // if(solver.info() != Eigen::Success) {
@@ -215,8 +257,10 @@ Eigen::BiCGSTAB<SpMat> solver;
 
     std::cout<<"solve"<<std::endl;
 
-
-  vec_x = solver.solve(b);
+vec_x = lscg.solve(b);
+//if(lscg.info()!=Eigen::Success)
+ // std::cout<<"solving failed"<<std::endl;
+  //vec_x = solver.solve(b);
 
 
     std::cout<<"all donnneeeee"<<std::endl;
@@ -239,7 +283,11 @@ Eigen::BiCGSTAB<SpMat> solver;
 //copy result into the wtd array:
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
-    arp.wtd(x,y) = vec_x(x+(y*params.ncells_y)) - arp.topo(x,y);
+    if(arp.land_mask(x,y)==0)
+      arp.wtd(x,y) = 0;
+    else
+      arp.wtd(x,y) = vec_x(x+(y*params.ncells_x)) - arp.topo(x,y);
+ //   std::cout<<"cell number "<<x+(y*params.ncells_x)<<" value "<<vec_x(x+(y*params.ncells_x))<<" topo "<<arp.topo(x,y)<<" wtd "<<arp.wtd(x,y)<<endl;
   }
 
 
@@ -281,7 +329,7 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
   fdp.cellsize_n_s_metres = params.cellsize_n_s_metres;
   fdp.fdepth              = arp.fdepth.data();
   fdp.land_mask           = arp.land_mask.data();
-  fdp.ice_mask            = arp.ice_mask.data();
+  //fdp.ice_mask            = arp.ice_mask.data();
   fdp.porosity            = arp.porosity.data();
   fdp.topo                = arp.topo.data();
   fdp.transmissivity      = arp.transmissivity.data();

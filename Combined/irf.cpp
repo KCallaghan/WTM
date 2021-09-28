@@ -214,7 +214,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   arp.land_mask = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start + "_mask.tif");
 
-  arp.ice_mask = rd::Array2D<float>(params.surfdatadir + params.region + \
+ // arp.ice_mask = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_end + "_ice_mask.tif");
 
   arp.precip = rd::Array2D<float>(params.surfdatadir + params.region + \
@@ -264,7 +264,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   params.time_start + "_starting_wt.tif");
   }
   else{
-    arp.wtd           = rd::Array2D<double>(arp.topo,100.);
+    arp.wtd           = rd::Array2D<double>(arp.topo,0.);
   }
   //we start with a water table at the surface for equilibrium runs.
 
@@ -290,8 +290,19 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
 void InitialiseTest(Parameters &params, ArrayPack &arp){
 
-  arp.topo = rd::Array2D<float>(params.surfdatadir + params.region + \
+  arp.topo_start = rd::Array2D<float>(params.surfdatadir + params.region + \
   "modern_topography.tif");
+  arp.slope_start         = rd::Array2D<float>(params.surfdatadir + params.region + \
+  "modern_slope.tif");  //Slope as a value from 0 to 1.
+
+  arp.topo = rd::Array2D<uint8_t>(arp.topo_start.width(),arp.topo_start.height()/2,1.);
+  arp.slope = rd::Array2D<uint8_t>(arp.topo_start.width(),arp.topo_start.height()/2,1.);
+
+  for(unsigned int i=0;i<arp.topo_start.width();i++)
+    for(unsigned int j=0;j<arp.topo_start.height()/2;j++){
+      arp.topo(i,j) = arp.topo_start(i,j);
+      arp.slope(i,j) = arp.slope_start(i,j);
+    }
 
  // arp.topo          = LoadData<float>(params.surfdatadir + params.region + \
   "_topography.tif",   "value");  //Units: metres
@@ -300,8 +311,6 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   params.ncells_x = arp.topo.width();
   params.ncells_y = arp.topo.height();
 
-  arp.slope         = rd::Array2D<float>(params.surfdatadir + params.region + \
-  "modern_slope.tif");  //Slope as a value from 0 to 1.
 
   if(params.infiltration_on == true){
     arp.vert_ksat = rd::Array2D<float>(arp.topo,0.00001);  //Units of ksat are m/s.
@@ -396,7 +405,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   //Wtd is 0 in the ocean and under the ice:
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
-    if(arp.land_mask(i) == 0 || arp.ice_mask(i) == 1){
+    if(arp.land_mask(i) == 0){// || arp.ice_mask(i) == 1){
       arp.wtd  (i) = 0.;
     }
   }
@@ -563,7 +572,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 //Wtd is 0 in the ocean and under the ice:
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
-    if(arp.land_mask(i) == 0 || arp.ice_mask(i) ==1){
+    if(arp.land_mask(i) == 0 ){//|| arp.ice_mask(i) ==1){
       arp.wtd  (i) = 0.;
     }
   }

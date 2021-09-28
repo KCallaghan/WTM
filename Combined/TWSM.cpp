@@ -25,17 +25,12 @@ void initialise(Parameters &params, ArrayPack &arp){
     InitialiseEquilibrium(params,arp);
     //compute changing cell size and distances between cells as
     //these change with latitude:
-    std::cout<<"initialised equilibrium"<<std::endl;
-
     cell_size_area(params,arp);
     textfile<<"computed distances, areas, and latitudes"<<std::endl;
-    std::cout<<"computed distances, areas, and latitudes"<<std::endl;
 
     //finalise some setup for runoff, labels, etc that is the
     //same for both run types.
     InitialiseBoth(params,arp);
-        textfile<<"initialised both"<<std::endl;
-
   }
   else if(params.run_type == "test"){
     textfile<<"Initialise test"<<std::endl;
@@ -49,7 +44,7 @@ void initialise(Parameters &params, ArrayPack &arp){
     throw std::runtime_error("That was not a recognised run type! \
       Please choose transient or equilibrium.");
   }
-std::cout<<"done with initialisation"<<std::endl;
+
   arp.check();
   textfile.close();
 }
@@ -93,6 +88,7 @@ void update(
   arp.wtd_old = arp.wtd;  //These are used to see how much change occurs
   arp.wtd_mid = arp.wtd;  //in FSM vs in the groundwater portion.
 
+
   //Run the groundwater code to move water
 
   time_t now = time(0);
@@ -111,9 +107,9 @@ void update(
         continue;
       arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
     }
+
     FanDarcyGroundwater::update(params, arp);
   }
-
 
   now = time(0);
   dt = ctime(&now);
