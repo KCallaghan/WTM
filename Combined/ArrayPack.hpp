@@ -17,6 +17,7 @@ class ArrayPack {
  public:
   f2d porosity;
   f2d land_mask;
+  f2d ice_mask;
 
   f2d ksat;
   f2d vert_ksat;

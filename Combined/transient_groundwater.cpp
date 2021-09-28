@@ -34,6 +34,7 @@ struct FanDarcyPack {
   d2d_pointer   fdepth;
  // ui82d_pointer land_mask;
   f2d_pointer   land_mask;
+  f2d_pointer   ice_mask;
  
   f2d_pointer   porosity;
   f2d_pointer   topo;
@@ -61,7 +62,7 @@ double depthIntegratedTransmissivity(
     // also seems an okay thing to do in this case.
     return 0;
   } else if(wtd < -shallow){ // Equation S6 from the Fan paper
-    return std::max(0.0,fdepth * ksat * std::exp((wtd + shallow)/fdepth));
+    return std::max(0.0,fdepth * ksat  * std::exp((wtd + shallow)/fdepth));
   } else if(wtd > 0){
     // If wtd is greater than 0, max out rate of groundwater movement
     // as though wtd were 0. The surface water will get to move in
@@ -265,10 +266,25 @@ void computeWTDchangeAtCell(
   // Sum discharges and divide by the time step to compute the water volume
   // added to the center cell
   const double dVolume = (QN + QS + QW + QE) * dt;
-
+if(!(local_wtd[0]<0 || local_wtd[0]>=0)){
+  std::cout<<"cell was "<<x<<" "<<y<<std::endl;
+  std::cout<<"wtd in the cell was "<<local_wtd[0]<<std::endl;
+  std::cout<<"transmissivityN "<<transmissivityN<<" transmissivityS "<<transmissivityS<<" transmissivityE "<<transmissivityE<<" transmissivityW "<<transmissivityW<<std::endl;
+  std::cout<<"headCenter "<<headCenter<<" headN "<<headN<<" headS "<<headS<<" headE "<<headE<<" headW "<<headW<<std::endl;
+  std::cout<<"QN "<<QN<<" QS "<<QS<<" QE "<<QE<<" QW "<<QW<<" dVolume "<<dVolume<<std::endl;
+}
   // Update the cell's WTD
   local_wtd[0] = computeNewWTD( dVolume, local_wtd[0], c2d(fdp.porosity, x, y), fdp.cell_area[y] );
 
+if(!(local_wtd[0]<0 || local_wtd[0]>=0)){
+  std::cout<<"cell was "<<x<<" "<<y<<std::endl;
+  std::cout<<"topo was "<<c2d(fdp.topo, x  , y  )<<std::endl;
+  std::cout<<"wtd in the cell now is "<<local_wtd[0]<<std::endl;
+  std::cout<<"transmissivityN "<<transmissivityN<<" transmissivityS "<<transmissivityS<<" transmissivityE "<<transmissivityE<<" transmissivityW "<<transmissivityW<<std::endl;
+  std::cout<<"headCenter "<<headCenter<<" headN "<<headN<<" headS "<<headS<<" headE "<<headE<<" headW "<<headW<<std::endl;
+  std::cout<<"QN "<<QN<<" QS "<<QS<<" QE "<<QE<<" QW "<<QW<<" dVolume "<<dVolume<<std::endl;
+
+}
   // For local dynamic time stepping (consider switching to global later),
   // update the neighboring cell WTDs
   local_wtd[1] = computeNewWTD( -QN*dt, local_wtd[1], c2d(fdp.porosity, x, y+1), fdp.cell_area[y+1] );
@@ -292,7 +308,7 @@ double updateCell(
   const auto width = fdp.width;
 
   // Skip ocean cells
-  if(c2d(fdp.land_mask,x,y) != 1)
+  if(c2d(fdp.land_mask,x,y) != 1 || c2d(fdp.ice_mask,x,y) != 0)
     return 0;                     //the coastline represents a boundary condition where water table is at the land surface
 
   // Runs functions to compute time steps and update WTD for the center cell
@@ -320,7 +336,7 @@ double updateCell(
     else{
       dt_inner = max_stable_time_step;
     }
-
+if(x== 4591 && y==3192)
     computeWTDchangeAtCell(x, y, dt_inner, local_wtd, fdp);
     time_remaining -= dt_inner;
   }
@@ -342,6 +358,7 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
   fdp.cellsize_n_s_metres = params.cellsize_n_s_metres;
   fdp.fdepth              = arp.fdepth.data();
   fdp.land_mask           = arp.land_mask.data();
+  fdp.ice_mask            = arp.ice_mask.data();
   fdp.porosity            = arp.porosity.data();
   fdp.topo                = arp.topo.data();
   fdp.transmissivity      = arp.transmissivity.data();
