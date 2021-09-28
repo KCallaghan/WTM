@@ -264,9 +264,11 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   params.time_start + "_starting_wt.tif");
   }
   else{
-    arp.wtd           = rd::Array2D<double>(arp.topo,0.);
+    arp.wtd           = rd::Array2D<double>(arp.topo,100.);
+    arp.wtd_T = rd::Array2D<double>(arp.topo,100.);
   }
   //we start with a water table at the surface for equilibrium runs.
+
 
   arp.fdepth   = rd::Array2D<double>(arp.topo,0);
   for(unsigned int i=0;i<arp.topo.size();i++){
@@ -291,9 +293,9 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 void InitialiseTest(Parameters &params, ArrayPack &arp){
 
   arp.topo_start = rd::Array2D<float>(params.surfdatadir + params.region + \
-  "modern_topography.tif");
+  "021000_topography.tif");
   arp.slope_start         = rd::Array2D<float>(params.surfdatadir + params.region + \
-  "modern_slope.tif");  //Slope as a value from 0 to 1.
+  "021000_slope.tif");  //Slope as a value from 0 to 1.
 
   arp.topo = rd::Array2D<uint8_t>(arp.topo_start.width(),arp.topo_start.height()/2,1.);
   arp.slope = rd::Array2D<uint8_t>(arp.topo_start.width(),arp.topo_start.height()/2,1.);
@@ -329,7 +331,9 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.open_water_evap = rd::Array2D<float>(arp.topo,0.5); //Units: m/yr.
 
   arp.winter_temp     = rd::Array2D<float>(arp.topo,0);    //Units: deg C
-  arp.wtd             = rd::Array2D<double>(arp.topo,0.0);
+  arp.wtd             = rd::Array2D<double>(arp.topo,100.0);
+  arp.wtd_T             = rd::Array2D<double>(arp.topo,100.0);
+
   //we start with a water table below the surface for testing.
   arp.evap            = arp.starting_evap;
   arp.fdepth          = rd::Array2D<double>(arp.topo,2.5);
@@ -407,6 +411,8 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   for(unsigned int i=0;i<arp.topo.size();i++){
     if(arp.land_mask(i) == 0){// || arp.ice_mask(i) == 1){
       arp.wtd  (i) = 0.;
+      arp.wtd_T  (i) = 0.;
+
     }
   }
 
@@ -574,6 +580,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   for(unsigned int i=0;i<arp.topo.size();i++){
     if(arp.land_mask(i) == 0 ){//|| arp.ice_mask(i) ==1){
       arp.wtd  (i) = 0.;
+      arp.wtd_T  (i) = 0.;
     }
   }
 

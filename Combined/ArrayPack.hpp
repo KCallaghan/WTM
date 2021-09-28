@@ -60,6 +60,7 @@ class ArrayPack {
   d2d wtd_mid;
   d2d wtd_old;
   d2d wtd_changed;
+  d2d wtd_T;
 
   dh_label_t flowdir_t;
 
