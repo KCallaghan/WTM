@@ -148,68 +148,89 @@ float ocean_T = 0.000001 * (1.5 + 2.5);  //some constant for all T values in oce
     main_col = y+params.ncells_y*x;
     //start with the central diagonal, which contains the info for the current cell:
     //This diagonal will be populated for all cells in the domain, provided that they are not ocean cells.
-//    if(!(arp.land_mask(x,y) == 0.f)){  //check that they are not ocean cells
+    if(arp.land_mask(x,y) == 0.f)  //check that they are not ocean cells
+      entry = 1.;
+    else
       entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(-4 * arp.transmissivity(x,y)) + 1;
-      coefficients.push_back(T(main_row,main_col, entry));
-//    }
+    coefficients.push_back(T(main_row,main_col, entry));
     //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-    if(y==0 && !(arp.land_mask(x,y+1) == 0.f)){
+    if(y==0){
       //y == 0 means we are in the very first column of the domain. There is no cell to the west of the current cell.
       //we also make sure that it is not an ocean cell.
-      entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-ocean_T)/4));  //ocean_T is used for the T at the non-existant western cell.
+      if(arp.land_mask(x,y+1) == 0.f)
+        entry = 1.;
+      else
+        entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-ocean_T)/4));  //ocean_T is used for the T at the non-existant western cell.
       coefficients.push_back(T(main_row+1,main_col,entry ));  //Note: reading the docs made it seem like we should have the same main_row and increment main_col, but when printing the matrices, the opposite is seen to be true. With this configuration, the final matrix has values in the SAME ROW and DIFFERENT COLUMNS for each cardinal direction.
     }
-    else if(!(y == params.ncells_y-1) && !(arp.land_mask(x,y+1) == 0.f)){
+    else if(!(y == params.ncells_y-1)){
       //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
       //again, we also make sure that it is not an ocean cell.
-      entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
+      if(arp.land_mask(x,y+1) == 0.f)
+        entry = 1.;
+      else
+        entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
       coefficients.push_back(T(main_row+1,main_col,entry ));
     }
 
-
   //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-      if(y== params.ncells_y-1 && !(arp.land_mask(x,y-1) == 0.f)){
+      if(y== params.ncells_y-1){
         //y is in the final column, there is no cell to the East.
         //Also check that is is not an ocean cell.
-        entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((ocean_T-arp.transmissivity(x,y-1))/4));
+        if(arp.land_mask(x,y-1) == 0.f)
+          entry = 1.;
+        else
+          entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((ocean_T-arp.transmissivity(x,y-1))/4));
         coefficients.push_back(T(main_row-1,main_col,entry ));
       }
-      else if(!(y == 0) && !(arp.land_mask(x,y-1) == 0.f)){
+      else if(!(y == 0)){
         //y may not == 0 since then there is no cell to the west.
+        if(arp.land_mask(x,y-1) == 0.f)
+          entry = 1.;
+        else
           entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
-          coefficients.push_back(T(main_row-1,main_col,entry ));
+        coefficients.push_back(T(main_row-1,main_col,entry ));
       }
-
 
 
   //Now let's do the North diagonal. Offset by -(ncells_y).
-      if(x==params.ncells_x-1 && !(arp.land_mask(x-1,y) == 0.f)){
+      if(x==params.ncells_x-1 ){
         //we are in the final row of the domain, there is no cell to the South.
         //also check that it is not an ocean cell.
-        entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((ocean_T-arp.transmissivity(x-1,y))/4));
+        if(arp.land_mask(x-1,y) == 0.f)
+          entry = 1.;
+        else
+          entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((ocean_T-arp.transmissivity(x-1,y))/4));
         coefficients.push_back(T(main_row-(params.ncells_y),main_col, entry)); //I do (params.ncells_x -1) because of zero-indexing
       }
-      else if((!x == 0 ) && !(arp.land_mask(x-1,y) == 0.f)){
+      else if(!x == 0  ){
         //x may not equal 0 since then there is no cell to the north.
         //also check that it is not an ocean cell.
+        if(arp.land_mask(x-1,y) == 0.f)
+          entry = 1.;
+        else
           entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
-          coefficients.push_back(T(main_row-(params.ncells_y),main_col, entry));
+        coefficients.push_back(T(main_row-(params.ncells_y),main_col, entry));
       }
-
     //finally, do the South diagonal, offset by +(ncells_y).
-      if(x==0 && !(arp.land_mask(x+1,y) == 0.f)){
+      if(x==0 ){
         //There is no cell to the North of the main cell.
         //also check that it is not an ocean cell.
+        if(arp.land_mask(x+1,y) == 0.f)
+          entry = 1.;
+        else
           entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-ocean_T)/4));
           coefficients.push_back(T(main_row+(params.ncells_y),main_col, entry));
       }
-     else if(!(x == params.ncells_x-1) && !(arp.land_mask(x+1,y) == 0.f)){
+     else if(!(x == params.ncells_x-1)){
         //we may not be in the final row where there is no cell
         //also check that it is not an ocean cell
+        if(arp.land_mask(x+1,y) == 0.f)
+          entry = 1.;
+        else
         entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
         coefficients.push_back(T(main_row+(params.ncells_y),main_col, entry));
       }
-
 
   }
 
@@ -285,31 +306,7 @@ vec_x = solver.solve(b);
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
       arp.wtd_T(x,y) = vec_x(x+(y*params.ncells_x)) - arp.topo(x,y);
- //   std::cout<<"cell number "<<x+(y*params.ncells_x)<<" value "<<vec_x(x+(y*params.ncells_x))<<" topo "<<arp.topo(x,y)<<" wtd "<<arp.wtd(x,y)<<endl;
   }
-
-
-
- // for(int y=0;y<params.ncells_y;y++)
- // for(int x=0;x<params.ncells_x; x++){  //not sure why it is ncells-1. Should it just be ncells?
-//
-// //   //populate the diagonal matrix
-// //   arp.diagonal_matrix(x+(y*params.ncells_y),x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(-4 * arp.transmissivity(x,y)) + 1;  //which direction of cellsize am I supposed to use here?
-// //   if(x!=0 && x != params.ncells_x-1){ //what happens in the corner cells? I can't add data because we need both T_i+1 and T_i-1??
-// //     arp.diagonal_matrix(x+(y*params.ncells_y)-1,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x-1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
-// //     arp.diagonal_matrix(x+(y*params.ncells_y)+1,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x+1,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
-// //   }
-// //   if(x>params.ncells_x && x<(params.ncells_x*params.ncells_y-params.ncells_x) && x!= 2 && y!=0 &&y!=params.ncells_y-1) //what happens in the corner cells? I can't add data because we need both T_i+1 and T_i-1??
-// //     arp.diagonal_matrix(x+(y*params.ncells_y)-params.ncells_x,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x,y-1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
-// //   if(x != params.ncells_x-2 && x!=params.ncells_x-1 && x!=params.ncells_x && y!=0 &&y!=params.ncells_y-1)
-// //     arp.diagonal_matrix(x+(y*params.ncells_y)+params.ncells_x,x+(y*params.ncells_y)) = (-params.deltat/(arp.porosity(x,y+1)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
-//
-//
-// //   //populate the starting guess vector for the wtd
-// //   arp.wtd_1D(x+(y*params.ncells_y)) = arp.wtd(x,y);
- //   }
-
-
 
 }
 
@@ -342,27 +339,6 @@ updateTransmissivity(params,fdp,arp);
 
 std::cout<<"populateArrays"<<std::endl;
 populateArrays(params,fdp,arp);
-
-
-//std::cout<<"solve the matrix"<<std::endl;
-//solveMatrix(params,fdp,arp);
-
-//std::cout<<"mat_mult"<<std::endl;
-//mat_mult(params.ncells_x*params.ncells_y,params.ncells_x*params.ncells_y, params.ncells_x*params.ncells_y,1, arp.diagonal_matrix,arp.wtd_1D,arp.wtd_1D_out);
-
-
-//std::cout<<"update wtd"<<std::endl;
-//  // Once all the changes are known, update the WTD everywhere with the
-//  // difference array
-//  #pragma omp parallel for collapse(2) default(none) shared(arp,params)
-//  for(int32_t y=0; y<params.ncells_y; y++)
-//  for(int32_t x=0; x<params.ncells_x; x++){
-//    // Update the whole wtd array at once.
-//    // This is the new water table after groundwater has moved
-//    // for delta_t seconds.
-//    arp.wtd(x,y) = arp.wtd_1D_out(x+y*params.ncells_y);;
-//  }
-//arp.wtd.printAll("answer so far - after");
 }
 
 
