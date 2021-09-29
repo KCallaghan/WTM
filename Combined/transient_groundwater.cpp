@@ -125,9 +125,9 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
     if(arp.land_mask(x+(y*params.ncells_x)) == 0.f)
-      b(x+(y*params.ncells_x)) = 0.;
+      b(y+(x*params.ncells_y)) = 0.;
     else
-      b(x+(y*params.ncells_x)) = arp.wtd(x,y) + arp.topo(x,y);
+      b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
   }
 
     std::cout<<"populate triplet"<<std::endl;
@@ -135,7 +135,6 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
     std::cout<<"cells x "<<params.ncells_x<<" cells y "<<params.ncells_y<<std::endl;
 
 float ocean_T = 0.000001 * (1.5 + 2.5);  //some constant for all T values in ocean - TODO look up representative values
-float ocean_p = 0.5;
 
   int main_row = 0;
   int main_col = 0;
@@ -144,32 +143,27 @@ float ocean_p = 0.5;
   for(int y=0;y<params.ncells_y;y++){
     //The row and column that the current cell will be stored in in matrix A.
     //This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
-    //All of the N,E,S,W directions should be in the same row, i.e. all will use main_row, but the column will differ.
+    //All of the N,E,S,W directions should be in the same row, but the column will differ.
     main_row = y+params.ncells_y*x;
     main_col = y+params.ncells_y*x;
     //start with the central diagonal, which contains the info for the current cell:
     //This diagonal will be populated for all cells in the domain, provided that they are not ocean cells.
-    if(!(arp.land_mask(x,y) == 0.f)){  //check that they are not ocean cells
+//    if(!(arp.land_mask(x,y) == 0.f)){  //check that they are not ocean cells
       entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(-4 * arp.transmissivity(x,y)) + 1;
       coefficients.push_back(T(main_row,main_col, entry));
-    }
-
+//    }
     //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
     if(y==0 && !(arp.land_mask(x,y+1) == 0.f)){
       //y == 0 means we are in the very first column of the domain. There is no cell to the west of the current cell.
       //we also make sure that it is not an ocean cell.
-      entry = (-2*params.deltat/(arp.porosity(x,y+1)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-ocean_T)/4));  //ocean_T is used for the T at the non-existant western cell.
-      coefficients.push_back(T(main_row,main_col+1,entry ));
+      entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-ocean_T)/4));  //ocean_T is used for the T at the non-existant western cell.
+      coefficients.push_back(T(main_row+1,main_col,entry ));  //Note: reading the docs made it seem like we should have the same main_row and increment main_col, but when printing the matrices, the opposite is seen to be true. With this configuration, the final matrix has values in the SAME ROW and DIFFERENT COLUMNS for each cardinal direction.
     }
-//    else if(y== params.ncells_y-1 && !(main_cell+1 == params.ncells_y*params.ncells_x)){
-//      entry = (-2*params.deltat/(ocean_p*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((ocean_T-arp.transmissivity(x,y-1))/4));
-//      coefficients.push_back(T(main_row,main_col+1,entry ));
-//    }
     else if(!(y == params.ncells_y-1) && !(arp.land_mask(x,y+1) == 0.f)){
       //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
       //again, we also make sure that it is not an ocean cell.
-      entry = (-2*params.deltat/(arp.porosity(x,y+1)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
-      coefficients.push_back(T(main_row,main_col+1,entry ));
+      entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
+      coefficients.push_back(T(main_row+1,main_col,entry ));
     }
 
 
@@ -177,89 +171,80 @@ float ocean_p = 0.5;
       if(y== params.ncells_y-1 && !(arp.land_mask(x,y-1) == 0.f)){
         //y is in the final column, there is no cell to the East.
         //Also check that is is not an ocean cell.
-        entry = (-2*params.deltat/(arp.porosity(x,y-1)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((ocean_T-arp.transmissivity(x,y-1))/4));
-        coefficients.push_back(T(main_row,main_col-1,entry ));
+        entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((ocean_T-arp.transmissivity(x,y-1))/4));
+        coefficients.push_back(T(main_row-1,main_col,entry ));
       }
       else if(!(y == 0) && !(arp.land_mask(x,y-1) == 0.f)){
         //y may not == 0 since then there is no cell to the west.
-          entry = (-2*params.deltat/(arp.porosity(x,y-1)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
-          coefficients.push_back(T(main_row,main_col-1,entry ));
+          entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
+          coefficients.push_back(T(main_row-1,main_col,entry ));
       }
 
 
 
-  //Now let's do the North diagonal. Offset by -(ncells_x-1).
- //     if(x==0 && !(main_cell-params.ncells_x < 0)){
- //       entry = (-2*params.deltat/(ocean_p*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-ocean_T)/4));
-//        coefficients.push_back(T(main_cell,main_cell-params.ncells_x, entry));
-//    }
+  //Now let's do the North diagonal. Offset by -(ncells_y).
       if(x==params.ncells_x-1 && !(arp.land_mask(x-1,y) == 0.f)){
         //we are in the final row of the domain, there is no cell to the South.
         //also check that it is not an ocean cell.
-        entry = (-2*params.deltat/(arp.porosity(x-1,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((ocean_T-arp.transmissivity(x-1,y))/4));
-        coefficients.push_back(T(main_row,main_col-(params.ncells_x-1), entry)); //I do (params.ncells_x -1) because of zero-indexing
+        entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((ocean_T-arp.transmissivity(x-1,y))/4));
+        coefficients.push_back(T(main_row-(params.ncells_y),main_col, entry)); //I do (params.ncells_x -1) because of zero-indexing
       }
       else if((!x == 0 ) && !(arp.land_mask(x-1,y) == 0.f)){
         //x may not equal 0 since then there is no cell to the north.
         //also check that it is not an ocean cell.
-          entry = (-2*params.deltat/(arp.porosity(x-1,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
-          coefficients.push_back(T(main_row,main_col-(params.ncells_x-1), entry));
+          entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
+          coefficients.push_back(T(main_row-(params.ncells_y),main_col, entry));
       }
 
-    //finally, do the South diagonal, offset by +(ncells_x-1).
+    //finally, do the South diagonal, offset by +(ncells_y).
       if(x==0 && !(arp.land_mask(x+1,y) == 0.f)){
         //There is no cell to the North of the main cell.
         //also check that it is not an ocean cell.
-          entry = (-2*params.deltat/(arp.porosity(x+1,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-ocean_T)/4));
-          coefficients.push_back(T(main_row,main_col+(params.ncells_x-1), entry));
+          entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-ocean_T)/4));
+          coefficients.push_back(T(main_row+(params.ncells_y),main_col, entry));
       }
- //     else if(x==params.ncells_x-1 && !(main_cell+params.ncells_x >= params.ncells_y*params.ncells_x)){
- //       entry = (-2*params.deltat/(ocean_p*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((ocean_T-arp.transmissivity(x-1,y))/4));
- //       coefficients.push_back(T(main_cell,main_cell+(params.ncells_x-1), entry));
- //     }
-      else if(!(x == params.ncells_x-1) && !(arp.land_mask(x+1,y) == 0.f)){
+     else if(!(x == params.ncells_x-1) && !(arp.land_mask(x+1,y) == 0.f)){
         //we may not be in the final row where there is no cell
         //also check that it is not an ocean cell
-        entry = (-2*params.deltat/(arp.porosity(x+1,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
-        coefficients.push_back(T(main_row,main_col+(params.ncells_x-1), entry));
+        entry = (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres))*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
+        coefficients.push_back(T(main_row+(params.ncells_y),main_col, entry));
       }
 
 
   }
 
-      std::cout<<"set A"<<std::endl;
-
+      std::cerr<<"set A"<<std::endl;
+//std::cout<<"begin "<<coefficients.begin()<<" end "<<coefficients.end()<<std::endl;
   //use the triplet vector to populate the matrix, A.
   A.setFromTriplets(coefficients.begin(),coefficients.end());
 
-//  SpMat::makeCompressed(A);
 
 //  Eigen::SimplicialCholesky<SpMat> chol(A);  // performs a Cholesky factorization of A
 //  vec_x = chol.solve(b);
-    std::cout<<"set solver"<<std::endl;
+    std::cerr<<"set solver"<<std::endl;
 
 
 
-//Eigen::SparseLU<SpMat, COLAMDOrdering<int> >   solver;
+Eigen::SparseLU<SpMat, COLAMDOrdering<int> >   solver;
 // fill A and b;
 // Compute the ordering permutation vector from the structural pattern of A
-      std::cout<<"compute"<<std::endl;
-//solver.analyzePattern(A);
+      std::cerr<<"compute"<<std::endl;
+solver.analyzePattern(A);
 // Compute the numerical factorization
-      std::cout<<"check"<<std::endl;
-//solver.factorize(A);
+      std::cerr<<"check"<<std::endl;
+solver.factorize(A);
 
-//assert(solver.info()==Eigen::Success);
+assert(solver.info()==Eigen::Success);
 //Use the factors to solve the linear system
 
 
 //  Eigen::SparseQR<SpMat, Eigen::COLAMDOrdering<int> > qr(A);
-Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
+//Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
  //   Eigen::SPQR<SpMat> lscg(A);
 //Eigen::BiCGSTAB<SpMat> solver;
-lscg.compute(A);
-if(lscg.info()!=Eigen::Success)
-  std::cout<<"failed 222 "<<lscg.info()<<std::endl;
+//lscg.compute(A);
+//if(lscg.info()!=Eigen::Success)
+//  std::cerr<<"failed 222 "<<lscg.info()<<std::endl;
 //Eigen::SimplicialLDLT
 //lscg.setTolerance(1e-14);
   //solver.compute(A);
@@ -270,10 +255,10 @@ if(lscg.info()!=Eigen::Success)
   //  return;
  // }
 
-    std::cout<<"solve"<<std::endl;
-//vec_x = solver.solve(b);
+    std::cerr<<"solve"<<std::endl;
+vec_x = solver.solve(b);
 
-vec_x = lscg.solve(b);
+//vec_x = lscg.solve(b);
 //if(lscg.info()!=Eigen::Success)
  // std::cout<<"solving failed"<<std::endl;
   //vec_x = solver.solve(b);
