@@ -293,9 +293,9 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 void InitialiseTest(Parameters &params, ArrayPack &arp){
 
   arp.topo_start = rd::Array2D<float>(params.surfdatadir + params.region + \
-  "021000_topography.tif");
+  "modern_topography.tif");
   arp.slope_start         = rd::Array2D<float>(params.surfdatadir + params.region + \
-  "021000_slope.tif");  //Slope as a value from 0 to 1.
+  "modern_slope.tif");  //Slope as a value from 0 to 1.
 
   arp.topo = rd::Array2D<uint8_t>(arp.topo_start.width(),arp.topo_start.height()/2,1.);
   arp.slope = rd::Array2D<uint8_t>(arp.topo_start.width(),arp.topo_start.height()/2,1.);
