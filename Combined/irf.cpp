@@ -40,8 +40,7 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   params.time_start + "_topography.tif");
 
 
- // arp.topo_start          = LoadData<float>(params.surfdatadir + params.region \
-  + params.time_start + "_topo.nc",   "value");  //Units: metres
+ // arp.topo_start          = LoadData<float>(params.surfdatadir + params.region  + params.time_start + "_topo.nc",   "value");  //Units: metres
 
   //width and height in number of cells in the array
   params.ncells_x = arp.topo_start.width();
@@ -75,31 +74,23 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   params.time_end + "_ice_mask.tif");
 
 
-//  arp.slope_start         = LoadData<float>(params.surfdatadir + params.region \
-  + params.time_start + "_slope.nc",  "value");  //Slope as a value from 0 to 1.
+//  arp.slope_start         = LoadData<float>(params.surfdatadir + params.region  + params.time_start + "_slope.nc",  "value");  //Slope as a value from 0 to 1.
 
-//  arp.precip_start        = LoadData<float>(params.surfdatadir + params.region \
-  + params.time_start + "_precip.nc", "value");  //Units: m/yr.
+//  arp.precip_start        = LoadData<float>(params.surfdatadir + params.region  + params.time_start + "_precip.nc", "value");  //Units: m/yr.
 
-//  arp.starting_evap_start = LoadData<float>(params.surfdatadir + params.region \
-  + params.time_start + "_evap.nc",   "value");  //Units: m/yr
+//  arp.starting_evap_start = LoadData<float>(params.surfdatadir + params.region  + params.time_start + "_evap.nc",   "value");  //Units: m/yr
 
-//  arp.open_water_evap_start = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_open_water_evaporation.nc",   "value");  //Units: m/yr
+//  arp.open_water_evap_start = LoadData<float>(params.surfdatadir + params.region +  params.time_start + "_open_water_evaporation.nc",   "value");  //Units: m/yr
 
-//  arp.winter_temp_start  = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_winter_temp.nc", "value");  //Units: degrees Celsius
+//  arp.winter_temp_start  = LoadData<float>(params.surfdatadir + params.region +  params.time_start + "_winter_temp.nc", "value");  //Units: degrees Celsius
 
 
 
-//  arp.topo_end          = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_end + "_topo.nc",   "value");  //Units: metres
+//  arp.topo_end          = LoadData<float>(params.surfdatadir + params.region +  params.time_end + "_topo.nc",   "value");  //Units: metres
 
-//  arp.slope_end         = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_end + "_slope.nc",  "value");  //Slope as a value from 0 to 1.
+//  arp.slope_end         = LoadData<float>(params.surfdatadir + params.region +  params.time_end + "_slope.nc",  "value");  //Slope as a value from 0 to 1.
 
-//  arp.land_mask         = LoadData<uint8_t>(params.surfdatadir + params.region + \
-  params.time_end + "_mask.nc",   "value");  //A binary mask that is 1 where
+//  arp.land_mask         = LoadData<uint8_t>(params.surfdatadir + params.region +  params.time_end + "_mask.nc",   "value");  //A binary mask that is 1 where
   //there is land and 0 in the ocean
   arp.land_mask.setEdges(0);
 
@@ -118,33 +109,27 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 
 
 
-//  arp.precip_end        = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_end + "_precip.nc", "value");  //Units: m/yr.
+//  arp.precip_end        = LoadData<float>(params.surfdatadir + params.region +  params.time_end + "_precip.nc", "value");  //Units: m/yr.
 
-  //arp.starting_evap_end = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_end + "_evap.nc",   "value");  //Units: m/yr
+  //arp.starting_evap_end = LoadData<float>(params.surfdatadir + params.region +  params.time_end + "_evap.nc",   "value");  //Units: m/yr
 
-  //arp.open_water_evap_end = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_end + "_open_water_evaporation.nc",   "value");  //Units: m/yr
+  //arp.open_water_evap_end = LoadData<float>(params.surfdatadir + params.region +  params.time_end + "_open_water_evaporation.nc",   "value");  //Units: m/yr
 
-  //arp.winter_temp_end    = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_end + "_winter_temp.nc", "value");  //Units: degrees Celsius
+  //arp.winter_temp_end    = LoadData<float>(params.surfdatadir + params.region +  params.time_end + "_winter_temp.nc", "value");  //Units: degrees Celsius
 
 
   if(params.infiltration_on == true){
     arp.vert_ksat = rd::Array2D<float>(params.surfdatadir + params.region + \
     "vertical_ksat.tif");
 
-    //arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + \
-    "vertical_ksat.nc", "value");   //Units of ksat are m/s.
+    //arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region +    "vertical_ksat.nc", "value");   //Units of ksat are m/s.
   }
 
   //load in the wtd result from the previous time:
   arp.wtd = rd::Array2D<double>(params.surfdatadir + params.region + \
   params.time_start + "_wtd.tif");
 
-//  arp.wtd    = LoadData<double>(params.surfdatadir + params.region + \
-  params.time_start + "_wtd.nc", "value");  //units are metres relative to land surface.
+//  arp.wtd    = LoadData<double>(params.surfdatadir + params.region +  params.time_start + "_wtd.nc", "value");  //units are metres relative to land surface.
 
   //calculate the fdepth (e-folding depth, representing rate of decay of the
   //hydraulic conductivity with depth) arrays:
@@ -201,8 +186,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   arp.topo = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start + "_topography.tif");
 
-  //  arp.topo          = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_topography.nc",   "value");  //Units: metres
+  //  arp.topo          = LoadData<float>(params.surfdatadir + params.region +  params.time_start + "_topography.nc",   "value");  //Units: metres
 
 //width and height in number of cells in the array
   params.ncells_x = arp.topo.width();
@@ -214,8 +198,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   arp.land_mask = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start + "_mask.tif");
 
- // arp.ice_mask = rd::Array2D<float>(params.surfdatadir + params.region + \
-  params.time_end + "_ice_mask.tif");
+ // arp.ice_mask = rd::Array2D<float>(params.surfdatadir + params.region +  params.time_end + "_ice_mask.tif");
 
   arp.precip = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start + "_precipitation.tif");
@@ -230,33 +213,26 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   params.time_start + "_winter_temperature.tif");
 
 
-//  arp.slope         = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_slope.nc",  "value");  //Slope as a value from 0 to 1.
+//  arp.slope         = LoadData<float>(params.surfdatadir + params.region +   params.time_start + "_slope.nc",  "value");  //Slope as a value from 0 to 1.
 
- // arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region + \
-  params.time_start + "_mask.nc",   "value");
+ // arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region + params.time_start + "_mask.nc",   "value");
   arp.land_mask.setEdges(0);
 
   //A binary mask that is 1 where there is land and 0 in the ocean
 
-//  arp.precip        = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_precipitation.nc", "value");  //Units: m/yr.
+//  arp.precip        = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_precipitation.nc", "value");  //Units: m/yr.
 
- // arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_evaporation.nc",   "value");  //Units: m/yr
+ // arp.starting_evap = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_evaporation.nc",   "value");  //Units: m/yr
 
- // arp.open_water_evap = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_open_water_evaporation.nc",   "value");  //Units: m/yr
+ // arp.open_water_evap = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_open_water_evaporation.nc",   "value");  //Units: m/yr
 
- // arp.winter_temp    = LoadData<float>(params.surfdatadir + params.region + \
-  params.time_start + "_winter_temperature.nc", "value");  //Units: degrees Celsius
+ // arp.winter_temp    = LoadData<float>(params.surfdatadir + params.region + params.time_start + "_winter_temperature.nc", "value");  //Units: degrees Celsius
 
   if(params.infiltration_on == true){
     arp.vert_ksat = rd::Array2D<float>(params.surfdatadir + params.region + \
   "vertical_ksat.tif");
 
- //   arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + \
-    "vertical_ksat.nc", "value");   //Units of ksat are m/s.
+ //   arp.vert_ksat = LoadData<float>(params.surfdatadir + params.region + \"vertical_ksat.nc", "value");   //Units of ksat are m/s.
   }
 
   if(params.supplied_wt == true){
@@ -297,17 +273,16 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.slope_start         = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start+"_slope.tif");  //Slope as a value from 0 to 1.
 
-  arp.topo = rd::Array2D<uint8_t>(arp.topo_start.width(),arp.topo_start.height()/2,1.);
-  arp.slope = rd::Array2D<uint8_t>(arp.topo_start.width(),arp.topo_start.height()/2,1.);
+  arp.topo = rd::Array2D<uint8_t>(arp.topo_start.width(),arp.topo_start.height(),1.);
+  arp.slope = rd::Array2D<uint8_t>(arp.topo_start.width(),arp.topo_start.height(),1.);
 
   for(unsigned int i=0;i<arp.topo_start.width();i++)
-    for(unsigned int j=0;j<arp.topo_start.height()/2;j++){
+    for(unsigned int j=0;j<arp.topo_start.height();j++){
       arp.topo(i,j) = arp.topo_start(i,j);
       arp.slope(i,j) = arp.slope_start(i,j);
     }
 
- // arp.topo          = LoadData<float>(params.surfdatadir + params.region + \
-  "_topography.tif",   "value");  //Units: metres
+ // arp.topo          = LoadData<float>(params.surfdatadir + params.region +   "_topography.tif",   "value");  //Units: metres
 
   //width and height in number of cells in the array
   params.ncells_x = arp.topo.width();
@@ -517,10 +492,8 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 
 
 
-//  arp.ksat = LoadData<float>(params.surfdatadir + params.region + \
-  "horizontal_ksat.nc", "value");   //Units of ksat are m/s.
-//  arp.porosity    = LoadData<float>(params.surfdatadir + params.region + \
-  "porosity.nc", "value");  //Units: unitless
+//  arp.ksat = LoadData<float>(params.surfdatadir + params.region +  "horizontal_ksat.nc", "value");   //Units of ksat are m/s.
+//  arp.porosity    = LoadData<float>(params.surfdatadir + params.region +  "porosity.nc", "value");  //Units: unitless
 
 
   //Set arrays that start off with zero or other values,
