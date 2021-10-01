@@ -1,6 +1,7 @@
-#define EIGEN_DONT_PARALLELIZE
+//#define EIGEN_DONT_PARALLELIZE
 
 #include <eigen3/Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
+#include <eigen3/Eigen/Core>
 //#include <eigen3/Eigen/SPQRSupport>
 #include "doctest.h"
 #include <algorithm>
@@ -131,8 +132,8 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
   //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y; y++){
-    double scalar_portion_x = -2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres);
-    double scalar_portion_y = -2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]);
+    double scalar_portion_x = -2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres*fdp.cellsize_n_s_metres);
+    double scalar_portion_y = -2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]*fdp.cellsize_e_w_metres[y]);
     //The row and column that the current cell will be stored in in matrix A.
     //This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
     //All of the N,E,S,W directions should be in the same row, but the column will differ.
@@ -227,28 +228,29 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
 
 
 Eigen::SparseLU<SpMat, COLAMDOrdering<int> >   solver;
+ // Eigen::SparseQR<SpMat, Eigen::COLAMDOrdering<int> > solver;
+//Eigen::BiCGSTAB<SpMat> solver;
+//Eigen::PartialPivLU<SpMat> solver;
 // fill A and b;
 // Compute the ordering permutation vector from the structural pattern of A
+//Eigen::LeastSquaresConjugateGradient<SpMat> solver;
       std::cerr<<"compute"<<std::endl;
-solver.analyzePattern(A);
+//solver.analyzePattern(A);
 // Compute the numerical factorization
+solver.compute(A);
       std::cerr<<"check"<<std::endl;
-solver.factorize(A);
+//solver.factorize(A);
 
 assert(solver.info()==Eigen::Success);
 //Use the factors to solve the linear system
 
 
-//  Eigen::SparseQR<SpMat, Eigen::COLAMDOrdering<int> > qr(A);
-//Eigen::LeastSquaresConjugateGradient<SpMat> lscg;
  //   Eigen::SPQR<SpMat> lscg(A);
-//Eigen::BiCGSTAB<SpMat> solver;
 //lscg.compute(A);
 //if(lscg.info()!=Eigen::Success)
 //  std::cerr<<"failed 222 "<<lscg.info()<<std::endl;
 //Eigen::SimplicialLDLT
 //lscg.setTolerance(1e-14);
-  //solver.compute(A);
 
  // if(solver.info() != Eigen::Success) {
     // decomposition failed
@@ -285,10 +287,11 @@ vec_x = solver.solve(b);
 //copy result into the wtd_T array:
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
-    if(arp.land_mask(x,y) != 0.f){  //if they are ocean cells
+    if(arp.land_mask(x,y) != 0.f)  //if they are ocean cells
       arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
+    else  //TODO: why does this seem to be necessary? Why am I getting non-zero values in the ocean, ever?
+      arp.wtd_T(x,y) = 0.;
   }
-
 }
 
 
@@ -314,6 +317,8 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
   fdp.wtd_T                 = arp.wtd_T.data();
   fdp.wtd_changed         = arp.wtd_changed.data();
   fdp.ksat                = arp.ksat.data();
+
+  Eigen::initParallel();
 
 std::cout<<"updateTransmissivity"<<std::endl;
 updateTransmissivity(params,fdp,arp);
