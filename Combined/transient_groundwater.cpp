@@ -336,7 +336,6 @@ double updateCell(
     else{
       dt_inner = max_stable_time_step;
     }
-if(x== 4591 && y==3192)
     computeWTDchangeAtCell(x, y, dt_inner, local_wtd, fdp);
     time_remaining -= dt_inner;
   }
