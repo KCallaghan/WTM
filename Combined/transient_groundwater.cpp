@@ -313,18 +313,30 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
   fdp.topo                = arp.topo.data();
   fdp.transmissivity      = arp.transmissivity.data();
   fdp.width               = arp.fdepth.width();
-  fdp.wtd                 = arp.wtd.data();
-  fdp.wtd_T                 = arp.wtd_T.data();
+  fdp.wtd                 = arp.wtd.data(); // External wtd
+  fdp.wtd_T               = arp.wtd_T.data(); // Internal wtd for Picard iter
   fdp.wtd_changed         = arp.wtd_changed.data();
   fdp.ksat                = arp.ksat.data();
 
   Eigen::initParallel();
 
-std::cout<<"updateTransmissivity"<<std::endl;
-updateTransmissivity(params,fdp,arp);
-
-std::cout<<"populateArrays"<<std::endl;
-populateArrays(params,fdp,arp);
+  // Picard iteration through solver
+  // For now, just iterate three times
+  int niter = 5;
+  for (int i=0; i<niter; i++){
+    std::cout << "updateTransmissivity: Iteration " << i+1 << "/" << niter << std::endl;
+    updateTransmissivity(params,fdp,arp);
+    std::cout<<"populateArrays: Iteration " << i+1 << "/" << niter << std::endl;
+    populateArrays(params,fdp,arp);
+  }
+  // Following these iterations, copy the result into the WTD array
+  // >>>> Improve code in future to send results directly to WTD on the
+  //      final Picard iteration <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<TODO!
+  for(int x=0;x<params.ncells_x; x++)
+  for(int y=0;y<params.ncells_y;y++){
+    if(arp.land_mask(x,y) != 0.f)  //if they are ocean cells
+      arp.wtd(x,y) = arp.wtd_T(x,y);
+  }
 }
 
 

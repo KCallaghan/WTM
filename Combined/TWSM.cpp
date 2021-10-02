@@ -101,6 +101,8 @@ void update(
   richdem::Timer time_groundwater;
   time_groundwater.start();
 
+  // Apply recharge to the water-table depth grid (wtd)
+  // Its clone (wtd_T) is used and updated in the Picard iteration
   #pragma omp parallel for collapse(2)
   for(int y=1;y<params.ncells_y-1;y++)
   for(int x=1;x<params.ncells_x-1; x++){
@@ -110,11 +112,15 @@ void update(
     arp.wtd_T(x,y) = arp.wtd(x,y);
   }
 
+  // AW: Let's rename these to be inner time steps instead of just iterations
+  // AW: unless this IS what Kerry intended...
   int iter_count = 0;
   while(iter_count++ < params.maxiter){
     FanDarcyGroundwater::update(params, arp);
   }
 
+  /*
+  // AW: UNNECESSARY -- Picard iteration inside transient_groundwater now
   #pragma omp parallel for collapse(2)
   for(int y=1;y<params.ncells_y-1;y++)
   for(int x=1;x<params.ncells_x-1; x++){
@@ -123,6 +129,7 @@ void update(
    // arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
     arp.wtd(x,y) = arp.wtd_T(x,y);
   }
+  */
 
   now = time(0);
   dt = ctime(&now);
