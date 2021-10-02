@@ -89,7 +89,9 @@ void update(
   arp.wtd_mid = arp.wtd;  //in FSM vs in the groundwater portion.
 
 
-  //Run the groundwater code to move water
+  //////////////////////
+  // Move groundwater //
+  //////////////////////
 
   time_t now = time(0);
   char* dt = ctime(&now);
@@ -134,37 +136,61 @@ void update(
 
   arp.wtd_mid = arp.wtd;
 
-  //Move surface water
-  richdem::Timer fsm_timer;
-  fsm_timer.start();
-  dh::FillSpillMerge(params,deps,arp);
 
-  now = time(0);
-  dt = ctime(&now);
+  ////////////////////////
+  // Move surface water //
+  ////////////////////////
 
-  std::cerr << "t FSM time = " << fsm_timer.lap() << std::endl;
-  std::cerr << "After FSM time: " << dt << std::endl;
+  if(params.fsm_on){
+    richdem::Timer fsm_timer;
+    fsm_timer.start();
+    dh::FillSpillMerge(params,deps,arp);
 
-  //check to see where there is surface water, and adjust how evaporation works
-  //at these locations.
-  richdem::Timer evaporation_timer;
-  evaporation_timer.start();
- // evaporation_update(params,arp);
+    now = time(0);
+    dt = ctime(&now);
 
-
-  #pragma omp parallel for
-  for(unsigned int i=0;i<arp.topo.size();i++){
-    if(arp.wtd(i)>0)  //if there is surface water present
-//arp.wtd(i) = 0;   //use this option when testing GW component alone
-      arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
-    else{              //water table is below the surface
-      arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
-      if(arp.rech(i) <0)    //Recharge is always positive.
-        arp.rech(i) = 0.0f;
-    }
+    std::cerr << "t FSM time = " << fsm_timer.lap() << std::endl;
+    std::cerr << "After FSM time: " << dt << std::endl;
   }
 
 
+  /////////////////////////////
+  // Evaporate surface water //
+  /////////////////////////////
+
+  // Check to see where there is surface water, and adjust how evaporation works
+  // at these locations.
+  richdem::Timer evaporation_timer;
+  evaporation_timer.start();
+  // evaporation_update(params,arp);
+  
+  // Evap mode 1: Use the computed open-water evaporation rate
+  if(params.fsm_on){
+    #pragma omp parallel for
+    for(unsigned int i=0;i<arp.topo.size();i++){
+      if(arp.wtd(i)>0)  //if there is surface water present
+        arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
+      else{              //water table is below the surface
+        arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
+        if(arp.rech(i) <0)    //Recharge is always positive.
+          arp.rech(i) = 0.0f;
+      }
+    }
+  }
+  
+  // Evap mode 0: remove all surface water (like Fan Reinfelder et al., 2013)
+  else{
+    #pragma omp parallel for
+    for(unsigned int i=0;i<arp.topo.size();i++){
+      if(arp.wtd(i)>0)  //if there is surface water present
+        arp.wtd(i) = 0;   //use this option when testing GW component alone
+      else{              //water table is below the surface
+        arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
+        if(arp.rech(i) <0)    //Recharge is always positive.
+          arp.rech(i) = 0.0f;
+      }
+    }
+  }
 
   std::cerr << "t Evaporation time = " << evaporation_timer.lap() << std::endl;
   std::cerr << "After evaporation_update: " << dt << std::endl;

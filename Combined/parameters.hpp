@@ -47,8 +47,8 @@ public:
     double    fdepth_a             = 0.;
     double    fdepth_b             = 0.;
     double    fdepth_fmin          = 0.;
-    bool      fsm_on               = 1.; // Default surface water on
-    bool      evap_mode            = 1.; // Default potential evaporation
+    bool      fsm_on               = 1; // Default surface water on
+    bool      evap_mode            = 1; // Default potential evaporation
 
 
     //Set for convenience within the code
