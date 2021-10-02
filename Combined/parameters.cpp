@@ -47,7 +47,7 @@ Parameters::Parameters(const std::string config_file){
 
 
     else
-      throw std::runtime_error("Unrecognised key!");
+      throw std::runtime_error("Unrecognised key: " + key);
   }
 }
 
