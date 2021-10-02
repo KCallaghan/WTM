@@ -55,6 +55,7 @@ if(USE_GDAL AND GDAL_FOUND)
   add_sanitizers(dephier.x)
 else()
   message(WARNING "GDAL is needed to build some of the FSM performance tests and example programs; it is not needed to use the FSM library in another project.")
+  message(WARNING "Without GDAL, the WTM *will not build*.")
 endif()
 
 add_executable(fsm_unittests.exe
