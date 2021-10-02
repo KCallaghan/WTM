@@ -101,33 +101,28 @@ void update(
   richdem::Timer time_groundwater;
   time_groundwater.start();
 
-    #pragma omp parallel for collapse(2)
-    for(int y=1;y<params.ncells_y-1;y++)
-    for(int x=1;x<params.ncells_x-1; x++){
-      if(arp.land_mask(x,y) == 0)          //skip ocean cells
-        continue;
-      arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
-      arp.wtd_T(x,y) = arp.wtd(x,y);
-    }
+  #pragma omp parallel for collapse(2)
+  for(int y=1;y<params.ncells_y-1;y++)
+  for(int x=1;x<params.ncells_x-1; x++){
+    if(arp.land_mask(x,y) == 0)          //skip ocean cells
+      continue;
+    arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
+    arp.wtd_T(x,y) = arp.wtd(x,y);
+  }
 
   int iter_count = 0;
   while(iter_count++ < params.maxiter){
-
     FanDarcyGroundwater::update(params, arp);
   }
 
-
-    #pragma omp parallel for collapse(2)
-    for(int y=1;y<params.ncells_y-1;y++)
-    for(int x=1;x<params.ncells_x-1; x++){
-      //if(arp.land_mask(x,y) == 0)          //skip ocean cells
-     //   continue;
-     // arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
-      arp.wtd(x,y) = arp.wtd_T(x,y);
-    }
-
-
-
+  #pragma omp parallel for collapse(2)
+  for(int y=1;y<params.ncells_y-1;y++)
+  for(int x=1;x<params.ncells_x-1; x++){
+    //if(arp.land_mask(x,y) == 0)          //skip ocean cells
+   //   continue;
+   // arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
+    arp.wtd(x,y) = arp.wtd_T(x,y);
+  }
 
   now = time(0);
   dt = ctime(&now);
