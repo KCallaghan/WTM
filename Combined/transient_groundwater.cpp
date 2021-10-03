@@ -226,8 +226,60 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
     std::cerr<<"set solver"<<std::endl;
 
 
-
+// Sparse LU solver
 Eigen::SparseLU<SpMat, COLAMDOrdering<int> >   solver;
+      std::cerr<<"compute"<<std::endl;
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+    std::cerr<<"solve"<<std::endl;
+vec_x = solver.solve(b);
+
+/*
+// UMFPACK -- not installed / set up
+Eigen::UmfPackLU<SpMat>   solver;
+      std::cerr<<"compute"<<std::endl;
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+    std::cerr<<"solve"<<std::endl;
+vec_x = solver.solve(b);
+*/
+
+/*
+// Biconjugate gradient solver
+//Eigen::BiCGSTAB<SpMat> solver;
+Eigen::BiCGSTAB<SpMat, Eigen::IncompleteLUT<double> > solver;
+      std::cerr<<"compute"<<std::endl;
+solver.analyzePattern(A);
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+    std::cerr<<"solve"<<std::endl;
+vec_x = solver.solve(b);
+*/
+
+
+/*
+// Biconjugate gradient solver with guess
+// Set up the guess -- same as last time's levels (b)
+// or topography (arp.topo)
+for(int x=0;x<params.ncells_x; x++)
+for(int y=0;y<params.ncells_y; y++){
+    //vec_x(y+(x*params.ncells_y)) = b(y+(x*params.ncells_y));
+    //vec_x(y+(x*params.ncells_y)) = arp.topo(x,y);
+    vec_x(y+(x*params.ncells_y)) = 500.;
+}
+// Solver
+//Eigen::BiCGSTAB<SpMat> solver;
+Eigen::BiCGSTAB<SpMat, Eigen::IncompleteLUT<double> > solver;
+      std::cerr<<"compute"<<std::endl;
+solver.analyzePattern(A);
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+    std::cerr<<"solve"<<std::endl;
+vec_x = solver.solveWithGuess(b, vec_x);
+*/
+
+
+/*
  // Eigen::SparseQR<SpMat, Eigen::COLAMDOrdering<int> > solver;
 //Eigen::BiCGSTAB<SpMat> solver;
 //Eigen::PartialPivLU<SpMat> solver;
@@ -244,7 +296,6 @@ solver.compute(A);
 assert(solver.info()==Eigen::Success);
 //Use the factors to solve the linear system
 
-
  //   Eigen::SPQR<SpMat> lscg(A);
 //lscg.compute(A);
 //if(lscg.info()!=Eigen::Success)
@@ -260,6 +311,7 @@ assert(solver.info()==Eigen::Success);
 
     std::cerr<<"solve"<<std::endl;
 vec_x = solver.solve(b);
+*/
 
 //vec_x = lscg.solve(b);
 //if(lscg.info()!=Eigen::Success)
@@ -322,7 +374,7 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
 
   // Picard iteration through solver
   // For now, just iterate three times
-  int niter = 5;
+  int niter = 4;
   for (int i=0; i<niter; i++){
     std::cout << "updateTransmissivity: Iteration " << i+1 << "/" << niter << std::endl;
     updateTransmissivity(params,fdp,arp);
