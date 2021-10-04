@@ -67,9 +67,7 @@ void updateTransmissivity(
 
 
 
-
-
-void solveArrays(const Parameters &params,ArrayPack &arp,const int i){
+void populateArrays(const Parameters &params,ArrayPack &arp){
 
   std::vector<T> coefficients;
   Eigen::VectorXd b(params.ncells_x*params.ncells_y);
@@ -107,39 +105,40 @@ void solveArrays(const Parameters &params,ArrayPack &arp,const int i){
     }
     else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
       b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
-      entry = (-2 * arp.transmissivity(x,y))*(scalar_portion_x+scalar_portion_y) +1;
+   //   entry = (-2 * ( ( (arp.transmissivity(x,y)/4. + arp.transmissivity(x+1,y)/2. + arp.transmissivity(x-1,y)/2)*scalar_portion_x) + ((arp.transmissivity(x,y)/4. + arp.transmissivity(x,y+1)/2. + arp.transmissivity(x,y-1)/2)*scalar_portion_y) ) )+1;
+         entry =  (-arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y) + arp.transmissivity(x-1,y) + arp.transmissivity(x,y-1) + arp.transmissivity(x,y+1) )/4.) ) * (scalar_portion_x + scalar_portion_y) +1;
       coefficients.push_back(T(main_col,main_row, entry));
 
       //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-          if(!(y == params.ncells_y-1)){//} && arp.land_mask(x,y+1) != 0.f){
+          if(!(y == params.ncells_y-1)){  // && arp.land_mask(x,y+1) != 0.f){
             //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
-            entry = scalar_portion_x*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
+            entry = scalar_portion_x*((arp.transmissivity(x,y+1)+arp.transmissivity(x,y))/2);
             coefficients.push_back(T(main_row,main_col+1,entry ));
           }
 
         //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-          if(y != 0){// && arp.land_mask(x,y-1) != 0.f){
+          if(y != 0){  // && arp.land_mask(x,y-1) != 0.f){
             //y may not == 0 since then there is no cell to the west.
-            entry = scalar_portion_x*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
+            entry = scalar_portion_x*((arp.transmissivity(x,y)+arp.transmissivity(x,y-1))/2);
             coefficients.push_back(T(main_row,main_col-1,entry ));
           }
 
 
       //Now let's do the North diagonal. Offset by -(ncells_y).
-        if(x != 0){// && arp.land_mask(x-1,y) != 0.f){
+        if(x != 0 ){  // && arp.land_mask(x-1,y) != 0.f){
           //x may not equal 0 since then there is no cell to the north.
-          entry = scalar_portion_y*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
+          entry = scalar_portion_y*((arp.transmissivity(x,y)+arp.transmissivity(x-1,y))/2);
           coefficients.push_back(T(main_row,main_col-params.ncells_y, entry));
         }
 
       //finally, do the South diagonal, offset by +(ncells_y).
-        if(!(x == params.ncells_x-1)){// && arp.land_mask(x+1,y) != 0.f){
+        if(!(x == params.ncells_x-1)){  // && arp.land_mask(x+1,y) != 0.f){
           //we may not be in the final row where there is no cell
-          entry = scalar_portion_y*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
+          entry = scalar_portion_y*((arp.transmissivity(x+1,y)+arp.transmissivity(x,y))/2);
           coefficients.push_back(T(main_row,main_col+params.ncells_y, entry));
         }
       }
-    }
+  }
 
       std::cerr<<"set A"<<std::endl;
 
@@ -203,10 +202,7 @@ vec_x = solver.solveWithGuess(b, b);  // guess = b;
 //copy result into the wtd_T array:
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
-    if(i!= params.picard_iterations)
-      arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
-    else
-      arp.wtd(x,y)   = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
+    arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
   }
 }
 
@@ -226,8 +222,15 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
   for (int i=0; i<params.picard_iterations; i++){
     std::cout << "updateTransmissivity: Iteration " << i+1 << "/" << params.picard_iterations << std::endl;
     updateTransmissivity(params,arp);
-    std::cout<<"solveArrays: Iteration " << i+1 << "/" << params.picard_iterations << std::endl;
-    solveArrays(params,arp,i);
+    std::cout<<"populateArrays: Iteration " << i+1 << "/" << params.picard_iterations << std::endl;
+    populateArrays(params,arp);
+  }
+  // Following these iterations, copy the result into the WTD array
+  // >>>> Improve code in future to send results directly to WTD on the
+  //      final Picard iteration <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<TODO!
+  for(int x=0;x<params.ncells_x; x++)
+  for(int y=0;y<params.ncells_y;y++){
+      arp.wtd(x,y) = arp.wtd_T(x,y);
   }
 }
 
