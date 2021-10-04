@@ -274,7 +274,7 @@ for(int y=0;y<params.ncells_y; y++){
 //Eigen::BiCGSTAB<SpMat> solver;
 Eigen::BiCGSTAB<SpMat, Eigen::IncompleteLUT<double> > solver;
       std::cerr<<"compute"<<std::endl;
-solver.analyzePattern(A);
+//solver.analyzePattern(A);
 solver.compute(A);
       std::cerr<<"check"<<std::endl;
     std::cerr<<"solve"<<std::endl;
