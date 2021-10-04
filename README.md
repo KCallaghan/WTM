@@ -65,7 +65,7 @@ To build with `cmake` use:
 ```
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DUSE_GDAL=ON ..
 make
 ```
 Use `-DSANITIZE_ADDRESS=On` to enable addressing sanitizing

@@ -44,10 +44,11 @@ Parameters::Parameters(const std::string config_file){
     else if(key=="fdepth_b")           ss>>fdepth_b;
     else if(key=="fdepth_fmin")        ss>>fdepth_fmin;
     else if(key=="supplied_wt")        ss>>supplied_wt;
-
+    else if(key=="fsm_on")             ss>>fsm_on;
+    else if(key=="evap_mode")          ss>>evap_mode;
 
     else
-      throw std::runtime_error("Unrecognised key!");
+      throw std::runtime_error("Unrecognised key: " + key);
   }
 }
 
