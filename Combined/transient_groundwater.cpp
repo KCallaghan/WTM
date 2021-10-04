@@ -378,7 +378,8 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
 
   // Picard iteration through solver
   // For now, just iterate three times
-  int niter = 1;
+
+  int niter = 5;
   for (int i=0; i<niter; i++){
     std::cout << "updateTransmissivity: Iteration " << i+1 << "/" << niter << std::endl;
     updateTransmissivity(params,fdp,arp);
@@ -390,8 +391,7 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
   //      final Picard iteration <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<TODO!
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
-    //if(arp.land_mask(x,y) != 0.f)  //if they are ocean cells
-    arp.wtd(x,y) = arp.wtd_T(x,y);
+      arp.wtd(x,y) = arp.wtd_T(x,y);
   }
 }
 
