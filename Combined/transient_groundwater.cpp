@@ -99,7 +99,7 @@ void updateTransmissivity(
   for(int y=0;y<params.ncells_y-1;y++)
   for(int x=0;x<params.ncells_x-1; x++){
       float ocean_T = 0.000001 * (1.5 + 2.5);  //some constant for all T values in ocean - TODO look up representative values
-      if(arp.land_mask(x,y) == 0)
+      if(arp.land_mask(x,y) == 0.f)
         arp.transmissivity(x,y) = ocean_T;
       else
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(c2d(fdp.wtd_T,x,y), c2d(fdp.fdepth,x,y), c2d(fdp.ksat,x,y));
@@ -132,8 +132,8 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
   //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y; y++){
-    double scalar_portion_x = -2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres*fdp.cellsize_n_s_metres);
-    double scalar_portion_y = -2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]*fdp.cellsize_e_w_metres[y]);
+    double scalar_portion_x = -params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres*fdp.cellsize_n_s_metres);
+    double scalar_portion_y = -params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]*fdp.cellsize_e_w_metres[y]);
     //The row and column that the current cell will be stored in in matrix A.
     //This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
     //All of the N,E,S,W directions should be in the same row, but the column will differ.
@@ -149,7 +149,7 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
     }
     else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
       b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
-      entry = (-2 * arp.transmissivity(x,y))*(scalar_portion_x+scalar_portion_y) +1;//   (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(-4 * arp.transmissivity(x,y)) + 1;
+      entry = (-2 * arp.transmissivity(x,y))*(scalar_portion_x+scalar_portion_y) +1;//   (-params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(-4 * arp.transmissivity(x,y)) + 1;
       coefficients.push_back(T(main_col,main_row, entry));
 
       //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
@@ -225,9 +225,65 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
 //  vec_x = chol.solve(b);
     std::cerr<<"set solver"<<std::endl;
 
-
-
+/*
+// Sparse LU solver
 Eigen::SparseLU<SpMat, COLAMDOrdering<int> >   solver;
+      std::cerr<<"compute"<<std::endl;
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+    std::cerr<<"solve"<<std::endl;
+vec_x = solver.solve(b);
+*/
+
+/*
+// UMFPACK -- not installed / set up
+Eigen::UmfPackLU<SpMat>   solver;
+      std::cerr<<"compute"<<std::endl;
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+    std::cerr<<"solve"<<std::endl;
+vec_x = solver.solve(b);
+*/
+
+/*
+// Biconjugate gradient solver
+//Eigen::BiCGSTAB<SpMat> solver;
+Eigen::BiCGSTAB<SpMat, Eigen::IncompleteLUT<double> > solver;
+      std::cerr<<"compute"<<std::endl;
+solver.analyzePattern(A);
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+    std::cerr<<"solve"<<std::endl;
+vec_x = solver.solve(b);
+*/
+
+
+// Biconjugate gradient solver with guess
+// Set up the guess -- same as last time's levels (b)
+// or topography (arp.topo)
+// Just guessing it is b now; commenting out!
+/*
+for(int x=0;x<params.ncells_x; x++)
+for(int y=0;y<params.ncells_y; y++){
+    //vec_x(y+(x*params.ncells_y)) = b(y+(x*params.ncells_y));
+    //vec_x(y+(x*params.ncells_y)) = arp.topo(x,y);
+    vec_x(y+(x*params.ncells_y)) = 500.;
+}
+*/
+// Solver
+//Eigen::BiCGSTAB<SpMat> solver;
+Eigen::BiCGSTAB<SpMat, Eigen::IncompleteLUT<double> > solver;
+      std::cerr<<"compute"<<std::endl;
+//solver.analyzePattern(A);
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+    std::cerr<<"solve"<<std::endl;
+// guess = b; use first line otherwise & uncomment the above
+//vec_x = solver.solveWithGuess(b, vec_x);
+vec_x = solver.solveWithGuess(b, b);
+
+
+/*
  // Eigen::SparseQR<SpMat, Eigen::COLAMDOrdering<int> > solver;
 //Eigen::BiCGSTAB<SpMat> solver;
 //Eigen::PartialPivLU<SpMat> solver;
@@ -244,7 +300,6 @@ solver.compute(A);
 assert(solver.info()==Eigen::Success);
 //Use the factors to solve the linear system
 
-
  //   Eigen::SPQR<SpMat> lscg(A);
 //lscg.compute(A);
 //if(lscg.info()!=Eigen::Success)
@@ -260,6 +315,7 @@ assert(solver.info()==Eigen::Success);
 
     std::cerr<<"solve"<<std::endl;
 vec_x = solver.solve(b);
+*/
 
 //vec_x = lscg.solve(b);
 //if(lscg.info()!=Eigen::Success)
@@ -287,10 +343,10 @@ vec_x = solver.solve(b);
 //copy result into the wtd_T array:
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
-    if(arp.land_mask(x,y) != 0.f)  //if they are ocean cells
-      arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
-    else  //TODO: why does this seem to be necessary? Why am I getting non-zero values in the ocean, ever?
-      arp.wtd_T(x,y) = 0.;
+    //if(arp.land_mask(x,y) != 0.f)  //if they are ocean cells
+    arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
+    //else  //TODO: why does this seem to be necessary? Why am I getting non-zero values in the ocean, ever?
+    //  arp.wtd_T(x,y) = 0.;
   }
 }
 
@@ -322,6 +378,7 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
 
   // Picard iteration through solver
   // For now, just iterate three times
+
   int niter = 5;
   for (int i=0; i<niter; i++){
     std::cout << "updateTransmissivity: Iteration " << i+1 << "/" << niter << std::endl;
@@ -334,7 +391,6 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
   //      final Picard iteration <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<TODO!
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
-    if(arp.land_mask(x,y) != 0.f)  //if they are ocean cells
       arp.wtd(x,y) = arp.wtd_T(x,y);
   }
 }
