@@ -111,65 +111,35 @@ void populateArrays(const Parameters &params,ArrayPack &arp){
       coefficients.push_back(T(main_col,main_row, entry));
 
       //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
- //       if(!(arp.land_mask(x,y+1) == 0.f)){ //make sure it is not an ocean cell
-          if(y==0){
-            //y == 0 means we are in the very first column of the domain. There is no cell to the west of the current cell.
-            entry = scalar_portion_x*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));  //ocean_T is used for the T at the non-existant western cell.
-            coefficients.push_back(T(main_row,main_col+1,entry ));
-          }
-          else if(!(y == params.ncells_y-1)){
+          if(!(y == params.ncells_y-1)){//} && arp.land_mask(x,y+1) != 0.f){
             //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
             entry = scalar_portion_x*(arp.transmissivity(x,y) + ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
             coefficients.push_back(T(main_row,main_col+1,entry ));
-
           }
- //       }
 
         //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-   //     if(!(arp.land_mask(x,y-1) == 0.f)){ //make sure it is not an ocean cell
-          if(y== params.ncells_y-1){
-            //y is in the final column, there is no cell to the East.
-            entry = scalar_portion_x*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
-            coefficients.push_back(T(main_row,main_col-1,entry ));
-          }
-          else if(y != 0){
+          if(y != 0){// && arp.land_mask(x,y-1) != 0.f){
             //y may not == 0 since then there is no cell to the west.
             entry = scalar_portion_x*(arp.transmissivity(x,y) - ((arp.transmissivity(x,y+1)-arp.transmissivity(x,y-1))/4));
             coefficients.push_back(T(main_row,main_col-1,entry ));
           }
-  //      }
 
 
       //Now let's do the North diagonal. Offset by -(ncells_y).
-   //   if(!(arp.land_mask(x-1,y) == 0.f)){ //make sure it is not an ocean cell
-        if(x==params.ncells_x-1){
-          //we are in the final row of the domain, there is no cell to the South.
-          entry = scalar_portion_y*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
-          coefficients.push_back(T(main_row,main_col-params.ncells_y, entry));
-        }
-        else if(x != 0 ){
+        if(x != 0){// && arp.land_mask(x-1,y) != 0.f){
           //x may not equal 0 since then there is no cell to the north.
-          //also check that it is not an ocean cell.
           entry = scalar_portion_y*(arp.transmissivity(x,y) - ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
           coefficients.push_back(T(main_row,main_col-params.ncells_y, entry));
         }
-  //    }
 
       //finally, do the South diagonal, offset by +(ncells_y).
-  //    if(!(arp.land_mask(x+1,y) == 0.f)){ //make sure it is not an ocean cell
-        if(x==0){
-          //There is no cell to the North of the main cell.
-          entry = scalar_portion_y*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
-          coefficients.push_back(T(main_row,main_col+params.ncells_y, entry));
-        }
-        else if(!(x == params.ncells_x-1)){
+        if(!(x == params.ncells_x-1)){// && arp.land_mask(x+1,y) != 0.f){
           //we may not be in the final row where there is no cell
           entry = scalar_portion_y*(arp.transmissivity(x,y) + ((arp.transmissivity(x+1,y)-arp.transmissivity(x-1,y))/4));
           coefficients.push_back(T(main_row,main_col+params.ncells_y, entry));
         }
       }
-  //  }
-  }
+    }
 
       std::cerr<<"set A"<<std::endl;
 
