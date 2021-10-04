@@ -1,10 +1,12 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4265369.svg)](https://doi.org/10.5281/zenodo.4265369)
+
 # The Water Table Model (WTM)
 
 ***This model combines groundwater and surface water flow to output the elevation of the water table relative to the land surface at a given time.***
 
 The model is intended for determining the depth or elevation of the water table, given a certain topography and set of climate inputs. Water table can be below ground (groundwater) or above ground (lake surfaces).
 
-The model works by coupling groundwater and surface water components. The groundwater component moves water cell-to-cell using Darcy's Law with a finite-difference approach in a single layer of vertically integrated hydraulic conductivity. 
+The model works by coupling groundwater and surface water components. The groundwater component moves water cell-to-cell using Darcy's Law with a finite-difference approach in a single layer of vertically integrated hydraulic conductivity.
 
 The surface-water component was collaboratively written by R Barnes and KL Callaghan. It works by creating a hierarchy of depressions for the topography, and then allowing water to move across the land surface, filling depressions and spilling from one depression into another. For more details on the depression hierarchy, see:
 
@@ -65,7 +67,7 @@ To build with `cmake` use:
 ```
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DUSE_GDAL=ON ..
 make
 ```
 Use `-DSANITIZE_ADDRESS=On` to enable addressing sanitizing
@@ -94,7 +96,7 @@ Other parameters include:
 * deltat             {Number of seconds per time step, e.g. 315360000 for a 10-year time step}
 * southern_edge      {Southern-most latitude of your domain in decimal degrees, e.g. 5}
 * maxiter            500                  {How many times GW should run before FSM runs}
-* total_cycles       1000                 {how many times FSM should run before completion} 
+* total_cycles       1000                 {how many times FSM should run before completion}
 * infiltration_on    0                    {true is 1, false is 0. Only recommend true for high-resolution input data.}
 * fdepth_a           200                  {e-folding depth coefficients}
 * fdepth_b           150                  {e-folding depth coefficients}
@@ -102,8 +104,13 @@ Other parameters include:
 
 Once the configuration file has been set up appropriately, simply open a terminal and type
 ```
+# Optionally:
+# export OMP_NUM_THREADS=N
+# Required
 ./twsm.x Config_file.cfg
 ```
+Here, N is the number of CPU threads you want the parallel processing for the groundwater-flow step to use. In the above line, you are setting an environment variable that will define this until you exit the terminal window.
+
 There will be some on-screen outputs to indicate the first steps through the code, after which values of interest will be output to the text file and an updated geoTiff output file will be saved every 100 iterations.
 
 ## Outputs
