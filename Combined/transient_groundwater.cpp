@@ -69,7 +69,7 @@ void updateTransmissivity(
 
 
 
-void populateArrays(const Parameters &params,ArrayPack &arp){
+void solveArrays(const Parameters &params,ArrayPack &arp,const int i){
 
   std::vector<T> coefficients;
   Eigen::VectorXd b(params.ncells_x*params.ncells_y);
@@ -203,7 +203,10 @@ vec_x = solver.solveWithGuess(b, b);  // guess = b;
 //copy result into the wtd_T array:
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
-    arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
+    if(i!= params.picard_iterations)
+      arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
+    else
+      arp.wtd(x,y)   = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
   }
 }
 
@@ -223,15 +226,8 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
   for (int i=0; i<params.picard_iterations; i++){
     std::cout << "updateTransmissivity: Iteration " << i+1 << "/" << params.picard_iterations << std::endl;
     updateTransmissivity(params,arp);
-    std::cout<<"populateArrays: Iteration " << i+1 << "/" << params.picard_iterations << std::endl;
-    populateArrays(params,arp);
-  }
-  // Following these iterations, copy the result into the WTD array
-  // >>>> Improve code in future to send results directly to WTD on the
-  //      final Picard iteration <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<TODO!
-  for(int x=0;x<params.ncells_x; x++)
-  for(int y=0;y<params.ncells_y;y++){
-      arp.wtd(x,y) = arp.wtd_T(x,y);
+    std::cout<<"solveArrays: Iteration " << i+1 << "/" << params.picard_iterations << std::endl;
+    solveArrays(params,arp,i);
   }
 }
 
