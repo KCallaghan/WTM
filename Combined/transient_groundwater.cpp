@@ -132,8 +132,8 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
   //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y; y++){
-    double scalar_portion_x = -2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres*fdp.cellsize_n_s_metres);
-    double scalar_portion_y = -2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]*fdp.cellsize_e_w_metres[y]);
+    double scalar_portion_x = -params.deltat/(arp.porosity(x,y)*fdp.cellsize_n_s_metres*fdp.cellsize_n_s_metres);
+    double scalar_portion_y = -params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]*fdp.cellsize_e_w_metres[y]);
     //The row and column that the current cell will be stored in in matrix A.
     //This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
     //All of the N,E,S,W directions should be in the same row, but the column will differ.
@@ -149,7 +149,7 @@ void populateArrays(const Parameters &params,const FanDarcyPack &fdp,ArrayPack &
     }
     else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
       b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
-      entry = (-2 * arp.transmissivity(x,y))*(scalar_portion_x+scalar_portion_y) +1;//   (-2*params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(-4 * arp.transmissivity(x,y)) + 1;
+      entry = (-2 * arp.transmissivity(x,y))*(scalar_portion_x+scalar_portion_y) +1;//   (-params.deltat/(arp.porosity(x,y)*fdp.cellsize_e_w_metres[y]))*(-4 * arp.transmissivity(x,y)) + 1;
       coefficients.push_back(T(main_col,main_row, entry));
 
       //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
