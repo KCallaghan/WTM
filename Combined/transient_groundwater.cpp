@@ -378,7 +378,7 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
 
   // Picard iteration through solver
   // For now, just iterate three times
-  int niter = 4;
+  int niter = 1;
   for (int i=0; i<niter; i++){
     std::cout << "updateTransmissivity: Iteration " << i+1 << "/" << niter << std::endl;
     updateTransmissivity(params,fdp,arp);
