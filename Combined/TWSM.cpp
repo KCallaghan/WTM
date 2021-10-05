@@ -119,17 +119,6 @@ void update(
     FanDarcyGroundwater::update(params, arp);
   }
 
-  /*
-  // AW: UNNECESSARY -- Picard iteration inside transient_groundwater now
-  #pragma omp parallel for collapse(2)
-  for(int y=1;y<params.ncells_y-1;y++)
-  for(int x=1;x<params.ncells_x-1; x++){
-    //if(arp.land_mask(x,y) == 0)          //skip ocean cells
-   //   continue;
-   // arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
-    arp.wtd(x,y) = arp.wtd_T(x,y);
-  }
-  */
 
   now = time(0);
   dt = ctime(&now);
@@ -254,19 +243,9 @@ int main(int argc, char **argv){
   std::cerr<<"Argv"<<argv<<std::endl;
   Parameters params(argv[1]);
 
-  //gw.set_arp(arp);
-  //gw.set_params(params);
-
   initialise(params,arp);
   run(params,arp);
   finalise(params, arp);
 
   return 0;
 }
-
-//Class
-//twsm::twsm(char* paramfile_name){
-//    ArrayPack arp;
-//    std::cerr<<"Argv"<<argv<<std::endl;
-//    Parameters params(argv[1]);
-//}

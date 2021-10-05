@@ -16,39 +16,40 @@ public:
     int32_t iterations = -1;
     int32_t maxiter    = -1;
 
-    std::string surfdatadir  = UNINIT_STR;
+    std::string outfilename  = UNINIT_STR;
     std::string region       = UNINIT_STR;
     std::string run_type     = UNINIT_STR;
+    std::string surfdatadir  = UNINIT_STR;
+    std::string textfilename = UNINIT_STR;
     std::string time_start   = UNINIT_STR;
     std::string time_end     = UNINIT_STR;
-    std::string textfilename = UNINIT_STR;
-    std::string outfilename  = UNINIT_STR;
 
     int16_t cells_per_degree = -1;
 
-    //const double UNDEF  = -1.0e7;
     double UNDEF  = -1.0e7;
 
     bool infiltration_on;
     bool supplied_wt;
+    bool evap_mode            = 1; // Default potential evaporation
+    bool fsm_on               = 1; // Default surface water on
 
-    double    southern_edge        = std::numeric_limits<double>::signaling_NaN();
     double    deltat               = std::numeric_limits<double>::signaling_NaN();
+    double    fdepth_a             = 0.;
+    double    fdepth_b             = 0.;
+    double    fdepth_fmin          = 0.;
+    double    southern_edge        = std::numeric_limits<double>::signaling_NaN();
+    int32_t   picard_iterations    = 1; //Default only one iteration
+    int32_t   total_cycles         = -1;
+
+    double    abs_GW_wtd_change    = 0.;
+    double    abs_total_wtd_change = 0.;
+    double    abs_wtd_mid_change   = 0.;
     double    cellsize_n_s_metres  = std::numeric_limits<double>::signaling_NaN();
     int32_t   cycles_done          = 0;
     double    total_wtd_change     = 0.;
     double    wtd_mid_change       = 0.;
     double    GW_wtd_change        = 0.;
-    double    abs_total_wtd_change = 0.;
-    double    abs_wtd_mid_change   = 0.;
-    double    abs_GW_wtd_change    = 0.;
     double    infiltration_change  = 0.;
-    int32_t   total_cycles         = -1;
-    double    fdepth_a             = 0.;
-    double    fdepth_b             = 0.;
-    double    fdepth_fmin          = 0.;
-    bool      fsm_on               = 1; // Default surface water on
-    bool      evap_mode            = 1; // Default potential evaporation
 
 
     //Set for convenience within the code
