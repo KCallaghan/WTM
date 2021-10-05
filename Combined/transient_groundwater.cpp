@@ -195,6 +195,86 @@ for(int y=0;y<params.ncells_y; y++){
 // Solver
 //Eigen::BiCGSTAB<SpMat> solver;
 Eigen::BiCGSTAB<SpMat, Eigen::IncompleteLUT<double> > solver;
+      std::cerr<<"compute"<<std::endl;
+//solver.analyzePattern(A);
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+    std::cerr<<"solve"<<std::endl;
+// guess = b; use first line otherwise & uncomment the above
+//vec_x = solver.solveWithGuess(b, vec_x);
+vec_x = solver.solveWithGuess(b, b);
+
+
+/*
+ // Eigen::SparseQR<SpMat, Eigen::COLAMDOrdering<int> > solver;
+//Eigen::BiCGSTAB<SpMat> solver;
+//Eigen::PartialPivLU<SpMat> solver;
+// fill A and b;
+// Compute the ordering permutation vector from the structural pattern of A
+//Eigen::LeastSquaresConjugateGradient<SpMat> solver;
+      std::cerr<<"compute"<<std::endl;
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+//solver.factorize(A);
+
+assert(solver.info()==Eigen::Success);
+//Use the factors to solve the linear system
+
+ //   Eigen::SPQR<SpMat> lscg(A);
+//lscg.compute(A);
+//if(lscg.info()!=Eigen::Success)
+//  std::cerr<<"failed 222 "<<lscg.info()<<std::endl;
+//Eigen::SimplicialLDLT
+//lscg.setTolerance(1e-14);
+
+ // if(solver.info() != Eigen::Success) {
+    // decomposition failed
+   // std::cout<<"first failed"<<std::endl;
+  //  return;
+ // }
+
+    std::cerr<<"solve"<<std::endl;
+vec_x = solver.solve(b);
+*/
+
+/*
+// UMFPACK -- not installed / set up
+Eigen::UmfPackLU<SpMat>   solver;
+      std::cerr<<"compute"<<std::endl;
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+    std::cerr<<"solve"<<std::endl;
+vec_x = solver.solve(b);
+*/
+
+/*
+// Biconjugate gradient solver
+//Eigen::BiCGSTAB<SpMat> solver;
+Eigen::BiCGSTAB<SpMat, Eigen::IncompleteLUT<double> > solver;
+      std::cerr<<"compute"<<std::endl;
+solver.analyzePattern(A);
+solver.compute(A);
+      std::cerr<<"check"<<std::endl;
+    std::cerr<<"solve"<<std::endl;
+vec_x = solver.solve(b);
+*/
+
+
+// Biconjugate gradient solver with guess
+// Set up the guess -- same as last time's levels (b)
+// or topography (arp.topo)
+// Just guessing it is b now; commenting out!
+/*
+for(int x=0;x<params.ncells_x; x++)
+for(int y=0;y<params.ncells_y; y++){
+    //vec_x(y+(x*params.ncells_y)) = b(y+(x*params.ncells_y));
+    //vec_x(y+(x*params.ncells_y)) = arp.topo(x,y);
+    vec_x(y+(x*params.ncells_y)) = 500.;
+}
+*/
+// Solver
+//Eigen::BiCGSTAB<SpMat> solver;
+Eigen::BiCGSTAB<SpMat, Eigen::IncompleteLUT<double> > solver;
 solver.compute(A);
 assert(solver.info()==Eigen::Success);
 vec_x = solver.solveWithGuess(b, b);  // guess = b;
