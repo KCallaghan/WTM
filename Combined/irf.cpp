@@ -185,8 +185,8 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   params.time_start + "_starting_wt.tif");
   }
   else{
-    arp.wtd   = rd::Array2D<double>(arp.topo,0.);
-    arp.wtd_T = rd::Array2D<double>(arp.topo,0.);
+    arp.wtd   = rd::Array2D<double>(arp.topo,100.);
+    arp.wtd_T = rd::Array2D<double>(arp.topo,100.);
   }
   //we start with a water table at the surface for equilibrium runs.
 
