@@ -187,6 +187,8 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   else{
     arp.wtd   = rd::Array2D<double>(arp.topo,100.);
     arp.wtd_T = rd::Array2D<double>(arp.topo,100.);
+        arp.wtd_T_iteration = rd::Array2D<double>(arp.topo,100.);
+
   }
   //we start with a water table at the surface for equilibrium runs.
 
@@ -253,6 +255,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.winter_temp     = rd::Array2D<float>(arp.topo,0);    //Units: deg C
   arp.wtd             = rd::Array2D<double>(arp.topo,100.0);
   arp.wtd_T             = rd::Array2D<double>(arp.topo,100.0);
+  arp.wtd_T_iteration             = rd::Array2D<double>(arp.topo,100.0);
 
   //we start with a water table below the surface for testing.
   arp.evap            = arp.starting_evap;
@@ -332,6 +335,8 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
     if(arp.land_mask(i) == 0){// || arp.ice_mask(i) == 1){
       arp.wtd  (i) = 0.;
       arp.wtd_T  (i) = 0.;
+            arp.wtd_T_iteration  (i) = 0.;
+
 
     }
   }
@@ -493,6 +498,8 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
     if(arp.land_mask(i) == 0 ){//|| arp.ice_mask(i) ==1){
       arp.wtd  (i) = 0.;
       arp.wtd_T  (i) = 0.;
+            arp.wtd_T_iteration  (i) = 0.;
+
     }
   }
 

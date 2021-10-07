@@ -11,7 +11,7 @@
 
 using namespace Eigen;
 
-typedef Eigen::SparseMatrix<double> SpMat; // declares a column-major sparse matrix type of double
+typedef Eigen::SparseMatrix<double,RowMajor> SpMat; // declares a row-major sparse matrix type of double
 typedef Eigen::Triplet<double> T;  // used to populate the matrices
 
 ///////////////////////
@@ -67,7 +67,7 @@ void updateTransmissivity(
 
 
 
-void populateArrays(const Parameters &params,ArrayPack &arp){
+int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
 
   std::vector<T> coefficients;
   Eigen::VectorXd b(params.ncells_x*params.ncells_y);
@@ -99,14 +99,14 @@ void populateArrays(const Parameters &params,ArrayPack &arp){
       //populate the known vector b. This is the current wtd, which is the 'guess' that we are using to get our answer, x.
       b(y+(x*params.ncells_y)) = 0.;
       entry = 1.;                   //then they should not change (wtd should be 0 both before and after) so only the centre diagonal is populated, and it is = 1.
-      coefficients.push_back(T(main_col,main_row, entry));
+      coefficients.push_back(T(main_row,main_col, entry));
     }
     else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
       b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
       if(y== 608 && x ==1595)
         std::cout<<"x "<<x<<" y "<<y<<" wtd "<<arp.wtd(x,y)<<" b "<<b(y+(x*params.ncells_y))<<" wtd_T "<<arp.wtd_T(x,y) <<std::endl;
       entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(- scalar_portion_x) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(- scalar_portion_y) +1;
-      coefficients.push_back(T(main_col,main_row, entry));
+      coefficients.push_back(T(main_row,main_col, entry));
 
       //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
           if(!(y == params.ncells_y-1)){  // && arp.land_mask(x,y+1) != 0.f){
@@ -166,36 +166,24 @@ solver.compute(A);
 vec_x = solver.solve (b);
 */
 
-/*
-// Biconjugate gradient solver
-//Eigen::BiCGSTAB<SpMat> solver;
-Eigen::BiCGSTAB<SpMat, Eigen::IncompleteLUT<double> > solver;
-      std::cerr<<"compute"<<std::endl;
-solver.analyzePattern(A);
-solver.compute(A);
-      std::cerr<<"check"<<std::endl;
-    std::cerr<<"solve"<<std::endl;
-vec_x = solver.solve(b);
-*/
+
+//#pragma omp parallel
+//    {  printf("Hello World from thread = %d\n", omp_get_thread_num()); }
+
+
+//int nthreads = Eigen::nbThreads( );
+//std::cout << "THREADS = " << nthreads <<std::ends;
 
 
 // Biconjugate gradient solver with guess
 // Set up the guess -- same as last time's levels (b)
-// or topography (arp.topo)
-// Just guessing it is b now; commenting out!
-/*
-for(int x=0;x<params.ncells_x; x++)
-for(int y=0;y<params.ncells_y; y++){
-    //vec_x(y+(x*params.ncells_y)) = b(y+(x*params.ncells_y));
-    //vec_x(y+(x*params.ncells_y)) = arp.topo(x,y);
-    vec_x(y+(x*params.ncells_y)) = 500.;
-}
-*/
-// Solver
-//Eigen::BiCGSTAB<SpMat> solver;
-Eigen::BiCGSTAB<SpMat, Eigen::IncompleteLUT<double> > solver;
+Eigen::BiCGSTAB<SpMat> solver;//, Eigen::IncompleteLUT<double> > solver;
+//NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means that BiCGSTAB will not run in parallel. It is faster without.
+std::cout<<"compute"<<std::endl;
 solver.compute(A);
+//solver.setTolerance(1e-15);
 assert(solver.info()==Eigen::Success);
+std::cout<<"solve"<<std::endl;
 vec_x = solver.solveWithGuess(b, b);  // guess = b;
 
 std::cout<<"set the new wtd_T values "<<std::endl;
@@ -204,8 +192,33 @@ std::cout<<"set the new wtd_T values "<<std::endl;
   for(int y=0;y<params.ncells_y;y++){
     arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
   }
+
+
+
+
+int cell_count = 0;
+int total_cells = params.ncells_x * params.ncells_y;
+  for(int x=0;x<params.ncells_x; x++)
+  for(int y=0;y<params.ncells_y;y++){
+    if(std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.1)
+        cell_count += 1;
+    arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
+  }
+
+
+if(cell_count < total_cells/100.){
+  std::cout<<"The number of cells not equilibrating is "<<cell_count<<", which is less than 1 percent of the total cells. Picard iterations terminating."<<std::endl;
+  return 0;
+}
+else{
+  picard_number += 1;
+  std::cout<<"The number of cells not equilibrating is "<<cell_count<<", out of a total of "<<total_cells<<" cells. We will continue to picard iteration number "<<picard_number<<std::endl;
+  return picard_number;
 }
 
+
+
+}
 
 
 
@@ -215,15 +228,19 @@ std::cout<<"set the new wtd_T values "<<std::endl;
 
 void UpdateCPU(const Parameters &params, ArrayPack &arp){
 
-   Eigen::initParallel();
+  Eigen::initParallel();
+  omp_set_num_threads(8);
+  Eigen::setNbThreads(8);
 
   // Picard iteration through solver
 
-  for (int i=0; i<params.picard_iterations; i++){
-    std::cout << "updateTransmissivity: Iteration " << i+1 << "/" << params.picard_iterations << std::endl;
+  //for (int i=0; i<params.picard_iterations; i++){
+   int continue_picard = 1;
+   while(continue_picard != 0 ){
+    std::cout << "updateTransmissivity: " << std::endl;
     updateTransmissivity(params,arp);
-    std::cout<<"populateArrays: Iteration " << i+1 << "/" << params.picard_iterations << std::endl;
-    populateArrays(params,arp);
+    std::cout<<"populateArrays: " << std::endl;
+    continue_picard = populateArrays(params,arp,continue_picard);
   }
   // Following these iterations, copy  the result into the WTD array
   // >>>> Improve code in future to send results directly to WTD on the
