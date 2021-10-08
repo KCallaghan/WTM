@@ -88,6 +88,9 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
   for(int y=0;y<params.ncells_y; y++){
     double scalar_portion_x = -params.deltat/(arp.porosity(x,y)*params.cellsize_n_s_metres*params.cellsize_n_s_metres);
     double scalar_portion_y = -params.deltat/(arp.porosity(x,y)*arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]);
+
+//TODO: Do I have my usage of scalar_portion_x and scalar_portion_y the right way around? Getting confused if I want the distance travelled or the cross-sectional area that the T is felt across.
+
     //The row and column that the current cell will be stored in in matrix A.
     //This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
     //All of the N,E,S,W directions should be in the same row, but the column will differ.
@@ -105,38 +108,40 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
       b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
       if(y== 608 && x ==1595)
         std::cout<<"x "<<x<<" y "<<y<<" wtd "<<arp.wtd(x,y)<<" b "<<b(y+(x*params.ncells_y))<<" wtd_T "<<arp.wtd_T(x,y) <<std::endl;
-      entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(- scalar_portion_x) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(- scalar_portion_y) +1;
+      entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(- scalar_portion_y) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(- scalar_portion_x) +1;
       coefficients.push_back(T(main_row,main_col, entry));
+}
 
       //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-          if(!(y == params.ncells_y-1)){  // && arp.land_mask(x,y+1) != 0.f){
+          if(y != params.ncells_y-1 && y!= 0){  // && arp.land_mask(x,y+1) != 0.f){
             //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
-            entry = scalar_portion_x*((3./8.)*arp.transmissivity(x,y+1) + arp.transmissivity(x,y)/4. + (3./8.)*arp.transmissivity(x,y-1));
+            //entry = scalar_portion_y*((3./8.)*arp.transmissivity(x,y+1) + arp.transmissivity(x,y)/4. + (3./8.)*arp.transmissivity(x,y-1));
+            entry = scalar_portion_y*((3./8.)*arp.transmissivity(x,y+1) + arp.transmissivity(x,y)/2. + (1./8.)*arp.transmissivity(x,y-1));
             coefficients.push_back(T(main_row,main_col+1,entry ));
           }
 
         //Next is the West diagonal. Opposite of the East. Lo cated at (i,j-1).
-          if(y != 0){  // && arp.land_ mask(x,y-1) != 0.f){
+          if(y != 0 && y != params.ncells_y-1){  // && arp.land_ mask(x,y-1) != 0.f){
             //y may not == 0 since then there is no cell to the west.
-            entry = scalar_portion_x*((1./8.)*arp.transmissivity(x,y+1) + (3./4.)*arp.transmissivity(x,y) + (1./8.)*arp.transmissivity(x,y-1));
+            entry = scalar_portion_y*((1./8.)*arp.transmissivity(x,y+1) + (1./2.)*arp.transmissivity(x,y) + (3./8.)*arp.transmissivity(x,y-1));
             coefficients.push_back(T(main_row,main_col-1,entry ));
           }
 
 
       //Now let's do the North diagonal. Offset by -(ncells_y).
-        if(x != 0 ){  // && arp.land_mask(x-1,y) != 0.f){
+        if(x != 0 && x != params.ncells_x-1){  // && arp.land_mask(x-1,y) != 0.f){
           //x may not equal 0 since then there is no cell to the north.
-          entry = scalar_portion_y*((1./8.)*arp.transmissivity(x+1,y) + (3./4.)*arp.transmissivity(x,y) + (1./8.)*arp.transmissivity(x-1,y));
+          entry = scalar_portion_x*((1./8.)*arp.transmissivity(x+1,y) + (1./2.)*arp.transmissivity(x,y) + (3./8.)*arp.transmissivity(x-1,y));
           coefficients.push_back(T(main_row,main_col-params.ncells_y, entry));
         }
 
       //finally, do the South diagonal, offset by +(ncells_y).
-        if(!(x == params.ncells_x-1)){  // && arp.land_mask(x+1,y) != 0.f){
+        if(x != params.ncells_x-1 && x!=0){  // && arp.land_mask(x+1,y) != 0.f){
            //we may not be in the final row where there is no cell
-          entry = scalar_portion_y*((3./8.)*arp.transmissivity(x+1,y) + arp.transmissivity(x,y)/4. + (3./8.)*arp.transmissivity(x-1,y));
+          entry = scalar_portion_x*((3./8.)*arp.transmissivity(x+1,y) + arp.transmissivity(x,y)/2. + (1./8.)*arp.transmissivity(x-1,y));
           coefficients.push_back(T(main_row,main_col+params.ncells_y, entry));
         }
-      }
+
   }
 
       std::cerr<<"set A"<<std::endl;
