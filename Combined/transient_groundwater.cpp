@@ -2,7 +2,6 @@
 
 #include <eigen3/Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
 #include <eigen3/Eigen/Core>
-#include "doctest.h"
 #include <algorithm>
 #include <chrono>
 #include <thread>

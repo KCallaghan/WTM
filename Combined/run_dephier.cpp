@@ -158,8 +158,8 @@ int main(int argc, char **argv){
   std::cout<<"done with processing"<<std::endl;
 
 
-  label.saveGDAL("label.tif");
-  final_label.saveGDAL("final_label.tif");
+//  label.saveGDAL("label.tif");
+//  final_label.saveGDAL("final_label.tif");
 
 //  SaveAsNetCDF(label,"label.nc","value");
 //  SaveAsNetCDF(final_label,"final_label.nc","value");
