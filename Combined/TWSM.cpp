@@ -256,7 +256,7 @@ int main(int argc, char **argv){
 
   ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
 
-
+std::cout<<"initialised petsc"<<std::endl;
   initialise(params,arp);
   run(params,arp);
   finalise(params, arp);
