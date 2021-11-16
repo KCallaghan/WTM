@@ -1,5 +1,5 @@
 #include "irf.cpp"
-#include "petsc/petscksp.h"
+//#include "petscksp.h"
 
 #include <richdem/common/timer.hpp>
 
@@ -84,7 +84,7 @@ void update(
     textfile<<"saving partway result."<<std::endl;
     //arp.wtd.printAll();
     string cycles_str = to_string(params.cycles_done);
-//    arp.wtd.saveGDAL(params.outfilename + cycles_str +".tif");
+    arp.wtd.saveGDAL(params.outfilename + cycles_str +".tif");
 
     //Save the output every 100 iterations, under a new filename
     //so we can compare how the water table has changed through time.
@@ -232,7 +232,7 @@ void finalise(Parameters &params, ArrayPack &arp){
 
   textfile<<"done with processing"<<std::endl;
   string cycles_str = to_string(params.cycles_done);
-//  arp.wtd.saveGDAL(params.outfilename + cycles_str +".tif");
+  arp.wtd.saveGDAL(params.outfilename + cycles_str +".tif");
   //save the final answer for water table depth.
 
   textfile.close();
@@ -252,9 +252,9 @@ int main(int argc, char **argv){
   std::cerr<<"Argv"<<argv<<std::endl;
   Parameters params(argv[1]);
 
-  PetscErrorCode ierr;
+ // PetscErrorCode ierr;
 
-  ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
+ // ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
 
 std::cout<<"initialised petsc"<<std::endl;
   initialise(params,arp);

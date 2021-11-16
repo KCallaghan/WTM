@@ -37,14 +37,14 @@ double depthIntegratedTransmissivity(
     // also seems an okay thing to do in this case.
     return 0;
   } else if(wtd_T < -shallow){ // Equation S6 from the Fan paper
-    return std::max(0.0,fdepth * ksat  * std::exp((wtd_T + shallow)/fdepth));
+    return std::max(0.0,0.1*fdepth * ksat  * std::exp((wtd_T + shallow)/fdepth));
   } else if(wtd_T > 0){
     // If wtd_T is greater than 0, max out rate of groundwater movement
     // as though wtd_T were 0. The surface water will get to move in
     // FillSpillMerge.
-    return std::max(0.0,ksat * (0 + shallow + fdepth));
+    return std::max(0.0,0.1*ksat * (0 + shallow + fdepth));
   } else { //Equation S4 from the Fan paper
-    return std::max(0.0,ksat * (wtd_T + shallow + fdepth));  //max because you can't have a negative transmissivity.
+    return std::max(0.0,0.1*ksat * (wtd_T + shallow + fdepth));  //max because you can't have a negative transmissivity.
   }
 }
 
@@ -101,28 +101,29 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
       //populate the known vector b. This is the current wtd, which is the 'guess' that we are using to get our answer, x.
       b(y+(x*params.ncells_y)) = 0.;
       entry = 1.;                   //then they should not change (wtd should be 0 both before and after) so only the centre diagonal is populated, and it is = 1.
+
       coefficients.push_back(T(main_row,main_col, entry));
     }
     else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
       b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
-      if(y== 608 && x ==1595)
-        std::cout<<"x "<<x<<" y "<<y<<" wtd "<<arp.wtd(x,y)<<" b "<<b(y+(x*params.ncells_y))<<" wtd_T "<<arp.wtd_T(x,y) <<std::endl;
       entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(- scalar_portion_y) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(- scalar_portion_x) +1;
       coefficients.push_back(T(main_row,main_col, entry));
-}
+
 
       //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
           if(y != params.ncells_y-1 && y!= 0){  // && arp.land_mask(x,y+1) != 0.f){
             //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
             //entry = scalar_portion_y*((3./8.)*arp.transmissivity(x,y+1) + arp.transmissivity(x,y)/4. + (3./8.)*arp.transmissivity(x,y-1));
-            entry = scalar_portion_y*((3./8.)*arp.transmissivity(x,y+1) + arp.transmissivity(x,y)/2. + (1./8.)*arp.transmissivity(x,y-1));
+       //     entry = scalar_portion_y*((3./8.)*arp.transmissivity(x,y+1) + arp.transmissivity(x,y)/2. + (1./8.)*arp.transmissivity(x,y-1));
+            entry = scalar_portion_y*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
             coefficients.push_back(T(main_row,main_col+1,entry ));
           }
 
         //Next is the West diagonal. Opposite of the East. Lo cated at (i,j-1).
           if(y != 0 && y != params.ncells_y-1){  // && arp.land_ mask(x,y-1) != 0.f){
             //y may not == 0 since then there is no cell to the west.
-            entry = scalar_portion_y*((1./8.)*arp.transmissivity(x,y+1) + (1./2.)*arp.transmissivity(x,y) + (3./8.)*arp.transmissivity(x,y-1));
+           // entry = scalar_portion_y*((1./8.)*arp.transmissivity(x,y+1) + (1./2.)*arp.transmissivity(x,y) + (3./8.)*arp.transmissivity(x,y-1));
+            entry = scalar_portion_y*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
             coefficients.push_back(T(main_row,main_col-1,entry ));
           }
 
@@ -130,17 +131,19 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
       //Now let's do the North diagonal. Offset by -(ncells_y).
         if(x != 0 && x != params.ncells_x-1){  // && arp.land_mask(x-1,y) != 0.f){
           //x may not equal 0 since then there is no cell to the north.
-          entry = scalar_portion_x*((1./8.)*arp.transmissivity(x+1,y) + (1./2.)*arp.transmissivity(x,y) + (3./8.)*arp.transmissivity(x-1,y));
+          //entry = scalar_portion_x*((1./8.)*arp.transmissivity(x+1,y) + (1./2.)*arp.transmissivity(x,y) + (3./8.)*arp.transmissivity(x-1,y));
+          entry = scalar_portion_x*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
           coefficients.push_back(T(main_row,main_col-params.ncells_y, entry));
         }
 
       //finally, do the South diagonal, offset by +(ncells_y).
         if(x != params.ncells_x-1 && x!=0){  // && arp.land_mask(x+1,y) != 0.f){
            //we may not be in the final row where there is no cell
-          entry = scalar_portion_x*((3./8.)*arp.transmissivity(x+1,y) + arp.transmissivity(x,y)/2. + (1./8.)*arp.transmissivity(x-1,y));
+          //entry = scalar_portion_x*((3./8.)*arp.transmissivity(x+1,y) + arp.transmissivity(x,y)/2. + (1./8.)*arp.transmissivity(x-1,y));
+          entry = scalar_portion_x*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
           coefficients.push_back(T(main_row,main_col+params.ncells_y, entry));
         }
-
+}
   }
 
       std::cerr<<"set A"<<std::endl;

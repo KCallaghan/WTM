@@ -215,19 +215,19 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
 void InitialiseTest(Parameters &params, ArrayPack &arp){
 
-  arp.topo_start = rd::Array2D<float>(params.surfdatadir + params.region + \
+  arp.topo = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start+"_topography.tif");
-  arp.slope_start         = rd::Array2D<float>(params.surfdatadir + params.region + \
+  arp.slope         = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start+"_slope.tif");  //Slope as a value from 0 to 1.
 
-  arp.topo = rd::Array2D<uint8_t>(arp.topo_start.width()/4,arp.topo_start.height()/4,1.);
-  arp.slope = rd::Array2D<uint8_t>(arp.topo_start.width()/4,arp.topo_start.height()/4,1.);
+  //arp.topo = rd::Array2D<uint8_t>(arp.topo_start.width()/4,arp.topo_start.height()/4,1.);
+  //arp.slope = rd::Array2D<uint8_t>(arp.topo_start.width()/4,arp.topo_start.height()/4,1.);
 
-  for(unsigned int i=0;i<arp.topo_start.width()/4;i++)
-    for(unsigned int j=0;j<arp.topo_start.height()/4;j++){
-      arp.topo(i,j) = arp.topo_start(i,j);
-      arp.slope(i,j) = arp.slope_start(i,j);
-    }
+ // for(unsigned int i=0;i<arp.topo_start.width()/4;i++)
+ //   for(unsigned int j=0;j<arp.topo_start.height()/4;j++){
+ //     arp.topo(i,j) = arp.topo_start(i,j);
+ //     arp.slope(i,j) = arp.slope_start(i,j);
+ //   }
 
  // arp.topo          = LoadData<float>(params.surfdatadir + params.region +   "_topography.tif",   "value");  //Units: metres
 
