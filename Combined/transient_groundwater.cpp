@@ -59,8 +59,8 @@ void updateTransmissivity(
       float ocean_T = 0.000001 * (1.5 + 25);  //some constant for all T values in ocean - TODO look up representative values
       if(arp.land_mask(x,y) == 0.f)
         arp.transmissivity(x,y) = ocean_T;
-      else if(continue_picard < 2){
-        arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+      else if(continue_picard < 5){
+        arp.my_last_wtd(x,y) = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
        // arp.my_last_wtd(x,y) = -50;
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
@@ -76,8 +76,18 @@ void updateTransmissivity(
         //if(continue_picard <= 2)
         //   arp.transmissivity(x,y) = depthIntegratedTransmissivity(my_wtd, arp.fdepth(x,y), arp.ksat(x,y));
         //else if(continue_picard>2 && arp.nope(x,y)==1){
+if(arp.wtd_T(x,y)<=0 && arp.my_last_wtd(x,y) > 0){
+  arp.my_last_wtd(x,y) = 0;
+//  if(x==45&&(y==78) )
+//    std::cout<<"Zero!"<<std::endl;
+}
+//if(arp.wtd_T(x,y)>=0 && arp.my_last_wtd(x,y) < 0){
+//  arp.my_last_wtd(x,y) = 0;
+//    if(x==45&&(y==78) )
+//    std::cout<<"Zero!"<<std::endl;
+//}
 
-        if((arp.wtd_T(x,y)>arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)>arp.my_last_wtd(x,y)) ||(arp.wtd_T(x,y)<arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)<arp.my_last_wtd(x,y))){
+        if((arp.wtd_T(x,y)>=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)>=arp.my_last_wtd(x,y)) ||(arp.wtd_T(x,y)<=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)<=arp.my_last_wtd(x,y))){
 
         if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 2000){
           arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
@@ -149,8 +159,8 @@ void updateTransmissivity(
 
 
 
-        if(arp.my_last_wtd(x,y) > 10  && arp.wtd_T(x,y) > 10 && arp.wtd_T_iteration(x,y) > 10 && arp.my_prev_wtd(x,y) > 10)
-          arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+       // if(arp.my_last_wtd(x,y) > 10  && arp.wtd_T(x,y) > 10 && arp.wtd_T_iteration(x,y) > 10 && arp.my_prev_wtd(x,y) > 10)
+         // arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
 
 //if(arp.my_last_wtd(x,y) >= 0 && arp.my_prev_wtd(x,y) < 0){
  // arp.my_last_wtd(x,y) = arp.my_prev_wtd(x,y) - arp.my_prev_wtd(x,y)/10.;
@@ -162,6 +172,15 @@ void updateTransmissivity(
 
 //arp.my_last_wtd(68,34 ) = -0.88;
              //   arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+
+
+
+//      if(arp.wtd_T(x,y) < arp.wtd_T_iteration(x,y) && arp.wtd_T(x,y) < arp.my_last_wtd(x,y) && arp.my_last_wtd(x,y) < arp.my_prev_wtd(x,y))
+  //      arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+
+//if(arp.wtd_T(x,y) > arp.wtd_T_iteration(x,y) && arp.wtd_T(x,y) > arp.my_last_wtd(x,y) && arp.my_last_wtd(x,y) > arp.my_prev_wtd(x,y))
+  //      arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+
 
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
       }
@@ -339,13 +358,13 @@ int total_cells = params.ncells_x * params.ncells_y;
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
  //         if(x==68&&y==34)
-            if(x==25&&(y==75 || y ==25) )
+            if(x==89&&(y==71) )
       std::cout<<"x "<<x<<" y "<<y<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" my wtd "<<arp.my_last_wtd(x,y)<<" prev was "<<arp.my_prev_wtd(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<std::endl;
 
-    if((std::abs(arp.my_last_wtd(x,y) - arp.wtd_T(x,y)) > 0.1)){
+    if((std::abs(arp.my_last_wtd(x,y) - arp.wtd_T(x,y)) > 0.1) && (arp.my_last_wtd(x,y) <0 || arp.wtd_T(x,y) <0)){
       cell_count += 1;
       arp.nope(x,y)=1;
-      if(picard_number == 1000)
+      if(picard_number == 10)
         std::cout<<"x "<<x<<" y "<<y<<" diff "<<arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)<<std::endl;
     }
     else{
