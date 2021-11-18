@@ -37,21 +37,21 @@ double depthIntegratedTransmissivity(
     // also seems an okay thing to do in this case.
     return 0;
   } else if(wtd_T < -shallow){ // Equation S6 from the Fan paper
-    return std::max(0.0,0.1*fdepth * ksat  * std::exp((wtd_T + shallow)/fdepth));
+    return std::max(0.0,fdepth * ksat  * std::exp((wtd_T + shallow)/(fdepth*5)));
   } else if(wtd_T > 0){
     // If wtd_T is greater than 0, max out rate of groundwater movement
     // as though wtd_T were 0. The surface water will get to move in
     // FillSpillMerge.
-    return std::max(0.0,0.1*ksat * (0 + shallow + fdepth));
+    return std::max(0.0,ksat * (0 + shallow + fdepth));
   } else { //Equation S4 from the Fan paper
-    return std::max(0.0,0.1*ksat * (wtd_T + shallow + fdepth));  //max because you can't have a negative transmissivity.
+    return std::max(0.0,ksat * (wtd_T + shallow + fdepth));  //max because you can't have a negative transmissivity.
   }
 }
 
 
 //update the entire transmissivity array
 void updateTransmissivity(
-  const Parameters &params,ArrayPack &arp
+  const Parameters &params,ArrayPack &arp,int continue_picard
 ){
   #pragma omp parallel for collapse(2)
   for(int y=0;y<params.ncells_y-1;y++)
@@ -59,9 +59,67 @@ void updateTransmissivity(
       float ocean_T = 0.000001 * (1.5 + 25);  //some constant for all T values in ocean - TODO look up representative values
       if(arp.land_mask(x,y) == 0.f)
         arp.transmissivity(x,y) = ocean_T;
-      else
-        arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
+      else if(continue_picard < 2){
+        arp.my_last_wtd(x,y) = -50;
+        arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
+      }
+      else if(continue_picard<5){
+        arp.my_last_wtd(x,y) = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
+        arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
+      }
+      else{
+        //if(continue_picard <= 2)
+        //   arp.transmissivity(x,y) = depthIntegratedTransmissivity(my_wtd, arp.fdepth(x,y), arp.ksat(x,y));
+        //else if(continue_picard>2 && arp.nope(x,y)==1){
+        if((arp.wtd_T(x,y)>arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)>arp.my_last_wtd(x,y)) ||(arp.wtd_T(x,y)<arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)<arp.my_last_wtd(x,y))){
+
+        if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 2000)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + 500;
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 200)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + 50;
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 10)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + 5;
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 2)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +1;
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.5)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +0.1;
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.05)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +0.01;
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -2000)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) - 500;
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -200)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) - 50;
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -10)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -5;
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -2)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -1;
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.5)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -0.1;
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.05)
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -0.01;
+        else
+          arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+
+        }
+        else{
+          arp.my_last_wtd(x,y) = (arp.my_last_wtd(x,y) + arp.my_prev_wtd(x,y))/2.;
+        }
+
+
+
+        //  my_wtd = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
+
+        arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
+      }
+      if(x==68&&y==34)
+        std::cout<<"wtd_T "<<arp.wtd_T(68,34)<<" wtd_T_iteration "<<arp.wtd_T_iteration(68,34)<<" my wtd "<<arp.my_last_wtd(x,y)<<" transmissivity "<<arp.transmissivity(68,34)<<std::endl;
+
+
+   arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
   }
+
+
+
 }
 
 
@@ -78,6 +136,11 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
     std::cout<<"populate b and triplet"<<std::endl;
 
     std::cout<<"cells x "<<params.ncells_x<<" cells y "<<params.ncells_y<<std::endl;
+
+  for(int x=0;x<params.ncells_x; x++)
+  for(int y=0;y<params.ncells_y;y++){
+    arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
+  }
 
 
   int main_row = 0;
@@ -106,7 +169,9 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
     }
     else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
       b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
-      entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(- scalar_portion_y) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(- scalar_portion_x) +1;
+      //entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(- scalar_portion_y) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(- scalar_portion_x) +1;
+      entry = arp.transmissivity(x,y)*-2*(-scalar_portion_y - scalar_portion_x ) + 1;
+
       coefficients.push_back(T(main_row,main_col, entry));
 
 
@@ -115,7 +180,9 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
             //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
             //entry = scalar_portion_y*((3./8.)*arp.transmissivity(x,y+1) + arp.transmissivity(x,y)/4. + (3./8.)*arp.transmissivity(x,y-1));
        //     entry = scalar_portion_y*((3./8.)*arp.transmissivity(x,y+1) + arp.transmissivity(x,y)/2. + (1./8.)*arp.transmissivity(x,y-1));
-            entry = scalar_portion_y*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
+          //  entry = scalar_portion_y*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
+              entry = scalar_portion_y*(arp.transmissivity(x,y) + (arp.transmissivity(x,y+1) + arp.transmissivity(x,y-1))/4.);
+
             coefficients.push_back(T(main_row,main_col+1,entry ));
           }
 
@@ -123,7 +190,8 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
           if(y != 0 && y != params.ncells_y-1){  // && arp.land_ mask(x,y-1) != 0.f){
             //y may not == 0 since then there is no cell to the west.
            // entry = scalar_portion_y*((1./8.)*arp.transmissivity(x,y+1) + (1./2.)*arp.transmissivity(x,y) + (3./8.)*arp.transmissivity(x,y-1));
-            entry = scalar_portion_y*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
+            //entry = scalar_portion_y*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
+            entry = scalar_portion_y*(arp.transmissivity(x,y) - (arp.transmissivity(x,y+1) + arp.transmissivity(x,y-1))/4.);
             coefficients.push_back(T(main_row,main_col-1,entry ));
           }
 
@@ -132,7 +200,8 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
         if(x != 0 && x != params.ncells_x-1){  // && arp.land_mask(x-1,y) != 0.f){
           //x may not equal 0 since then there is no cell to the north.
           //entry = scalar_portion_x*((1./8.)*arp.transmissivity(x+1,y) + (1./2.)*arp.transmissivity(x,y) + (3./8.)*arp.transmissivity(x-1,y));
-          entry = scalar_portion_x*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
+          //entry = scalar_portion_x*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
+          entry = scalar_portion_x*(arp.transmissivity(x,y) - (arp.transmissivity(x+1,y) + arp.transmissivity(x-1,y))/4.);
           coefficients.push_back(T(main_row,main_col-params.ncells_y, entry));
         }
 
@@ -140,7 +209,8 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
         if(x != params.ncells_x-1 && x!=0){  // && arp.land_mask(x+1,y) != 0.f){
            //we may not be in the final row where there is no cell
           //entry = scalar_portion_x*((3./8.)*arp.transmissivity(x+1,y) + arp.transmissivity(x,y)/2. + (1./8.)*arp.transmissivity(x-1,y));
-          entry = scalar_portion_x*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
+          //entry = scalar_portion_x*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
+          entry = scalar_portion_x*(arp.transmissivity(x,y) + (arp.transmissivity(x+1,y) + arp.transmissivity(x-1,y))/4.);
           coefficients.push_back(T(main_row,main_col+params.ncells_y, entry));
         }
 }
@@ -203,13 +273,22 @@ std::cout<<"set the new wtd_T values "<<std::endl;
 
 
 
+
+
+
 int cell_count = 0;
 int total_cells = params.ncells_x * params.ncells_y;
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
-    if(std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.1)
-        cell_count += 1;
-    arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
+    if(std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.1){
+      cell_count += 1;
+      arp.nope(x,y)=1;
+   //   if(picard_number == 100)
+   //     std::cout<<"x "<<x<<" y "<<y<<" diff "<<arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)<<std::endl;
+    }
+    else{
+      arp.nope(x,y)=0;
+    }
   }
 
 
@@ -245,7 +324,7 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
    int continue_picard = 1;
    while(continue_picard != 0 ){
     std::cout << "updateTransmissivity: " << std::endl;
-    updateTransmissivity(params,arp);
+    updateTransmissivity(params,arp,continue_picard);
     std::cout<<"populateArrays: " << std::endl;
     continue_picard = populateArrays(params,arp,continue_picard);
   }

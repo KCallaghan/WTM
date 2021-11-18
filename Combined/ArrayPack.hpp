@@ -19,6 +19,7 @@ class ArrayPack {
   f2d porosity;
   f2d land_mask;
   f2d ice_mask;
+  d2d nope;
 
   f2d ksat;
   f2d vert_ksat;
@@ -62,6 +63,8 @@ class ArrayPack {
   d2d wtd_changed;
   d2d wtd_T;
   d2d wtd_T_iteration;
+  d2d my_last_wtd;
+  d2d my_prev_wtd;
 
   dh_label_t flowdir_t;
 

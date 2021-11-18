@@ -174,6 +174,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   arp.winter_temp = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start + "_winter_temperature.tif");      //Units: degrees Celsius
 
+    arp.nope = rd::Array2D<double>(arp.topo,0.);
 
   if(params.infiltration_on == true){
     arp.vert_ksat = rd::Array2D<float>(params.surfdatadir + params.region + \
@@ -187,7 +188,11 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   else{
     arp.wtd   = rd::Array2D<double>(arp.topo,100.);
     arp.wtd_T = rd::Array2D<double>(arp.topo,100.);
-        arp.wtd_T_iteration = rd::Array2D<double>(arp.topo,100.);
+    arp.wtd_T_iteration = rd::Array2D<double>(arp.topo,100.);
+        arp.my_last_wtd = rd::Array2D<double>(arp.topo,100.);
+                arp.my_prev_wtd = rd::Array2D<double>(arp.topo,100.);
+
+
 
   }
   //we start with a water table at the surface for equilibrium runs.
@@ -219,6 +224,8 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   params.time_start+"_topography.tif");
   arp.slope         = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start+"_slope.tif");  //Slope as a value from 0 to 1.
+
+    arp.nope = rd::Array2D<double>(arp.topo,0.);
 
   //arp.topo = rd::Array2D<uint8_t>(arp.topo_start.width()/4,arp.topo_start.height()/4,1.);
   //arp.slope = rd::Array2D<uint8_t>(arp.topo_start.width()/4,arp.topo_start.height()/4,1.);
@@ -256,6 +263,9 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.wtd             = rd::Array2D<double>(arp.topo,100.0);
   arp.wtd_T             = rd::Array2D<double>(arp.topo,100.0);
   arp.wtd_T_iteration             = rd::Array2D<double>(arp.topo,100.0);
+    arp.my_last_wtd             = rd::Array2D<double>(arp.topo,100.0);
+    arp.my_prev_wtd             = rd::Array2D<double>(arp.topo,100.0);
+
 
   //we start with a water table below the surface for testing.
   arp.evap            = arp.starting_evap;
@@ -336,6 +346,9 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
       arp.wtd  (i) = 0.;
       arp.wtd_T  (i) = 0.;
             arp.wtd_T_iteration  (i) = 0.;
+                        arp.my_last_wtd  (i) = 0.;
+
+                        arp.my_prev_wtd  (i) = 0.;
 
 
     }
@@ -499,6 +512,9 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
       arp.wtd  (i) = 0.;
       arp.wtd_T  (i) = 0.;
             arp.wtd_T_iteration  (i) = 0.;
+                        arp.my_last_wtd  (i) = 0.;
+                        arp.my_prev_wtd  (i) = 0.;
+
 
     }
   }
