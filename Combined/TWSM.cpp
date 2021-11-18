@@ -142,8 +142,11 @@ void update(
   if(params.fsm_on){
     richdem::Timer fsm_timer;
     fsm_timer.start();
-    dh::FillSpillMerge(params,deps,arp);
 
+    std::cout<<"before FSM "<<arp.wtd(25,25)<<" "<<arp.wtd(25,75)<<std::endl;
+
+    dh::FillSpillMerge(params,deps,arp);
+std::cout<<"after FSM "<<arp.wtd(25,25)<<" "<<arp.wtd(25,75)<<std::endl;
     now = time(0);
     dt = ctime(&now);
 

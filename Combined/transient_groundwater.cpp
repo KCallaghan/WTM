@@ -60,62 +60,115 @@ void updateTransmissivity(
       if(arp.land_mask(x,y) == 0.f)
         arp.transmissivity(x,y) = ocean_T;
       else if(continue_picard < 2){
-        arp.my_last_wtd(x,y) = -50;
+        arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+       // arp.my_last_wtd(x,y) = -50;
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
+           arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+
       }
-      else if(continue_picard<5){
-        arp.my_last_wtd(x,y) = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
-        arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
-      }
+ //     else if(continue_picard<5){
+ //       arp.my_last_wtd(x,y) = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
+ //       arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
+ //          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+
+ //     }
       else{
         //if(continue_picard <= 2)
         //   arp.transmissivity(x,y) = depthIntegratedTransmissivity(my_wtd, arp.fdepth(x,y), arp.ksat(x,y));
         //else if(continue_picard>2 && arp.nope(x,y)==1){
+
         if((arp.wtd_T(x,y)>arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)>arp.my_last_wtd(x,y)) ||(arp.wtd_T(x,y)<arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)<arp.my_last_wtd(x,y))){
 
-        if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 2000)
+        if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 2000){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
           arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + 500;
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 200)
+        }
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 200){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
           arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + 50;
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 10)
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + 5;
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 2)
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +1;
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.5)
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +0.1;
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.05)
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +0.01;
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -2000)
+        }
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 10){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + 1;
+        }
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 3){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +0.05;
+        }
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.05){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +0.005;
+        }
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.005){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +0.0005;
+        }
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -2000){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
           arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) - 500;
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -200)
+        }
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -200){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
           arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) - 50;
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -10)
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -5;
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -2)
+        }
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -10){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
           arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -1;
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.5)
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -0.1;
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.05)
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -0.01;
-        else
-          arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
-
+        }
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -3){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -0.05;
+        }
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.05){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -0.005;
+        }
+        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.005){
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -0.0005;
         }
         else{
-          arp.my_last_wtd(x,y) = (arp.my_last_wtd(x,y) + arp.my_prev_wtd(x,y))/2.;
+          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+          arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
         }
 
+//        if((std::abs(arp.my_last_wtd(x,y) - arp.my_prev_wtd(x,y)) < 0.1) && std::abs){
+  //        if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < 0)
+    //        arp.my_last_wtd(x,y) = arp.my_prev_wtd(x,y) - 0.001;
+      //    else
+        //    arp.my_last_wtd(x,y) = arp.my_prev_wtd(x,y) + 0.001;
+       // }
+        }
+        else{
+          double temp = arp.my_last_wtd(x,y);
+          arp.my_last_wtd(x,y) = (arp.my_last_wtd(x,y) + arp.my_prev_wtd(x,y))/2.;
+          arp.my_prev_wtd(x,y) = temp;
+
+        }
+
+
+
+
+        if(arp.my_last_wtd(x,y) > 10  && arp.wtd_T(x,y) > 10 && arp.wtd_T_iteration(x,y) > 10 && arp.my_prev_wtd(x,y) > 10)
+          arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+
+//if(arp.my_last_wtd(x,y) >= 0 && arp.my_prev_wtd(x,y) < 0){
+ // arp.my_last_wtd(x,y) = arp.my_prev_wtd(x,y) - arp.my_prev_wtd(x,y)/10.;
+ // arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+//}
 
 
         //  my_wtd = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
 
+//arp.my_last_wtd(68,34 ) = -0.88;
+             //   arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
       }
-      if(x==68&&y==34)
-        std::cout<<"wtd_T "<<arp.wtd_T(68,34)<<" wtd_T_iteration "<<arp.wtd_T_iteration(68,34)<<" my wtd "<<arp.my_last_wtd(x,y)<<" transmissivity "<<arp.transmissivity(68,34)<<std::endl;
+ //     if(x==68&&y==34)
+   //     std::cout<<"wtd_T "<<arp.wtd_T(68,34)<<" wtd_T_iteration "<<arp.wtd_T_iteration(68,34)<<" my wtd "<<arp.my_last_wtd(x,y)<<" transmissivity "<<arp.transmissivity(68,34)<<std::endl;
 
 
-   arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
   }
 
 
@@ -129,6 +182,7 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
   std::vector<T> coefficients;
   Eigen::VectorXd b(params.ncells_x*params.ncells_y);
   Eigen::VectorXd vec_x(params.ncells_x*params.ncells_y);
+  Eigen::VectorXd guess(params.ncells_x*params.ncells_y);
 
   SpMat A(params.ncells_x*params.ncells_y,params.ncells_x*params.ncells_y);
   double entry;
@@ -163,14 +217,18 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
     if(arp.land_mask(x,y) == 0.f){  //if they are ocean cells
       //populate the known vector b. This is the current wtd, which is the 'guess' that we are using to get our answer, x.
       b(y+(x*params.ncells_y)) = 0.;
+            guess(y+(x*params.ncells_y)) = 0.;
+
       entry = 1.;                   //then they should not change (wtd should be 0 both before and after) so only the centre diagonal is populated, and it is = 1.
 
       coefficients.push_back(T(main_row,main_col, entry));
     }
     else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
       b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
-      //entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(- scalar_portion_y) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(- scalar_portion_x) +1;
-      entry = arp.transmissivity(x,y)*-2*(-scalar_portion_y - scalar_portion_x ) + 1;
+            guess(y+(x*params.ncells_y)) = arp.wtd_T(x,y) + arp.topo(x,y);
+
+      entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(- scalar_portion_y) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(- scalar_portion_x) +1;
+      //entry = arp.transmissivity(x,y)*-2*(-scalar_portion_y - scalar_portion_x ) + 1;
 
       coefficients.push_back(T(main_row,main_col, entry));
 
@@ -180,8 +238,8 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
             //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
             //entry = scalar_portion_y*((3./8.)*arp.transmissivity(x,y+1) + arp.transmissivity(x,y)/4. + (3./8.)*arp.transmissivity(x,y-1));
        //     entry = scalar_portion_y*((3./8.)*arp.transmissivity(x,y+1) + arp.transmissivity(x,y)/2. + (1./8.)*arp.transmissivity(x,y-1));
-          //  entry = scalar_portion_y*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
-              entry = scalar_portion_y*(arp.transmissivity(x,y) + (arp.transmissivity(x,y+1) + arp.transmissivity(x,y-1))/4.);
+            entry = scalar_portion_y*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
+              //entry = scalar_portion_y*(arp.transmissivity(x,y) + (arp.transmissivity(x,y+1) + arp.transmissivity(x,y-1))/4.);
 
             coefficients.push_back(T(main_row,main_col+1,entry ));
           }
@@ -190,8 +248,8 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
           if(y != 0 && y != params.ncells_y-1){  // && arp.land_ mask(x,y-1) != 0.f){
             //y may not == 0 since then there is no cell to the west.
            // entry = scalar_portion_y*((1./8.)*arp.transmissivity(x,y+1) + (1./2.)*arp.transmissivity(x,y) + (3./8.)*arp.transmissivity(x,y-1));
-            //entry = scalar_portion_y*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
-            entry = scalar_portion_y*(arp.transmissivity(x,y) - (arp.transmissivity(x,y+1) + arp.transmissivity(x,y-1))/4.);
+            entry = scalar_portion_y*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
+            //entry = scalar_portion_y*(arp.transmissivity(x,y) - (arp.transmissivity(x,y+1) + arp.transmissivity(x,y-1))/4.);
             coefficients.push_back(T(main_row,main_col-1,entry ));
           }
 
@@ -200,8 +258,8 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
         if(x != 0 && x != params.ncells_x-1){  // && arp.land_mask(x-1,y) != 0.f){
           //x may not equal 0 since then there is no cell to the north.
           //entry = scalar_portion_x*((1./8.)*arp.transmissivity(x+1,y) + (1./2.)*arp.transmissivity(x,y) + (3./8.)*arp.transmissivity(x-1,y));
-          //entry = scalar_portion_x*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
-          entry = scalar_portion_x*(arp.transmissivity(x,y) - (arp.transmissivity(x+1,y) + arp.transmissivity(x-1,y))/4.);
+          entry = scalar_portion_x*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
+          //entry = scalar_portion_x*(arp.transmissivity(x,y) - (arp.transmissivity(x+1,y) + arp.transmissivity(x-1,y))/4.);
           coefficients.push_back(T(main_row,main_col-params.ncells_y, entry));
         }
 
@@ -209,8 +267,8 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
         if(x != params.ncells_x-1 && x!=0){  // && arp.land_mask(x+1,y) != 0.f){
            //we may not be in the final row where there is no cell
           //entry = scalar_portion_x*((3./8.)*arp.transmissivity(x+1,y) + arp.transmissivity(x,y)/2. + (1./8.)*arp.transmissivity(x-1,y));
-          //entry = scalar_portion_x*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
-          entry = scalar_portion_x*(arp.transmissivity(x,y) + (arp.transmissivity(x+1,y) + arp.transmissivity(x-1,y))/4.);
+          entry = scalar_portion_x*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
+          //entry = scalar_portion_x*(arp.transmissivity(x,y) + (arp.transmissivity(x+1,y) + arp.transmissivity(x-1,y))/4.);
           coefficients.push_back(T(main_row,main_col+params.ncells_y, entry));
         }
 }
@@ -261,7 +319,7 @@ solver.compute(A);
 //solver.setTolerance(1e-15);
 assert(solver.info()==Eigen::Success);
 std::cout<<"solve"<<std::endl;
-vec_x = solver.solveWithGuess(b, b);  // guess = b;
+vec_x = solver.solveWithGuess(b, guess);  // guess = b;
 
 std::cout<<"set the new wtd_T values "<<std::endl;
 //copy result into the wtd_T array:
@@ -280,11 +338,15 @@ int cell_count = 0;
 int total_cells = params.ncells_x * params.ncells_y;
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
-    if(std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.1){
+ //         if(x==68&&y==34)
+            if(x==25&&(y==75 || y ==25) )
+      std::cout<<"x "<<x<<" y "<<y<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" my wtd "<<arp.my_last_wtd(x,y)<<" prev was "<<arp.my_prev_wtd(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<std::endl;
+
+    if((std::abs(arp.my_last_wtd(x,y) - arp.wtd_T(x,y)) > 0.1)){
       cell_count += 1;
       arp.nope(x,y)=1;
-   //   if(picard_number == 100)
-   //     std::cout<<"x "<<x<<" y "<<y<<" diff "<<arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)<<std::endl;
+      if(picard_number == 1000)
+        std::cout<<"x "<<x<<" y "<<y<<" diff "<<arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)<<std::endl;
     }
     else{
       arp.nope(x,y)=0;
