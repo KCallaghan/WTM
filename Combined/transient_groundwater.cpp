@@ -51,146 +51,152 @@ double depthIntegratedTransmissivity(
 
 //update the entire transmissivity array
 void updateTransmissivity(
-  const Parameters &params,ArrayPack &arp,int continue_picard
+  Parameters &params,ArrayPack &arp,int continue_picard
 ){
-  #pragma omp parallel for collapse(2)
-  for(int y=0;y<params.ncells_y-1;y++)
-  for(int x=0;x<params.ncells_x-1; x++){
+int big_count = 0;
+int medium_count = 0;
+int small_count = 0;
+int tiny_count = 0;
+int itsy_count = 0;
+int bitsy_count = 0;
+int tracking_count = 0;
+int fluctuating_count = 0;
+int ocean_count = 0;
+int total_count = 0;
+int spider_count = 0;
+ //     if(continue_picard % 100 == 0){
+ //       params.s_big = params.s_big/3.;
+ //       params.s_medium = params.s_medium/3.;
+ //       params.s_small = params.s_small/3.;
+ //       params.s_tiny = params.s_tiny/3.;
+ //       params.s_itsy =params.s_itsy/3.;
+ //       params.s_bitsy = params.s_bitsy/3.;
+ //       std::cout<<"the new values are "<<params.s_big<<" med "<<params.s_medium<<" small "<<params.s_small<<" tiny "<<params.s_tiny<<std::endl;
+ //     }
+  //#pragma omp parallel for collapse(2)
+  for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x; x++){
+    total_count +=1;
+
       float ocean_T = 0.000001 * (1.5 + 25);  //some constant for all T values in ocean - TODO look up representative values
-      if(arp.land_mask(x,y) == 0.f)
+
+
+      if(arp.land_mask(x,y) == 0.f){
+        if(x==88&&y==70)
+          std::cout<<"it's an ocean cell"<<std::endl;
         arp.transmissivity(x,y) = ocean_T;
-      else if(continue_picard < 5){
+        arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+        ocean_count +=1;
+      }
+      else if(continue_picard < 12){
         arp.my_last_wtd(x,y) = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
-       // arp.my_last_wtd(x,y) = -50;
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
-           arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+        arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
 
       }
- //     else if(continue_picard<5){
- //       arp.my_last_wtd(x,y) = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
- //       arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
- //          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-
- //     }
       else{
-        //if(continue_picard <= 2)
-        //   arp.transmissivity(x,y) = depthIntegratedTransmissivity(my_wtd, arp.fdepth(x,y), arp.ksat(x,y));
-        //else if(continue_picard>2 && arp.nope(x,y)==1){
-if(arp.wtd_T(x,y)<=0 && arp.my_last_wtd(x,y) > 0){
-  arp.my_last_wtd(x,y) = 0;
-//  if(x==45&&(y==78) )
-//    std::cout<<"Zero!"<<std::endl;
-}
-//if(arp.wtd_T(x,y)>=0 && arp.my_last_wtd(x,y) < 0){
-//  arp.my_last_wtd(x,y) = 0;
-//    if(x==45&&(y==78) )
-//    std::cout<<"Zero!"<<std::endl;
-//}
-
+        if(arp.wtd_T(x,y)<=0 && arp.my_last_wtd(x,y) > 0){
+          arp.my_last_wtd(x,y) = 0;
+        }
         if((arp.wtd_T(x,y)>=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)>=arp.my_last_wtd(x,y)) ||(arp.wtd_T(x,y)<=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)<=arp.my_last_wtd(x,y))){
 
-        if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 2000){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + 500;
-        }
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 200){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + 50;
-        }
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 10){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + 1;
-        }
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 3){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +0.05;
-        }
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.05){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +0.005;
-        }
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.005){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +0.0005;
-        }
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -2000){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) - 500;
-        }
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -200){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) - 50;
-        }
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -10){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -1;
-        }
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -3){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -0.05;
-        }
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.05){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -0.005;
-        }
-        else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.005){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -0.0005;
-        }
-        else{
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
-        }
-
-//        if((std::abs(arp.my_last_wtd(x,y) - arp.my_prev_wtd(x,y)) < 0.1) && std::abs){
-  //        if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < 0)
-    //        arp.my_last_wtd(x,y) = arp.my_prev_wtd(x,y) - 0.001;
-      //    else
-        //    arp.my_last_wtd(x,y) = arp.my_prev_wtd(x,y) + 0.001;
-       // }
+          if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 2000){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + params.s_big;
+            big_count +=1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 200){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + params.s_medium;
+            medium_count += 1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 10){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + params.s_small;
+            small_count +=1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 5){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_tiny;
+            tiny_count +=1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 1){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_itsy;
+            itsy_count +=1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.3){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_bitsy;
+            bitsy_count +=1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.005){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_spider;
+            spider_count +=1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -2000){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) - params.s_big;
+            big_count +=1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -200){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) - params.s_medium;
+            medium_count += 1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -10){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_small;
+            small_count +=1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -5){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_tiny;
+            tiny_count +=1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -1){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_itsy;
+            itsy_count +=1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.3){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_bitsy;
+            bitsy_count +=1;
+          }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.005){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_spider;
+            spider_count +=1;
+          }
+          else{
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+            tracking_count +=1;
+          }
         }
         else{
           double temp = arp.my_last_wtd(x,y);
           arp.my_last_wtd(x,y) = (arp.my_last_wtd(x,y) + arp.my_prev_wtd(x,y))/2.;
           arp.my_prev_wtd(x,y) = temp;
+          fluctuating_count +=1;
 
         }
 
 
-
-
-       // if(arp.my_last_wtd(x,y) > 10  && arp.wtd_T(x,y) > 10 && arp.wtd_T_iteration(x,y) > 10 && arp.my_prev_wtd(x,y) > 10)
-         // arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
-
-//if(arp.my_last_wtd(x,y) >= 0 && arp.my_prev_wtd(x,y) < 0){
- // arp.my_last_wtd(x,y) = arp.my_prev_wtd(x,y) - arp.my_prev_wtd(x,y)/10.;
- // arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-//}
-
-
-        //  my_wtd = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
-
-//arp.my_last_wtd(68,34 ) = -0.88;
-             //   arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
-
-
-
-//      if(arp.wtd_T(x,y) < arp.wtd_T_iteration(x,y) && arp.wtd_T(x,y) < arp.my_last_wtd(x,y) && arp.my_last_wtd(x,y) < arp.my_prev_wtd(x,y))
-  //      arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
-
-//if(arp.wtd_T(x,y) > arp.wtd_T_iteration(x,y) && arp.wtd_T(x,y) > arp.my_last_wtd(x,y) && arp.my_last_wtd(x,y) > arp.my_prev_wtd(x,y))
-  //      arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
+if(arp.wtd_T(x,y)<=0 && arp.my_last_wtd(x,y) > 0)
+  arp.my_last_wtd(x,y) = arp.wtd_T(x,y)/10.;
 
 
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
       }
- //     if(x==68&&y==34)
-   //     std::cout<<"wtd_T "<<arp.wtd_T(68,34)<<" wtd_T_iteration "<<arp.wtd_T_iteration(68,34)<<" my wtd "<<arp.my_last_wtd(x,y)<<" transmissivity "<<arp.transmissivity(68,34)<<std::endl;
 
 
   }
 
 
+std::cout<<"big_count "<<big_count<<" medium_count "<<medium_count<<" small_count "<<small_count<<" tiny_count "<<tiny_count<<" itsy_count "<<itsy_count<<" bitsy_count "<<bitsy_count<<" spider_count "<<spider_count<<" tracking_count "<<tracking_count<<" fluctuating_count "<<fluctuating_count<<" ocean_count "<<ocean_count<<" total_count "<<total_count<<std::endl;
 
 }
 
@@ -338,7 +344,7 @@ solver.compute(A);
 //solver.setTolerance(1e-15);
 assert(solver.info()==Eigen::Success);
 std::cout<<"solve"<<std::endl;
-vec_x = solver.solveWithGuess(b, guess);  // guess = b;
+vec_x = solver.solveWithGuess(b, b);  // guess = b;
 
 std::cout<<"set the new wtd_T values "<<std::endl;
 //copy result into the wtd_T array:
@@ -355,17 +361,28 @@ std::cout<<"set the new wtd_T values "<<std::endl;
 
 int cell_count = 0;
 int total_cells = params.ncells_x * params.ncells_y;
+int land_cells = 0;
+int land_eq = 0;
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
- //         if(x==68&&y==34)
-            if(x==89&&(y==71) )
-      std::cout<<"x "<<x<<" y "<<y<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" my wtd "<<arp.my_last_wtd(x,y)<<" prev was "<<arp.my_prev_wtd(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<std::endl;
+    if(arp.land_mask(x,y) != 0.f){
+      land_cells +=1;
+    }
 
-    if((std::abs(arp.my_last_wtd(x,y) - arp.wtd_T(x,y)) > 0.1) && (arp.my_last_wtd(x,y) <0 || arp.wtd_T(x,y) <0)){
+
+ //         if(x==68&&y==34)
+  //          if((x==89||x==88||x==90)&&(y==71||y==70||y==72) )
+  //    std::cout<<"x "<<x<<" y "<<y<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" my wtd "<<arp.my_last_wtd(x,y)<<" prev was "<<arp.my_prev_wtd(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<std::endl;
+
+    if((std::abs(arp.my_last_wtd(x,y) - arp.wtd_T(x,y)) > 0.1)){
       cell_count += 1;
       arp.nope(x,y)=1;
-      if(picard_number == 10)
-        std::cout<<"x "<<x<<" y "<<y<<" diff "<<arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)<<std::endl;
+          if(arp.land_mask(x,y) != 0.f){
+            land_eq +=1;
+          }
+
+ //     if(picard_number == 10)
+   //     std::cout<<"x "<<x<<" y "<<y<<" diff "<<arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)<<std::endl;
     }
     else{
       arp.nope(x,y)=0;
@@ -375,11 +392,13 @@ int total_cells = params.ncells_x * params.ncells_y;
 
 if(cell_count < total_cells/100.){
   std::cout<<"The number of cells not equilibrating is "<<cell_count<<", which is less than 1 percent of the total cells. Picard iterations terminating."<<std::endl;
+  std::cout<<"There are a total of "<<land_cells<<" land cells and of these, "<<land_eq<<" are not equilibrating."<<std::endl;
   return 0;
 }
 else{
   picard_number += 1;
   std::cout<<"The number of cells not equilibrating is "<<cell_count<<", out of a total of "<<total_cells<<" cells. We will continue to picard iteration number "<<picard_number<<std::endl;
+  std::cout<<"There are a total of "<<land_cells<<" land cells and of these, "<<land_eq<<" are not equilibrating."<<std::endl;
   return picard_number;
 }
 
@@ -393,7 +412,7 @@ else{
 // PUBLIC FUNCTIONS //
 //////////////////////
 
-void UpdateCPU(const Parameters &params, ArrayPack &arp){
+void UpdateCPU(Parameters &params, ArrayPack &arp){
 
   Eigen::initParallel();
   omp_set_num_threads(8);
@@ -420,7 +439,7 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
 }
 
 
-void update(const Parameters &params, ArrayPack &arp){
+void update(Parameters &params, ArrayPack &arp){
   std::cout<<"entering the transient_groundwater module"<<std::endl;
   UpdateCPU(params, arp);
   std::cout<<"leaving the transient_groundwater module"<<std::endl;

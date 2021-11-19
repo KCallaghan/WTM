@@ -24,7 +24,7 @@ typedef rd::Array2D<float>  f2d;
 
 namespace FanDarcyGroundwater {
 
-void update(const Parameters &params, ArrayPack &arp);
+void update(Parameters &params, ArrayPack &arp);
 
 }
 

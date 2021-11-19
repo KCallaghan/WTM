@@ -52,6 +52,17 @@ public:
     double    infiltration_change  = 0.;
 
 
+
+
+      float s_big = 500;
+      float s_medium = 10;
+      float s_small = 0.5;
+      float s_tiny = 0.1;
+      float s_itsy = 0.05;
+      float s_bitsy = 0.005;
+      float s_spider = 0.00005;
+
+
     //Set for convenience within the code
     int32_t ncells_x  = -1;
     int32_t ncells_y  = -1;
