@@ -88,7 +88,7 @@ int spider_count = 0;
         arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
         ocean_count +=1;
       }
-      else if(continue_picard < 12){
+      else if(continue_picard < 20){
         arp.my_last_wtd(x,y) = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
         arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
@@ -338,7 +338,7 @@ vec_x = solver.solve (b);
 // Biconjugate gradient solver with guess
 // Set up the guess -- same as last time's levels (b)
 Eigen::BiCGSTAB<SpMat> solver;//, Eigen::IncompleteLUT<double> > solver;
-solver.setTolerance(0.0000001);
+solver.setTolerance(0.000001);
 //Eigen::LeastSquaresConjugateGradient<SpMat> solver;
 //NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means that BiCGSTAB will not run in parallel. It is faster without.
 std::cout<<"compute"<<std::endl;
@@ -351,7 +351,7 @@ if(solver.info()!=Success) {
 //solver.setTolerance(1e-15);
 assert(solver.info()==Eigen::Success);
 std::cout<<"solve"<<std::endl;
-vec_x = solver.solveWithGuess(b, b);  // guess = b;
+vec_x = solver.solveWithGuess(b, guess);  // guess = b;
 
 if(solver.info()!=Success) {
   std::cout<<"########################################################################### solving failed!!!!!!!!!!!!!!!!!!!!!!!!!"<<std::endl;
@@ -389,7 +389,7 @@ int land_eq = 0;
   //          if((x==89||x==88||x==90)&&(y==71||y==70||y==72) )
   //    std::cout<<"x "<<x<<" y "<<y<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" my wtd "<<arp.my_last_wtd(x,y)<<" prev was "<<arp.my_prev_wtd(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<std::endl;
 
-    if((std::abs(arp.my_last_wtd(x,y) - arp.wtd_T(x,y)) > 0.1)){
+    if((std::abs(arp.my_last_wtd(x,y) - arp.wtd_T(x,y)) > 0.001)){
       cell_count += 1;
       arp.nope(x,y)=1;
           if(arp.land_mask(x,y) != 0.f){
@@ -405,7 +405,7 @@ int land_eq = 0;
   }
 
 
-if(cell_count < total_cells/100.){
+if(cell_count < land_cells/100.){
   std::cout<<"The number of cells not equilibrating is "<<cell_count<<", which is less than 1 percent of the total cells. Picard iterations terminating."<<std::endl;
   std::cout<<"There are a total of "<<land_cells<<" land cells and of these, "<<land_eq<<" are not equilibrating."<<std::endl;
   return 0;
