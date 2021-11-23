@@ -95,9 +95,9 @@ int spider_count = 0;
 
       }
       else{
-        if(arp.wtd_T(x,y)<=0 && arp.my_last_wtd(x,y) > 0){
-          arp.my_last_wtd(x,y) = 0;
-        }
+       // if(arp.wtd_T(x,y)<=0 && arp.my_last_wtd(x,y) > 0){
+       //   arp.my_last_wtd(x,y) = 0;
+       // }
         if((arp.wtd_T(x,y)>=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)>=arp.my_last_wtd(x,y)) ||(arp.wtd_T(x,y)<=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)<=arp.my_last_wtd(x,y))){
 
           if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 2000){
@@ -185,8 +185,8 @@ int spider_count = 0;
         }
 
 
-if(arp.wtd_T(x,y)<=0 && arp.my_last_wtd(x,y) > 0)
-  arp.my_last_wtd(x,y) = arp.wtd_T(x,y)/10.;
+//if(arp.wtd_T(x,y)<=0 && arp.my_last_wtd(x,y) > 0)
+ // arp.my_last_wtd(x,y) = arp.wtd_T(x,y)/10.;
 
 
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
@@ -338,13 +338,28 @@ vec_x = solver.solve (b);
 // Biconjugate gradient solver with guess
 // Set up the guess -- same as last time's levels (b)
 Eigen::BiCGSTAB<SpMat> solver;//, Eigen::IncompleteLUT<double> > solver;
+solver.setTolerance(0.0000001);
+//Eigen::LeastSquaresConjugateGradient<SpMat> solver;
 //NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means that BiCGSTAB will not run in parallel. It is faster without.
 std::cout<<"compute"<<std::endl;
 solver.compute(A);
+
+if(solver.info()!=Success) {
+  std::cout<<"$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ decomposition failed!!!!!!!!!!!!!!!!!!!!!"<<std::endl;
+}
+
 //solver.setTolerance(1e-15);
 assert(solver.info()==Eigen::Success);
 std::cout<<"solve"<<std::endl;
 vec_x = solver.solveWithGuess(b, b);  // guess = b;
+
+if(solver.info()!=Success) {
+  std::cout<<"########################################################################### solving failed!!!!!!!!!!!!!!!!!!!!!!!!!"<<std::endl;
+}
+
+
+  std::cout << "#iterations:     " << solver.iterations() << std::endl;
+  std::cout << "estimated error: " << solver.error()      << std::endl;
 
 std::cout<<"set the new wtd_T values "<<std::endl;
 //copy result into the wtd_T array:
