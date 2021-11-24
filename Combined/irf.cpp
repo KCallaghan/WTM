@@ -91,6 +91,8 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
   }
 
 arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
 
   //load in the wtd result from the previous time:
   arp.wtd = rd::Array2D<double>(params.surfdatadir + params.region + \
@@ -178,6 +180,9 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 
     arp.nope = rd::Array2D<double>(arp.topo,0.);
 arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
+
   if(params.infiltration_on == true){
     arp.vert_ksat = rd::Array2D<float>(params.surfdatadir + params.region + \
   "vertical_ksat.tif");                                //Units of ksat are m/s.
@@ -268,6 +273,8 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
     arp.my_last_wtd             = rd::Array2D<double>(arp.topo,100.0);
     arp.my_prev_wtd             = rd::Array2D<double>(arp.topo,100.0);
     arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
 
 
   //we start with a water table below the surface for testing.

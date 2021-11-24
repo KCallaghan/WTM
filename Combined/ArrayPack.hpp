@@ -21,6 +21,8 @@ class ArrayPack {
   f2d ice_mask;
   d2d nope;
   d2d initial_T;
+  d2d scalar_array_x;
+  d2d scalar_array_y;
 
   f2d ksat;
   f2d vert_ksat;

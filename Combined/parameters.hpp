@@ -60,8 +60,8 @@ public:
       float s_tiny = 1;
       float s_itsy = 0.2;
       float s_bitsy = 0.05;
-      float s_between = 0.01;
-      float s_spider = 0.00005;
+      float s_between = 0.02;
+      float s_spider = 0.001;
 
 
     //Set for convenience within the code
