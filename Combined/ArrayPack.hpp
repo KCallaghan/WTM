@@ -20,6 +20,7 @@ class ArrayPack {
   f2d land_mask;
   f2d ice_mask;
   d2d nope;
+  d2d initial_T;
 
   f2d ksat;
   f2d vert_ksat;

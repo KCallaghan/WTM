@@ -90,6 +90,8 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
     "vertical_ksat.tif");
   }
 
+arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
+
   //load in the wtd result from the previous time:
   arp.wtd = rd::Array2D<double>(params.surfdatadir + params.region + \
   params.time_start + "_wtd.tif");
@@ -175,7 +177,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   params.time_start + "_winter_temperature.tif");      //Units: degrees Celsius
 
     arp.nope = rd::Array2D<double>(arp.topo,0.);
-
+arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
   if(params.infiltration_on == true){
     arp.vert_ksat = rd::Array2D<float>(params.surfdatadir + params.region + \
   "vertical_ksat.tif");                                //Units of ksat are m/s.
@@ -265,6 +267,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.wtd_T_iteration             = rd::Array2D<double>(arp.topo,100.0);
     arp.my_last_wtd             = rd::Array2D<double>(arp.topo,100.0);
     arp.my_prev_wtd             = rd::Array2D<double>(arp.topo,100.0);
+    arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
 
 
   //we start with a water table below the surface for testing.

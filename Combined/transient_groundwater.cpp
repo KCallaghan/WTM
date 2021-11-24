@@ -59,6 +59,7 @@ int small_count = 0;
 int tiny_count = 0;
 int itsy_count = 0;
 int bitsy_count = 0;
+int between_count = 0;
 int tracking_count = 0;
 int fluctuating_count = 0;
 int ocean_count = 0;
@@ -82,8 +83,6 @@ int spider_count = 0;
 
 
       if(arp.land_mask(x,y) == 0.f){
-        if(x==88&&y==70)
-          std::cout<<"it's an ocean cell"<<std::endl;
         arp.transmissivity(x,y) = ocean_T;
         arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
         ocean_count +=1;
@@ -92,7 +91,7 @@ int spider_count = 0;
         arp.my_last_wtd(x,y) = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
         arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-
+        arp.initial_T(x,y) = arp.transmissivity(x,y);
       }
       else{
        // if(arp.wtd_T(x,y)<=0 && arp.my_last_wtd(x,y) > 0){
@@ -130,6 +129,11 @@ int spider_count = 0;
             arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_bitsy;
             bitsy_count +=1;
           }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.1){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_between;
+            between_count +=1;
+          }
           else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.005){
             arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
             arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_spider;
@@ -165,6 +169,11 @@ int spider_count = 0;
             arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_bitsy;
             bitsy_count +=1;
           }
+          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.1){
+            arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
+            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_between;
+            between_count +=1;
+          }
           else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.005){
             arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
             arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_spider;
@@ -188,15 +197,18 @@ int spider_count = 0;
 //if(arp.wtd_T(x,y)<=0 && arp.my_last_wtd(x,y) > 0)
  // arp.my_last_wtd(x,y) = arp.wtd_T(x,y)/10.;
 
-
+//if(params.cycles_done == 1)
+//  arp.my_last_wtd(630,1279) = -0.915;
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
+
+        arp.transmissivity(x,y) = arp.initial_T(x,y)*0.5 + arp.transmissivity(x,y)*0.5;
       }
 
 
   }
 
 
-std::cout<<"big_count "<<big_count<<" medium_count "<<medium_count<<" small_count "<<small_count<<" tiny_count "<<tiny_count<<" itsy_count "<<itsy_count<<" bitsy_count "<<bitsy_count<<" spider_count "<<spider_count<<" tracking_count "<<tracking_count<<" fluctuating_count "<<fluctuating_count<<" ocean_count "<<ocean_count<<" total_count "<<total_count<<std::endl;
+std::cout<<"big_count "<<big_count<<" medium_count "<<medium_count<<" small_count "<<small_count<<" tiny_count "<<tiny_count<<" itsy_count "<<itsy_count<<" bitsy_count "<<bitsy_count<<" between_count "<<between_count<<" spider_count "<<spider_count<<" tracking_count "<<tracking_count<<" fluctuating_count "<<fluctuating_count<<" ocean_count "<<ocean_count<<" total_count "<<total_count<<std::endl;
 
 }
 
@@ -371,33 +383,63 @@ std::cout<<"set the new wtd_T values "<<std::endl;
 
 
 
-
+int ten_m = 0;
+int one_m = 0;
+int ten_cm = 0;
+int one_cm = 0;
+int one_mm = 0;
+int tenth_mm = 0;
+int less = 0;
 
 
 int cell_count = 0;
 int total_cells = params.ncells_x * params.ncells_y;
 int land_cells = 0;
 int land_eq = 0;
+
+float test_T = 0;
+
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
     if(arp.land_mask(x,y) != 0.f){
       land_cells +=1;
     }
 
+  if(x==630&&y==1279)
+    std::cout<<"x "<<x<<" y "<<y<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" my wtd "<<arp.my_last_wtd(x,y)<<" prev was "<<arp.my_prev_wtd(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<std::endl;
 
- //         if(x==68&&y==34)
-  //          if((x==89||x==88||x==90)&&(y==71||y==70||y==72) )
-  //    std::cout<<"x "<<x<<" y "<<y<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" my wtd "<<arp.my_last_wtd(x,y)<<" prev was "<<arp.my_prev_wtd(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<std::endl;
+        test_T = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
+if (std::abs(arp.transmissivity(x,y) - test_T) > 0.001  && picard_number > 100 && (arp.land_mask(x,y) != 0.f)){
+  std::cout<<"x "<<x<<" y "<<y<<" transmissivity "<<arp.transmissivity(x,y)<<" test_T "<<test_T<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" my_last_wtd "<<arp.my_last_wtd(x,y)<<" transmissivity initial "<<arp.initial_T(x,y)<<std::endl;
+}
 
-    if((std::abs(arp.my_last_wtd(x,y) - arp.wtd_T(x,y)) > 0.001)){
+//Print stats on how close we are:
+if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 10) && arp.land_mask(x,y) !=0.f)
+  ten_m +=1;
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 1)&& arp.land_mask(x,y) !=0.f){
+  one_m += 1;
+  //if(picard_number > 100)
+    //std::cout<<"x "<<x<<" y "<<y<<std::endl;
+}
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.1)&& arp.land_mask(x,y) !=0.f)
+  ten_cm +=1;
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.01)&& arp.land_mask(x,y) != 0.f)
+  one_cm +=1;
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.001)&& arp.land_mask(x,y) != 0.f)
+  one_mm +=1;
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.0001)&& arp.land_mask(x,y) != 0.f)
+  tenth_mm +=1;
+else if (arp.land_mask(x,y) != 0.f)
+  less +=1;
+
+
+//    if((std::abs(arp.my_last_wtd(x,y) - arp.wtd_T(x,y)) > 0.1)){
+    if((arp.land_mask(x,y) != 0.f) && ((std::abs(arp.transmissivity(x,y) - test_T) > 0.001) || (std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.001))){
       cell_count += 1;
       arp.nope(x,y)=1;
           if(arp.land_mask(x,y) != 0.f){
             land_eq +=1;
           }
-
- //     if(picard_number == 10)
-   //     std::cout<<"x "<<x<<" y "<<y<<" diff "<<arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)<<std::endl;
     }
     else{
       arp.nope(x,y)=0;
@@ -405,8 +447,25 @@ int land_eq = 0;
   }
 
 
-if(cell_count < land_cells/100.){
-  std::cout<<"The number of cells not equilibrating is "<<cell_count<<", which is less than 1 percent of the total cells. Picard iterations terminating."<<std::endl;
+std::cout<<"here are the stats on how close we are: "<<std::endl;
+std::cout<<ten_m<<" cells are more than 10 m off; "<<std::endl;
+std::cout<<one_m<<" cells are more than 1 m off; "<<std::endl;
+std::cout<<ten_cm<<" cells are more than 10 cm off; "<<std::endl;
+std::cout<<one_cm<<" cells are more than 1 cm off; "<<std::endl;
+std::cout<<one_mm<<" cells are more than 1 mm off; "<<std::endl;
+std::cout<<one_mm<<" cells are more than 1/10 mm off; "<<std::endl;
+std::cout<<less<<" cells are closer than 1/10 mm; "<<std::endl;
+
+
+
+
+
+
+
+
+
+if(cell_count == 0.){
+  std::cout<<"The number of cells not equilibrating is "<<cell_count<<". Picard iterations terminating."<<std::endl;
   std::cout<<"There are a total of "<<land_cells<<" land cells and of these, "<<land_eq<<" are not equilibrating."<<std::endl;
   return 0;
 }

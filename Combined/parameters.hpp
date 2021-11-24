@@ -56,10 +56,11 @@ public:
 
       float s_big = 500;
       float s_medium = 10;
-      float s_small = 0.5;
-      float s_tiny = 0.1;
-      float s_itsy = 0.05;
-      float s_bitsy = 0.005;
+      float s_small = 2;
+      float s_tiny = 1;
+      float s_itsy = 0.2;
+      float s_bitsy = 0.05;
+      float s_between = 0.01;
       float s_spider = 0.00005;
 
 
