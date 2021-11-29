@@ -73,7 +73,7 @@ void updateTransmissivity(
         arp.my_last_wtd(x,y) = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
         arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-        arp.initial_T(x,y) = arp.transmissivity(x,y);
+   //     arp.initial_T(x,y) = arp.transmissivity(x,y);
       }
       else{
         if((arp.wtd_T(x,y)>=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)>=arp.my_last_wtd(x,y)) ||(arp.wtd_T(x,y)<=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)<=arp.my_last_wtd(x,y))){
@@ -138,10 +138,11 @@ void updateTransmissivity(
         }
 
 
-        arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
+        double new_T = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
 
   //      if(std::abs(arp.my_last_wtd(x,y) - arp.wtd_T(x,y)) > 0.005 )
-          arp.transmissivity(x,y) = arp.initial_T(x,y)*0.5 + arp.transmissivity(x,y)*0.5;
+        if(arp.nope(x,y) == 1)
+          arp.transmissivity(x,y) = arp.transmissivity(x,y)*0.99 + new_T*0.01;
       }
     }
   }
@@ -284,6 +285,13 @@ assert(solver.info()==Eigen::Success);
   int cell_count = 0;
   float test_T = 0;
 
+int ten_m = 0;
+int one_m = 0;
+int ten_cm = 0;
+int one_cm = 0;
+int one_mm = 0;
+int tenth_mm = 0;
+int less = 0;
 
   //#pragma omp parallel for collapse(2)
   for(int x=0;x<params.ncells_x; x++)
@@ -295,20 +303,65 @@ assert(solver.info()==Eigen::Success);
       arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
       test_T = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
 
-      if((x==334&&y==1413)||(x==239&&y==1486)||(x==596&&y==1413)||(x==339&&y==1398))
+      if((x==1269&&y==759))//||(x==239&&y==1486)||(x==596&&y==1413)||(x==339&&y==1398))
         std::cout<<"x "<<x<<" y "<<y<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" my wtd "<<arp.my_last_wtd(x,y)<<" prev was "<<arp.my_prev_wtd(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<" test_T "<<test_T<<std::endl;
 
       if((std::abs(arp.transmissivity(x,y) - test_T) > 0.001) || (std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.001)){
         cell_count += 1;
+
+
+      if(std::abs(arp.transmissivity(x,y) - test_T) > 0.0001)
+        arp.nope(x,y) =1;
+      else
+        arp.nope(x,y) = 0;
 
     //  if(picard_number>100)
       //  std::cout<<"x "<<x<<" y "<<y<<std::endl;
 
 
       }
+
+
+
+
+//Print stats on how close we are:
+if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 10) && arp.land_mask(x,y) !=0.f)
+  ten_m +=1;
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 1)&& arp.land_mask(x,y) !=0.f){
+  one_m += 1;
+}
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.1)&& arp.land_mask(x,y) !=0.f){
+  ten_cm +=1;
+  if(picard_number > 100)
+    std::cout<<"x "<<x<<" y "<<y<<std::endl;
+}
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.01)&& arp.land_mask(x,y) != 0.f)
+  one_cm +=1;
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.001)&& arp.land_mask(x,y) != 0.f)
+  one_mm +=1;
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.0001)&& arp.land_mask(x,y) != 0.f)
+  tenth_mm +=1;
+else if (arp.land_mask(x,y) != 0.f)
+  less +=1;
+
+
+
+
+
+
+
     }
   }
 
+
+std::cout<<"here are the stats on how close we are: "<<std::endl;
+std::cout<<ten_m<<" cells are more than 10 m off; "<<std::endl;
+std::cout<<one_m<<" cells are more than 1 m off; "<<std::endl;
+std::cout<<ten_cm<<" cells are more than 10 cm off; "<<std::endl;
+std::cout<<one_cm<<" cells are more than 1 cm off; "<<std::endl;
+std::cout<<one_mm<<" cells are more than 1 mm off; "<<std::endl;
+std::cout<<tenth_mm<<" cells are more than 1/10 mm off; "<<std::endl;
+std::cout<<less<<" cells are closer than 1/10 mm; "<<std::endl;
 
 
 
