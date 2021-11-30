@@ -60,20 +60,10 @@ void updateTransmissivity(
 
     if(arp.land_mask(x,y) != 0.f){
 
-
-      double test_T = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
-
- //     if(std::abs(arp.transmissivity(x,y) - test_T) <= 0.00001) {
- //       arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
- //       arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
- //     }
-
-
       if(continue_picard < 20){
         arp.my_last_wtd(x,y) = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
         arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-   //     arp.initial_T(x,y) = arp.transmissivity(x,y);
       }
       else{
         if((arp.wtd_T(x,y)>=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)>=arp.my_last_wtd(x,y)) ||(arp.wtd_T(x,y)<=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)<=arp.my_last_wtd(x,y))){
@@ -140,7 +130,6 @@ void updateTransmissivity(
 
         double new_T = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
 
-  //      if(std::abs(arp.my_last_wtd(x,y) - arp.wtd_T(x,y)) > 0.005 )
         if(arp.nope(x,y) == 1)
           arp.transmissivity(x,y) = arp.transmissivity(x,y)*0.99 + new_T*0.01;
       }
@@ -262,7 +251,7 @@ vec_x = solver.solve (b);
 // Biconjugate gradient solver with guess
 // Set up the guess -- same as last time's levels (b)
 Eigen::BiCGSTAB<SpMat> solver;//, Eigen::IncompleteLUT<double> > solver;
-solver.setTolerance(0.000001);
+solver.setTolerance(0.00001);
 //Eigen::LeastSquaresConjugateGradient<SpMat> solver;
 //NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means that BiCGSTAB will not run in parallel. It is faster without.
 std::cout<<"compute"<<std::endl;
@@ -292,6 +281,7 @@ int one_cm = 0;
 int one_mm = 0;
 int tenth_mm = 0;
 int less = 0;
+int cells_to_adjust = 0;
 
   //#pragma omp parallel for collapse(2)
   for(int x=0;x<params.ncells_x; x++)
@@ -303,23 +293,25 @@ int less = 0;
       arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
       test_T = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
 
-      if((x==1269&&y==759))//||(x==239&&y==1486)||(x==596&&y==1413)||(x==339&&y==1398))
-        std::cout<<"x "<<x<<" y "<<y<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" my wtd "<<arp.my_last_wtd(x,y)<<" prev was "<<arp.my_prev_wtd(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<" test_T "<<test_T<<std::endl;
+      if(x==723&&y==1280){
+        std::cout<<"wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<" test_T "<<test_T<<std::endl;
+      }
+
 
       if((std::abs(arp.transmissivity(x,y) - test_T) > 0.001) || (std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.001)){
         cell_count += 1;
-
-
-      if(std::abs(arp.transmissivity(x,y) - test_T) > 0.0001)
         arp.nope(x,y) =1;
-      else
+        if(x==723&&y==1280)
+          std::cout<<"nope 1 "<<std::endl;
+          cells_to_adjust +=1;
+      }
+      else{
         arp.nope(x,y) = 0;
 
-    //  if(picard_number>100)
-      //  std::cout<<"x "<<x<<" y "<<y<<std::endl;
-
-
+              if(x==723&&y==1280)
+                std::cout<<"nope 0 "<<std::endl;
       }
+
 
 
 
@@ -327,26 +319,21 @@ int less = 0;
 //Print stats on how close we are:
 if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 10) && arp.land_mask(x,y) !=0.f)
   ten_m +=1;
-else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 1)&& arp.land_mask(x,y) !=0.f){
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 1)&& arp.land_mask(x,y) !=0.f)
   one_m += 1;
-}
-else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.1)&& arp.land_mask(x,y) !=0.f){
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.1)&& arp.land_mask(x,y) !=0.f)
   ten_cm +=1;
-  if(picard_number > 100)
-    std::cout<<"x "<<x<<" y "<<y<<std::endl;
-}
-else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.01)&& arp.land_mask(x,y) != 0.f)
+else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.01)&& arp.land_mask(x,y) != 0.f){
   one_cm +=1;
+//  if (picard_number>100)
+  //  std::cout<<"x "<<x<<" y "<<y<<std::endl;
+}
 else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.001)&& arp.land_mask(x,y) != 0.f)
   one_mm +=1;
 else if((std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.0001)&& arp.land_mask(x,y) != 0.f)
   tenth_mm +=1;
 else if (arp.land_mask(x,y) != 0.f)
   less +=1;
-
-
-
-
 
 
 
@@ -362,11 +349,16 @@ std::cout<<one_cm<<" cells are more than 1 cm off; "<<std::endl;
 std::cout<<one_mm<<" cells are more than 1 mm off; "<<std::endl;
 std::cout<<tenth_mm<<" cells are more than 1/10 mm off; "<<std::endl;
 std::cout<<less<<" cells are closer than 1/10 mm; "<<std::endl;
+std::cout<<"cells_to_adjust: "<<cells_to_adjust<<std::endl;
 
 
 
 
-  if(cell_count != 0.){
+  if(picard_number == 200){
+    std::cout<<"The number of cells not equilibrating is "<<cell_count<<". 100 picard iterations, so we will terminate."<<std::endl;
+    return 0;
+  }
+  else if(cell_count != 0.){
     std::cout<<"The number of cells not equilibrating is "<<cell_count<<". We will continue to picard iteration number "<<picard_number<<std::endl;
     picard_number += 1;
     return picard_number;
