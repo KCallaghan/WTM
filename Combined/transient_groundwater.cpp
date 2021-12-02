@@ -130,8 +130,13 @@ void updateTransmissivity(
 
         double new_T = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
 
-        if(arp.nope(x,y) == 1)
-          arp.transmissivity(x,y) = arp.transmissivity(x,y)*0.99 + new_T*0.01;
+        if(arp.nope(x,y) == 1){
+	  if(continue_picard>100)
+		std::cout<<"x "<<x<<" y "<<y<<" old T "<<arp.transmissivity(x,y)<<" new T "<<new_T<<std::endl;
+          arp.transmissivity(x,y) = arp.transmissivity(x,y)*0.7 + new_T*0.3;
+	  if(continue_picard>100)
+	      std::cout<<"x "<<x<<" y "<<y<<" updated T is "<<arp.transmissivity(x,y)<<std::endl;
+	}
       }
     }
   }
@@ -298,18 +303,17 @@ int cells_to_adjust = 0;
       }
 
 
-      if((std::abs(arp.transmissivity(x,y) - test_T) > 0.001) || (std::abs(arp.wtd_T_iteration(x,y) - arp.wtd_T(x,y)) > 0.001)){
+      if(1-(std::abs(arp.transmissivity(x,y)/test_T)) > 0.001){
+	      if(x==723&&y==1280)
+		      std::cout<<"in here "<<arp.transmissivity(x,y)/test_T<<std::endl;
         cell_count += 1;
         arp.nope(x,y) =1;
-        if(x==723&&y==1280)
-          std::cout<<"nope 1 "<<std::endl;
           cells_to_adjust +=1;
+	  if(picard_number>100)
+		  std::cout<<"x "<<x<<" y "<<y<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<" test_T "<<test_T<<" fdepth "<<arp.fdepth(x,y)<<" last wtd "<<arp.my_last_wtd(x,y)<<std::endl;
       }
       else{
         arp.nope(x,y) = 0;
-
-              if(x==723&&y==1280)
-                std::cout<<"nope 0 "<<std::endl;
       }
 
 
@@ -354,11 +358,11 @@ std::cout<<"cells_to_adjust: "<<cells_to_adjust<<std::endl;
 
 
 
-  if(picard_number == 200){
-    std::cout<<"The number of cells not equilibrating is "<<cell_count<<". 100 picard iterations, so we will terminate."<<std::endl;
-    return 0;
-  }
-  else if(cell_count != 0.){
+//  if(picard_number == 200){
+//    std::cout<<"The number of cells not equilibrating is "<<cell_count<<". 100 picard iterations, so we will terminate."<<std::endl;
+//    return 0;
+//  }
+  if(cell_count != 0.){
     std::cout<<"The number of cells not equilibrating is "<<cell_count<<". We will continue to picard iteration number "<<picard_number<<std::endl;
     picard_number += 1;
     return picard_number;
