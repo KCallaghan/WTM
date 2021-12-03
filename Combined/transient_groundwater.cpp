@@ -133,7 +133,7 @@ void updateTransmissivity(
         if(arp.nope(x,y) == 1){
 	  if(continue_picard>100)
 		std::cout<<"x "<<x<<" y "<<y<<" old T "<<arp.transmissivity(x,y)<<" new T "<<new_T<<std::endl;
-          arp.transmissivity(x,y) = arp.transmissivity(x,y)*0.7 + new_T*0.3;
+          arp.transmissivity(x,y) = arp.transmissivity(x,y)*0.6 + new_T*0.4;
 	  if(continue_picard>100)
 	      std::cout<<"x "<<x<<" y "<<y<<" updated T is "<<arp.transmissivity(x,y)<<std::endl;
 	}
@@ -298,22 +298,16 @@ int cells_to_adjust = 0;
       arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
       test_T = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
 
-      if(x==723&&y==1280){
-        std::cout<<"wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<" test_T "<<test_T<<std::endl;
+      if((1-(std::abs(arp.transmissivity(x,y)/test_T)) < 0.001)  || (std::abs(arp.transmissivity(x,y)-test_T) < 1e-10)){
+        arp.nope(x,y) = 0;
       }
 
-
-      if(1-(std::abs(arp.transmissivity(x,y)/test_T)) > 0.001){
-	      if(x==723&&y==1280)
-		      std::cout<<"in here "<<arp.transmissivity(x,y)/test_T<<std::endl;
+      else{
         cell_count += 1;
         arp.nope(x,y) =1;
-          cells_to_adjust +=1;
+        cells_to_adjust +=1;
 	  if(picard_number>100)
 		  std::cout<<"x "<<x<<" y "<<y<<" wtd_T "<<arp.wtd_T(x,y)<<" wtd_T_iteration "<<arp.wtd_T_iteration(x,y)<<" transmissivity "<<arp.transmissivity(x,y)<<" test_T "<<test_T<<" fdepth "<<arp.fdepth(x,y)<<" last wtd "<<arp.my_last_wtd(x,y)<<std::endl;
-      }
-      else{
-        arp.nope(x,y) = 0;
       }
 
 
