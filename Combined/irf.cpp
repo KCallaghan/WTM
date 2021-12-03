@@ -315,6 +315,7 @@ arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
 
   arp.rech               = rd::Array2D<double>(arp.ksat,0);
   arp.transmissivity     = rd::Array2D<double>(arp.ksat,0);
+  arp.temp_T     = rd::Array2D<double>(arp.ksat,0);
 
 
   //This array is used to store the values of how much the water table will
@@ -481,6 +482,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 
   arp.rech               = rd::Array2D<double>(arp.ksat,0);
   arp.transmissivity     = rd::Array2D<double>(arp.ksat,0);
+  arp.temp_T     = rd::Array2D<double>(arp.ksat,0);
 
 
   //This array is used to store the values of how much the water table will

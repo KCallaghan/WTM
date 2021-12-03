@@ -29,6 +29,7 @@ class ArrayPack {
 
   d2d head;
   d2d transmissivity;
+  d2d temp_T;
 
   f2d topo_start;
   f2d topo_end;
