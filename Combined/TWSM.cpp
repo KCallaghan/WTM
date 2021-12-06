@@ -80,7 +80,7 @@ void update(
   textfile<<"Cycles done: "<<params.cycles_done<<std::endl;
 
   //TODO: How should equilibrium know when to exit?
-  //if((params.cycles_done % 10) == 0){
+  if((params.cycles_done % 10) == 0){
     textfile<<"saving partway result."<<std::endl;
     //arp.wtd.printAll();
     string cycles_str = to_string(params.cycles_done);
@@ -88,7 +88,7 @@ void update(
 
     //Save the output every 100 iterations, under a new filename
     //so we can compare how the water table has changed through time.
-  //}
+  }
 
   arp.wtd_old = arp.wtd;  //These are used to see how much change occurs
   arp.wtd_mid = arp.wtd;  //in FSM vs in the groundwater portion.
