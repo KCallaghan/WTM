@@ -111,21 +111,7 @@ void update(
   // AW: unless this IS what Kerry intended...
   int iter_count = 0;
   while(iter_count++ < params.maxiter){
-    // Apply recharge to the water-table depth grid (wtd)
-    // Its clone (wtd_T) is used and updated in the Picard iteration
-    #pragma omp parallel for collapse(2)
-    for(int y=1;y<params.ncells_y-1;y++)
-    for(int x=1;x<params.ncells_x-1; x++){
-      if(arp.land_mask(x,y) == 0){          //skip ocean cells
-        arp.wtd(x,y) = 0;
-        //     continue;
-      }
-      else
-        arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
-      arp.wtd_T(x,y) = arp.wtd(x,y);
-      arp.wtd_T_iteration(x,y) = arp.wtd(x,y);
 
-    }
     FanDarcyGroundwater::update(params, arp);
   }
 

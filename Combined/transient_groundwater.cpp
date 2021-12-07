@@ -7,6 +7,8 @@
 #include <thread>
 #include "transient_groundwater.hpp"
 #include "mat_mult.cpp"
+#include "add_recharge.hpp"
+
 
 using namespace Eigen;
 
@@ -438,6 +440,24 @@ std::cout<<"create some needed arrays "<<std::endl;
 
 
 
+ // Apply the first half of the recharge to the water-table depth grid (wtd)
+    // Its clone (wtd_T) is used and updated in the Picard iteration
+    #pragma omp parallel for collapse(2)
+    for(int y=1;y<params.ncells_y-1;y++)
+    for(int x=1;x<params.ncells_x-1; x++){
+      if(arp.land_mask(x,y) == 0){          //skip ocean cells
+        arp.wtd(x,y) = 0;
+        //     continue;
+      }
+      else
+        arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y)/2., arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
+        arp.wtd_T(x,y) = arp.wtd(x,y);
+        arp.wtd_T_iteration(x,y) = arp.wtd(x,y);
+
+    }
+
+
+
   //for (int i=0; i<params.picard_iterations; i++){
    int continue_picard = 1;
    while(continue_picard != 0 ){
@@ -446,6 +466,21 @@ std::cout<<"create some needed arrays "<<std::endl;
     std::cout<<"first_half: " << std::endl;
     continue_picard = first_half(params,arp,continue_picard);
   }
+
+
+ // Apply the second half of the recharge to the water-table depth grid (wtd_T is currently in use). For this, start with the original wtd and add the second half of rech to it.
+  //TODO: is this right, or should we start with the halfway-solved wtd_T and add half the rech to it?
+    #pragma omp parallel for collapse(2)
+    for(int y=1;y<params.ncells_y-1;y++)
+    for(int x=1;x<params.ncells_x-1; x++){
+      if(arp.land_mask(x,y) == 0){          //skip ocean cells
+        arp.wtd_T(x,y) = 0;
+        //     continue;
+      }
+      else
+        arp.wtd_T(x,y) = add_recharge(params.deltat, arp.rech(x,y)/2., arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
+    }
+
 
 //get the final T for the halfway point
   for(int y=0;y<params.ncells_y;y++)

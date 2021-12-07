@@ -1,5 +1,6 @@
 #include "doctest.h"
 #include "irf.cpp"
+#include "add_recharge.hpp"
 
 #include <richdem/terrain_generation.hpp>
 #include <random>
