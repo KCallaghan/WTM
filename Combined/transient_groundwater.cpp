@@ -139,7 +139,7 @@ void updateTransmissivity(
 
 
 
-int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
+int first_half(const Parameters &params,ArrayPack &arp, int picard_number){
 
   std::vector<T> coefficients;
   Eigen::VectorXd b(params.ncells_x*params.ncells_y);
@@ -235,89 +235,6 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
   std::cout << "#iterations:     " << solver.iterations() << std::endl;
   std::cout << "estimated error: " << solver.error()      << std::endl;
 
-
-
-  #pragma omp parallel for collapse(2)
-  for(int x=0;x<params.ncells_x; x++)
-  for(int y=0;y<params.ncells_y;y++){
-    if(arp.land_mask(x,y) != 0.f){
-      arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
-      arp.temp_T(x,y) = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
-      }
-  }
-
-
-  std::vector<T> coefficients_A;
-  SpMat A_A(params.ncells_x*params.ncells_y,params.ncells_x*params.ncells_y);
-
-  //SECOND SOLVE
-  //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
-  for(int x=0;x<params.ncells_x; x++)
-  for(int y=0;y<params.ncells_y; y++){
-    //The row and column that the current cell will be stored in in matrix A.
-    //This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
-    //All of the N,E,S,W directions should be in the same row, but the column will differ.
-    main_loc = y+(x*params.ncells_y);
-    //start with the central diagonal, which contains the info for the current cell:
-    //This diagonal will be populated for all cells in the domain, provided that they are not ocean cells.
-    if(arp.land_mask(x,y) == 0.f){  //if they are ocean cells
-      entry = 1.;                   //then they should not change (wtd should be 0 both before and after) so only the centre diagonal is populated, and it is = 1.
-      coefficients_A.push_back(T(main_loc,main_loc, entry));
-    }
-    else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
-      entry =  (arp.temp_T(x,y-1)/2 + arp.temp_T(x,y) + arp.temp_T(x,y+1)/2)*(- arp.scalar_array_y(x,y)) + (arp.temp_T(x-1,y)/2 + arp.temp_T(x,y) + arp.temp_T(x+1,y)/2)*(- arp.scalar_array_x(x,y)) +1;
-      coefficients_A.push_back(T(main_loc,main_loc, entry));
-
-      //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-      if(y != params.ncells_y-1 && y!= 0){  // && arp.land_mask(x,y+1) != 0.f){
-        //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
-        entry = arp.scalar_array_y(x,y)*((arp.temp_T(x,y+1) + arp.temp_T(x,y))/2.);
-        coefficients_A.push_back(T(main_loc,main_loc+1,entry ));
-      }
-      //Next is the West diagonal. Opposite of the East. Lo cated at (i,j-1).
-      if(y != 0 && y != params.ncells_y-1){  // && arp.land_ mask(x,y-1) != 0.f){
-        //y may not == 0 since then there is no cell to the west.
-        entry = arp.scalar_array_y(x,y)*((arp.temp_T(x,y-1) + arp.temp_T(x,y))/2.);
-        coefficients_A.push_back(T(main_loc,main_loc-1,entry ));
-      }
-      //Now let's do the North diagonal. Offset by -(ncells_y).
-      if(x != 0 && x != params.ncells_x-1){  // && arp.land_mask(x-1,y) != 0.f){
-        //x may not equal 0 since then there is no cell to the north.
-        entry = arp.scalar_array_x(x,y)*((arp.temp_T(x-1,y) + arp.temp_T(x,y))/2.);
-        coefficients_A.push_back(T(main_loc,main_loc-params.ncells_y, entry));
-      }
-      //finally, do the South diagonal, offset by +(ncells_y).
-      if(x != params.ncells_x-1 && x!=0){  // && arp.land_mask(x+1,y) != 0.f){
-        //we may not be in the final row where there is no cell
-        entry = arp.scalar_array_x(x,y)*((arp.temp_T(x+1,y) + arp.temp_T(x,y))/2.);
-        coefficients_A.push_back(T(main_loc,main_loc+params.ncells_y, entry));
-      }
-    }
-  }
-
-
-  //use the triplet vector to populate the matrix, A.
-  A_A.setFromTriplets(coefficients_A.begin(),coefficients_A.end());
-
-
-  // Biconjugate gradient solver with guess
-  Eigen::BiCGSTAB<SpMat> solverA;
-  solverA.setTolerance(0.00001);
-  //NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means that BiCGSTAB will not run in parallel. It is faster without.
-  std::cout<<"compute"<<std::endl;
-  solverA.compute(A_A);
-
-  assert(solverA.info()==Eigen::Success);
-
-  std::cout<<"solve"<<std::endl;
-  vec_x = solverA.solveWithGuess(b, guess);
-
-  assert(solverA.info()==Eigen::Success);
-
-  std::cout << "#iterations:     " << solverA.iterations() << std::endl;
-  std::cout << "estimated error: " << solverA.error()      << std::endl;
-
-
   int cell_count = 0;
   float test_T = 0;
 
@@ -356,6 +273,139 @@ int populateArrays(const Parameters &params,ArrayPack &arp, int picard_number){
 
 
 
+
+
+
+void second_half(const Parameters &params,ArrayPack &arp){
+
+  std::vector<T> coefficients_A;
+  std::vector<T> coefficients_B;
+  SpMat A(params.ncells_x*params.ncells_y,params.ncells_x*params.ncells_y);
+  SpMat B(params.ncells_x*params.ncells_y,params.ncells_x*params.ncells_y);
+
+  Eigen::VectorXd b(params.ncells_x*params.ncells_y);
+  Eigen::VectorXd vec_x(params.ncells_x*params.ncells_y);
+  Eigen::VectorXd guess(params.ncells_x*params.ncells_y);
+
+
+  #pragma omp parallel for collapse(2)
+  for(int x=0;x<params.ncells_x; x++)
+  for(int y=0;y<params.ncells_y; y++){
+
+    if(arp.land_mask(x,y) == 0.f){  //if they are ocean cells
+      //populate the known vector b. This is the current wtd. We also populate 'guess', which is based on the previous picard iteration's wtd result and we will use it as the guess to get our answer, x.
+      b(y+(x*params.ncells_y)) = 0.;
+      guess(y+(x*params.ncells_y)) = 0.;
+    }
+    else{
+      b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
+      guess(y+(x*params.ncells_y)) = arp.wtd_T(x,y) + arp.topo(x,y);
+    }
+  }
+
+  double entry;
+  int main_loc = 0;
+
+
+  ////SECOND SOLVE
+  //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
+  for(int x=0;x<params.ncells_x; x++)
+  for(int y=0;y<params.ncells_y; y++){
+    //The row and column that the current cell will be stored in in matrix A.
+    //This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
+    //All of the N,E,S,W directions should be in the same row, but the column will differ.
+    main_loc = y+(x*params.ncells_y);
+    //start with the central diagonal, which contains the info for the current cell:
+    //This diagonal will be populated for all cells in the domain, provided that they are not ocean cells.
+    if(arp.land_mask(x,y) == 0.f){  //if they are ocean cells
+      entry = 1.;                   //then they should not change (wtd should be 0 both before and after) so only the centre diagonal is populated, and it is = 1.
+      coefficients_A.push_back(T(main_loc,main_loc, entry));
+      coefficients_B.push_back(T(main_loc,main_loc, entry));
+    }
+    else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
+      entry =  1 - (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.) ) - (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_B.push_back(T(main_loc,main_loc, entry));
+      entry =  1 + (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) + (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_A.push_back(T(main_loc,main_loc, entry));
+
+     //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      if(y != params.ncells_y-1 && y!= 0){  // && arp.land_mask(x,y+1) != 0.f){
+        //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
+        entry = (arp.scalar_array_y(x,y)/2.)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.) + (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y+1)) - (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y-1));
+        coefficients_B.push_back(T(main_loc,main_loc+1,entry ));
+        entry = (-arp.scalar_array_y(x,y)/2.)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.) - (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y+1)) + (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y-1));
+        coefficients_A.push_back(T(main_loc,main_loc+1,entry ));
+      }
+      //Next is the West diagonal. Opposite of the East. Lo cated at (i,j-1).
+      if(y != 0 && y != params.ncells_y-1){  // && arp.land_ mask(x,y-1) != 0.f){
+        //y may not == 0 since then there is no cell to the west.
+        entry = (arp.scalar_array_y(x,y)/2.)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.) - (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y+1)) + (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y-1));
+        coefficients_B.push_back(T(main_loc,main_loc-1,entry ));
+        entry = (-arp.scalar_array_y(x,y)/2.)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.) + (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y+1)) - (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y-1));
+        coefficients_A.push_back(T(main_loc,main_loc-1,entry ));
+      }
+      //Now let's do the North diagonal. Offset by -(ncells_y).
+      if(x != 0 && x != params.ncells_x-1){  // && arp.land_mask(x-1,y) != 0.f){
+        //x may not equal 0 since then there is no cell to the north.
+        entry = (arp.scalar_array_x(x,y)/2.)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.) - (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x+1,y)) + (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x-1,y));
+        coefficients_B.push_back(T(main_loc,main_loc-params.ncells_y,entry ));
+        entry = (-arp.scalar_array_x(x,y)/2.)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.) + (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x+1,y)) - (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x-1,y));
+        coefficients_A.push_back(T(main_loc,main_loc-params.ncells_y,entry ));
+      }
+      //finally, do the South diagonal, offset by +(ncells_y).
+      if(x != params.ncells_x-1 && x!=0){  // && arp.land_mask(x+1,y) != 0.f){
+        //we may not be in the final row where there is no cell
+        entry = (arp.scalar_array_x(x,y)/2.)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.) + (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x+1,y)) - (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x-1,y));
+        coefficients_B.push_back(T(main_loc,main_loc+params.ncells_y,entry ));
+        entry = (-arp.scalar_array_x(x,y)/2.)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.) - (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x+1,y)) + (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x-1,y));
+        coefficients_A.push_back(T(main_loc,main_loc+params.ncells_y,entry ));
+        }
+    }
+  }
+
+  std::cerr<<"finished second set of matrices"<<std::endl;
+
+  //use the triplet vector to populate the matrices, A and B.
+  A.setFromTriplets(coefficients_A.begin(),coefficients_A.end());
+  B.setFromTriplets(coefficients_B.begin(),coefficients_B.end());
+
+
+  b = B*b;
+
+  // Biconjugate gradient solver with guess
+  Eigen::BiCGSTAB<SpMat> solver;
+  solver.setTolerance(0.00001);
+  //NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means that BiCGSTAB will not run in parallel. It is faster without.
+
+  std::cout<<"compute"<<std::endl;
+  solver.compute(A);
+
+  assert(solver.info()==Eigen::Success);
+
+  std::cout<<"solve"<<std::endl;
+  vec_x = solver.solveWithGuess(b, guess);
+
+  assert(solver.info()==Eigen::Success);
+
+  std::cout << "#iterations:     " << solver.iterations() << std::endl;
+  std::cout << "estimated error: " << solver.error()      << std::endl;
+
+
+  #pragma omp parallel for collapse(2)
+  for(int x=0;x<params.ncells_x; x++)
+  for(int y=0;y<params.ncells_y;y++){
+  //copy result into the wtd_T array:
+    if(arp.land_mask(x,y) != 0.f){
+      arp.wtd(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
+    }
+  }
+  std::cerr<<"finished assigning the new wtd"<<std::endl;
+}
+
+
+
+
+
 //////////////////////
 // PUBLIC FUNCTIONS //
 //////////////////////
@@ -367,9 +417,10 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
   Eigen::setNbThreads(8);
 
   // Picard iteration through solver
-  double x_partial = -params.deltat/(params.cellsize_n_s_metres*params.cellsize_n_s_metres);
+  double x_partial = params.deltat/(params.cellsize_n_s_metres*params.cellsize_n_s_metres);
   float ocean_T = 0.000001 * (1.5 + 25); //some constant for all T values in ocean - TODO look up representative values
 
+std::cout<<"create some needed arrays "<<std::endl;
   #pragma omp parallel for collapse(2)
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
@@ -379,9 +430,9 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
       }
     else{
       arp.scalar_array_x(x,y) = x_partial/arp.porosity(x,y);
-      arp.scalar_array_y(x,y) = -params.deltat/(arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]*arp.porosity(x,y));
-      arp.scalar_array_x_half(x,y) = arp.scalar_array_x(x,y)/2.;
-      arp.scalar_array_y_half(x,y) = arp.scalar_array_y(x,y)/2.;
+      arp.scalar_array_y(x,y) = params.deltat/(arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]*arp.porosity(x,y));
+      arp.scalar_array_x_half(x,y) = -arp.scalar_array_x(x,y)/2.;
+      arp.scalar_array_y_half(x,y) = -arp.scalar_array_y(x,y)/2.;
     }
   }
 
@@ -392,19 +443,19 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
    while(continue_picard != 0 ){
     std::cout << "updateTransmissivity: " << std::endl;
     updateTransmissivity(params,arp,continue_picard);
-    std::cout<<"populateArrays: " << std::endl;
-    continue_picard = populateArrays(params,arp,continue_picard);
+    std::cout<<"first_half: " << std::endl;
+    continue_picard = first_half(params,arp,continue_picard);
   }
-  // Following these iterations, copy  the result into the WTD array
-  // >>>> Improve code in future to send results directly to WTD on the
-  //      final Picard iteration <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<TODO!
-  std::cout<<"update the wtd to the new set of values "<<std::endl;
 
-  #pragma omp parallel for collapse(2)
-  for(int x=0;x<params.ncells_x; x++)
-  for(int y=0;y<params.ncells_y;y++){
-      arp.wtd(x,y) = arp.wtd_T(x,y);
+//get the final T for the halfway point
+  for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x; x++){
+    arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
   }
+
+  //Do the second half of the midpoint method:
+  std::cout<<"second_half: " << std::endl;
+  second_half(params,arp);
 }
 
 
