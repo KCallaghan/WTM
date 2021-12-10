@@ -162,7 +162,7 @@ int first_half(const Parameters &params,ArrayPack &arp, int picard_number){
       guess(y+(x*params.ncells_y)) = 0.;
     }
     else{
-      b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
+      b(y+(x*params.ncells_y)) = arp.wtd_T(x,y) + arp.topo(x,y);
       guess(y+(x*params.ncells_y)) = arp.wtd_T(x,y) + arp.topo(x,y);
     }
   }
@@ -261,15 +261,20 @@ int first_half(const Parameters &params,ArrayPack &arp, int picard_number){
   }
 
 
-  if(cell_count != 0.){
-    std::cout<<"The number of cells not equilibrating is "<<cell_count<<". We will continue to picard iteration number "<<picard_number<<std::endl;
+  //if(cell_count != 0.){
+  //  std::cout<<"The number of cells not equilibrating is "<<cell_count<<". We will continue to picard iteration number "<<picard_number<<std::endl;
+  //  picard_number += 1;
+  //  return picard_number;
+ // }
+ // else{
+ //   std::cout<<"The number of cells not equilibrating is "<<cell_count<<". Picard iterations terminating."<<std::endl;
+  if(picard_number == 10)
+    return 0;
+  else{
     picard_number += 1;
     return picard_number;
   }
-  else{
-    std::cout<<"The number of cells not equilibrating is "<<cell_count<<". Picard iterations terminating."<<std::endl;
-    return 0;
-  }
+ // }
 
 }
 
@@ -333,33 +338,33 @@ void second_half(const Parameters &params,ArrayPack &arp){
      //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
       if(y != params.ncells_y-1 && y!= 0){  // && arp.land_mask(x,y+1) != 0.f){
         //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
-        entry = (arp.scalar_array_y(x,y)/2.)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.) + (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y+1)) - (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y-1));
+        entry = (arp.scalar_array_y(x,y))*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y+1)/4.);
         coefficients_B.push_back(T(main_loc,main_loc+1,entry ));
-        entry = (-arp.scalar_array_y(x,y)/2.)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.) - (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y+1)) + (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y-1));
+        entry = (-arp.scalar_array_y(x,y))*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y+1)/4.);
         coefficients_A.push_back(T(main_loc,main_loc+1,entry ));
       }
       //Next is the West diagonal. Opposite of the East. Lo cated at (i,j-1).
       if(y != 0 && y != params.ncells_y-1){  // && arp.land_ mask(x,y-1) != 0.f){
         //y may not == 0 since then there is no cell to the west.
-        entry = (arp.scalar_array_y(x,y)/2.)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.) - (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y+1)) + (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y-1));
+        entry = (arp.scalar_array_y(x,y))*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y-1)/4.);
         coefficients_B.push_back(T(main_loc,main_loc-1,entry ));
-        entry = (-arp.scalar_array_y(x,y)/2.)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.) + (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y+1)) - (arp.scalar_array_y(x,y)/8.)*(arp.transmissivity(x,y-1));
+        entry = (-arp.scalar_array_y(x,y))*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y-1)/4.);
         coefficients_A.push_back(T(main_loc,main_loc-1,entry ));
       }
       //Now let's do the North diagonal. Offset by -(ncells_y).
       if(x != 0 && x != params.ncells_x-1){  // && arp.land_mask(x-1,y) != 0.f){
         //x may not equal 0 since then there is no cell to the north.
-        entry = (arp.scalar_array_x(x,y)/2.)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.) - (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x+1,y)) + (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x-1,y));
+        entry = (arp.scalar_array_x(x,y))*(arp.transmissivity(x,y)/4. + arp.transmissivity(x-1,y)/4.);
         coefficients_B.push_back(T(main_loc,main_loc-params.ncells_y,entry ));
-        entry = (-arp.scalar_array_x(x,y)/2.)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.) + (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x+1,y)) - (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x-1,y));
+        entry = (-arp.scalar_array_x(x,y))*(arp.transmissivity(x,y)/4. + arp.transmissivity(x-1,y)/4.);
         coefficients_A.push_back(T(main_loc,main_loc-params.ncells_y,entry ));
       }
       //finally, do the South diagonal, offset by +(ncells_y).
       if(x != params.ncells_x-1 && x!=0){  // && arp.land_mask(x+1,y) != 0.f){
         //we may not be in the final row where there is no cell
-        entry = (arp.scalar_array_x(x,y)/2.)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.) + (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x+1,y)) - (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x-1,y));
+        entry = (arp.scalar_array_x(x,y))*(arp.transmissivity(x,y)/4. + arp.transmissivity(x+1,y)/4.);
         coefficients_B.push_back(T(main_loc,main_loc+params.ncells_y,entry ));
-        entry = (-arp.scalar_array_x(x,y)/2.)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.) - (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x+1,y)) + (arp.scalar_array_x(x,y)/8.)*(arp.transmissivity(x-1,y));
+        entry = (-arp.scalar_array_x(x,y))*(arp.transmissivity(x,y)/4. + arp.transmissivity(x+1,y)/4.);
         coefficients_A.push_back(T(main_loc,main_loc+params.ncells_y,entry ));
         }
     }
@@ -373,6 +378,32 @@ void second_half(const Parameters &params,ArrayPack &arp){
 
 
   b = B*b;
+
+
+ // Apply the second half of the recharge to the water-table depth grid (wtd_T is currently in use). For this, start with the original wtd and add the second half of rech to it.
+  //TODO: is this right, or should we start with the halfway-solved wtd_T and add half the rech to it?
+ //   #pragma omp parallel for collapse(2)
+    for(int y=1;y<params.ncells_y-1;y++)
+    for(int x=1;x<params.ncells_x-1; x++){
+      if(arp.land_mask(x,y) != 0){          //skip ocean cells
+        if(arp.wtd(x,y)>=0){
+          b(y+(x*params.ncells_y)) += arp.rech(x,y)/31536000. * params.deltat;
+          //if(b(y+(x*params.ncells_y)) <0)
+            //b(y+(x*params.ncells_y)) = 0;
+        }
+        else if (arp.rech(x,y)>0){
+          double GW_space = -arp.wtd(x,y) * arp.porosity(x,y);
+          if(GW_space > (arp.rech(x,y)/31536000 * params.deltat))
+            b(y+(x*params.ncells_y)) += (arp.rech(x,y)/31536000. * params.deltat)/arp.porosity(x,y);
+          else{
+            double temp = ( (arp.rech(x,y)/31536000. * params.deltat) - GW_space) - arp.wtd(x,y);
+            //std::cout<<"x "<<x<<" y "<<y<<" new water table "<<temp<<" old water table "<<
+            b(y+(x*params.ncells_y)) += temp;
+          }
+        }
+      }
+    }
+
 
   // Biconjugate gradient solver with guess
   Eigen::BiCGSTAB<SpMat> solver;
@@ -450,9 +481,9 @@ std::cout<<"create some needed arrays "<<std::endl;
         //     continue;
       }
       else
-        arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y)/2., arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
-        arp.wtd_T(x,y) = arp.wtd(x,y);
-        arp.wtd_T_iteration(x,y) = arp.wtd(x,y);
+        arp.wtd_T(x,y) = add_recharge(params.deltat, arp.rech(x,y)/2., arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
+        //arp.wtd_T(x,y) = arp.wtd(x,y);
+        arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
 
     }
 
@@ -468,24 +499,14 @@ std::cout<<"create some needed arrays "<<std::endl;
   }
 
 
- // Apply the second half of the recharge to the water-table depth grid (wtd_T is currently in use). For this, start with the original wtd and add the second half of rech to it.
-  //TODO: is this right, or should we start with the halfway-solved wtd_T and add half the rech to it?
-    #pragma omp parallel for collapse(2)
-    for(int y=1;y<params.ncells_y-1;y++)
-    for(int x=1;x<params.ncells_x-1; x++){
-      if(arp.land_mask(x,y) == 0){          //skip ocean cells
-        arp.wtd_T(x,y) = 0;
-        //     continue;
-      }
-      else
-        arp.wtd_T(x,y) = add_recharge(params.deltat, arp.rech(x,y)/2., arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
-    }
+
 
 
 //get the final T for the halfway point
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
-    arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
+    if(arp.land_mask(x,y) != 0.f)
+      arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
   }
 
   //Do the second half of the midpoint method:
