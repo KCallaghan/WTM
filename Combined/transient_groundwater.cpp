@@ -388,8 +388,10 @@ void second_half(const Parameters &params,ArrayPack &arp){
       if(arp.land_mask(x,y) != 0){          //skip ocean cells
         if(arp.wtd(x,y)>=0){
           b(y+(x*params.ncells_y)) += arp.rech(x,y)/31536000. * params.deltat;
-          //if(b(y+(x*params.ncells_y)) <0)
-            //b(y+(x*params.ncells_y)) = 0;
+          if(arp.wtd(x,y) + arp.rech(x,y)/31536000. * params.deltat <0){
+            double temp = -(arp.wtd(x,y) + arp.rech(x,y)/31536000. * params.deltat);
+            b(y+(x*params.ncells_y)) += temp;
+          }
         }
         else if (arp.rech(x,y)>0){
           double GW_space = -arp.wtd(x,y) * arp.porosity(x,y);
@@ -478,10 +480,11 @@ std::cout<<"create some needed arrays "<<std::endl;
     for(int x=1;x<params.ncells_x-1; x++){
       if(arp.land_mask(x,y) == 0){          //skip ocean cells
         arp.wtd(x,y) = 0;
+        arp.wtd_T(x,y) = 0;
         //     continue;
       }
       else
-        arp.wtd_T(x,y) = add_recharge(params.deltat, arp.rech(x,y)/2., arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
+        arp.wtd_T(x,y) = add_recharge(params.deltat/2., arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
         //arp.wtd_T(x,y) = arp.wtd(x,y);
         arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
 
