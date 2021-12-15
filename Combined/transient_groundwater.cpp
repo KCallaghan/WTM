@@ -59,85 +59,13 @@ void updateTransmissivity(
   #pragma omp parallel for collapse(2)
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
-
     if(arp.land_mask(x,y) != 0.f){
-
-      if(continue_picard < 20){
         arp.my_last_wtd(x,y) = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
         arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
-        arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-      }
-      else{
-        if((arp.wtd_T(x,y)>=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)>=arp.my_last_wtd(x,y)) ||(arp.wtd_T(x,y)<=arp.my_last_wtd(x,y) && arp.wtd_T_iteration(x,y)<=arp.my_last_wtd(x,y))){
-          arp.my_prev_wtd(x,y) = arp.my_last_wtd(x,y);
-
-          if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 2000){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + params.s_big;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 200){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + params.s_medium;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 10){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) + params.s_small;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 5){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_tiny;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 1){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_itsy;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.3){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_bitsy;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.1){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_between;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) > 0.005){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) +params.s_spider;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -2000){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) - params.s_big;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -200){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) - params.s_medium;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -10){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_small;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -5){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_tiny;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -1){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_itsy;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.3){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_bitsy;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.1){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_between;
-          }
-          else if(arp.wtd_T(x,y)- arp.my_last_wtd(x,y) < -0.005){
-            arp.my_last_wtd(x,y) = arp.my_last_wtd(x,y) -params.s_spider;
-          }
-          else{
-            arp.my_last_wtd(x,y) = arp.wtd_T(x,y);
-          }
-        }
-        else{
-          double temp = arp.my_last_wtd(x,y);
-          arp.my_last_wtd(x,y) = (arp.my_last_wtd(x,y) + arp.my_prev_wtd(x,y))/2.;
-          arp.my_prev_wtd(x,y) = temp;
-        }
-
-        double new_T = depthIntegratedTransmissivity(arp.my_last_wtd(x,y), arp.fdepth(x,y), arp.ksat(x,y));
-
-        if(arp.nope(x,y) == 1){
-	        arp.transmissivity(x,y) = arp.transmissivity(x,y)*0.6 + new_T*0.4;
-	      }
       }
     }
   }
-}
+
 
 
 
@@ -162,7 +90,7 @@ int first_half(const Parameters &params,ArrayPack &arp, int picard_number){
       guess(y+(x*params.ncells_y)) = 0.;
     }
     else{
-      b(y+(x*params.ncells_y)) = arp.wtd_T(x,y) + arp.topo(x,y);
+      b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
       guess(y+(x*params.ncells_y)) = arp.wtd_T(x,y) + arp.topo(x,y);
     }
   }
@@ -238,7 +166,6 @@ int first_half(const Parameters &params,ArrayPack &arp, int picard_number){
   std::cout << "estimated error: " << solver.error()      << std::endl;
 
   int cell_count = 0;
-  float test_T = 0;
 
   #pragma omp parallel for collapse(2)
   for(int x=0;x<params.ncells_x; x++)
@@ -247,28 +174,10 @@ int first_half(const Parameters &params,ArrayPack &arp, int picard_number){
   //copy result into the wtd_T array:
     if(arp.land_mask(x,y) != 0.f){
       arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
-      test_T = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
-
-      if((1-(std::abs(arp.transmissivity(x,y)/test_T)) < 0.001)  || (std::abs(arp.transmissivity(x,y)-test_T) < 1e-10)){
-        arp.nope(x,y) = 0;
-      }
-
-      else{
-        cell_count += 1;
-        arp.nope(x,y) =1;
-	    }
     }
   }
 
-
-  //if(cell_count != 0.){
-  //  std::cout<<"The number of cells not equilibrating is "<<cell_count<<". We will continue to picard iteration number "<<picard_number<<std::endl;
-  //  picard_number += 1;
-  //  return picard_number;
- // }
- // else{
- //   std::cout<<"The number of cells not equilibrating is "<<cell_count<<". Picard iterations terminating."<<std::endl;
-  if(picard_number == 10)
+  if(picard_number == 3)
     return 0;
   else{
     picard_number += 1;
@@ -305,7 +214,7 @@ void second_half(const Parameters &params,ArrayPack &arp){
       guess(y+(x*params.ncells_y)) = 0.;
     }
     else{
-      b(y+(x*params.ncells_y)) = arp.wtd(x,y) + arp.topo(x,y);
+      b(y+(x*params.ncells_y)) = arp.original_wtd(x,y) + arp.topo(x,y);
       guess(y+(x*params.ncells_y)) = arp.wtd_T(x,y) + arp.topo(x,y);
     }
   }
@@ -385,27 +294,26 @@ void second_half(const Parameters &params,ArrayPack &arp){
  //   #pragma omp parallel for collapse(2)
     for(int y=1;y<params.ncells_y-1;y++)
     for(int x=1;x<params.ncells_x-1; x++){
+      double rech_change = arp.rech(x,y)/31536000. * params.deltat;
       if(arp.land_mask(x,y) != 0){          //skip ocean cells
-        if(arp.wtd(x,y)>=0){
-          b(y+(x*params.ncells_y)) += arp.rech(x,y)/31536000. * params.deltat;
-          if(arp.wtd(x,y) + arp.rech(x,y)/31536000. * params.deltat <0){
-            double temp = -(arp.wtd(x,y) + arp.rech(x,y)/31536000. * params.deltat);
+        if(arp.original_wtd(x,y)>=0){
+          b(y+(x*params.ncells_y)) += rech_change;
+          if(arp.original_wtd(x,y) + rech_change <0){
+            double temp = -(arp.original_wtd(x,y) + rech_change);
             b(y+(x*params.ncells_y)) += temp;
           }
         }
         else if (arp.rech(x,y)>0){
-          double GW_space = -arp.wtd(x,y) * arp.porosity(x,y);
-          if(GW_space > (arp.rech(x,y)/31536000 * params.deltat))
-            b(y+(x*params.ncells_y)) += (arp.rech(x,y)/31536000. * params.deltat)/arp.porosity(x,y);
+          double GW_space = -arp.original_wtd(x,y) * arp.porosity(x,y);
+          if(GW_space > rech_change)
+            b(y+(x*params.ncells_y)) += rech_change/arp.porosity(x,y);
           else{
-            double temp = ( (arp.rech(x,y)/31536000. * params.deltat) - GW_space) - arp.wtd(x,y);
-            //std::cout<<"x "<<x<<" y "<<y<<" new water table "<<temp<<" old water table "<<
+            double temp = ( rech_change - GW_space) - arp.original_wtd(x,y);
             b(y+(x*params.ncells_y)) += temp;
           }
         }
       }
     }
-
 
   // Biconjugate gradient solver with guess
   Eigen::BiCGSTAB<SpMat> solver;
@@ -471,8 +379,6 @@ std::cout<<"create some needed arrays "<<std::endl;
     }
   }
 
-
-
  // Apply the first half of the recharge to the water-table depth grid (wtd)
     // Its clone (wtd_T) is used and updated in the Picard iteration
     #pragma omp parallel for collapse(2)
@@ -481,18 +387,17 @@ std::cout<<"create some needed arrays "<<std::endl;
       if(arp.land_mask(x,y) == 0){          //skip ocean cells
         arp.wtd(x,y) = 0;
         arp.wtd_T(x,y) = 0;
+        arp.original_wtd(x,y) = 0;
         //     continue;
       }
       else
-        arp.wtd_T(x,y) = add_recharge(params.deltat/2., arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
-        //arp.wtd_T(x,y) = arp.wtd(x,y);
+        arp.original_wtd(x,y) = arp.wtd(x,y);
+        arp.wtd(x,y) = add_recharge(params.deltat/2., arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
+        arp.wtd_T(x,y) = arp.wtd(x,y);
         arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
 
     }
 
-
-
-  //for (int i=0; i<params.picard_iterations; i++){
    int continue_picard = 1;
    while(continue_picard != 0 ){
     std::cout << "updateTransmissivity: " << std::endl;
@@ -502,6 +407,9 @@ std::cout<<"create some needed arrays "<<std::endl;
   }
 
 
+
+    string cycles_str = to_string(params.cycles_done);
+    arp.wtd_T.saveGDAL(params.outfilename + cycles_str +"_first_half.tif");
 
 
 

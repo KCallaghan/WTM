@@ -202,6 +202,7 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
     arp.wtd_T_iteration = rd::Array2D<double>(arp.topo,100.);
         arp.my_last_wtd = rd::Array2D<double>(arp.topo,100.);
                 arp.my_prev_wtd = rd::Array2D<double>(arp.topo,100.);
+                arp.original_wtd = rd::Array2D<double>(arp.topo,100.);
 
 
 
@@ -276,6 +277,8 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.wtd_T_iteration             = rd::Array2D<double>(arp.topo,100.0);
     arp.my_last_wtd             = rd::Array2D<double>(arp.topo,100.0);
     arp.my_prev_wtd             = rd::Array2D<double>(arp.topo,100.0);
+        arp.original_wtd             = rd::Array2D<double>(arp.topo,100.0);
+
     arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
@@ -365,6 +368,8 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
                         arp.my_last_wtd  (i) = 0.;
 
                         arp.my_prev_wtd  (i) = 0.;
+                                                arp.original_wtd  (i) = 0.;
+
 
 
     }
@@ -531,6 +536,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
             arp.wtd_T_iteration  (i) = 0.;
                         arp.my_last_wtd  (i) = 0.;
                         arp.my_prev_wtd  (i) = 0.;
+                        arp.original_wtd  (i) = 0.;
 
 
     }

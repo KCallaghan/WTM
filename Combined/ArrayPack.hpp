@@ -71,6 +71,7 @@ class ArrayPack {
   d2d wtd_T_iteration;
   d2d my_last_wtd;
   d2d my_prev_wtd;
+  d2d original_wtd;
 
   dh_label_t flowdir_t;
 
