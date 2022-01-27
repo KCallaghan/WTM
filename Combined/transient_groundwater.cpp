@@ -349,6 +349,36 @@ void second_half(const Parameters &params,ArrayPack &arp){
 
 
 
+//a temporary function to test adjustments to porosity for when there is surface water available
+//TODO: I DO NOT BELIEVE THIS FUNCTION IS CORRECT WITH THE MATH OF THE ORGINAL MATRICES
+//NOT SURE HOW TO DO THIS APPROPRIATELY!!!!
+void adjust_porosity(const Parameters &params,ArrayPack &arp){
+
+  for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x; x++){
+    double height_change = arp.wtd(x,y) - arp.original_wtd(x,y);
+    if(arp.original_wtd(x,y)<=0 && arp.wtd(x,y)<= 0)
+      continue;
+    else if(arp.original_wtd(x,y) > 0 && arp.wtd(x,y) > 0){
+      arp.wtd(x,y) = arp.original_wtd(x,y) + height_change*arp.porosity(x,y);
+    }
+    else if(arp.original_wtd(x,y) > 0 && arp.wtd(x,y) <=0){
+      //double portion_above = arp.original_wtd(x,y) * arp.porosity(x,y);
+      arp.wtd(x,y) += arp.original_wtd(x,y) - arp.original_wtd(x,y)*arp.porosity(x,y);//??????????????????//
+    }
+    else{ //original_wtd(x,y)<=0  && arp.wtd(x,y) >0
+      arp.wtd(x,y) = arp.wtd(x,y)*arp.porosity(x,y);
+
+    }
+  }
+
+}
+
+
+
+
+
+
 //////////////////////
 // PUBLIC FUNCTIONS //
 //////////////////////
@@ -372,8 +402,13 @@ std::cout<<"create some needed arrays "<<std::endl;
       arp.temp_T(x,y) = ocean_T;
       }
     else{
-      arp.scalar_array_x(x,y) = x_partial/arp.porosity(x,y);
-      arp.scalar_array_y(x,y) = params.deltat/(arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]*arp.porosity(x,y));
+      float my_p;
+      if(arp.wtd(x,y)>0)
+        my_p = 1;
+      else
+        my_p = arp.porosity(x,y);
+      arp.scalar_array_x(x,y) = x_partial/my_p;
+      arp.scalar_array_y(x,y) = params.deltat/(arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]*my_p);
       arp.scalar_array_x_half(x,y) = -arp.scalar_array_x(x,y)/2.;
       arp.scalar_array_y_half(x,y) = -arp.scalar_array_y(x,y)/2.;
     }
@@ -408,8 +443,8 @@ std::cout<<"create some needed arrays "<<std::endl;
 
 
 
-    string cycles_str = to_string(params.cycles_done);
-    arp.wtd_T.saveGDAL(params.outfilename + cycles_str +"_first_half.tif");
+ //   string cycles_str = to_string(params.cycles_done);
+ //   arp.wtd_T.saveGDAL(params.outfilename + cycles_str +"_first_half.tif");
 
 
 
@@ -420,9 +455,34 @@ std::cout<<"create some needed arrays "<<std::endl;
       arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
   }
 
+  #pragma omp parallel for collapse(2)
+  for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x; x++){
+    if(arp.land_mask(x,y) == 0.f){
+      arp.transmissivity(x,y) = ocean_T;
+      arp.temp_T(x,y) = ocean_T;
+      }
+    else{
+      float my_p;
+      if(arp.wtd_T(x,y)>0)
+        my_p = 1;
+      else
+        my_p = arp.porosity(x,y);
+      arp.scalar_array_x(x,y) = x_partial/my_p;
+      arp.scalar_array_y(x,y) = params.deltat/(arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]*my_p);
+      arp.scalar_array_x_half(x,y) = -arp.scalar_array_x(x,y)/2.;
+      arp.scalar_array_y_half(x,y) = -arp.scalar_array_y(x,y)/2.;
+    }
+  }
+
+
+
+
   //Do the second half of the midpoint method:
   std::cout<<"second_half: " << std::endl;
   second_half(params,arp);
+
+ // adjust_porosity(params,arp);
 }
 
 
