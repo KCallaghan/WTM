@@ -195,6 +195,11 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
   if(params.supplied_wt == true){
     arp.wtd = rd::Array2D<double>(params.surfdatadir + params.region + \
   params.time_start + "_starting_wt.tif");
+    arp.wtd_T = arp.wtd;
+    arp.wtd_T_iteration = arp.wtd;
+    arp.my_last_wtd = arp.wtd;
+    arp.my_prev_wtd = arp.wtd;
+    arp.original_wtd = arp.wtd;
   }
   else{
     arp.wtd   = rd::Array2D<double>(arp.topo,100.);
