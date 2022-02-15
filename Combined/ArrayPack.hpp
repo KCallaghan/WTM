@@ -17,14 +17,13 @@ class ArrayPack {
  public:
 
   f2d porosity;
+  f2d effective_storativity;
   f2d land_mask;
   f2d ice_mask;
   d2d nope;
   d2d initial_T;
   d2d scalar_array_x;
   d2d scalar_array_y;
-  d2d scalar_array_x_half;
-  d2d scalar_array_y_half;
 
   f2d ksat;
   f2d vert_ksat;

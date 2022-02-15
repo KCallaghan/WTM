@@ -113,31 +113,31 @@ int first_half(const Parameters &params,ArrayPack &arp, int picard_number){
       coefficients.push_back(T(main_loc,main_loc, entry));
     }
     else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
-      entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(- arp.scalar_array_y_half(x,y)) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(- arp.scalar_array_x_half(x,y)) +1;
+      entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(arp.scalar_array_y(x,y)/(2*arp.effective_storativity(x,y))) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(params.x_partial/(2*arp.effective_storativity(x,y))) +1;
       coefficients.push_back(T(main_loc,main_loc, entry));
 
       //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
       if(y != params.ncells_y-1 && y!= 0){  // && arp.land_mask(x,y+1) != 0.f){
         //y may not == params.ncells_y-1, since this would be the eastern-most cell in the domain. There is no neighbour to the east.
-        entry = arp.scalar_array_y_half(x,y)*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
+        entry = -arp.scalar_array_y(x,y)/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
         coefficients.push_back(T(main_loc,main_loc+1,entry ));
       }
       //Next is the West diagonal. Opposite of the East. Lo cated at (i,j-1).
       if(y != 0 && y != params.ncells_y-1){  // && arp.land_ mask(x,y-1) != 0.f){
         //y may not == 0 since then there is no cell to the west.
-        entry = arp.scalar_array_y_half(x,y)*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
+        entry = -arp.scalar_array_y(x,y)/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
         coefficients.push_back(T(main_loc,main_loc-1,entry ));
       }
       //Now let's do the North diagonal. Offset by -(ncells_y).
       if(x != 0 && x != params.ncells_x-1){  // && arp.land_mask(x-1,y) != 0.f){
         //x may not equal 0 since then there is no cell to the north.
-        entry = arp.scalar_array_x_half(x,y)*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
+        entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
         coefficients.push_back(T(main_loc,main_loc-params.ncells_y, entry));
       }
       //finally, do the South diagonal, offset by +(ncells_y).
       if(x != params.ncells_x-1 && x!=0){  // && arp.land_mask(x+1,y) != 0.f){
         //we may not be in the final row where there is no cell
-        entry = arp.scalar_array_x_half(x,y)*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
+        entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
         coefficients.push_back(T(main_loc,main_loc+params.ncells_y, entry));
       }
     }
@@ -349,30 +349,46 @@ void second_half(const Parameters &params,ArrayPack &arp){
 
 
 
-//a temporary function to test adjustments to porosity for when there is surface water available
-//TODO: I DO NOT BELIEVE THIS FUNCTION IS CORRECT WITH THE MATH OF THE ORGINAL MATRICES
-//NOT SURE HOW TO DO THIS APPROPRIATELY!!!!
-void adjust_porosity(const Parameters &params,ArrayPack &arp){
-
+//Deal with the fact that porosity is 1 above ground but [value] below ground. It is included directly in the matrix calculation,
+//so we can't just scale water change before or after. Instead, we are scaling the effective storativity according to how much
+//change in water table we are projecting to see during that time step.
+void updateEffectiveStorativity(const Parameters &params,ArrayPack &arp){
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
-    double height_change = arp.wtd(x,y) - arp.original_wtd(x,y);
-    if(arp.original_wtd(x,y)<=0 && arp.wtd(x,y)<= 0)
-      continue;
-    else if(arp.original_wtd(x,y) > 0 && arp.wtd(x,y) > 0){
-      arp.wtd(x,y) = arp.original_wtd(x,y) + height_change*arp.porosity(x,y);
-    }
-    else if(arp.original_wtd(x,y) > 0 && arp.wtd(x,y) <=0){
-      //double portion_above = arp.original_wtd(x,y) * arp.porosity(x,y);
-      arp.wtd(x,y) += arp.original_wtd(x,y) - arp.original_wtd(x,y)*arp.porosity(x,y);//??????????????????//
-    }
-    else{ //original_wtd(x,y)<=0  && arp.wtd(x,y) >0
-      arp.wtd(x,y) = arp.wtd(x,y)*arp.porosity(x,y);
-
+    float projected_full_step_wtd = arp.original_wtd(x,y) + (arp.wtd_T(x,y) - arp.original_wtd(x,y))*2.;
+    if(arp.original_wtd(x,y) <= 0.f && projected_full_step_wtd <= 0.f) //both are below ground, so we can use the original porosity
+      arp.effective_storativity(x,y) = arp.porosity(x,y);
+    else if(arp.original_wtd(x,y) >= 0.f && projected_full_step_wtd >= 0.f) //both are above ground, so the porosity is 1
+      arp.effective_storativity(x,y) = 1.;
+    else{
+      float change_in_water_column_thickness = std::abs(projected_full_step_wtd - arp.original_wtd(x,y));
+      if(arp.original_wtd(x,y) < 0.f && projected_full_step_wtd > 0.f){ //started below ground and ended above ground
+        // First, scale the change in wtd as if the whole column has the porosity of the belowground area
+        float scaled_change_in_water_column_thickness = change_in_water_column_thickness * arp.effective_storativity(x,y)/arp.porosity(x,y);
+        // Then get just that portion that is >0 (aboveground), and scale it back down to the equivalent thickness with 100% porosity (surface water)
+        float aboveground_water_column_thickness = (scaled_change_in_water_column_thickness + arp.original_wtd(x,y)) * arp.effective_storativity(x,y);//Above-ground effective porosity is ==1, so no need to actually divide by 1 here (save on computation).
+        //belowground water column thickness is equal to -original_wtd, so no need to assign it to a new variable.
+        //float belowground_water_column_thickness = arp.original_wtd(x,y);//this is what the other formula works out to, I think. No more space than this below the ground. //scaled_change_in_water_column_thickness - (scaled_change_in_water_column_thickness + arp.original_wtd(x,y));
+        arp.effective_storativity(x,y) = (aboveground_water_column_thickness + arp.porosity(x,y)*-arp.original_wtd(x,y)) / (aboveground_water_column_thickness - arp.original_wtd(x,y));
+      }
+      else if(arp.original_wtd(x,y) > 0.f && projected_full_step_wtd < 0.f){ //started above ground and ended below ground
+        float scaled_change_in_water_column_thickness = change_in_water_column_thickness * arp.effective_storativity(x,y); //divided by 1 for above-ground porosity
+        if(scaled_change_in_water_column_thickness < projected_full_step_wtd){  //when rescaling the water according to the porosity values, there is no longer enough to reach below ground; so the scaled new porosity will be = 1
+          arp.effective_storativity(x,y) = 1;
+        }
+        else{
+          // Get the belowground water thickness and expand it to a deeper depth in order to account for changing porosity
+          float belowground_water_column_thickness = (scaled_change_in_water_column_thickness - arp.original_wtd(x,y)) * arp.effective_storativity(x,y)/arp.porosity(x,y);
+          arp.effective_storativity(x,y) = (arp.original_wtd(x,y) + arp.porosity(x,y)*belowground_water_column_thickness) / (arp.original_wtd(x,y) + belowground_water_column_thickness);
+        }
+      }
     }
   }
-
 }
+
+
+
+
 
 
 
@@ -390,48 +406,41 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
   Eigen::setNbThreads(8);
 
   // Picard iteration through solver
-  double x_partial = params.deltat/(params.cellsize_n_s_metres*params.cellsize_n_s_metres);
+  params.x_partial = params.deltat/(params.cellsize_n_s_metres*params.cellsize_n_s_metres);
   float ocean_T = 0.000001 * (1.5 + 25); //some constant for all T values in ocean - TODO look up representative values
 
 std::cout<<"create some needed arrays "<<std::endl;
+
+// Apply the first half of the recharge to the water-table depth grid (wtd)
+    // Its clone (wtd_T) is used and updated in the Picard iteration
+    //also set the starting porosity
+//set the scalar arrays for x and y directions
   #pragma omp parallel for collapse(2)
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
     if(arp.land_mask(x,y) == 0.f){
       arp.transmissivity(x,y) = ocean_T;
       arp.temp_T(x,y) = ocean_T;
+      arp.wtd(x,y) = 0;
+      arp.wtd_T(x,y) = 0;
+      arp.original_wtd(x,y) = 0;
       }
     else{
-      float my_p;
+      arp.original_wtd(x,y) = arp.wtd(x,y);
+      arp.wtd(x,y) = add_recharge(params.deltat/2., arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y)); //use regular porosity for adding recharge since this checks for underground space within add_recharge.
+      arp.wtd_T(x,y) = arp.wtd(x,y);
+      arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
+
       if(arp.wtd(x,y)>0)
-        my_p = 1;
+        arp.effective_storativity(x,y) = 1;
       else
-        my_p = arp.porosity(x,y);
-      arp.scalar_array_x(x,y) = x_partial/my_p;
-      arp.scalar_array_y(x,y) = params.deltat/(arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]*my_p);
-      arp.scalar_array_x_half(x,y) = -arp.scalar_array_x(x,y)/2.;
-      arp.scalar_array_y_half(x,y) = -arp.scalar_array_y(x,y)/2.;
+        arp.effective_storativity(x,y) = arp.porosity(x,y);
+
+      arp.scalar_array_y(x,y) = params.deltat/(arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]);
     }
   }
 
- // Apply the first half of the recharge to the water-table depth grid (wtd)
-    // Its clone (wtd_T) is used and updated in the Picard iteration
-    #pragma omp parallel for collapse(2)
-    for(int y=1;y<params.ncells_y-1;y++)
-    for(int x=1;x<params.ncells_x-1; x++){
-      if(arp.land_mask(x,y) == 0){          //skip ocean cells
-        arp.wtd(x,y) = 0;
-        arp.wtd_T(x,y) = 0;
-        arp.original_wtd(x,y) = 0;
-        //     continue;
-      }
-      else
-        arp.original_wtd(x,y) = arp.wtd(x,y);
-        arp.wtd(x,y) = add_recharge(params.deltat/2., arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y));
-        arp.wtd_T(x,y) = arp.wtd(x,y);
-        arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
 
-    }
 
    int continue_picard = 1;
    while(continue_picard != 0 ){
@@ -439,12 +448,10 @@ std::cout<<"create some needed arrays "<<std::endl;
     updateTransmissivity(params,arp,continue_picard);
     std::cout<<"first_half: " << std::endl;
     continue_picard = first_half(params,arp,continue_picard);
+    //update the effective storativity to use during the next iteration of the first half:
+    updateEffectiveStorativity(params,arp);
   }
 
-
-
- //   string cycles_str = to_string(params.cycles_done);
- //   arp.wtd_T.saveGDAL(params.outfilename + cycles_str +"_first_half.tif");
 
 
 
@@ -455,6 +462,9 @@ std::cout<<"create some needed arrays "<<std::endl;
       arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), arp.ksat(x,y));
   }
 
+
+
+
   #pragma omp parallel for collapse(2)
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
@@ -463,18 +473,10 @@ std::cout<<"create some needed arrays "<<std::endl;
       arp.temp_T(x,y) = ocean_T;
       }
     else{
-      float my_p;
-      if(arp.wtd_T(x,y)>0)
-        my_p = 1;
-      else
-        my_p = arp.porosity(x,y);
-      arp.scalar_array_x(x,y) = x_partial/my_p;
-      arp.scalar_array_y(x,y) = params.deltat/(arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]*my_p);
-      arp.scalar_array_x_half(x,y) = -arp.scalar_array_x(x,y)/2.;
-      arp.scalar_array_y_half(x,y) = -arp.scalar_array_y(x,y)/2.;
+      arp.scalar_array_x(x,y) = params.x_partial/arp.effective_storativity(x,y);
+      arp.scalar_array_y(x,y) /= arp.effective_storativity(x,y);
     }
   }
-
 
 
 
@@ -482,7 +484,6 @@ std::cout<<"create some needed arrays "<<std::endl;
   std::cout<<"second_half: " << std::endl;
   second_half(params,arp);
 
- // adjust_porosity(params,arp);
 }
 
 

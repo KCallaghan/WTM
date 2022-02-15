@@ -92,8 +92,6 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_x_half             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
 
 
   //load in the wtd result from the previous time:
@@ -184,8 +182,6 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_x_half             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
 
   if(params.infiltration_on == true){
     arp.vert_ksat = rd::Array2D<float>(params.surfdatadir + params.region + \
@@ -287,8 +283,6 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
     arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_x_half             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
 
   //we start with a water table below the surface for testing.
   arp.evap            = arp.starting_evap;
@@ -309,6 +303,7 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
 
   arp.ksat = rd::Array2D<float>(arp.topo,0.0001);   //Units of ksat are m/s.
   arp.porosity    = rd::Array2D<float>(arp.topo,0.25);  //Units: unitless
+  arp.effective_storativity = arp.porosity;
 
   //Set arrays that start off with zero or other values,
   //that are not imported files. Just to initialise these -
@@ -479,6 +474,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   arp.porosity = rd::Array2D<float>(params.surfdatadir + params.region + \
   "porosity.tif");
 
+  arp.effective_storativity = arp.porosity;
   //Set arrays that start off with zero or other values,
   //that are not imported files. Just to initialise these -
   //we'll add the appropriate values later.

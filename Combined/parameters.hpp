@@ -50,6 +50,7 @@ public:
     double    wtd_mid_change       = 0.;
     double    GW_wtd_change        = 0.;
     double    infiltration_change  = 0.;
+    double    x_partial            = 0.;
 
 
 
