@@ -102,11 +102,11 @@ void update(
 //    #pragma omp parallel for collapse(2)
     for(int y=0;y<params.ncells_y;y++)
     for(int x=0;x<params.ncells_x; x++){
-//      if(arp.land_mask(x,y) == 0)          //skip ocean cells
-//        continue;
+      if(arp.land_mask(x,y) == 0)          //skip ocean cells
+        continue;
       arp.wtd(x,y) = add_recharge(params.deltat, arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), arp.porosity(x,y),params,arp.cell_area[y]);
     }
-//    FanDarcyGroundwater::update(params, arp);
+    FanDarcyGroundwater::update(params, arp);
   }
 
 
