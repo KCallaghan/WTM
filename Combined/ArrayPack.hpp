@@ -24,6 +24,8 @@ class ArrayPack {
   d2d initial_T;
   d2d scalar_array_x;
   d2d scalar_array_y;
+  d2d scalar_array_x_half;
+  d2d scalar_array_y_half;
 
   f2d ksat;
   f2d vert_ksat;

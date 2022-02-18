@@ -92,6 +92,8 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
 arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_x_half             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
 
 
   //load in the wtd result from the previous time:
@@ -182,6 +184,8 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
 arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_x_half             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
 
   if(params.infiltration_on == true){
     arp.vert_ksat = rd::Array2D<float>(params.surfdatadir + params.region + \
@@ -198,12 +202,12 @@ arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
     arp.original_wtd = arp.wtd;
   }
   else{
-    arp.wtd   = rd::Array2D<double>(arp.topo,100.);
-    arp.wtd_T = rd::Array2D<double>(arp.topo,100.);
-    arp.wtd_T_iteration = rd::Array2D<double>(arp.topo,100.);
-        arp.my_last_wtd = rd::Array2D<double>(arp.topo,100.);
-                arp.my_prev_wtd = rd::Array2D<double>(arp.topo,100.);
-                arp.original_wtd = rd::Array2D<double>(arp.topo,100.);
+    arp.wtd   = rd::Array2D<double>(arp.topo,0.);
+    arp.wtd_T = rd::Array2D<double>(arp.topo,0.);
+    arp.wtd_T_iteration = rd::Array2D<double>(arp.topo,0.);
+        arp.my_last_wtd = rd::Array2D<double>(arp.topo,0.);
+                arp.my_prev_wtd = rd::Array2D<double>(arp.topo,0.);
+                arp.original_wtd = rd::Array2D<double>(arp.topo,0.);
 
 
 
@@ -273,16 +277,18 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.open_water_evap = rd::Array2D<float>(arp.topo,0.5); //Units: m/yr.
 
   arp.winter_temp     = rd::Array2D<float>(arp.topo,0);    //Units: deg C
-  arp.wtd             = rd::Array2D<double>(arp.topo,100.0);
-  arp.wtd_T             = rd::Array2D<double>(arp.topo,100.0);
-  arp.wtd_T_iteration             = rd::Array2D<double>(arp.topo,100.0);
-    arp.my_last_wtd             = rd::Array2D<double>(arp.topo,100.0);
-    arp.my_prev_wtd             = rd::Array2D<double>(arp.topo,100.0);
-        arp.original_wtd             = rd::Array2D<double>(arp.topo,100.0);
+  arp.wtd             = rd::Array2D<double>(arp.topo,0.0);
+  arp.wtd_T             = rd::Array2D<double>(arp.topo,0.0);
+  arp.wtd_T_iteration             = rd::Array2D<double>(arp.topo,0.0);
+    arp.my_last_wtd             = rd::Array2D<double>(arp.topo,0.0);
+    arp.my_prev_wtd             = rd::Array2D<double>(arp.topo,0.0);
+        arp.original_wtd             = rd::Array2D<double>(arp.topo,0.0);
 
     arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
 arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_x_half             = rd::Array2D<double>(arp.topo,0.0);
+arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
 
   //we start with a water table below the surface for testing.
   arp.evap            = arp.starting_evap;
@@ -621,9 +627,12 @@ void PrintValues(Parameters &params, ArrayPack &arp){
   params.total_wtd_change = 0.0;
   params.wtd_mid_change = 0.0;
   params.GW_wtd_change = 0.0;
+  params.wtd_sum = 0.0;
 
-  for(int y=1;y<params.ncells_y-1;y++)
-  for(int x=1;x<params.ncells_x-1; x++){
+    double total_cell_area     = 0.0;
+
+  for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x; x++){
     params.abs_total_wtd_change += fabs(arp.wtd(x,y)     - arp.wtd_old(x,y));
     params.abs_wtd_mid_change   += fabs(arp.wtd(x,y)     - arp.wtd_mid(x,y));
     params.abs_GW_wtd_change    += fabs(arp.wtd_mid(x,y) - arp.wtd_old(x,y));
@@ -631,6 +640,12 @@ void PrintValues(Parameters &params, ArrayPack &arp){
     params.wtd_mid_change       += (arp.wtd(x,y)         - arp.wtd_mid(x,y));
     params.GW_wtd_change        += (arp.wtd_mid(x,y)     - arp.wtd_old(x,y));
     params.infiltration_change  += arp.infiltration_array(x,y);
+    if(arp.wtd(x,y) > 0)
+      params.wtd_sum              += arp.wtd(x,y)*arp.cell_area[y];
+    else
+      params.wtd_sum              += arp.wtd(x,y)*arp.porosity(x,y)*arp.cell_area[y];
+    if(arp.land_mask(x,y) == 1)
+      total_cell_area        += arp.cell_area[y];
   }
 
   textfile<<"params.cycles_done "<<params.cycles_done<<std::endl;
@@ -642,5 +657,11 @@ void PrintValues(Parameters &params, ArrayPack &arp){
   " and change in SW only was "<<params.abs_wtd_mid_change<<std::endl;
   textfile<<"the change in infiltration was "<<params.infiltration_change\
   <<std::endl;
+  textfile<<"the total amount of recharge added was "<<params.total_added_recharge<<std::endl;
+  textfile<<"the total loss to the ocean was "<<params.total_loss_to_ocean<<std::endl;
+  textfile<<"the sum of all water tables was "<<params.wtd_sum<<std::endl;
+  textfile<<"total cell area "<<total_cell_area<<std::endl;
+
+
   textfile.close();
 }

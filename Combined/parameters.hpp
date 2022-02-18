@@ -51,6 +51,9 @@ public:
     double    GW_wtd_change        = 0.;
     double    infiltration_change  = 0.;
     double    x_partial            = 0.;
+    double    total_added_recharge = 0.;
+    double    total_loss_to_ocean  = 0.;
+    double    wtd_sum              = 0.;
 
 
 

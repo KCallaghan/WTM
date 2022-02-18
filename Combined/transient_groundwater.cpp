@@ -100,19 +100,19 @@ int first_half(const Parameters &params,ArrayPack &arp, int picard_number){
 
   //HALFWAY SOLVE
   //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
-  for(int x=0;x<params.ncells_x; x++)
-  for(int y=0;y<params.ncells_y; y++){
+  for(int x=1;x<params.ncells_x; x++)
+  for(int y=1;y<params.ncells_y; y++){
     //The row and column that the current cell will be stored in in matrix A.
     //This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
     //All of the N,E,S,W directions should be in the same row, but the column will differ.
     main_loc = y+(x*params.ncells_y);
     //start with the central diagonal, which contains the info for the current cell:
     //This diagonal will be populated for all cells in the domain, provided that they are not ocean cells.
-    if(arp.land_mask(x,y) == 0.f){  //if they are ocean cells
-      entry = 1.;                   //then they should not change (wtd should be 0 both before and after) so only the centre diagonal is populated, and it is = 1.
-      coefficients.push_back(T(main_loc,main_loc, entry));
-    }
-    else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
+//    if(arp.land_mask(x,y) == 0.f){  //if they are ocean cells
+//      entry = 1.;                   //then they should not change (wtd should be 0 both before and after) so only the centre diagonal is populated, and it is = 1.
+//      coefficients.push_back(T(main_loc,main_loc, entry));
+//    }
+ //   else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
       entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(arp.scalar_array_y(x,y)/(2*arp.effective_storativity(x,y))) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(params.x_partial/(2*arp.effective_storativity(x,y))) +1;
       coefficients.push_back(T(main_loc,main_loc, entry));
 
@@ -140,7 +140,7 @@ int first_half(const Parameters &params,ArrayPack &arp, int picard_number){
         entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
         coefficients.push_back(T(main_loc,main_loc+params.ncells_y, entry));
       }
-    }
+  //  }
   }
 
   //use the triplet vector to populate the matrix, A.
@@ -175,6 +175,10 @@ int first_half(const Parameters &params,ArrayPack &arp, int picard_number){
     if(arp.land_mask(x,y) != 0.f){
       arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
     }
+    else
+      arp.wtd_T(x,y) = vec_x(y+(x*params.ncells_y)) - 0.;
+
+
   }
 
   if(picard_number == 3)
@@ -192,7 +196,7 @@ int first_half(const Parameters &params,ArrayPack &arp, int picard_number){
 
 
 
-void second_half(const Parameters &params,ArrayPack &arp){
+void second_half(Parameters &params,ArrayPack &arp){
 
   std::vector<T> coefficients_A;
   std::vector<T> coefficients_B;
@@ -225,20 +229,20 @@ void second_half(const Parameters &params,ArrayPack &arp){
 
   ////SECOND SOLVE
   //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
-  for(int x=0;x<params.ncells_x; x++)
-  for(int y=0;y<params.ncells_y; y++){
+  for(int x=1;x<params.ncells_x; x++)
+  for(int y=1;y<params.ncells_y; y++){
     //The row and column that the current cell will be stored in in matrix A.
     //This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
     //All of the N,E,S,W directions should be in the same row, but the column will differ.
     main_loc = y+(x*params.ncells_y);
     //start with the central diagonal, which contains the info for the current cell:
     //This diagonal will be populated for all cells in the domain, provided that they are not ocean cells.
-    if(arp.land_mask(x,y) == 0.f){  //if they are ocean cells
-      entry = 1.;                   //then they should not change (wtd should be 0 both before and after) so only the centre diagonal is populated, and it is = 1.
-      coefficients_A.push_back(T(main_loc,main_loc, entry));
-      coefficients_B.push_back(T(main_loc,main_loc, entry));
-    }
-    else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
+//    if(arp.land_mask(x,y) == 0.f){  //if they are ocean cells
+//      entry = 1.;                   //then they should not change (wtd should be 0 both before and after) so only the centre diagonal is populated, and it is = 1.
+//      coefficients_A.push_back(T(main_loc,main_loc, entry));
+//      coefficients_B.push_back(T(main_loc,main_loc, entry));
+//    }
+//    else{  //land cells, so we have an actual value here and we should consider the neighbouring cells.
       entry =  1 - (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.) ) - (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
       coefficients_B.push_back(T(main_loc,main_loc, entry));
       entry =  1 + (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) + (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
@@ -276,7 +280,7 @@ void second_half(const Parameters &params,ArrayPack &arp){
         entry = (-arp.scalar_array_x(x,y))*(arp.transmissivity(x,y)/4. + arp.transmissivity(x+1,y)/4.);
         coefficients_A.push_back(T(main_loc,main_loc+params.ncells_y,entry ));
         }
-    }
+  //  }
   }
 
   std::cerr<<"finished second set of matrices"<<std::endl;
@@ -287,33 +291,44 @@ void second_half(const Parameters &params,ArrayPack &arp){
 
 
   b = B*b;
+  guess = B*guess;
 
 
  // Apply the second half of the recharge to the water-table depth grid (wtd_T is currently in use). For this, start with the original wtd and add the second half of rech to it.
   //TODO: is this right, or should we start with the halfway-solved wtd_T and add half the rech to it?
  //   #pragma omp parallel for collapse(2)
-    for(int y=1;y<params.ncells_y-1;y++)
-    for(int x=1;x<params.ncells_x-1; x++){
+    for(int y=0;y<params.ncells_y;y++)
+    for(int x=0;x<params.ncells_x; x++){
       double rech_change = arp.rech(x,y)/31536000. * params.deltat;
-      if(arp.land_mask(x,y) != 0){          //skip ocean cells
-        if(arp.original_wtd(x,y)>=0){
+      if(arp.original_wtd(x,y) >= 0 && arp.land_mask(x,y) == 1){          //skip ocean cells
+        params.total_added_recharge += rech_change*arp.cell_area[y];
           b(y+(x*params.ncells_y)) += rech_change;
+          guess(y+(x*params.ncells_y)) += rech_change;
           if(arp.original_wtd(x,y) + rech_change <0){
             double temp = -(arp.original_wtd(x,y) + rech_change);
             b(y+(x*params.ncells_y)) += temp;
+            guess(y+(x*params.ncells_y)) += temp;
+            params.total_added_recharge += temp*arp.cell_area[y];  //in this scenario, there has been a negative amount of recharge, so temp here will be positive and remove the extra amount that was spuriously subtracted.
           }
         }
-        else if (arp.rech(x,y)>0){
+        else if (rech_change>0 && arp.land_mask(x,y) == 1){
+          params.total_added_recharge += rech_change*arp.cell_area[y];
           double GW_space = -arp.original_wtd(x,y) * arp.porosity(x,y);
-          if(GW_space > rech_change)
+          if(GW_space > rech_change){
             b(y+(x*params.ncells_y)) += rech_change/arp.porosity(x,y);
+            guess(y+(x*params.ncells_y)) += rech_change/arp.porosity(x,y);
+          }
           else{
             double temp = ( rech_change - GW_space) - arp.original_wtd(x,y);
             b(y+(x*params.ncells_y)) += temp;
+            guess(y+(x*params.ncells_y)) += temp;
           }
         }
       }
-    }
+
+
+
+
 
   // Biconjugate gradient solver with guess
   Eigen::BiCGSTAB<SpMat> solver;
@@ -340,7 +355,12 @@ void second_half(const Parameters &params,ArrayPack &arp){
   //copy result into the wtd_T array:
     if(arp.land_mask(x,y) != 0.f){
       arp.wtd(x,y) = vec_x(y+(x*params.ncells_y)) - arp.topo(x,y);
+
     }
+    else
+      arp.wtd(x,y) = vec_x(y+(x*params.ncells_y)) - 0.;
+
+
   }
   std::cerr<<"finished assigning the new wtd"<<std::endl;
 }
@@ -415,15 +435,18 @@ std::cout<<"create some needed arrays "<<std::endl;
     // Its clone (wtd_T) is used and updated in the Picard iteration
     //also set the starting porosity
 //set the scalar arrays for x and y directions
-  #pragma omp parallel for collapse(2)
+  //#pragma omp parallel for collapse(2)
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
     if(arp.land_mask(x,y) == 0.f){
       arp.transmissivity(x,y) = ocean_T;
       arp.temp_T(x,y) = ocean_T;
-      arp.wtd(x,y) = 0;
-      arp.wtd_T(x,y) = 0;
-      arp.original_wtd(x,y) = 0;
+      params.total_loss_to_ocean += arp.wtd(x,y)*arp.cell_area[y];
+      arp.wtd(x,y) = 0.;
+      arp.wtd_T(x,y) = 0.;
+      arp.original_wtd(x,y) = 0.;
+      arp.wtd_T_iteration(x,y) = 0.;
+      arp.effective_storativity(x,y) = 1.;
       }
     else{
       arp.original_wtd(x,y) = arp.wtd(x,y);
@@ -431,13 +454,13 @@ std::cout<<"create some needed arrays "<<std::endl;
       arp.wtd_T(x,y) = arp.wtd(x,y);
       arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
 
-      if(arp.wtd(x,y)>0)
+      if(arp.original_wtd(x,y)>0)
         arp.effective_storativity(x,y) = 1;
       else
         arp.effective_storativity(x,y) = arp.porosity(x,y);
 
-      arp.scalar_array_y(x,y) = params.deltat/(arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]);
     }
+      arp.scalar_array_y(x,y) = params.deltat/(arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]);
   }
 
 
@@ -471,18 +494,36 @@ std::cout<<"create some needed arrays "<<std::endl;
     if(arp.land_mask(x,y) == 0.f){
       arp.transmissivity(x,y) = ocean_T;
       arp.temp_T(x,y) = ocean_T;
+      arp.effective_storativity(x,y) = 1.;
       }
-    else{
+//    else{
       arp.scalar_array_x(x,y) = params.x_partial/arp.effective_storativity(x,y);
       arp.scalar_array_y(x,y) /= arp.effective_storativity(x,y);
-    }
+ //   }
   }
 
+
+for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x; x++){
+    if(arp.land_mask(x,y) == 0.f){
+      params.total_loss_to_ocean += arp.wtd(x,y)*arp.cell_area[y];
+      arp.wtd(x,y) = 0.;
+    }
+  }
 
 
   //Do the second half of the midpoint method:
   std::cout<<"second_half: " << std::endl;
   second_half(params,arp);
+
+
+for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x; x++){
+    if(arp.land_mask(x,y) == 0.f){
+      params.total_loss_to_ocean += arp.wtd(x,y)*arp.cell_area[y];
+      arp.wtd(x,y) = 0.;
+    }
+  }
 
 }
 
