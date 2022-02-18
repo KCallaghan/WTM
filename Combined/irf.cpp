@@ -646,8 +646,8 @@ void PrintValues(Parameters &params, ArrayPack &arp){
   params.GW_wtd_change = 0.0;
   params.wtd_sum = 0.0;
 
-  for(int y=1;y<params.ncells_y-1;y++)
-  for(int x=1;x<params.ncells_x-1; x++){
+  for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x; x++){
     params.abs_total_wtd_change += fabs(arp.wtd(x,y)     - arp.wtd_old(x,y));
     params.abs_wtd_mid_change   += fabs(arp.wtd(x,y)     - arp.wtd_mid(x,y));
     params.abs_GW_wtd_change    += fabs(arp.wtd_mid(x,y) - arp.wtd_old(x,y));
