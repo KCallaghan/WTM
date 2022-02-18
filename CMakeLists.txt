@@ -59,7 +59,6 @@ endif()
 
 add_executable(fsm_unittests.exe
   Combined/test_main.cpp
-  Combined/test_kerry_FSM.cpp
 )
 target_link_libraries(fsm_unittests.exe PRIVATE richdem OpenMP::OpenMP_CXX)
 target_compile_features(fsm_unittests.exe PUBLIC cxx_auto_type cxx_std_17)

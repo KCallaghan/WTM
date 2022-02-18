@@ -291,6 +291,8 @@ if(!(local_wtd[0]<0 || local_wtd[0]>=0)){
   local_wtd[2] = computeNewWTD( -QS*dt, local_wtd[2], c2d(fdp.porosity, x, y-1), fdp.cell_area[y-1] );
   local_wtd[3] = computeNewWTD( -QE*dt, local_wtd[3], c2d(fdp.porosity, x+1, y), fdp.cell_area[y] );
   local_wtd[4] = computeNewWTD( -QW*dt, local_wtd[4], c2d(fdp.porosity, x-1, y), fdp.cell_area[y] );
+
+
 }
 
 
@@ -303,7 +305,8 @@ double updateCell(
   const int x,
   const int y,
   double time_remaining,
-  const FanDarcyPack &fdp
+  const FanDarcyPack &fdp,
+  Parameters &params
 ){
   const auto width = fdp.width;
 
@@ -340,6 +343,15 @@ double updateCell(
     time_remaining -= dt_inner;
   }
 
+  if( c2d(fdp.land_mask,x+1,y) == 0)
+    params.total_loss_to_ocean += local_wtd[3]*fdp.cell_area[y];
+  if(c2d(fdp.land_mask,x-1,y) == 0)
+    params.total_loss_to_ocean += local_wtd[4]*fdp.cell_area[y];
+  if(c2d(fdp.land_mask,x,y+1) == 0)
+    params.total_loss_to_ocean += local_wtd[1]*fdp.cell_area[y+1];
+  if(c2d(fdp.land_mask,x,y-1) == 0)
+    params.total_loss_to_ocean += local_wtd[2]*fdp.cell_area[y-1];
+
   // When exiting loop, the local_wtd[0] variable holds the final water-table depth
   return local_wtd[0];
 }
@@ -350,7 +362,7 @@ double updateCell(
 // PUBLIC FUNCTIONS //
 //////////////////////
 
-void UpdateCPU(const Parameters &params, ArrayPack &arp){
+void UpdateCPU(Parameters &params, ArrayPack &arp){
   FanDarcyPack fdp;
   fdp.cell_area           = arp.cell_area.data();
   fdp.cellsize_e_w_metres = arp.cellsize_e_w_metres.data();
@@ -371,7 +383,7 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
   #pragma omp parallel for collapse(2) default(none) shared(arp,params,fdp)
   for(int32_t y=1; y<params.ncells_y-1; y++)
   for(int32_t x=1; x<params.ncells_x-1; x++){
-    arp.wtd_changed(x,y) = updateCell(x, y, params.deltat, fdp);
+    arp.wtd_changed(x,y) = updateCell(x, y, params.deltat, fdp,params);
   }
 
   // Once all the changes are known, update the WTD everywhere with the
@@ -388,7 +400,7 @@ void UpdateCPU(const Parameters &params, ArrayPack &arp){
 
 
 
-void update(const Parameters &params, ArrayPack &arp){
+void update(Parameters &params, ArrayPack &arp){
   UpdateCPU(params, arp);
 }
 

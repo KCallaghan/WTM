@@ -347,6 +347,7 @@ static void MoveWaterIntoPits(
       if(arp.wtd(x,y)>0){             //There is surface water in the cell.
         if(arp.label(x,y) == OCEAN){  //If downstream neighbour is the ocean, we drop our water into it and the ocean is unaffected.
           deps.at(OCEAN).water_vol += arp.wtd(x,y)*arp.cell_area[y]; //recording the volume that has ended up in the ocean.
+          params.total_loss_to_ocean += arp.wtd(x,y)*arp.cell_area[y];
           arp.wtd(x,y) = 0.0;         //all surface water from the cell has flowed into the ocean.
         }
         else{
@@ -824,6 +825,10 @@ static void MoveWaterInDepHier(
 
   //We are overflowing the depression
   if(this_dep.water_vol>this_dep.wtd_vol) {
+
+    if(current_depression==OCEAN)
+      params.total_loss_to_ocean += this_dep.water_vol - this_dep.wtd_vol;
+
     //The neighbouring depression is not the ocean and this depression is
     //overflowing (therefore, all of its children are full)
     assert(this_dep.lchild==NO_VALUE || fp_eq(deps.at(this_dep.lchild).water_vol,deps.at(this_dep.lchild).wtd_vol));
@@ -1211,6 +1216,8 @@ static dh_label_t OverflowInto(
   //When using the jump table, I know where the water ends up, but how do I know which side of the depression it flows in from?
 
   if(jump_table.count(root)!=0 && params.infiltration_on == false){  //we can only use the jump table if we dont' want water to infiltrate, or we won't know where infiltrating water is coming from.
+    if(jump_table.at(root)==OCEAN)
+      params.total_loss_to_ocean += extra_water;
     return jump_table[root] = OverflowInto(jump_table.at(root), -1, stop_node, deps, jump_table, extra_water, params, arp);
   }
 
@@ -1223,6 +1230,8 @@ static dh_label_t OverflowInto(
     auto &odep = deps.at(this_dep.odep);
     if(odep.water_vol<odep.wtd_vol){    //Can overflow depression hold more water?
       //Yes. Move the water geographically into that depression's leaf.
+      if(this_dep.geolink==OCEAN)
+        params.total_loss_to_ocean += extra_water;
       return jump_table[root] = OverflowInto(this_dep.geolink, this_dep.dep_label, stop_node, deps, jump_table, extra_water, params, arp);
     } else if(odep.water_vol >= odep.wtd_vol) {
       //Neighbour is overfull. Since our next stop is the parent, let's take the
@@ -1250,6 +1259,8 @@ static dh_label_t OverflowInto(
 
 
   //THIRD PLACE TO STASH WATER: IN THIS DEPRESSION'S PARENT
+  if(this_dep.parent==OCEAN)
+      params.total_loss_to_ocean += extra_water;
   return jump_table[root] = OverflowInto(this_dep.parent, this_dep.dep_label, stop_node, deps, jump_table, extra_water, params, arp);
 }
 

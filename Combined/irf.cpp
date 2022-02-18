@@ -264,7 +264,7 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   params.time_start + "_starting_wt.tif");
   }
   else{
-    arp.wtd           = rd::Array2D<double>(arp.topo,100.);
+    arp.wtd           = rd::Array2D<double>(arp.topo,0.);
   }
   //we start with a water table at the surface for equilibrium runs.
 
@@ -644,6 +644,7 @@ void PrintValues(Parameters &params, ArrayPack &arp){
   params.total_wtd_change = 0.0;
   params.wtd_mid_change = 0.0;
   params.GW_wtd_change = 0.0;
+  params.wtd_sum = 0.0;
 
   for(int y=1;y<params.ncells_y-1;y++)
   for(int x=1;x<params.ncells_x-1; x++){
@@ -654,6 +655,10 @@ void PrintValues(Parameters &params, ArrayPack &arp){
     params.wtd_mid_change       += (arp.wtd(x,y)         - arp.wtd_mid(x,y));
     params.GW_wtd_change        += (arp.wtd_mid(x,y)     - arp.wtd_old(x,y));
     params.infiltration_change  += arp.infiltration_array(x,y);
+    if(arp.wtd(x,y)>0)
+      params.wtd_sum            += arp.wtd(x,y)*arp.cell_area[y];
+    else
+      params.wtd_sum            += arp.wtd(x,y)*arp.porosity(x,y)*arp.cell_area[y];
   }
 
   textfile<<"params.cycles_done "<<params.cycles_done<<std::endl;
@@ -664,6 +669,12 @@ void PrintValues(Parameters &params, ArrayPack &arp){
   <<" change in GW only was "<<params.abs_GW_wtd_change<<\
   " and change in SW only was "<<params.abs_wtd_mid_change<<std::endl;
   textfile<<"the change in infiltration was "<<params.infiltration_change\
+  <<std::endl;
+    textfile<<"the total loss to ocean was "<<params.total_loss_to_ocean\
+  <<std::endl;
+      textfile<<"the sum of water tables was "<<params.wtd_sum\
+  <<std::endl;
+       textfile<<"the total recharge was "<<params.total_added_recharge\
   <<std::endl;
   textfile.close();
 }

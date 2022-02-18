@@ -47,6 +47,9 @@ public:
     double    fdepth_a             = 0.;
     double    fdepth_b             = 0.;
     double    fdepth_fmin          = 0.;
+    double    total_loss_to_ocean  = 0.;
+    double    wtd_sum              = 0.;
+    double    total_added_recharge = 0.;
 
 
     //Set for convenience within the code
