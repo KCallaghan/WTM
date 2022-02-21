@@ -621,6 +621,7 @@ void PrintValues(Parameters &params, ArrayPack &arp){
   ofstream textfile;
   textfile.open (params.textfilename, std::ios_base::app);
 
+
   params.abs_total_wtd_change = 0.0;
   params.abs_wtd_mid_change = 0.0;
   params.abs_GW_wtd_change = 0.0;
@@ -629,7 +630,6 @@ void PrintValues(Parameters &params, ArrayPack &arp){
   params.GW_wtd_change = 0.0;
   params.wtd_sum = 0.0;
 
-    double total_cell_area     = 0.0;
 
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
@@ -644,23 +644,13 @@ void PrintValues(Parameters &params, ArrayPack &arp){
       params.wtd_sum              += arp.wtd(x,y)*arp.cell_area[y];
     else
       params.wtd_sum              += arp.wtd(x,y)*arp.porosity(x,y)*arp.cell_area[y];
-    if(arp.land_mask(x,y) == 1)
-      total_cell_area        += arp.cell_area[y];
   }
 
-  textfile<<"params.cycles_done "<<params.cycles_done<<std::endl;
-  textfile<<"total wtd change was "<<params.total_wtd_change<<\
-  " change in GW only was "<<params.GW_wtd_change<<\
-  " and change in SW only was "<<params.wtd_mid_change<<std::endl;
-  textfile<<"absolute value total wtd change was "<<params.abs_total_wtd_change\
-  <<" change in GW only was "<<params.abs_GW_wtd_change<<\
-  " and change in SW only was "<<params.abs_wtd_mid_change<<std::endl;
-  textfile<<"the change in infiltration was "<<params.infiltration_change\
-  <<std::endl;
-  textfile<<"the total amount of recharge added was "<<params.total_added_recharge<<std::endl;
-  textfile<<"the total loss to the ocean was "<<params.total_loss_to_ocean<<std::endl;
-  textfile<<"the sum of all water tables was "<<params.wtd_sum<<std::endl;
-  textfile<<"total cell area "<<total_cell_area<<std::endl;
+
+  textfile<<params.cycles_done<<" "<<params.total_wtd_change<<" "<<\
+  params.GW_wtd_change<<" "<<params.wtd_mid_change<<" "<<params.abs_total_wtd_change<<" "<<\
+  params.abs_GW_wtd_change<<" "<<params.abs_wtd_mid_change<<" "<<params.infiltration_change<<" "<<\
+  params.total_added_recharge<<" "<<params.total_loss_to_ocean<<" "<<params.wtd_sum<<" "<<std::endl;
 
 
   textfile.close();
