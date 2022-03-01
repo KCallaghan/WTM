@@ -72,7 +72,7 @@ void update(
     //since the topography is changing.
   }
 
-  textfile<<"Cycles done: "<<params.cycles_done<<std::endl;
+  //textfile<<"Cycles done: "<<params.cycles_done<<std::endl;
 
   //TODO: How should equilibrium know when to exit?
   if((params.cycles_done % 50) == 0){

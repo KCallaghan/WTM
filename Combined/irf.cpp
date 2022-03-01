@@ -661,20 +661,10 @@ void PrintValues(Parameters &params, ArrayPack &arp){
       params.wtd_sum            += arp.wtd(x,y)*arp.porosity(x,y)*arp.cell_area[y];
   }
 
-  textfile<<"params.cycles_done "<<params.cycles_done<<std::endl;
-  textfile<<"total wtd change was "<<params.total_wtd_change<<\
-  " change in GW only was "<<params.GW_wtd_change<<\
-  " and change in SW only was "<<params.wtd_mid_change<<std::endl;
-  textfile<<"absolute value total wtd change was "<<params.abs_total_wtd_change\
-  <<" change in GW only was "<<params.abs_GW_wtd_change<<\
-  " and change in SW only was "<<params.abs_wtd_mid_change<<std::endl;
-  textfile<<"the change in infiltration was "<<params.infiltration_change\
-  <<std::endl;
-    textfile<<"the total loss to ocean was "<<params.total_loss_to_ocean\
-  <<std::endl;
-      textfile<<"the sum of water tables was "<<params.wtd_sum\
-  <<std::endl;
-       textfile<<"the total recharge was "<<params.total_added_recharge\
-  <<std::endl;
+  textfile<<params.cycles_done<<" "<<params.total_wtd_change<<" "<<\
+  params.GW_wtd_change<<" "<<params.wtd_mid_change<<" "<<params.abs_total_wtd_change<<" "<<\
+  params.abs_GW_wtd_change<<" "<<params.abs_wtd_mid_change<<" "<<params.infiltration_change<<" "<<\
+  params.total_added_recharge<<" "<<params.total_loss_to_ocean<<" "<<params.wtd_sum<<" "<<std::endl;
+
   textfile.close();
 }
