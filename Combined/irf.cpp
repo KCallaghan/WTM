@@ -1,8 +1,6 @@
 #include "transient_groundwater.hpp"
 #include "fill_spill_merge.hpp"
-//#include "evaporation.hpp"
 
-//#include "../common/netcdf.hpp"
 #include "ArrayPack.hpp"
 #include "parameters.hpp"
 #include <cassert>
@@ -89,11 +87,8 @@ void InitialiseTransient(Parameters &params, ArrayPack &arp){
     "vertical_ksat.tif");
   }
 
-arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_x_half             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
+  arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
+  arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
 
 
   //load in the wtd result from the previous time:
@@ -180,12 +175,8 @@ void InitialiseEquilibrium(Parameters &params, ArrayPack &arp){
   arp.winter_temp = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start + "_winter_temperature.tif");      //Units: degrees Celsius
 
-    arp.nope = rd::Array2D<double>(arp.topo,0.);
-arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_x_half             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
+  arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
+  arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
 
   if(params.infiltration_on == true){
     arp.vert_ksat = rd::Array2D<float>(params.surfdatadir + params.region + \
@@ -197,19 +188,13 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
   params.time_start + "_starting_wt.tif");
     arp.wtd_T = arp.wtd;
     arp.wtd_T_iteration = arp.wtd;
-    arp.my_last_wtd = arp.wtd;
-    arp.my_prev_wtd = arp.wtd;
     arp.original_wtd = arp.wtd;
   }
   else{
     arp.wtd   = rd::Array2D<double>(arp.topo,0.);
     arp.wtd_T = rd::Array2D<double>(arp.topo,0.);
     arp.wtd_T_iteration = rd::Array2D<double>(arp.topo,0.);
-        arp.my_last_wtd = rd::Array2D<double>(arp.topo,0.);
-                arp.my_prev_wtd = rd::Array2D<double>(arp.topo,0.);
-                arp.original_wtd = rd::Array2D<double>(arp.topo,0.);
-
-
+    arp.original_wtd = rd::Array2D<double>(arp.topo,0.);
 
   }
   //we start with a water table at the surface for equilibrium runs.
@@ -242,19 +227,6 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.slope         = rd::Array2D<float>(params.surfdatadir + params.region + \
   params.time_start+"_slope.tif");  //Slope as a value from 0 to 1.
 
-    arp.nope = rd::Array2D<double>(arp.topo,0.);
-
-  //arp.topo = rd::Array2D<uint8_t>(arp.topo_start.width()/4,arp.topo_start.height()/4,1.);
-  //arp.slope = rd::Array2D<uint8_t>(arp.topo_start.width()/4,arp.topo_start.height()/4,1.);
-
- // for(unsigned int i=0;i<arp.topo_start.width()/4;i++)
- //   for(unsigned int j=0;j<arp.topo_start.height()/4;j++){
- //     arp.topo(i,j) = arp.topo_start(i,j);
- //     arp.slope(i,j) = arp.slope_start(i,j);
- //   }
-
- // arp.topo          = LoadData<float>(params.surfdatadir + params.region +   "_topography.tif",   "value");  //Units: metres
-
   //width and height in number of cells in the array
   params.ncells_x = arp.topo.width();
   params.ncells_y = arp.topo.height();
@@ -271,7 +243,6 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.ice_mask = rd::Array2D<uint8_t>(arp.topo,0); //binary mask that is 0 where there is no ice and 1 where there is ice
 
 
-
   arp.precip          = rd::Array2D<float>(arp.topo,0.03);  //Units: m/yr.
   arp.starting_evap   = rd::Array2D<float>(arp.topo,0.);     //Units: m/yr.
   arp.open_water_evap = rd::Array2D<float>(arp.topo,0.5); //Units: m/yr.
@@ -280,15 +251,10 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   arp.wtd             = rd::Array2D<double>(arp.topo,0.0);
   arp.wtd_T             = rd::Array2D<double>(arp.topo,0.0);
   arp.wtd_T_iteration             = rd::Array2D<double>(arp.topo,0.0);
-    arp.my_last_wtd             = rd::Array2D<double>(arp.topo,0.0);
-    arp.my_prev_wtd             = rd::Array2D<double>(arp.topo,0.0);
-        arp.original_wtd             = rd::Array2D<double>(arp.topo,0.0);
+  arp.original_wtd             = rd::Array2D<double>(arp.topo,0.0);
 
-    arp.initial_T             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_x_half             = rd::Array2D<double>(arp.topo,0.0);
-arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
+  arp.scalar_array_x             = rd::Array2D<double>(arp.topo,0.0);
+  arp.scalar_array_y             = rd::Array2D<double>(arp.topo,0.0);
 
   //we start with a water table below the surface for testing.
   arp.evap            = arp.starting_evap;
@@ -303,13 +269,12 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
       if(!(arp.topo(x,y)<0 || arp.topo(x,y)>=0))
         arp.topo(x,y) = 0;
     }
-
     //border of 'ocean' with land everywhere else
   }
 
   arp.ksat = rd::Array2D<float>(arp.topo,0.0001);   //Units of ksat are m/s.
   arp.porosity    = rd::Array2D<float>(arp.topo,0.25);  //Units: unitless
-  arp.effective_storativity = arp.porosity;
+  arp.effective_storativity = rd::Array2D<double>(arp.topo,0.);
 
   //Set arrays that start off with zero or other values,
   //that are not imported files. Just to initialise these -
@@ -321,7 +286,6 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
   arp.wtd_mid            = arp.wtd;
 
   arp.runoff             = rd::Array2D<double>(arp.ksat,0);
-  arp.head               = rd::Array2D<double>(arp.ksat,0);
 
   //This is used to see how much change occurred in infiltration
   //portion of the code. Just informational.
@@ -329,12 +293,6 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
 
   arp.rech               = rd::Array2D<double>(arp.ksat,0);
   arp.transmissivity     = rd::Array2D<double>(arp.ksat,0);
-  arp.temp_T     = rd::Array2D<double>(arp.ksat,0);
-
-
-  //This array is used to store the values of how much the water table will
-  //change in one iteration, then adding it to wtd gets the new wtd.
-  arp.wtd_changed        = rd::Array2D<double>(arp.ksat,0.0f);
 
   //These are populated during the calculation of the depression hierarchy:
   arp.label              = rd::Array2D<dh_label_t>   \
@@ -354,7 +312,7 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
     }
   }
 
-//get the starting runoff using precip and evap inputs:
+  //get the starting runoff using precip and evap inputs:
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.topo.size();i++){
     arp.rech(i) = (arp.precip(i)-arp.starting_evap(i));
@@ -370,14 +328,9 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
     if(arp.land_mask(i) == 0){// || arp.ice_mask(i) == 1){
       arp.wtd  (i) = 0.;
       arp.wtd_T  (i) = 0.;
-            arp.wtd_T_iteration  (i) = 0.;
-                        arp.my_last_wtd  (i) = 0.;
-
-                        arp.my_prev_wtd  (i) = 0.;
-                                                arp.original_wtd  (i) = 0.;
-
-
-
+      arp.wtd_T_iteration  (i) = 0.;
+      arp.original_wtd  (i) = 0.;
+      arp.topo(i) = 0.;
     }
   }
 
@@ -390,7 +343,6 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
       arp.final_label(i) = dh::OCEAN;
     }
   }
-
 }
 
 
@@ -399,16 +351,15 @@ arp.scalar_array_y_half             = rd::Array2D<double>(arp.topo,0.0);
 ///and the radius of the Earth to calculate the latitude of each row of cells,
 ///the size of a cell in the N-S and E-W directions, and the area of each cell.
 void cell_size_area(Parameters &params, ArrayPack &arp){
- //compute changing cell size and distances between
+  //compute changing cell size and distances between
   //cells as these change with latitude:
 
-  const float earth_radius = 6371000.; //metres
+  const double earth_radius = 6371000.; //metres
 
-//distance between lines of latitude is a constant.
-  params.cellsize_n_s_metres = (earth_radius*(M_PI/180.))\
-  /float(params.cells_per_degree);
+  //distance between lines of latitude is a constant.
+  params.cellsize_n_s_metres = (earth_radius*(M_PI/180.))/double(params.cells_per_degree);
 
-//initialise some arrays
+  //initialise some arrays
   arp.latitude_radians.resize       (params.ncells_y);
   //the latitude of each row of cells
   arp.cellsize_e_w_metres.resize    (params.ncells_y);
@@ -425,8 +376,7 @@ void cell_size_area(Parameters &params, ArrayPack &arp){
 
   for(unsigned int j=0;j<arp.latitude_radians.size();j++){
     //latitude at the centre of a cell:
-    arp.latitude_radians[j] = (float(j)/float(params.cells_per_degree) + \
-    float(params.southern_edge))*(M_PI/180.);
+    arp.latitude_radians[j] = (double(j)/double(params.cells_per_degree) + double(params.southern_edge))*(M_PI/180.);
     //southern edge of the domain in degrees, plus the number of cells up
     //from this location/the number of cells per degree, converted to radians.
 
@@ -438,32 +388,26 @@ void cell_size_area(Parameters &params, ArrayPack &arp){
     //latitude_radians is now the latitude in radians.
 
     //latitude at the southern edge of a cell (subtract half a cell):
-    double latitude_radians_S  = ((float(j) - 0.5)\
-      /float(params.cells_per_degree)+float(params.southern_edge))*(M_PI/180.);
+    double latitude_radians_S  = ((double(j) - 0.5)  /double(params.cells_per_degree)+double(params.southern_edge))*(M_PI/180.);
     //latitude at the northern edge of a cell (add half a cell):
-    double latitude_radians_N  = ((float(j) + 0.5)\
-      /float(params.cells_per_degree)+float(params.southern_edge))*(M_PI/180.);
+    double latitude_radians_N  = ((double(j) + 0.5)  /double(params.cells_per_degree)+double(params.southern_edge))*(M_PI/180.);
 
     //distance between lines of longitude varies with latitude.
     //This is the distance at the centre of a cell for a given latitude:
-    arp.cellsize_e_w_metres[j] = earth_radius* \
-    std::cos(arp.latitude_radians[j])*(M_PI/180.)/float(params.cells_per_degree);
 
     //distance at the northern edge of the cell for the given latitude:
-    arp.cellsize_e_w_metres_N[j] = earth_radius* \
-    std::cos(latitude_radians_N)*(M_PI/180.)/float(params.cells_per_degree);
+    arp.cellsize_e_w_metres_N[j] = earth_radius* std::cos(latitude_radians_N)*(M_PI/180.)/double(params.cells_per_degree);
     //distance at the southern edge of the cell for the given latitude:
-    arp.cellsize_e_w_metres_S[j] = earth_radius* \
-    std::cos(latitude_radians_S)*(M_PI/180.)/float(params.cells_per_degree);
+    arp.cellsize_e_w_metres_S[j] = earth_radius* std::cos(latitude_radians_S)*(M_PI/180.)/double(params.cells_per_degree);
 
+    arp.cellsize_e_w_metres[j] = (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j])/2.;
     //cell area computed as a trapezoid, using unchanging north-south distance,
     //and east-west distances at the northern and southern edges of the cell:
-    arp.cell_area[j] = float(params.cellsize_n_s_metres)* \
-    (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j])/2.;
+    arp.cell_area[j] = (params.cellsize_n_s_metres)* arp.cellsize_e_w_metres[j];
 
     if(arp.cell_area[j] < 0)
       std::cout<<"how can this be? ns size "<<params.cellsize_n_s_metres<<" ew size N "<<arp.cellsize_e_w_metres_N[j]<<" ew size S "<<arp.cellsize_e_w_metres_S[j]<<" area "<<arp.cell_area[j]<<std::endl;
-//TODO: see which, if any, arrays can be cleared after use to free up memory.
+    //TODO: see which, if any, arrays can be cleared after use to free up memory.
     //How to do this?
   }
 }
@@ -480,7 +424,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   arp.porosity = rd::Array2D<float>(params.surfdatadir + params.region + \
   "porosity.tif");
 
-  arp.effective_storativity = arp.porosity;
+  arp.effective_storativity = rd::Array2D<double>(arp.topo,0.);
   //Set arrays that start off with zero or other values,
   //that are not imported files. Just to initialise these -
   //we'll add the appropriate values later.
@@ -491,7 +435,6 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   arp.wtd_mid            = arp.wtd;
 
   arp.runoff             = rd::Array2D<double>(arp.ksat,0);
-  arp.head               = rd::Array2D<double>(arp.ksat,0);
 
   //These are used to see how much change occurred in infiltration
   //and updating lakes portions of the code. Just informational.
@@ -499,12 +442,6 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 
   arp.rech               = rd::Array2D<double>(arp.ksat,0);
   arp.transmissivity     = rd::Array2D<double>(arp.ksat,0);
-  arp.temp_T     = rd::Array2D<double>(arp.ksat,0);
-
-
-  //This array is used to store the values of how much the water table will
-  //change in one iteration, then adding it to wtd gets the new wtd.
-  arp.wtd_changed        = rd::Array2D<double>(arp.ksat,0.0f);
 
   //These are populated during the calculation of the depression hierarchy:
   arp.label              = rd::Array2D<dh_label_t>   \
@@ -540,16 +477,13 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
     if(arp.land_mask(i) == 0 ){//|| arp.ice_mask(i) ==1){
       arp.wtd  (i) = 0.;
       arp.wtd_T  (i) = 0.;
-            arp.wtd_T_iteration  (i) = 0.;
-                        arp.my_last_wtd  (i) = 0.;
-                        arp.my_prev_wtd  (i) = 0.;
-                        arp.original_wtd  (i) = 0.;
-
-
+      arp.wtd_T_iteration  (i) = 0.;
+      arp.original_wtd  (i) = 0.;
+      arp.topo(i) = 0.;
     }
   }
 
-//Label the ocean cells. This is a precondition for
+  //Label the ocean cells. This is a precondition for
   //using `GetDepressionHierarchy()`.
   #pragma omp parallel for
   for(unsigned int i=0;i<arp.label.size();i++){

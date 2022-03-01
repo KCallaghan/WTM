@@ -55,19 +55,6 @@ public:
     double    total_loss_to_ocean  = 0.;
     double    wtd_sum              = 0.;
 
-
-
-
-      float s_big = 500;
-      float s_medium = 10;
-      float s_small = 2;
-      float s_tiny = 1;
-      float s_itsy = 0.2;
-      float s_bitsy = 0.05;
-      float s_between = 0.02;
-      float s_spider = 0.001;
-
-
     //Set for convenience within the code
     int32_t ncells_x  = -1;
     int32_t ncells_y  = -1;

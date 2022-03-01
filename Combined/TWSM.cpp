@@ -20,7 +20,6 @@ void initialise(Parameters &params, ArrayPack &arp){
     //these change with latitude:
     cell_size_area(params,arp);
     textfile<<"computed distances, areas, and latitudes"<<std::endl;
-
     //finalise some setup for runoff, labels, etc that is the
     //same for both run types.
     InitialiseBoth(params,arp);
@@ -32,7 +31,6 @@ void initialise(Parameters &params, ArrayPack &arp){
     //these change with latitude:
     cell_size_area(params,arp);
     textfile<<"computed distances, areas, and latitudes"<<std::endl;
-
     //finalise some setup for runoff, labels, etc that is the
     //same for both run types.
     InitialiseBoth(params,arp);
@@ -51,9 +49,10 @@ void initialise(Parameters &params, ArrayPack &arp){
   }
 
   arp.check();
+
+  textfile<<"Cycles_done Total_wtd_change Change_in_GW_only Change_in_SW_only absolute_value_total_wtd_change abs_change_in_GW abs_change_in_SW change_in_infiltration total_recharge_added total_loss_to_ocean sum_of_water_tables "<<std::endl;
   textfile.close();
 }
-
 
 
 template<class elev_t>
@@ -65,9 +64,6 @@ void update(
   richdem::Timer timer_overall;
   timer_overall.start();
 
-  ofstream textfile;
-  textfile.open (params.textfilename, std::ios_base::app);
-
   if(params.run_type == "transient"){
     UpdateTransientArrays(params,arp);
     //linear interpolation of input data from start to end times.
@@ -77,16 +73,11 @@ void update(
     //since the topography is changing.
   }
 
-  textfile<<"Cycles done: "<<params.cycles_done<<std::endl;
-
   //TODO: How should equilibrium know when to exit?
   if((params.cycles_done % 10) == 0){
-    textfile<<"saving partway result."<<std::endl;
-    //arp.wtd.printAll();
     string cycles_str = to_string(params.cycles_done);
     arp.wtd.saveGDAL(params.outfilename + cycles_str +".tif");
-
-    //Save the output every 100 iterations, under a new filename
+    //Save the output every x iterations, under a new filename
     //so we can compare how the water table has changed through time.
   }
 
@@ -111,10 +102,8 @@ void update(
   // AW: unless this IS what Kerry intended...
   int iter_count = 0;
   while(iter_count++ < params.maxiter){
-
     FanDarcyGroundwater::update(params, arp);
   }
-
 
   now = time(0);
   dt = ctime(&now);
@@ -132,13 +121,10 @@ void update(
     richdem::Timer fsm_timer;
     fsm_timer.start();
 
-    std::cout<<"before FSM "<<arp.wtd(25,25)<<" "<<arp.wtd(25,75)<<std::endl;
+    dh::FillSpillMerge(params,deps,arp);
 
-  //  dh::FillSpillMerge(params,deps,arp);
-std::cout<<"after FSM "<<arp.wtd(25,25)<<" "<<arp.wtd(25,75)<<std::endl;
     now = time(0);
     dt = ctime(&now);
-
     std::cerr << "t FSM time = " << fsm_timer.lap() << std::endl;
     std::cerr << "After FSM time: " << dt << std::endl;
   }
@@ -152,7 +138,6 @@ std::cout<<"after FSM "<<arp.wtd(25,25)<<" "<<arp.wtd(25,75)<<std::endl;
   // at these locations.
   richdem::Timer evaporation_timer;
   evaporation_timer.start();
-  // evaporation_update(params,arp);
   
   // Evap mode 1: Use the computed open-water evaporation rate
   if(params.evap_mode){
@@ -160,11 +145,11 @@ std::cout<<"after FSM "<<arp.wtd(25,25)<<" "<<arp.wtd(25,75)<<std::endl;
     #pragma omp parallel for
     for(unsigned int i=0;i<arp.topo.size();i++){
       if(arp.wtd(i)>0)  //if there is surface water present
-        arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
+        arp.rech(i) = static_cast<double>(arp.precip(i)) - static_cast<double>(arp.open_water_evap(i));
       else{              //water table is below the surface
-        arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
+        arp.rech(i) = static_cast<double>(arp.precip(i)) - static_cast<double>(arp.starting_evap(i));
         if(arp.rech(i) <0)    //Recharge is always positive.
-          arp.rech(i) = 0.0f;
+          arp.rech(i) = 0.;
       }
     }
   }
@@ -244,11 +229,6 @@ int main(int argc, char **argv){
   std::cerr<<"Argv"<<argv<<std::endl;
   Parameters params(argv[1]);
 
- // PetscErrorCode ierr;
-
- // ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
-
-std::cout<<"initialised petsc"<<std::endl;
   initialise(params,arp);
   run(params,arp);
   finalise(params, arp);

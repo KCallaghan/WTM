@@ -17,26 +17,19 @@ class ArrayPack {
  public:
 
   f2d porosity;
-  f2d effective_storativity;
+  d2d effective_storativity;
   f2d land_mask;
   f2d ice_mask;
-  d2d nope;
-  d2d initial_T;
   d2d scalar_array_x;
   d2d scalar_array_y;
-  d2d scalar_array_x_half;
-  d2d scalar_array_y_half;
 
   f2d ksat;
   f2d vert_ksat;
 
-  d2d head;
   d2d transmissivity;
-  d2d temp_T;
 
   f2d topo_start;
   f2d topo_end;
-
   f2d topo;
 
   d2d runoff;
@@ -67,11 +60,8 @@ class ArrayPack {
   d2d wtd;
   d2d wtd_mid;
   d2d wtd_old;
-  d2d wtd_changed;
   d2d wtd_T;
   d2d wtd_T_iteration;
-  d2d my_last_wtd;
-  d2d my_prev_wtd;
   d2d original_wtd;
 
   dh_label_t flowdir_t;
