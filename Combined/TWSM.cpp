@@ -1,10 +1,5 @@
 #include "irf.cpp"
-//#include "petscksp.h"
-
 #include <richdem/common/timer.hpp>
-
-
-static char help[] = "Solves a tridiagonal linear system with KSP.\n\n";
 
 
 void initialise(Parameters &params, ArrayPack &arp){
@@ -50,6 +45,7 @@ void initialise(Parameters &params, ArrayPack &arp){
 
   arp.check();
 
+  //Print column headings to textfile to match data that will be printed after each time step.
   textfile<<"Cycles_done Total_wtd_change Change_in_GW_only Change_in_SW_only absolute_value_total_wtd_change abs_change_in_GW abs_change_in_SW change_in_infiltration total_recharge_added total_loss_to_ocean sum_of_water_tables "<<std::endl;
   textfile.close();
 }
@@ -98,8 +94,9 @@ void update(
   time_groundwater.start();
 
 
-  // AW: Let's rename these to be inner time steps instead of just iterations
-  // AW: unless this IS what Kerry intended...
+  // These iterations refer to how many times to repeat the time step within the groundwater
+  // portion of code before running FSM. For example, 1 year GW then FSM could also be run as
+  // 2x 6 months GW then FSM.
   int iter_count = 0;
   while(iter_count++ < params.maxiter){
     FanDarcyGroundwater::update(params, arp);

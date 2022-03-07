@@ -30,8 +30,8 @@ public:
 
     bool infiltration_on;
     bool supplied_wt;
-    bool evap_mode            = 1; // Default potential evaporation
-    bool fsm_on               = 1; // Default surface water on
+    bool evap_mode                 = 1; // Default potential evaporation
+    bool fsm_on                    = 1; // Default surface water on
 
     double    deltat               = std::numeric_limits<double>::signaling_NaN();
     double    fdepth_a             = 0.;

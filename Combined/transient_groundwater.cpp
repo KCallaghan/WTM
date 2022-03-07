@@ -1,16 +1,14 @@
-#include <eigen3/Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
-#include <eigen3/Eigen/Core>
-#include <algorithm>
-#include <chrono>
-#include <thread>
-#include "transient_groundwater.hpp"
-#include "mat_mult.cpp"
 #include "add_recharge.hpp"
+#include "mat_mult.cpp"
+#include "transient_groundwater.hpp"
 
 using namespace Eigen;
 
 typedef Eigen::SparseMatrix<double,RowMajor> SpMat; // declares a row-major sparse matrix type of double
 typedef Eigen::Triplet<double> T;  // used to populate the matrices
+
+const double solver_tolerance_value = 0.00001;
+const double seconds_in_a_year = 31536000.;
 
 ///////////////////////
 // PRIVATE FUNCTIONS //
@@ -62,7 +60,11 @@ void updateTransmissivity(
 
 
 
-
+// The midpoint method consists of two main steps.
+// In the first step, we compute water tables at the time that is *half* of the full time-step.
+// To do so, we use an implicit backward-difference Euler method.
+// Using these half-time water tables, we compute the new transmissivity values
+// That will be used in the second step of the midpoint method below.
 void first_half(const Parameters &params,ArrayPack &arp){
 
   std::vector<T> coefficients;
@@ -71,6 +73,11 @@ void first_half(const Parameters &params,ArrayPack &arp){
   Eigen::VectorXd guess(params.ncells_x*params.ncells_y);
   SpMat A(params.ncells_x*params.ncells_y,params.ncells_x*params.ncells_y);
 
+
+  //We need to solve the vector-matrix equation Ax=b.
+  //b consists of the current head values (i.e. water table depth + topography)
+  //We also populate a 'guess', which consists of a water table (wtd_T) that in later iterations
+  //has already been modified for changing transmissivity closer to the final answer.
   #pragma omp parallel for collapse(2)
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y; y++){
@@ -80,7 +87,7 @@ void first_half(const Parameters &params,ArrayPack &arp){
   }
 
   double entry;
-  int main_loc = 0;
+  int main_loc = 0; //the cell to populate in the A matrix.
 
   //HALFWAY SOLVE
   //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
@@ -118,7 +125,7 @@ void first_half(const Parameters &params,ArrayPack &arp){
 
   // Biconjugate gradient solver with guess
   Eigen::BiCGSTAB<SpMat> solver;
-  solver.setTolerance(0.00001);
+  solver.setTolerance(solver_tolerance_value);
   //NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means that BiCGSTAB will not run in parallel. It is faster without.
 
   std::cout<<"compute"<<std::endl;
@@ -145,7 +152,9 @@ void first_half(const Parameters &params,ArrayPack &arp){
 
 
 
-
+// In the second step of the midpoint method, we use the transmissivity values
+// obtained after the calculation in the first step above.
+// We then compute the new water table depths after a full time-step has passed.
 void second_half(Parameters &params,ArrayPack &arp){
 
   std::vector<T> coefficients_A;
@@ -157,7 +166,10 @@ void second_half(Parameters &params,ArrayPack &arp){
   Eigen::VectorXd vec_x(params.ncells_x*params.ncells_y);
   Eigen::VectorXd guess(params.ncells_x*params.ncells_y);
 
-
+  //We need to solve the vector-matrix equation Ax=Bb.
+  //b consists of the current head values (i.e. water table depth + topography)
+  //We also populate a 'guess', which consists of a water table (wtd_T) that
+  //has already been modified for changing transmissivity closer to the final answer.
   #pragma omp parallel for collapse(2)
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y; y++){
@@ -220,7 +232,7 @@ void second_half(Parameters &params,ArrayPack &arp){
     for(int y=0;y<params.ncells_y;y++)
     for(int x=0;x<params.ncells_x; x++){
       if(arp.land_mask(x,y) == 1){        //skip ocean cells
-        double rech_change = arp.rech(x,y)/31536000. * params.deltat;
+        double rech_change = arp.rech(x,y)/seconds_in_a_year * params.deltat;
         params.total_added_recharge += rech_change*arp.cell_area[y];
         if(arp.original_wtd(x,y) >= 0){          //there was surface water, so recharge may be negative
           b(y+(x*params.ncells_y)) += rech_change;
@@ -250,7 +262,7 @@ void second_half(Parameters &params,ArrayPack &arp){
 
   // Biconjugate gradient solver with guess
   Eigen::BiCGSTAB<SpMat> solver;
-  solver.setTolerance(0.00001);
+  solver.setTolerance(solver_tolerance_value);
   //NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means that BiCGSTAB will not run in parallel. It is faster without.
 
   std::cout<<"compute"<<std::endl;
@@ -331,6 +343,7 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
   // Picard iteration through solver
   params.x_partial = params.deltat/(params.cellsize_n_s_metres*params.cellsize_n_s_metres);
   double ocean_T = 0.000001 * (1.5 + 25.); //some constant for all T values in ocean - TODO look up representative values
+  //this assumes a ksat of 0.000001 and an e-folding depth of 25. 1.5 is a standard value based on the shallow depths to which soil textures are known.
 
   std::cout<<"create some needed arrays "<<std::endl;
 
