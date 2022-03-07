@@ -1,6 +1,7 @@
 #include "add_recharge.hpp"
 #include "mat_mult.cpp"
 #include "transient_groundwater.hpp"
+#include "update_effective_storativity.hpp"
 
 using namespace Eigen;
 
@@ -289,47 +290,6 @@ void second_half(Parameters &params,ArrayPack &arp){
 }
 
 
-
-//Deal with the fact that porosity is 1 above ground but [value] below ground. It is included directly in the matrix calculation,
-//so we can't just scale water change before or after. Instead, we are scaling the effective storativity according to how much
-//change in water table we are projecting to see during that time step.
-void updateEffectiveStorativity(const Parameters &params,ArrayPack &arp){
-  for(int y=0;y<params.ncells_y;y++)
-  for(int x=0;x<params.ncells_x; x++){
-    if(arp.land_mask(x,y) != 0.f){
-      double projected_full_step_wtd = arp.original_wtd(x,y) + (arp.wtd_T(x,y) - arp.original_wtd(x,y))*2.;
-      if(arp.original_wtd(x,y) <= 0. && projected_full_step_wtd <= 0.) //both are below ground, so we can use the original porosity
-        arp.effective_storativity(x,y) = static_cast<double>(arp.porosity(x,y));
-      else if(arp.original_wtd(x,y) >= 0. && projected_full_step_wtd >= 0.) //both are above ground, so the porosity is 1
-        arp.effective_storativity(x,y) = 1.;
-      else{
-        double change_in_water_column_thickness = std::abs(projected_full_step_wtd - arp.original_wtd(x,y));
-        if(arp.original_wtd(x,y) < 0. && projected_full_step_wtd > 0.){ //started below ground and ended above ground
-          // First, scale the change in wtd as if the whole column has the porosity of the belowground area
-          double scaled_change_in_water_column_thickness = change_in_water_column_thickness * arp.effective_storativity(x,y)/static_cast<double>(arp.porosity(x,y));
-          // Then get just that portion that is >0 (aboveground), and scale it back down to the equivalent thickness with 100% porosity (surface water)
-          double aboveground_water_column_thickness = (scaled_change_in_water_column_thickness + arp.original_wtd(x,y)) * arp.effective_storativity(x,y);//Above-ground effective porosity is ==1, so no need to actually divide by 1 here (save on computation).
-          //belowground water column thickness is equal to -original_wtd, so no need to assign it to a new variable.
-          arp.effective_storativity(x,y) = (aboveground_water_column_thickness + static_cast<double>(arp.porosity(x,y))*-arp.original_wtd(x,y)) / (aboveground_water_column_thickness - arp.original_wtd(x,y));
-        }
-        else if(arp.original_wtd(x,y) > 0. && projected_full_step_wtd < 0.){ //started above ground and ended below ground
-          double scaled_change_in_water_column_thickness = change_in_water_column_thickness * arp.effective_storativity(x,y); //divided by 1 for above-ground porosity
-          if(scaled_change_in_water_column_thickness < projected_full_step_wtd){  //when rescaling the water according to the porosity values, there is no longer enough to reach below ground; so the scaled new porosity will be = 1
-            arp.effective_storativity(x,y) = 1;
-          }
-          else{
-            // Get the belowground water thickness and expand it to a deeper depth in order to account for changing porosity
-            double belowground_water_column_thickness = (scaled_change_in_water_column_thickness - arp.original_wtd(x,y)) * arp.effective_storativity(x,y)/static_cast<double>(arp.porosity(x,y));
-            arp.effective_storativity(x,y) = (arp.original_wtd(x,y) + static_cast<double>(arp.porosity(x,y))*belowground_water_column_thickness) / (arp.original_wtd(x,y) + belowground_water_column_thickness);
-          }
-        }
-      }
-    }
-  }
-}
-
-
-
 //////////////////////
 // PUBLIC FUNCTIONS //
 //////////////////////
@@ -391,7 +351,11 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
     std::cout<<"first_half: " << std::endl;
     first_half(params,arp);
     //update the effective storativity to use during the next iteration of the first half:
-    updateEffectiveStorativity(params,arp);
+    for(int y=0;y<params.ncells_y;y++)
+    for(int x=0;x<params.ncells_x; x++){
+      if(arp.land_mask(x,y) != 0.f)
+        arp.effective_storativity(x,y) = updateEffectiveStorativity(arp.original_wtd(x,y),arp.wtd_T(x,y), arp.porosity(x,y), arp.effective_storativity(x,y));
+    }
   }
 
 
