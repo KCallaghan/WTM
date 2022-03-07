@@ -4,7 +4,8 @@ project(TWSM LANGUAGES CXX)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-set(CMAKE_CXX_FLAGS_RELTESTING "-O3 -g -Wall -pedantic")
+set(CMAKE_CXX_FLAGS_RELTESTING "-O3 -g -Wall -Wextra -pedantic")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -Wall -Wextra -pedantic")
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
@@ -48,4 +49,3 @@ else()
   message(WARNING "GDAL is needed to build some of the FSM performance tests and example programs; it is not needed to use the FSM library in another project.")
   message(WARNING "Without GDAL, the WTM *will not build*.")
 endif()
-
