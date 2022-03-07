@@ -32,7 +32,7 @@ double depthIntegratedTransmissivity(
     // also seems an okay thing to do in this case.
     return 0;
   } else if(wtd_T < -shallow){ // Equation S6 from the Fan paper
-    return std::max(0.0,fdepth * ksat  * std::exp((wtd_T + shallow)/fdepth));
+    return std::max(0.0,fdepth * ksat * std::exp((wtd_T + shallow)/fdepth));
   } else if(wtd_T > 0){
     // If wtd_T is greater than 0, max out rate of groundwater movement
     // as though wtd_T were 0. The surface water will get to move in
@@ -52,8 +52,10 @@ void updateTransmissivity(
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
     if(arp.land_mask(x,y) != 0.f){
-        double my_last_wtd = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
-        arp.transmissivity(x,y) = depthIntegratedTransmissivity(my_last_wtd, arp.fdepth(x,y), static_cast<double>(arp.ksat(x,y)));
+        const double my_last_wtd = (arp.wtd_T(x,y) + arp.wtd_T_iteration(x,y))/2.;
+        arp.transmissivity(x,y) = depthIntegratedTransmissivity(
+          my_last_wtd, arp.fdepth(x,y), static_cast<double>(arp.ksat(x,y))
+        );
     }
   }
 }
@@ -232,13 +234,13 @@ void second_half(Parameters &params,ArrayPack &arp){
     for(int y=0;y<params.ncells_y;y++)
     for(int x=0;x<params.ncells_x; x++){
       if(arp.land_mask(x,y) == 1){        //skip ocean cells
-        double rech_change = arp.rech(x,y)/seconds_in_a_year * params.deltat;
+        const double rech_change = arp.rech(x,y)/seconds_in_a_year * params.deltat;
         params.total_added_recharge += rech_change*arp.cell_area[y];
         if(arp.original_wtd(x,y) >= 0){          //there was surface water, so recharge may be negative
           b(y+(x*params.ncells_y)) += rech_change;
           guess(y+(x*params.ncells_y)) += rech_change;
           if(arp.original_wtd(x,y) + rech_change <0){
-            double temp = -(arp.original_wtd(x,y) + rech_change);
+            const double temp = -(arp.original_wtd(x,y) + rech_change);
             b(y+(x*params.ncells_y)) += temp;
             guess(y+(x*params.ncells_y)) += temp;
             params.total_added_recharge += temp*arp.cell_area[y];  //in this scenario, there has been a negative amount of recharge, so temp here will be positive and remove the extra amount that was spuriously subtracted.
@@ -251,7 +253,7 @@ void second_half(Parameters &params,ArrayPack &arp){
             guess(y+(x*params.ncells_y)) += rech_change/static_cast<double>(arp.porosity(x,y));
           }
           else{
-            double temp = ( rech_change - GW_space) - arp.original_wtd(x,y);
+            const double temp = ( rech_change - GW_space) - arp.original_wtd(x,y);
             b(y+(x*params.ncells_y)) += temp;
             guess(y+(x*params.ncells_y)) += temp;
           }
@@ -301,7 +303,7 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
 
   // Picard iteration through solver
   params.x_partial = params.deltat/(params.cellsize_n_s_metres*params.cellsize_n_s_metres);
-  double ocean_T = 0.000001 * (1.5 + 25.); //some constant for all T values in ocean - TODO look up representative values
+  constexpr double ocean_T = 0.000001 * (1.5 + 25.); //some constant for all T values in ocean - TODO look up representative values
   //this assumes a ksat of 0.000001 and an e-folding depth of 25. 1.5 is a standard value based on the shallow depths to which soil textures are known.
 
   std::cout<<"create some needed arrays "<<std::endl;
