@@ -1,5 +1,4 @@
 #include "add_recharge.hpp"
-#include "mat_mult.cpp"
 #include "transient_groundwater.hpp"
 #include "update_effective_storativity.hpp"
 
