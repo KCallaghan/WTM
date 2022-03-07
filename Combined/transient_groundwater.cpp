@@ -7,8 +7,8 @@ using namespace Eigen;
 typedef Eigen::SparseMatrix<double,RowMajor> SpMat; // declares a row-major sparse matrix type of double
 typedef Eigen::Triplet<double> T;  // used to populate the matrices
 
-const double solver_tolerance_value = 0.00001;
-const double seconds_in_a_year = 31536000.;
+constexpr double solver_tolerance_value = 0.00001;
+constexpr double seconds_in_a_year = 31536000.;
 
 ///////////////////////
 // PRIVATE FUNCTIONS //
