@@ -36,15 +36,6 @@ if(USE_GDAL AND GDAL_FOUND)
   add_sanitizers(twsm.x)
 
 
-  add_executable(unittests.x
-    Combined/test_main.cpp
-    Combined/transient_groundwater.cpp
-  )
-  target_link_libraries(unittests.x PRIVATE richdem OpenMP::OpenMP_CXX)
-  target_compile_features(unittests.x PRIVATE cxx_std_17)
-
-
-
   add_executable(dephier.x
     Combined/run_dephier.cpp
     Combined/parameters.cpp
@@ -57,12 +48,4 @@ else()
   message(WARNING "GDAL is needed to build some of the FSM performance tests and example programs; it is not needed to use the FSM library in another project.")
   message(WARNING "Without GDAL, the WTM *will not build*.")
 endif()
-
-add_executable(fsm_unittests.exe
-  Combined/test_main.cpp
-)
-target_link_libraries(fsm_unittests.exe PRIVATE richdem OpenMP::OpenMP_CXX)
-target_compile_features(fsm_unittests.exe PUBLIC cxx_auto_type cxx_std_17)
-
-
 
