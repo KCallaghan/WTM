@@ -50,10 +50,10 @@ int main(int argc, char **argv){
   params.time_start + "_mask.tif");
 
 
-//  arp.topo          = LoadData<float>(params.surfdatadir + params.region \
-  + params.time_start + "_topo.nc",    "value");
-//  arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region + \
-  params.time_start + "_mask.nc",   "value");
+//  arp.topo          = LoadData<float>(params.surfdatadir + params.region
+//  + params.time_start + "_topo.nc",    "value");
+//  arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region +
+//  params.time_start + "_mask.nc",   "value");
 
 //width and height in number of cells in the array
   params.ncells_x = arp.topo.width();

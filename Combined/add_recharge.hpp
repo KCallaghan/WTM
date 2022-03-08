@@ -3,7 +3,7 @@
 
 //Method for adding recharge where porosity does not change with depth:
 double add_recharge(const double deltat, const double my_rech, double my_wtd, const int my_mask, const double my_porosity){
-  const double seconds_in_a_year = 31536000.;
+  constexpr double seconds_in_a_year = 31536000.;
 
   double rech_change = my_rech/seconds_in_a_year * deltat;
 
