@@ -46,7 +46,7 @@ double depthIntegratedTransmissivity(
 
 //update the entire transmissivity array
 void updateTransmissivity(
-  Parameters &params,ArrayPack &arp
+  Parameters &params, ArrayPack &arp
 ){
   #pragma omp parallel for collapse(2)
   for(int y=0;y<params.ncells_y;y++)
@@ -295,8 +295,8 @@ void second_half(Parameters &params,ArrayPack &arp){
 
 
   #pragma omp parallel for collapse(2)
-  for(int x=0;x<params.ncells_x; x++)
-  for(int y=0;y<params.ncells_y;y++){
+  for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x;x++){
   //copy result into the wtd array:
     arp.wtd(x,y) = vec_x(y+(x*params.ncells_y)) - static_cast<double>(arp.topo(x,y));
   }
@@ -323,7 +323,7 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
 
   //no pragma because we're editing params.total_loss_to_ocean
   for(int y=0;y<params.ncells_y;y++)
-  for(int x=0;x<params.ncells_x; x++){
+  for(int x=0;x<params.ncells_x;x++){
     if(arp.land_mask(x,y) == 0.f){
       params.total_loss_to_ocean += arp.wtd(x,y)*arp.cell_area[y];
       arp.wtd(x,y) = 0.;
@@ -336,7 +336,7 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
   //set the scalar arrays for x and y directions
   #pragma omp parallel for collapse(2)
   for(int y=0;y<params.ncells_y;y++)
-  for(int x=0;x<params.ncells_x; x++){
+  for(int x=0;x<params.ncells_x;x++){
     if(arp.land_mask(x,y) == 0.f){
       arp.transmissivity(x,y) = ocean_T;
       arp.wtd_T(x,y) = 0.;
@@ -366,7 +366,7 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
     first_half(params,arp);
     //update the effective storativity to use during the next iteration of the first half:
     for(int y=0;y<params.ncells_y;y++)
-    for(int x=0;x<params.ncells_x; x++){
+    for(int x=0;x<params.ncells_x;x++){
       if(arp.land_mask(x,y) != 0.f)
         arp.effective_storativity(x,y) = updateEffectiveStorativity(arp.original_wtd(x,y),arp.wtd_T(x,y), arp.porosity(x,y), arp.effective_storativity(x,y));
     }
@@ -376,7 +376,7 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
   //get the final T for the halfway point
   #pragma omp parallel for collapse(2)
   for(int y=0;y<params.ncells_y;y++)
-  for(int x=0;x<params.ncells_x; x++){
+  for(int x=0;x<params.ncells_x;x++){
     if(arp.land_mask(x,y) != 0.f){
       arp.transmissivity(x,y) = depthIntegratedTransmissivity(arp.wtd_T(x,y), arp.fdepth(x,y), static_cast<double>(arp.ksat(x,y)));
     }
@@ -390,7 +390,7 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
 
 
   for(int y=0;y<params.ncells_y;y++)
-  for(int x=0;x<params.ncells_x; x++){
+  for(int x=0;x<params.ncells_x;x++){
     if(arp.land_mask(x,y) == 0.f){
       params.total_loss_to_ocean += arp.wtd(x,y)*arp.cell_area[y];
       arp.wtd(x,y) = 0.;
