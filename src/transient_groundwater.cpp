@@ -346,7 +346,7 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
     }
     else{
       arp.original_wtd(x,y) = arp.wtd(x,y);
-      arp.wtd(x,y) = add_recharge(params.deltat/2., arp.rech(x,y), arp.wtd(x,y), arp.land_mask(x,y), static_cast<double>(arp.porosity(x,y))); //use regular porosity for adding recharge since this checks for underground space within add_recharge.
+      arp.wtd(x,y) = add_recharge(params.deltat/2., arp.rech(x,y), arp.wtd(x,y), static_cast<double>(arp.porosity(x,y))); //use regular porosity for adding recharge since this checks for underground space within add_recharge.
       arp.wtd_T(x,y) = arp.wtd(x,y);
       arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
 
