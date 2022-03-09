@@ -26,10 +26,10 @@ add_subdirectory(common/richdem EXCLUDE_FROM_ALL)
 
 if(USE_GDAL AND GDAL_FOUND)
   add_executable(twsm.x
-    Combined/ArrayPack.cpp
-    Combined/parameters.cpp
-    Combined/transient_groundwater.cpp
-    Combined/TWSM.cpp
+    src/ArrayPack.cpp
+    src/parameters.cpp
+    src/transient_groundwater.cpp
+    src/TWSM.cpp
   )
   target_link_libraries(twsm.x PRIVATE richdem OpenMP::OpenMP_CXX)
   target_compile_features(twsm.x PRIVATE cxx_std_17)
@@ -38,9 +38,9 @@ if(USE_GDAL AND GDAL_FOUND)
 
 
   add_executable(dephier.x
-    Combined/run_dephier.cpp
-    Combined/parameters.cpp
-    Combined/ArrayPack.cpp
+    src/run_dephier.cpp
+    src/parameters.cpp
+    src/ArrayPack.cpp
   )
   target_link_libraries(dephier.x PRIVATE richdem OpenMP::OpenMP_CXX)
   target_compile_features(dephier.x PRIVATE cxx_std_17)
