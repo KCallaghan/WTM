@@ -16,13 +16,13 @@ public:
     int32_t iterations = -1;
     int32_t maxiter    = -1;
 
-    std::string outfilename  = UNINIT_STR;
-    std::string region       = UNINIT_STR;
-    std::string run_type     = UNINIT_STR;
-    std::string surfdatadir  = UNINIT_STR;
-    std::string textfilename = UNINIT_STR;
-    std::string time_start   = UNINIT_STR;
-    std::string time_end     = UNINIT_STR;
+    std::string outfile_prefix  = UNINIT_STR;
+    std::string region          = UNINIT_STR;
+    std::string run_type        = UNINIT_STR;
+    std::string surfdatadir     = UNINIT_STR;
+    std::string textfilename    = UNINIT_STR;
+    std::string time_start      = UNINIT_STR;
+    std::string time_end        = UNINIT_STR;
 
     int16_t cells_per_degree = -1;
 

@@ -74,7 +74,7 @@ void update(
     string cycles_str = to_string(params.cycles_done);
     unsigned int number_of_zeros = to_string(params.total_cycles).length() - cycles_str.length(); // add zeros
     cycles_str.insert(0, number_of_zeros, '0');
-    arp.wtd.saveGDAL(params.outfilename + cycles_str +".tif");
+    arp.wtd.saveGDAL(params.outfile_prefix + cycles_str +".tif");
     //Save the output every x iterations, under a new filename
     //so we can compare how the water table has changed through time.
   }
@@ -208,7 +208,7 @@ void finalise(Parameters &params, ArrayPack &arp){
 
   textfile<<"done with processing"<<std::endl;
   string cycles_str = to_string(params.cycles_done);
-  arp.wtd.saveGDAL(params.outfilename + cycles_str +".tif");
+  arp.wtd.saveGDAL(params.outfile_prefix + cycles_str +".tif");
   //save the final answer for water table depth.
 
   textfile.close();
