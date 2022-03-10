@@ -36,7 +36,7 @@ Parameters::Parameters(const std::string config_file){
     else if(key=="fsm_on")             ss>>fsm_on;
     else if(key=="infiltration_on")    ss>>infiltration_on;
     else if(key=="maxiter")            ss>>maxiter;
-    else if(key=="outfilename")        ss>>outfilename;
+    else if(key=="outfile_prefix")     ss>>outfile_prefix;
     else if(key=="picard_iterations")  ss>>picard_iterations;
     else if(key=="region")             ss>>region;
     else if(key=="run_type")           ss>>run_type;
@@ -63,7 +63,7 @@ void Parameters::print() const {
   std::cout<<"c fsm_on           = "<<fsm_on           <<std::endl;
   std::cout<<"c infiltration_on  = "<<infiltration_on  <<std::endl;
   std::cout<<"c maxiter          = "<<maxiter          <<std::endl;
-  std::cout<<"c outfilename      = "<<outfilename      <<std::endl;
+  std::cout<<"c outfile_prefix   = "<<outfile_prefix   <<std::endl;
   std::cout<<"c picard_iterations= "<<picard_iterations<<std::endl;
   std::cout<<"c region           = "<<region           <<std::endl;
   std::cout<<"c run_type         = "<<run_type         <<std::endl;
