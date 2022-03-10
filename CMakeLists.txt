@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.9)
 
-project(TWSM LANGUAGES CXX)
+project(WTM LANGUAGES CXX)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -25,16 +25,16 @@ add_subdirectory(common/richdem EXCLUDE_FROM_ALL)
 
 
 if(USE_GDAL AND GDAL_FOUND)
-  add_executable(twsm.x
+  add_executable(wtm.x
     src/ArrayPack.cpp
     src/parameters.cpp
     src/transient_groundwater.cpp
-    src/TWSM.cpp
+    src/WTM.cpp
   )
-  target_link_libraries(twsm.x PRIVATE richdem OpenMP::OpenMP_CXX)
-  target_compile_features(twsm.x PRIVATE cxx_std_17)
-  target_compile_definitions(twsm.x PRIVATE DOCTEST_CONFIG_DISABLE)
-  add_sanitizers(twsm.x)
+  target_link_libraries(wtm.x PRIVATE richdem OpenMP::OpenMP_CXX)
+  target_compile_features(wtm.x PRIVATE cxx_std_17)
+  target_compile_definitions(wtm.x PRIVATE DOCTEST_CONFIG_DISABLE)
+  add_sanitizers(wtm.x)
 
 
   add_executable(dephier.x
