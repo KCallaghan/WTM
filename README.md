@@ -107,8 +107,8 @@ Once the configuration file has been set up appropriately, simply open a termina
 There will be some on-screen outputs to indicate the first steps through the code, after which values of interest will be output to the text file and an updated geoTiff output file will be saved every 100 iterations.
 
 ## Example of a full config file:
-
-textfilename       my_model_run.txt
+'''
+textfilename       my_model_run.txt     #The name of the output textfile, which will include printed values describing change in the water table. 
 
 outfile_prefix     my_model_run_        #An output file after 10 time steps will be named "my_model_run_0010.tif".
 
@@ -168,6 +168,7 @@ fsm_on             1                    # 1 to enable Fill-Spill-Merge for routi
 #If this is set to 0, all surface water will be removed from the domain. 
 
 evap_mode          1                    # 1 to use a grid of potential evaporation for lakes; 0 to remove all surface water.
+'''
 
 ## Outputs
 The program outputs a text file that provides information on the current minimum and maximum water table elevation, the changes in surface water and groundwater within the past iteration, and the number of iterations passed.
