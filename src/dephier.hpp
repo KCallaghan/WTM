@@ -30,8 +30,8 @@ namespace richdem::dephier {
 //2,147,483,647 depressions. This should be enough for most practical purposes.
 
 //Some special values
-const dh_label_t NO_PARENT = std::numeric_limits<dh_label_t>::max();
-const dh_label_t NO_VALUE  = std::numeric_limits<dh_label_t>::max();
+constexpr dh_label_t NO_PARENT = std::numeric_limits<dh_label_t>::max();
+constexpr dh_label_t NO_VALUE  = std::numeric_limits<dh_label_t>::max();
 
 //This class holds information about a depression. Its pit cell and outlet cell
 //(in flat-index form) as well as the elevations of these cells. It also notes
@@ -220,7 +220,7 @@ std::ostream& operator<<(std::ostream &out, const DepressionHierarchy<elev_t> &d
     stack.push_back(root);
     child_count.push_back( (dep.lchild!=NO_VALUE) + (dep.rchild!=NO_VALUE) + dep.ocean_linked.size() );
 
-    for(int i=0;i<depth;i++){
+    for(size_t i=0;i<depth;i++){
       if(child_count.at(i)>1 && i==depth-1)
         out<<(dep.ocean_parent?"╠═":"├─");
       else if(child_count.at(i)==1 && i==depth-1)
@@ -296,23 +296,11 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
 
 
   //A D4 or D8 topology can be used.
-  const int    *dx;
-  const int    *dy;
-  const int    *dinverse;
-  int     neighbours;
-  if(topo==Topology::D4){
-    dx         = d4x;
-    dy         = d4y;
-    dinverse   = d4_inverse;
-    neighbours = 4;
-  } else if(topo==Topology::D8){
-    dx         = d8x;
-    dy         = d8y;
-    dinverse   = d8_inverse;
-    neighbours = 8;
-  } else {
-    throw std::runtime_error("Unrecognised topology!");
-  }
+  static_assert(topo==Topology::D8 || topo==Topology::D4);
+  constexpr auto dx = get_dx_for_topology<topo>();
+  constexpr auto dy = get_dy_for_topology<topo>();
+  constexpr auto dinverse = get_dinverse_for_topology<topo>();
+  constexpr auto neighbours = get_nmax_for_topology<topo>();
 
   //Depressions are identified by a number [0,*). The ocean is always
   //"depression" 0. This vector holds the depressions.
@@ -339,7 +327,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //begin looking for depressions. We add all of these ocean cells to the
   //priority queue now.
   uint64_t ocean_cells = 0;
-  #pragma omp parallel for collapse(2) reduction(+:ocean_cells) reduction(merge:ocean_seeds)
+  #pragma omp parallel for default(none) shared(dem,dx,dy,label,neighbours) collapse(2) reduction(+:ocean_cells) reduction(merge:ocean_seeds)
   for(int y=0;y<dem.height();y++)
   for(int x=0;x<dem.width();x++){
     //Ensure the input only has OCEAN and NO_DEP labels.
@@ -393,7 +381,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   //finds and this shouldn't slow things down too much!
   int pit_cell_count = 0;
   progress.start(dem.size());
-  #pragma omp parallel for collapse(2) reduction(+:pit_cell_count) reduction(merge:land_seeds)
+  #pragma omp parallel for default(none) shared(dem,dx,dy,label,neighbours,progress) private(ocean_seeds) collapse(2) reduction(+:pit_cell_count) reduction(merge:land_seeds)
   for(int y=0;y<dem.height();y++)  //Look at all the cells
   for(int x=0;x<dem.width() ;x++){ //Yes, all of them
     ++progress;
@@ -902,7 +890,7 @@ void CalculateTotalVolumes(
 template<class elev_t>
 void LastLayer(rd::Array2D<dh_label_t> &label, const rd::Array2D<float> &dem, \
   const DepressionHierarchy<elev_t> &depressions){
-  #pragma omp parallel for collapse(2)
+  #pragma omp parallel for default(none) collapse(2)
   for(int y=0;y<label.height();y++)
   for(int x=0;x<label.width();x++){
     auto mylabel = label(x,y);

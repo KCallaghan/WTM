@@ -143,7 +143,7 @@ void update(
   // Evap mode 1: Use the computed open-water evaporation rate
   if(params.evap_mode){
     std::cout<<"updating the evaporation field"<<std::endl;
-    #pragma omp parallel for
+    #pragma omp parallel for default(none) shared(arp)
     for(unsigned int i=0;i<arp.topo.size();i++){
       if(arp.wtd(i)>0) {  //if there is surface water present
         arp.rech(i) = static_cast<double>(arp.precip(i)) - static_cast<double>(arp.open_water_evap(i));
@@ -159,7 +159,7 @@ void update(
   // Evap mode 0: remove all surface water (like Fan Reinfelder et al., 2013)
   else{
     std::cout<<"removing all surface water"<<std::endl;
-    #pragma omp parallel for
+    #pragma omp parallel for default(none) shared(arp)
     for(unsigned int i=0;i<arp.topo.size();i++){
       if(arp.wtd(i)>0) {  //if there is surface water present
         arp.wtd(i) = 0;   //use this option when testing GW component alone

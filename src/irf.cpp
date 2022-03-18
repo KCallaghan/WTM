@@ -313,17 +313,19 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
   }
 
   //get the starting runoff using precip and evap inputs:
-  #pragma omp parallel for
+  #pragma omp parallel for default(none) shared(arp)
   for(unsigned int i=0;i<arp.topo.size();i++){
     arp.rech(i) = (arp.precip(i)-arp.starting_evap(i));
-    if(arp.rech(i) <0)    //Recharge is always positive.
+    if(arp.rech(i) < 0) {    //Recharge is always positive.
       arp.rech(i) = 0.0f;
-    if(arp.porosity(i) <=0 )
+    }
+    if(arp.porosity(i) <=0 ) {
       arp.porosity(i) = 0.0000001; //not sure why it is sometimes processing cells with 0 porosity?
+    }
   }
 
   //Wtd is 0 in the ocean and under the ice:
-  #pragma omp parallel for
+  #pragma omp parallel for default(none) shared(arp)
   for(unsigned int i=0;i<arp.topo.size();i++){
     if(arp.land_mask(i) == 0){// || arp.ice_mask(i) == 1){
       arp.wtd  (i) = 0.;
@@ -336,7 +338,7 @@ void InitialiseTest(Parameters &params, ArrayPack &arp){
 
   //Label the ocean cells. This is a precondition for
   //using `GetDepressionHierarchy()`.
-  #pragma omp parallel for
+  #pragma omp parallel for default(none) shared(arp)
   for(unsigned int i=0;i<arp.label.size();i++){
     if(arp.land_mask(i) == 0){
       arp.label(i) = dh::OCEAN;
@@ -462,7 +464,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   }
 
 //get the starting runoff using precip and evap inputs:
-  #pragma omp parallel for
+  #pragma omp parallel for default(none) shared(arp)
   for(unsigned int i=0;i<arp.topo.size();i++){
     arp.rech(i) = (arp.precip(i)-arp.starting_evap(i));
     if(arp.rech(i) <0)    //Recharge is always positive.
@@ -472,7 +474,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
   }
 
 //Wtd is 0 in the ocean and under the ice:
-  #pragma omp parallel for
+  #pragma omp parallel for default(none) shared(arp)
   for(unsigned int i=0;i<arp.topo.size();i++){
     if(arp.land_mask(i) == 0 ){//|| arp.ice_mask(i) ==1){
       arp.wtd  (i) = 0.;
@@ -485,7 +487,7 @@ void InitialiseBoth(const Parameters &params, ArrayPack &arp){
 
   //Label the ocean cells. This is a precondition for
   //using `GetDepressionHierarchy()`.
-  #pragma omp parallel for
+  #pragma omp parallel for default(none) shared(arp)
   for(unsigned int i=0;i<arp.label.size();i++){
     if(arp.land_mask(i) == 0){
       arp.label(i) = dh::OCEAN;
@@ -536,7 +538,7 @@ void UpdateTransientArrays(const Parameters &params, ArrayPack &arp){
     arp.flowdirs(i)     = rd::NO_FLOW; //No cells flow anywhere
   }
 
-  #pragma omp parallel for
+  #pragma omp parallel for default(none) shared(arp)
   for(unsigned int i=0;i<arp.label.size();i++){
     if(arp.land_mask(i) == 0){
       arp.label(i) = dh::OCEAN;

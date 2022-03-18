@@ -21,8 +21,6 @@ using namespace std;
 namespace rd = richdem;
 namespace dh = richdem::dephier;
 
-constexpr double UNDEF  = -1.0e7;
-constexpr float OCEAN_LEVEL = -9999;
 constexpr double DEG_TO_RAD = M_PI/180.0;
 
 
@@ -132,14 +130,14 @@ int main(int argc, char **argv){
     (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j])/2;
 
 
-//TODO: see which, if any, arrays can be cleared after use to free up memory.
+    //TODO(kcallaghan): see which, if any, arrays can be cleared after use to free up memory.
     //How to do this?
   }
 
 
  //Label the ocean cells. This is a precondition for using
   //`GetDepressionHierarchy()`.
-  #pragma omp parallel for
+  #pragma omp parallel for default(none) shared(arp, final_label, label)
   for(unsigned int i=0;i<label.size();i++){
     if(arp.land_mask(i) == 0){
       label(i) = dh::OCEAN;

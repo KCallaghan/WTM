@@ -7,6 +7,13 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(CMAKE_CXX_FLAGS_RELTESTING "-O3 -g -Wall -Wextra -pedantic")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -Wall -Wextra -pedantic")
 
+# # TODO: Enable to perform many linting checks
+# set(CMAKE_CXX_CLANG_TIDY
+#         clang-tidy;
+#             # -header-filter=.*;
+#             -checks=*,-llvmlibc-restrict-system-libc-headers,-modernize-use-trailing-return-type,-llvmlibc-callee-namespace,-bugprone-branch-clone,-google-readability-namespace-comments,-llvm-namespace-comment,-llvmlibc-implementation-in-namespace,-readability-uppercase-literal-suffix,-readability-function-cognitive-complexity,-fuchsia-default-arguments-calls,-cppcoreguidelines-pro-bounds-array-to-pointer-decay,-hicpp-uppercase-literal-suffix,-hicpp-no-array-decay,-misc-unused-parameters;
+#             -warnings-as-errors=*;)
+
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)

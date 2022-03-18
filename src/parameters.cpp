@@ -75,5 +75,5 @@ void Parameters::print() const {
   std::cout<<"c time_start       = "<<time_start       <<std::endl;
   std::cout<<"c total_cycles     = "<<total_cycles     <<std::endl;
 
-  //TODO: Synchronize with structure
+  //TODO(kcallaghan): Synchronize with structure
 }
