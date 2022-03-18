@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dephier.hpp"
+#include "parameters.hpp"
 
 #include <richdem/common/Array2D.hpp>
 #include <richdem/common/math.hpp>
@@ -1832,4 +1833,3 @@ void ResetDH(DepressionHierarchy<elev_t> &deps){
 }
 
 }
-

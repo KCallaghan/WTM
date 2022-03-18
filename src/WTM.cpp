@@ -1,6 +1,8 @@
 #include "irf.cpp"
 #include <richdem/common/timer.hpp>
 
+#include <iostream>
+
 
 void initialise(Parameters &params, ArrayPack &arp){
   ofstream textfile;
@@ -87,7 +89,7 @@ void update(
   // Move groundwater //
   //////////////////////
 
-  time_t now = time(0);
+  time_t now = time(nullptr);
   char* dt = ctime(&now);
 
   std::cerr << "Before GW time: " << dt << std::endl;
@@ -104,7 +106,7 @@ void update(
     FanDarcyGroundwater::update(params, arp);
   }
 
-  now = time(0);
+  now = time(nullptr);
   dt = ctime(&now);
   std::cerr << "t GW time = " << time_groundwater.lap() << std::endl;
   std::cerr << "After GW time: " << dt << std::endl;
@@ -122,7 +124,7 @@ void update(
 
     dh::FillSpillMerge(params,deps,arp);
 
-    now = time(0);
+    now = time(nullptr);
     dt = ctime(&now);
     std::cerr << "t FSM time = " << fsm_timer.lap() << std::endl;
     std::cerr << "After FSM time: " << dt << std::endl;
@@ -137,33 +139,35 @@ void update(
   // at these locations.
   richdem::Timer evaporation_timer;
   evaporation_timer.start();
-  
+
   // Evap mode 1: Use the computed open-water evaporation rate
   if(params.evap_mode){
     std::cout<<"updating the evaporation field"<<std::endl;
     #pragma omp parallel for
     for(unsigned int i=0;i<arp.topo.size();i++){
-      if(arp.wtd(i)>0)  //if there is surface water present
+      if(arp.wtd(i)>0) {  //if there is surface water present
         arp.rech(i) = static_cast<double>(arp.precip(i)) - static_cast<double>(arp.open_water_evap(i));
-      else{              //water table is below the surface
+      } else {              //water table is below the surface
         arp.rech(i) = static_cast<double>(arp.precip(i)) - static_cast<double>(arp.starting_evap(i));
-        if(arp.rech(i) <0)    //Recharge is always positive.
+        if(arp.rech(i) <0){    //Recharge is always positive.
           arp.rech(i) = 0.;
+        }
       }
     }
   }
-  
+
   // Evap mode 0: remove all surface water (like Fan Reinfelder et al., 2013)
   else{
     std::cout<<"removing all surface water"<<std::endl;
     #pragma omp parallel for
     for(unsigned int i=0;i<arp.topo.size();i++){
-      if(arp.wtd(i)>0)  //if there is surface water present
+      if(arp.wtd(i)>0) {  //if there is surface water present
         arp.wtd(i) = 0;   //use this option when testing GW component alone
-      else{              //water table is below the surface
+      } else {            //water table is below the surface
         arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
-        if(arp.rech(i) <0)    //Recharge is always positive.
+        if(arp.rech(i) < 0) {    //Recharge is always positive.
           arp.rech(i) = 0.0f;
+        }
       }
     }
   }
@@ -192,8 +196,9 @@ void run(Parameters &params, ArrayPack &arp){
     update(params,arp,deps);
     //For transient - user set param that I am setting for now
     //at 50 to get 500 years total.
-    if(params.cycles_done == params.total_cycles)
+    if(params.cycles_done == params.total_cycles){
       break;
+    }
   }
 }
 

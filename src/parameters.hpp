@@ -1,17 +1,17 @@
 #ifndef _parameters_hpp_
 #define _parameters_hpp_
 
-#include <stdint.h>
 #include <cmath>
 #include <limits>
+#include <stdint.h>
 #include <string>
 
 const std::string UNINIT_STR = "uninitialized";
 
 class Parameters{
 public:
-    Parameters();
-    Parameters(const std::string config_file);
+    Parameters() = default;
+    Parameters(const std::string &config_file);
 
     int32_t iterations = -1;
     int32_t maxiter    = -1;
