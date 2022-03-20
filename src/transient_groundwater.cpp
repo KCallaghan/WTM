@@ -2,9 +2,10 @@
 #include "transient_groundwater.hpp"
 #include "update_effective_storativity.hpp"
 
-using namespace Eigen;
+#include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
 
-typedef Eigen::SparseMatrix<double,RowMajor> SpMat; // declares a row-major sparse matrix type of double
+typedef Eigen::SparseMatrix<double,Eigen::RowMajor> SpMat; // declares a row-major sparse matrix type of double
 typedef Eigen::Triplet<double> T;  // used to populate the matrices
 
 constexpr double solver_tolerance_value = 0.00001;
@@ -48,7 +49,7 @@ double depthIntegratedTransmissivity(
 void updateTransmissivity(
   Parameters &params, ArrayPack &arp
 ){
-  #pragma omp parallel for collapse(2)
+  #pragma omp parallel for default(none) shared(arp,params) collapse(2)
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x; x++){
     if(arp.land_mask(x,y) != 0.f){
@@ -80,7 +81,7 @@ void first_half(const Parameters &params,ArrayPack &arp){
   //b consists of the current head values (i.e. water table depth + topography)
   //We also populate a 'guess', which consists of a water table (wtd_T) that in later iterations
   //has already been modified for changing transmissivity closer to the final answer.
-  #pragma omp parallel for collapse(2)
+  #pragma omp parallel for default(none) shared(arp,b,guess,params) collapse(2)
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y; y++){
     arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
@@ -88,7 +89,7 @@ void first_half(const Parameters &params,ArrayPack &arp){
     guess(y+(x*params.ncells_y)) = arp.wtd_T(x,y) + static_cast<double>(arp.topo(x,y));
   }
 
-  double entry;
+  double entry = std::numeric_limits<double>::signaling_NaN();
   int main_loc = 0; //the cell to populate in the A matrix.
   int coefficients_location = 0;
   //HALFWAY SOLVE
@@ -149,8 +150,7 @@ void first_half(const Parameters &params,ArrayPack &arp){
   std::cout << "#iterations:     " << solver.iterations() << std::endl;
   std::cout << "estimated error: " << solver.error()      << std::endl;
 
-
-  #pragma omp parallel for collapse(2)
+  #pragma omp parallel for default(none) shared(arp, params, vec_x) collapse(2)
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y;y++){
   //copy result into the wtd_T array:
@@ -179,7 +179,7 @@ void second_half(Parameters &params,ArrayPack &arp){
   //b consists of the current head values (i.e. water table depth + topography)
   //We also populate a 'guess', which consists of a water table (wtd_T) that
   //has already been modified for changing transmissivity closer to the final answer.
-  #pragma omp parallel for collapse(2)
+  #pragma omp parallel for default(none) shared(arp, b, guess, params) collapse(2)
   for(int x=0;x<params.ncells_x; x++)
   for(int y=0;y<params.ncells_y; y++){
     b(y+(x*params.ncells_y)) = arp.original_wtd(x,y) + static_cast<double>(arp.topo(x,y));  //original wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
@@ -294,7 +294,7 @@ void second_half(Parameters &params,ArrayPack &arp){
   std::cout << "estimated error: " << solver.error()      << std::endl;
 
 
-  #pragma omp parallel for collapse(2)
+  #pragma omp parallel for default(none) shared(arp, params, vec_x) collapse(2)
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x;x++){
   //copy result into the wtd array:
@@ -334,7 +334,7 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
   //Its clone (wtd_T) is used and updated in the Picard iteration
   //also set the starting porosity
   //set the scalar arrays for x and y directions
-  #pragma omp parallel for collapse(2)
+  #pragma omp parallel for default(none) shared(arp, params) collapse(2)
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x;x++){
     if(arp.land_mask(x,y) == 0.f){
@@ -343,17 +343,17 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
       arp.original_wtd(x,y) = 0.;
       arp.wtd_T_iteration(x,y) = 0.;
       arp.effective_storativity(x,y) = 1.;
-    }
-    else{
+    } else {
       arp.original_wtd(x,y) = arp.wtd(x,y);
       arp.wtd(x,y) = add_recharge(params.deltat/2., arp.rech(x,y), arp.wtd(x,y), static_cast<double>(arp.porosity(x,y))); //use regular porosity for adding recharge since this checks for underground space within add_recharge.
       arp.wtd_T(x,y) = arp.wtd(x,y);
       arp.wtd_T_iteration(x,y) = arp.wtd_T(x,y);
 
-      if(arp.original_wtd(x,y)>0)
+      if(arp.original_wtd(x,y)>0){
         arp.effective_storativity(x,y) = 1;
-      else
+      } else {
         arp.effective_storativity(x,y) = static_cast<double>(arp.porosity(x,y));
+      }
     }
     arp.scalar_array_y(x,y) = params.deltat/(2.*arp.cellsize_e_w_metres[y]*arp.cellsize_e_w_metres[y]);
   }
@@ -367,14 +367,15 @@ void UpdateCPU(Parameters &params, ArrayPack &arp){
     //update the effective storativity to use during the next iteration of the first half:
     for(int y=0;y<params.ncells_y;y++)
     for(int x=0;x<params.ncells_x;x++){
-      if(arp.land_mask(x,y) != 0.f)
+      if(arp.land_mask(x,y) != 0.f){
         arp.effective_storativity(x,y) = updateEffectiveStorativity(arp.original_wtd(x,y),arp.wtd_T(x,y), arp.porosity(x,y), arp.effective_storativity(x,y));
+      }
     }
   }
 
 
   //get the final T for the halfway point
-  #pragma omp parallel for collapse(2)
+  #pragma omp parallel for default(none) shared(arp, params) collapse(2)
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x;x++){
     if(arp.land_mask(x,y) != 0.f){

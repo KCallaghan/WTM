@@ -1,24 +1,24 @@
 #include "parameters.hpp"
-#include <string>
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
-
-// Dummy initializer
-Parameters::Parameters(){}
+#include <string>
 
 // Real initializer
-Parameters::Parameters(const std::string config_file){
+Parameters::Parameters(const std::string &config_file){
   std::ifstream fin(config_file);
 
-  if(!fin.good())
+  if(!fin.good()){
     throw std::runtime_error("Failed to read config file!");
+  }
 
   std::string line;
   while(std::getline(fin, line)) {
-    if(line.empty())
+    if(line.empty()){
       continue;
+    }
 
     std::stringstream ss(line);
     std::string key;
@@ -26,30 +26,30 @@ Parameters::Parameters(const std::string config_file){
 
 
     //Dummy key to make it easier to alphabetize list below
-    if     (key=="")                   {}
-    else if(key=="cells_per_degree")   ss>>cells_per_degree;
-    else if(key=="deltat")             ss>>deltat;
-    else if(key=="evap_mode")          ss>>evap_mode;
-    else if(key=="fdepth_a")           ss>>fdepth_a;
-    else if(key=="fdepth_b")           ss>>fdepth_b;
-    else if(key=="fdepth_fmin")        ss>>fdepth_fmin;
-    else if(key=="fsm_on")             ss>>fsm_on;
-    else if(key=="infiltration_on")    ss>>infiltration_on;
-    else if(key=="maxiter")            ss>>maxiter;
-    else if(key=="outfile_prefix")     ss>>outfile_prefix;
-    else if(key=="picard_iterations")  ss>>picard_iterations;
-    else if(key=="region")             ss>>region;
-    else if(key=="run_type")           ss>>run_type;
-    else if(key=="southern_edge")      ss>>southern_edge;
-    else if(key=="supplied_wt")        ss>>supplied_wt;
-    else if(key=="surfdatadir")        ss>>surfdatadir;
-    else if(key=="textfilename")       ss>>textfilename;
-    else if(key=="time_end")           ss>>time_end;
-    else if(key=="time_start")         ss>>time_start;
-    else if(key=="total_cycles")       ss>>total_cycles;
-
-    else
+    if     (key.empty())               {}
+    else if(key=="cells_per_degree")   { ss>>cells_per_degree; }
+    else if(key=="deltat")             { ss>>deltat; }
+    else if(key=="evap_mode")          { ss>>evap_mode; }
+    else if(key=="fdepth_a")           { ss>>fdepth_a; }
+    else if(key=="fdepth_b")           { ss>>fdepth_b; }
+    else if(key=="fdepth_fmin")        { ss>>fdepth_fmin; }
+    else if(key=="fsm_on")             { ss>>fsm_on; }
+    else if(key=="infiltration_on")    { ss>>infiltration_on; }
+    else if(key=="maxiter")            { ss>>maxiter; }
+    else if(key=="outfile_prefix")     { ss>>outfile_prefix; }
+    else if(key=="picard_iterations")  { ss>>picard_iterations; }
+    else if(key=="region")             { ss>>region; }
+    else if(key=="run_type")           { ss>>run_type; }
+    else if(key=="southern_edge")      { ss>>southern_edge; }
+    else if(key=="supplied_wt")        { ss>>supplied_wt; }
+    else if(key=="surfdatadir")        { ss>>surfdatadir; }
+    else if(key=="textfilename")       { ss>>textfilename; }
+    else if(key=="time_end")           { ss>>time_end; }
+    else if(key=="time_start")         { ss>>time_start; }
+    else if(key=="total_cycles")       { ss>>total_cycles; }
+    else {
       throw std::runtime_error("Unrecognised key: " + key);
+    }
   }
 }
 
@@ -75,5 +75,5 @@ void Parameters::print() const {
   std::cout<<"c time_start       = "<<time_start       <<std::endl;
   std::cout<<"c total_cycles     = "<<total_cycles     <<std::endl;
 
-  //TODO: Synchronize with structure
+  //TODO(kcallaghan): Synchronize with structure
 }

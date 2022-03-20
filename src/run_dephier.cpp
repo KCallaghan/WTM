@@ -1,29 +1,27 @@
-#include "transient_groundwater.hpp"
-#include "fill_spill_merge.hpp"
-//#include "evaporation.hpp"
-
-//#include "../common/netcdf.hpp"
 #include "ArrayPack.hpp"
+#include "fill_spill_merge.hpp"
 #include "parameters.hpp"
+#include "transient_groundwater.hpp"
+
+#include <richdem/common/Array2D.hpp>
+#include <richdem/common/ProgressBar.hpp>
+#include <richdem/common/timer.hpp>
+
 #include <cassert>
 #include <cmath>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <richdem/common/Array2D.hpp>
-#include <richdem/common/timer.hpp>
-#include <richdem/common/ProgressBar.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#include <fstream>
 using namespace std;
 
 namespace rd = richdem;
 namespace dh = richdem::dephier;
 
-const double UNDEF  = -1.0e7;
-const float OCEAN_LEVEL = -9999;
+constexpr double DEG_TO_RAD = M_PI/180.0;
 
 
 int main(int argc, char **argv){
@@ -75,7 +73,7 @@ int main(int argc, char **argv){
  const float earth_radius = 6371000.; //metres
 
 //distance between lines of latitude is a constant.
-  params.cellsize_n_s_metres = (earth_radius*(M_PI/180.))\
+  params.cellsize_n_s_metres = (earth_radius*DEG_TO_RAD)\
   /params.cells_per_degree;
 
 //initialise some arrays
@@ -96,7 +94,7 @@ int main(int argc, char **argv){
   for(unsigned int j=0;j<arp.latitude_radians.size();j++){
     //latitude at the centre of a cell:
     arp.latitude_radians[j] = (float(j)/params.cells_per_degree + \
-    params.southern_edge)*(M_PI/180.);
+    params.southern_edge)*DEG_TO_RAD;
     //southern edge of the domain in degrees, plus the number of cells up
     //from this location/the number of cells per degree, converted to radians.
 
@@ -109,22 +107,22 @@ int main(int argc, char **argv){
 
     //latitude at the southern edge of a cell (subtract half a cell):
     double latitude_radians_S  = ((float(j) - 0.5)\
-      /params.cells_per_degree+params.southern_edge)*(M_PI/180.);
+      /params.cells_per_degree+params.southern_edge)*DEG_TO_RAD;
     //latitude at the northern edge of a cell (add half a cell):
     double latitude_radians_N  = ((float(j) + 0.5)\
-      /params.cells_per_degree+params.southern_edge)*(M_PI/180.);
+      /params.cells_per_degree+params.southern_edge)*DEG_TO_RAD;
 
     //distance between lines of longitude varies with latitude.
     //This is the distance at the centre of a cell for a given latitude:
     arp.cellsize_e_w_metres[j] = earth_radius* \
-    std::cos(arp.latitude_radians[j])*(M_PI/180.)/params.cells_per_degree;
+    std::cos(arp.latitude_radians[j])*DEG_TO_RAD/params.cells_per_degree;
 
     //distance at the northern edge of the cell for the given latitude:
     arp.cellsize_e_w_metres_N[j] = earth_radius* \
-    std::cos(latitude_radians_N)*(M_PI/180.)/params.cells_per_degree;
+    std::cos(latitude_radians_N)*DEG_TO_RAD/params.cells_per_degree;
     //distance at the southern edge of the cell for the given latitude:
     arp.cellsize_e_w_metres_S[j] = earth_radius* \
-    std::cos(latitude_radians_S)*(M_PI/180.)/params.cells_per_degree;
+    std::cos(latitude_radians_S)*DEG_TO_RAD/params.cells_per_degree;
 
     //cell area computed as a trapezoid, using unchanging north-south distance,
     //and east-west distances at the northern and southern edges of the cell:
@@ -132,14 +130,14 @@ int main(int argc, char **argv){
     (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j])/2;
 
 
-//TODO: see which, if any, arrays can be cleared after use to free up memory.
+    //TODO(kcallaghan): see which, if any, arrays can be cleared after use to free up memory.
     //How to do this?
   }
 
 
  //Label the ocean cells. This is a precondition for using
   //`GetDepressionHierarchy()`.
-  #pragma omp parallel for
+  #pragma omp parallel for default(none) shared(arp, final_label, label)
   for(unsigned int i=0;i<label.size();i++){
     if(arp.land_mask(i) == 0){
       label(i) = dh::OCEAN;

@@ -1,13 +1,13 @@
 #pragma once
 
 #include "dephier.hpp"
+#include "parameters.hpp"
 
 #include <richdem/common/Array2D.hpp>
 #include <richdem/common/math.hpp>
 #include <richdem/common/logger.hpp>
 #include <richdem/common/ProgressBar.hpp>
 #include <richdem/common/timer.hpp>
-#include <richdem/depressions/depressions.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -25,12 +25,12 @@
 
 namespace richdem::dephier {
 
-const int *const dx         = d8x;
-const int *const dy         = d8y;
-const int *const dinverse   = d8_inverse;
-const int        neighbours = 8;
+constexpr auto dx = d8x;
+constexpr auto dy = d8y;
+constexpr auto dinverse = d8_inverse;
+constexpr int        neighbours = 8;
 
-const double FP_ERROR = 1e-4;
+constexpr double FP_ERROR = 1e-4;
 
 ///////////////////////////////////
 //Function prototypes
@@ -371,7 +371,7 @@ static void MoveWaterIntoPits(
   //necessarily fill all the way to the surface,
   //and still have water continue moving downslope.
   else{   //infiltration is turned on, so we have to move water cell by cell and calculate how much will infiltrate as we go.
-    #pragma omp parallel for
+    #pragma omp parallel for default(none) shared(arp)
     for(unsigned int i=0;i<arp.topo.size();i++){
       if(arp.wtd(i)>0){
         arp.runoff(i) = arp.wtd(i);
@@ -383,7 +383,7 @@ static void MoveWaterIntoPits(
 
     //Calculate how many upstream cells flow into each cell
     rd::Array2D<char>  dependencies(arp.topo.width(),arp.topo.height(),0);
-    #pragma omp parallel for collapse(2)
+    #pragma omp parallel for default(none) shared(arp, dependencies, dinverse, dx, dy) collapse(2)
     for(int y=0;y<arp.topo.height();y++)
     for(int x=0;x<arp.topo.width(); x++)
     for(int n=1;n<=neighbours;n++){         //Loop through neighbours
@@ -659,7 +659,7 @@ static void CalculateWtdVol(
 ///                  in each cell, should the user want this information.
 ///@return Calculates the amount of infiltration that will happen in this cell within
 ///        the time it takes the amount of  water to travel the given distance.
-static double CalculateInfiltration(
+static inline double CalculateInfiltration(
   int         cell,
   double      distance,
   double      h_0,
@@ -1511,7 +1511,7 @@ static void FillDepressions(
   const double                         out_elev,
   const std::unordered_set<dh_label_t> &dep_labels,
   double                               water_vol,
-  DepressionHierarchy<elev_t>          &deps,
+  DepressionHierarchy<elev_t>          &/*deps*/,
   ArrayPack                            &arp
 ){
   //Nothing to do if we have no water
@@ -1641,7 +1641,7 @@ static void FillDepressions(
 
     //The outlet cell never impacts the amount of water the depression can hold
     //and its water table is adjusted in the if-clause above, if appropriate.
-    if(arp.topo.xyToI(c.x,c.y) != out_cell ){
+    if(static_cast<int32_t>(arp.topo.xyToI(c.x,c.y)) != out_cell ){
 
       //Add this cell to those affected so that its volume is available for
       //filling.
@@ -1832,4 +1832,3 @@ void ResetDH(DepressionHierarchy<elev_t> &deps){
 }
 
 }
-
