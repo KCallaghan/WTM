@@ -25,7 +25,6 @@ find_package(Sanitizers)
 find_package(GDAL)
 # use -fsanitize=address (above) to check for memory errors
 
-
 add_subdirectory(common/richdem EXCLUDE_FROM_ALL)
 
 
@@ -52,6 +51,14 @@ if(USE_GDAL AND GDAL_FOUND)
   target_link_libraries(dephier.x PRIVATE richdem OpenMP::OpenMP_CXX)
   target_compile_features(dephier.x PRIVATE cxx_std_17)
   add_sanitizers(dephier.x)
+
+  add_executable(tests.x
+    src/tests.cpp
+    src/test_kerry_FSM.cpp
+    src/parameters.cpp
+  )
+  target_link_libraries(tests.x PRIVATE richdem OpenMP::OpenMP_CXX)
+  target_compile_features(tests.x PRIVATE cxx_std_17)
 else()
   message(WARNING "GDAL is needed to build some of the FSM performance tests and example programs; it is not needed to use the FSM library in another project.")
   message(WARNING "Without GDAL, the WTM *will not build*.")
