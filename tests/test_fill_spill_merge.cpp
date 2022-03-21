@@ -2,6 +2,7 @@
 #include "irf.cpp"
 #include "add_recharge.hpp"
 
+#include <richdem/depressions/Zhou2016.hpp>
 #include <richdem/terrain_generation.hpp>
 #include <random>
 #include <sstream>
@@ -16,8 +17,8 @@ using namespace richdem::dephier;
   const int number_of_large_tests = 5;
 #else
   #pragma message "FSM is using a large number of test cases to judge correctness. Enabling code coverage will reduce the number of test cases used."
-  const int number_of_small_tests = 6000;
-  const int number_of_large_tests = 500;
+  constexpr int number_of_small_tests = 1000;
+  constexpr int number_of_large_tests = 200;
 #endif
 
 
@@ -182,34 +183,33 @@ TEST_CASE("Backfill Depression"){
 
 
 
-TEST_CASE("Add recharge"){
-//double add_recharge(const double deltat, const double my_rech, double my_wtd, const int my_mask, const double my_porosity){
+// TEST_CASE("Add recharge"){
+// //double add_recharge(const double deltat, const double my_rech, double my_wtd, const int my_mask, const double my_porosity){
 
-  //positive wtd, positive rech
-  double new_wtd = add_recharge(31536000., 1., 1., 1, 0.4);
-  CHECK(new_wtd==2);
+//   //positive wtd, positive rech
+//   double new_wtd = add_recharge(31536000., 1., 1., 1, 0.4);
+//   CHECK(new_wtd==2);
 
-  //positive wtd, negative rech that still ends positive
-  new_wtd = add_recharge(31536000., -0.5, 1., 1, 0.4);
-  CHECK(new_wtd==0.5);
+//   //positive wtd, negative rech that still ends positive
+//   new_wtd = add_recharge(31536000., -0.5, 1., 1, 0.4);
+//   CHECK(new_wtd==0.5);
 
-  //positive wtd, negative rech that would end negative so gets corrected to 0
-  new_wtd = add_recharge(31536000., -2., 1., 1, 0.4);
-  CHECK(new_wtd==0);
+//   //positive wtd, negative rech that would end negative so gets corrected to 0
+//   new_wtd = add_recharge(31536000., -2., 1., 1, 0.4);
+//   CHECK(new_wtd==0);
 
-  //negative wtd, negative rech: wtd should not change
-  new_wtd = add_recharge(31536000., -1., -1., 1, 0.4);
-  CHECK(new_wtd==-1);
+//   //negative wtd, negative rech: wtd should not change
+//   new_wtd = add_recharge(31536000., -1., -1., 1, 0.4);
+//   CHECK(new_wtd==-1);
 
-  //negative wtd, positive rech, wtd stays negative
-  new_wtd = add_recharge(31536000., 1., -10., 1, 0.4);
-  CHECK(new_wtd==-7.5);
+//   //negative wtd, positive rech, wtd stays negative
+//   new_wtd = add_recharge(31536000., 1., -10., 1, 0.4);
+//   CHECK(new_wtd==-7.5);
 
-  //negative wtd, positive rech, wtd becomes positive
-  new_wtd = add_recharge(31536000., 1., -1., 1, 0.4);
-  CHECK(new_wtd==0.6);
-
-}
+//   //negative wtd, positive rech, wtd becomes positive
+//   new_wtd = add_recharge(31536000., 1., -1., 1, 0.4);
+//   CHECK(new_wtd==0.6);
+// }
 
 
 TEST_CASE("Fill a full depression"){
@@ -221,10 +221,8 @@ TEST_CASE("Fill a full depression"){
   ArrayPack arp;
 
   SUBCASE("A very basic depression"){
-
     arp.topo.resize(10,10,2);
     arp.topo.setEdges(-9);
-
 
     arp.topo(4,2) = 1;
     arp.topo(4,3) = 1;
@@ -260,8 +258,7 @@ TEST_CASE("Fill a full depression"){
 
     FillAFullDepression(my_stdi, DH, arp);
 
-
-    CHECK(ArrayValuesEqual(arp.wtd,wtd_good));
+    CHECK(ArrayValuesEqual(arp.wtd, wtd_good));
   }
   SUBCASE("Depression with a little more going on"){
   	arp.wtd = Array2D<double>(10,10,0);
@@ -406,74 +403,68 @@ TEST_CASE("Fill a full depression"){
 //  RandomizedFullDepressionVsPriorityFlood(number_of_large_tests, 100, 300);
 //}
 
-//void RandomizedHeavyFloodingVsPriorityFlood(const int count, const int min_size, const int max_size){
-//  #pragma omp parallel for
-//  for(int i=0;i<count;i++){
-//    std::stringstream oss;
-//
-//    ArrayPack arp;
-//    Parameters params;
-//    params.textfilename = "test.txt";
-//
-//    Array2D<double> dem;
-//
-//    #pragma omp critical
-//    {
-//      oss<<gen;
-//      dem = random_terrain(gen, min_size, max_size);
-//      std::cerr<<"Randomized Heavy Flooding vs Priority-Flood #"<<i<<std::endl;
-//    }
-//
-//    arp.topo = dem;
-//    arp.label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
-//    arp.final_label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
-//    arp.flowdirs = Array2D<flowdir_t>  (arp.topo.width(), arp.topo.height(), NO_FLOW);
-//
-//    arp.cell_area = std::vector<double> (arp.topo.height(), 1.);
-//
-//
-//    arp.topo.setEdges(-1);
-//    arp.label.setEdges(OCEAN);
-//
-//    auto deps = GetDepressionHierarchy<double,Topology::D8>(arp.topo, arp.cell_area,arp.label,arp.final_label, arp.flowdirs);
-//
-//    //wtd with a *lot* of initial surface water
-//    Array2D<double> wtd(arp.topo.width(), arp.topo.height(), 100);
-//
-//    try {
-//      FillSpillMerge(params, deps, arp);
-//    } catch (const std::exception &e) {
-//      std::cerr<<"FillSpillMerge failed because of \""<<e.what()<<"\" with width = "<<arp.topo.width()<<" height = "<<arp.topo.height()<<" state = "<<oss.str()<<std::endl;
-//      throw e;
-//    }
-//
-//    for(auto i=arp.topo.i0(); i<arp.topo.size(); i++){
-//      if(!arp.topo.isNoData(i))
-//        arp.topo(i) += wtd(i);
-//    }
-//
-//    auto comparison_dem = arp.topo;
-//    PriorityFlood_Zhou2016(comparison_dem);
-//
-//    CHECK_MESSAGE(MaxArrayDiff(comparison_dem,arp.topo)<1e-6, "Randomized Heavy Flooding vs Priority-Flood failed with width = "+std::to_string(arp.topo.width())+" height = "+std::to_string(arp.topo.height())+" state = " + oss.str());
-//  }
-//}
-//
-//TEST_CASE("Randomized Heavy Flooding vs Priority-Flood"){
-//  RandomizedHeavyFloodingVsPriorityFlood(number_of_small_tests,  10,  30);
-//  RandomizedHeavyFloodingVsPriorityFlood(number_of_large_tests, 100, 300);
-//}
+/*
+void RandomizedHeavyFloodingVsPriorityFlood(const int count, const int min_size, const int max_size){
+  #pragma omp parallel for
+  for(int i=0;i<count;i++){
+    std::stringstream oss;
 
+    ArrayPack arp;
+    Parameters params;
+    params.textfilename = "test.txt";
 
+    Array2D<double> dem;
 
+    #pragma omp critical
+    {
+      oss<<gen;
+      dem = random_terrain(gen, min_size, max_size);
+      std::cerr<<"Randomized Heavy Flooding vs Priority-Flood #"<<i<<std::endl;
+    }
 
+    arp.topo = dem;
+    arp.label = Array2D<dh_label_t>       (arp.topo.width(), arp.topo.height(), NO_DEP );
+    arp.final_label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
+    arp.flowdirs = Array2D<flowdir_t>     (arp.topo.width(), arp.topo.height(), NO_FLOW);
 
+    arp.cell_area = std::vector<double> (arp.topo.height(), 1.);
 
+    arp.topo.setEdges(-1);
+    arp.label.setEdges(OCEAN);
 
+    auto deps = GetDepressionHierarchy<double,Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
+    //wtd with a *lot* of initial surface water
+    arp.wtd.resize(arp.topo.width(), arp.topo.height());
+    arp.wtd.setAll(0);
 
+    arp.runoff.resize(arp.topo.width(), arp.topo.height());
+    arp.runoff.setAll(0);
 
+    arp.porosity.resize(arp.topo.width(), arp.topo.height());
+    arp.porosity.setAll(1);
 
+    try {
+      FillSpillMerge(params, deps, arp);
+    } catch (const std::exception &e) {
+      std::cerr<<"FillSpillMerge failed because of \""<<e.what()<<"\" with width = "<<arp.topo.width()<<" height = "<<arp.topo.height()<<" state = "<<oss.str()<<std::endl;
+      throw e;
+    }
 
+    for(auto i=arp.topo.i0(); i<arp.topo.size(); i++){
+      if(!arp.topo.isNoData(i))
+        arp.topo(i) += arp.wtd(i);
+    }
 
+    auto comparison_dem = arp.topo;
+    PriorityFlood_Zhou2016(comparison_dem);
 
+    CHECK_MESSAGE(MaxArrayDiff(comparison_dem,arp.topo)<1e-6, "Randomized Heavy Flooding vs Priority-Flood failed with width = "+std::to_string(arp.topo.width())+" height = "+std::to_string(arp.topo.height())+" state = " + oss.str());
+  }
+}
+
+TEST_CASE("Randomized Heavy Flooding vs Priority-Flood"){
+ RandomizedHeavyFloodingVsPriorityFlood(number_of_small_tests,  10,  30);
+ RandomizedHeavyFloodingVsPriorityFlood(number_of_large_tests, 100, 300);
+}
+*/
