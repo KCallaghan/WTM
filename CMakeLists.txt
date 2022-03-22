@@ -54,8 +54,9 @@ if(USE_GDAL AND GDAL_FOUND)
 
   add_executable(tests.x
     src/tests.cpp
-    src/test_kerry_FSM.cpp
+    src/test_fill_spill_merge.cpp
     src/parameters.cpp
+    src/transient_groundwater.cpp
   )
   target_link_libraries(tests.x PRIVATE richdem OpenMP::OpenMP_CXX)
   target_compile_features(tests.x PRIVATE cxx_std_17)

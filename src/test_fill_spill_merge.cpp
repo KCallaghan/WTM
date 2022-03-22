@@ -1,6 +1,7 @@
 #include "doctest.h"
 #include "irf.cpp"
-#include "add_recharge.hpp"
+//#include "add_recharge.hpp"
+
 
 #include <richdem/depressions/Zhou2016.hpp>
 #include <richdem/terrain_generation.hpp>
@@ -315,7 +316,158 @@ TEST_CASE("Fill a full depression"){
 
 
 
+void CheckMassLoss(const int count, const int min_size, const int max_size){
+  for(int i=0;i<count;i++){
+  std::stringstream oss;
 
+  ArrayPack arp;
+  Parameters params;
+
+
+    Array2D<double> dem;
+
+  {
+    oss<<gen;
+    dem = random_terrain(gen, min_size, max_size);
+    std::cerr<<"checking mass loss #"<<i<<std::endl;
+  }
+
+
+
+  arp.topo = dem;
+  arp.label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
+  arp.label.setEdges(OCEAN);
+  arp.final_label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
+  arp.final_label.setEdges(OCEAN);
+  arp.flowdirs = Array2D<flowdir_t>  (arp.topo.width(), arp.topo.height(), NO_FLOW);
+  arp.wtd = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
+  arp.wtd_T = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
+  arp.wtd_T_iteration = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
+  arp.original_wtd = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
+
+  arp.precip = Array2D<double> (arp.topo.width(), arp.topo.height(), 1.5 );
+  arp.starting_evap = Array2D<double> (arp.topo.width(), arp.topo.height(), 1.0 );
+  arp.open_water_evap = Array2D<double> (arp.topo.width(), arp.topo.height(), 1.3 );
+  arp.ksat = Array2D<double> (arp.topo.width(), arp.topo.height(), 0.00001 );
+  arp.fdepth = Array2D<double> (arp.topo.width(), arp.topo.height(), 50. );
+  arp.porosity = Array2D<double> (arp.topo.width(), arp.topo.height(), 0.3 );
+  arp.effective_storativity = Array2D<double> (arp.topo.width(), arp.topo.height(), 0.3 );
+  arp.rech = Array2D<double> (arp.topo.width(), arp.topo.height(), 0.5 );
+  arp.transmissivity = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
+
+  arp.runoff = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
+  arp.scalar_array_y = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
+  arp.scalar_array_x = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
+
+  arp.cell_area.resize              (arp.topo.height());
+  arp.cellsize_e_w_metres.resize              (arp.topo.height());
+  arp.land_mask = Array2D<uint8_t> (arp.topo.width(), arp.topo.height(), 1 );
+
+  for(unsigned int j=0;j<arp.cell_area.size();j++){
+        arp.cell_area[j] = 100;
+        arp.cellsize_e_w_metres[j] = 10;
+  }
+
+  params.ncells_x = arp.topo.width();
+  params.ncells_y = arp.topo.height();
+  params.cellsize_n_s_metres = 10;
+  params.infiltration_on = false;
+
+  for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x;x++){
+    arp.topo(x,y) = dem(x,y);
+    arp.precip(x,y) = 1.5;
+    arp.starting_evap(x,y) = 1.;
+    arp.open_water_evap(x,y) = 1.3;
+    arp.ksat(x,y) = 0.00001;
+    arp.fdepth(x,y) = 50.;
+    arp.porosity(x,y) = 0.3;
+    arp.effective_storativity(x,y) = 0.3;
+    arp.rech(x,y) = 0.5;
+    arp.land_mask(x,y) = 1;
+  }
+
+  arp.topo.setEdges(0);
+  arp.land_mask.setEdges(0);
+
+  params.deltat = 10000;
+
+
+  auto deps = GetDepressionHierarchy<float,Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
+  std::cerr<<"DH done"<<std::endl;
+
+double change_in_rech = 0.;
+double change_in_ocean_loss = 0;
+double change_in_water_table = 0;
+double rech_old = 0;
+double ocean_loss_old = 0;
+double water_table_old = 0;
+double mass_loss = 0.;
+
+  for(int reps=0;reps<10;reps++){
+  FanDarcyGroundwater::update(params, arp);
+  std::cout<<"GW done"<<std::endl;
+  dh::FillSpillMerge(params,deps,arp);
+  std::cout<<"FSM done"<<std::endl;
+
+  if(params.evap_mode){
+    std::cout<<"updating the evaporation field"<<std::endl;
+    #pragma omp parallel for default(none) shared(arp)
+    for(unsigned int i=0;i<arp.topo.size();i++){
+      if(arp.wtd(i)>0) {  //if there is surface water present
+        arp.rech(i) = static_cast<double>(arp.precip(i)) - static_cast<double>(arp.open_water_evap(i));
+      } else {              //water table is below the surface
+        arp.rech(i) = static_cast<double>(arp.precip(i)) - static_cast<double>(arp.starting_evap(i));
+        if(arp.rech(i) <0){    //Recharge is always positive.
+          arp.rech(i) = 0.;
+        }
+      }
+    }
+  }
+
+  double wtd_sum = 0.0;
+
+
+  for(int y=0;y<params.ncells_y;y++)
+  for(int x=0;x<params.ncells_x; x++){
+    if(arp.wtd(x,y) > 0)
+      wtd_sum              += arp.wtd(x,y)*arp.cell_area[y];
+    else
+      wtd_sum              += arp.wtd(x,y)*arp.porosity(x,y)*arp.cell_area[y];
+  }
+
+  change_in_rech = params.total_added_recharge - rech_old;
+  change_in_ocean_loss = params.total_loss_to_ocean - ocean_loss_old;
+  change_in_water_table = wtd_sum - water_table_old;
+
+
+  mass_loss = (change_in_rech - change_in_water_table - change_in_ocean_loss)/change_in_rech*100.;
+
+  std::cout<<"change in rech is "<<change_in_rech<<" total_added_recharge "<<params.total_added_recharge<<" rech old "<<rech_old<<std::endl;
+  std::cout<<"change in ocean loss "<<change_in_ocean_loss<<" total loss to ocean "<<params.total_loss_to_ocean<<" ocean loss old "<<ocean_loss_old<<std::endl;
+  std::cout<<"change in water table "<<change_in_water_table<<" wtd sum "<<wtd_sum<<" water table old "<<water_table_old<<std::endl;
+  std::cout<<"mass loss as a percentage of recharge is "<<mass_loss<<std::endl;
+
+
+  water_table_old = wtd_sum;
+  ocean_loss_old = params.total_loss_to_ocean;
+  rech_old = params.total_added_recharge;
+
+
+}
+
+    CHECK_MESSAGE(mass_loss<100, "failed mass loss check");
+  }
+
+
+
+
+}
+
+TEST_CASE("Check mass loss for random cases"){
+  CheckMassLoss(number_of_small_tests,  10,  30);
+  CheckMassLoss(number_of_large_tests, 100, 300);
+}
 
 
 
