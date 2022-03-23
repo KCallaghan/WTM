@@ -334,20 +334,7 @@ void CheckMassLoss(const int count, const int min_size, const int max_size){
 
 
 
-  //arp.topo = dem;
-      arp.topo = {
-        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 4, 4, 3, 3, 3, 3, 3, 4, 0},
-        {0, 4, 3, 3, 1, 2, 1, 3, 4, 0},
-        {0, 3, 3, 3, 1, 2, 1, 1, 4, 0},
-        {0, 3, 4, 3, 1, 1, 1, 1, 4, 0},
-        {0, 4, 5, 4, 1, 2, 1, 2, 4, 0},
-        {0, 4, 5, 5, 1, 2, 1, 2, 4, 0},
-        {0, 4, 5, 6, 6, 3, 3, 3, 4, 0},
-        {0, 4, 4, 6, 6, 3, 3, 3, 4, 0},
-        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    };
-
+  arp.topo = dem;
   arp.label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
   arp.label.setEdges(OCEAN);
   arp.final_label = Array2D<dh_label_t> (arp.topo.width(), arp.topo.height(), NO_DEP );
@@ -388,7 +375,7 @@ void CheckMassLoss(const int count, const int min_size, const int max_size){
 
   for(int y=0;y<params.ncells_y;y++)
   for(int x=0;x<params.ncells_x;x++){
-    //arp.topo(x,y) = dem(x,y);
+    arp.topo(x,y) = dem(x,y);
     arp.precip(x,y) = 1.5;
     arp.starting_evap(x,y) = 1.;
     arp.open_water_evap(x,y) = 1.3;
