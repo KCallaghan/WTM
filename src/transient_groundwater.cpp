@@ -70,7 +70,7 @@ void updateTransmissivity(
 // That will be used in the second step of the midpoint method below.
 void first_half(const Parameters &params,ArrayPack &arp){
 
-  std::vector<T> coefficients((params.ncells_x-2)*(params.ncells_y-2)*5);
+  std::vector<T> coefficients((params.ncells_x)*(params.ncells_y)*5);
   Eigen::VectorXd b(params.ncells_x*params.ncells_y);
   Eigen::VectorXd vec_x(params.ncells_x*params.ncells_y);
   Eigen::VectorXd guess(params.ncells_x*params.ncells_y);
@@ -94,15 +94,177 @@ void first_half(const Parameters &params,ArrayPack &arp){
   int coefficients_location = 0;
   //HALFWAY SOLVE
   //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
-  for(int x=1;x<params.ncells_x-1; x++)
-  for(int y=1;y<params.ncells_y-1; y++){
-
+  for(int x=0;x<params.ncells_x; x++)
+  for(int y=0;y<params.ncells_y; y++){
     //The row and column that the current cell will be stored in in matrix A.
     //This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
     //All of the N,E,S,W directions should be in the same row, but the column will differ.
     main_loc = y+(x*params.ncells_y);
     //start with the central diagonal, which contains the info for the current cell:
     //This diagonal will be populated for all cells in the domain.
+
+    if(x == 0){
+      if(y == 0){
+      entry =  (arp.transmissivity(x,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))) + (arp.transmissivity(x,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(params.x_partial/(2*arp.effective_storativity(x,y))) +1;
+      coefficients[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+            //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      entry = -arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc+1,entry );
+      coefficients_location++;
+
+
+      //finally, do the South diagonal, offset by +(ncells_y).
+      entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc+params.ncells_y, entry);
+      coefficients_location++;
+
+      }
+      else if (y == params.ncells_y-1){
+      entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y)/2)*(arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))) + (arp.transmissivity(x,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(params.x_partial/(2*arp.effective_storativity(x,y))) +1;
+      coefficients[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+
+
+      //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+      entry = -arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc-1,entry );
+      coefficients_location++;
+
+
+
+      //finally, do the South diagonal, offset by +(ncells_y).
+      entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc+params.ncells_y, entry);
+      coefficients_location++;
+
+      }
+      else{
+      entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))) + (arp.transmissivity(x,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(params.x_partial/(2*arp.effective_storativity(x,y))) +1;
+      coefficients[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+            //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      entry = -arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc+1,entry );
+      coefficients_location++;
+
+      //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+      entry = -arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc-1,entry );
+      coefficients_location++;
+
+
+
+      //finally, do the South diagonal, offset by +(ncells_y).
+      entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc+params.ncells_y, entry);
+      coefficients_location++;
+      }
+    }
+    else if (x == params.ncells_x-1){
+      if(y == 0){
+      entry =  (arp.transmissivity(x,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y)/2)*(params.x_partial/(2*arp.effective_storativity(x,y))) +1;
+      coefficients[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+            //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      entry = -arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc+1,entry );
+      coefficients_location++;
+
+
+
+      //Now let's do the North diagonal. Offset by -(ncells_y).
+      entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc-params.ncells_y, entry);
+      coefficients_location++;
+
+
+      }
+      else if (y == params.ncells_y-1){
+      entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y)/2)*(arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y)/2)*(params.x_partial/(2*arp.effective_storativity(x,y))) +1;
+      coefficients[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+
+      //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+      entry = -arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc-1,entry );
+      coefficients_location++;
+
+      //Now let's do the North diagonal. Offset by -(ncells_y).
+      entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc-params.ncells_y, entry);
+      coefficients_location++;
+
+
+      }
+      else{
+      entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y)/2)*(params.x_partial/(2*arp.effective_storativity(x,y))) +1;
+      coefficients[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+            //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      entry = -arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc+1,entry );
+      coefficients_location++;
+
+      //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+      entry = -arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc-1,entry );
+      coefficients_location++;
+
+      //Now let's do the North diagonal. Offset by -(ncells_y).
+      entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc-params.ncells_y, entry);
+      coefficients_location++;
+
+      }
+    }
+    else if (y == 0){
+      entry =  (arp.transmissivity(x,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(params.x_partial/(2*arp.effective_storativity(x,y))) +1;
+      coefficients[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+            //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      entry = -arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))*((arp.transmissivity(x,y+1) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc+1,entry );
+      coefficients_location++;
+
+
+      //Now let's do the North diagonal. Offset by -(ncells_y).
+      entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc-params.ncells_y, entry);
+      coefficients_location++;
+
+      //finally, do the South diagonal, offset by +(ncells_y).
+      entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc+params.ncells_y, entry);
+      coefficients_location++;
+    }
+    else if (y == params.ncells_y-1){
+      entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y)/2)*(arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(params.x_partial/(2*arp.effective_storativity(x,y))) +1;
+      coefficients[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+      //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+      entry = -arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))*((arp.transmissivity(x,y-1) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc-1,entry );
+      coefficients_location++;
+
+      //Now let's do the North diagonal. Offset by -(ncells_y).
+      entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x-1,y) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc-params.ncells_y, entry);
+      coefficients_location++;
+
+      //finally, do the South diagonal, offset by +(ncells_y).
+      entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
+      coefficients[coefficients_location] = T(main_loc,main_loc+params.ncells_y, entry);
+      coefficients_location++;
+    }
+    else{
+
       entry =  (arp.transmissivity(x,y-1)/2 + arp.transmissivity(x,y) + arp.transmissivity(x,y+1)/2)*(arp.scalar_array_y(x,y)/(arp.effective_storativity(x,y))) + (arp.transmissivity(x-1,y)/2 + arp.transmissivity(x,y) + arp.transmissivity(x+1,y)/2)*(params.x_partial/(2*arp.effective_storativity(x,y))) +1;
       coefficients[coefficients_location] = T(main_loc,main_loc, entry);
       coefficients_location++;
@@ -126,6 +288,12 @@ void first_half(const Parameters &params,ArrayPack &arp){
       entry = -params.x_partial/(2*arp.effective_storativity(x,y))*((arp.transmissivity(x+1,y) + arp.transmissivity(x,y))/2.);
       coefficients[coefficients_location] = T(main_loc,main_loc+params.ncells_y, entry);
       coefficients_location++;
+    }
+
+
+
+
+
   }
 
   //use the triplet vector to populate the matrix, A.
@@ -165,8 +333,8 @@ void first_half(const Parameters &params,ArrayPack &arp){
 // We then compute the new water table depths after a full time-step has passed.
 void second_half(Parameters &params,ArrayPack &arp){
 
-  std::vector<T> coefficients_A((params.ncells_x-2)*(params.ncells_y-2)*5);
-  std::vector<T> coefficients_B((params.ncells_x-2)*(params.ncells_y-2)*5);
+  std::vector<T> coefficients_A((params.ncells_x)*(params.ncells_y)*5);
+  std::vector<T> coefficients_B((params.ncells_x)*(params.ncells_y)*5);
 
   SpMat A(params.ncells_x*params.ncells_y,params.ncells_x*params.ncells_y);
   SpMat B(params.ncells_x*params.ncells_y,params.ncells_x*params.ncells_y);
@@ -192,14 +360,202 @@ void second_half(Parameters &params,ArrayPack &arp){
 
   ////SECOND SOLVE
   //populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
-  for(int x=1;x<params.ncells_x-1; x++)
-  for(int y=1;y<params.ncells_y-1; y++){
+  for(int x=0;x<params.ncells_x; x++)
+  for(int y=0;y<params.ncells_y; y++){
     //The row and column that the current cell will be stored in in matrix A.
     //This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
     //All of the N,E,S,W directions should be in the same row, but the column will differ.
     main_loc = y+(x*params.ncells_y);
     //start with the central diagonal, which contains the info for the current cell:
     //This diagonal will be populated for all cells in the domain.
+    if(x==0){
+      if(y ==0){
+      entry =  1. - (arp.scalar_array_x(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) - (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_B[coefficients_location] = T(main_loc,main_loc, entry);
+      entry =  1. + (arp.scalar_array_x(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) + (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_A[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+     //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      entry = arp.scalar_array_y(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x,y+1))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc+1,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc+1,-entry );
+      coefficients_location++;
+
+      //finally, do the South diagonal, offset by +(ncells_y).
+      entry = arp.scalar_array_x(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x+1,y))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc+params.ncells_y,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc+params.ncells_y,-entry );
+      coefficients_location++;
+      }
+      else if (y == params.ncells_y-1){
+      entry =  1. - (arp.scalar_array_x(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) - (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.));
+      coefficients_B[coefficients_location] = T(main_loc,main_loc, entry);
+      entry =  1. + (arp.scalar_array_x(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) + (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.));
+      coefficients_A[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+      //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+      entry = arp.scalar_array_y(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x,y-1))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc-1,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc-1,-entry );
+      coefficients_location++;
+
+      //finally, do the South diagonal, offset by +(ncells_y).
+      entry = arp.scalar_array_x(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x+1,y))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc+params.ncells_y,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc+params.ncells_y,-entry );
+      coefficients_location++;
+      }
+      else{
+      entry =  1. - (arp.scalar_array_x(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) - (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_B[coefficients_location] = T(main_loc,main_loc, entry);
+      entry =  1. + (arp.scalar_array_x(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) + (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_A[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+     //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      entry = arp.scalar_array_y(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x,y+1))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc+1,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc+1,-entry );
+      coefficients_location++;
+
+      //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+      entry = arp.scalar_array_y(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x,y-1))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc-1,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc-1,-entry );
+      coefficients_location++;
+
+      //finally, do the South diagonal, offset by +(ncells_y).
+      entry = arp.scalar_array_x(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x+1,y))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc+params.ncells_y,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc+params.ncells_y,-entry );
+      coefficients_location++;
+      }
+    }
+    else if(x == params.ncells_x-1){
+      if(y ==0){
+      entry =  1. - (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.)) - (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_B[coefficients_location] = T(main_loc,main_loc, entry);
+      entry =  1. + (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.)) + (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_A[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+     //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      entry = arp.scalar_array_y(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x,y+1))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc+1,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc+1,-entry );
+      coefficients_location++;
+
+       //Now let's do the North diagonal. Offset by -(ncells_y).
+      entry = arp.scalar_array_x(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x-1,y))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc-params.ncells_y,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc-params.ncells_y,-entry );
+      coefficients_location++;
+
+      }
+      else if (y == params.ncells_y-1){
+      entry =  1. - (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.)) - (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.));
+      coefficients_B[coefficients_location] = T(main_loc,main_loc, entry);
+      entry =  1. + (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.)) + (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.));
+      coefficients_A[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+     //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+      entry = arp.scalar_array_y(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x,y-1))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc-1,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc-1,-entry );
+      coefficients_location++;
+
+      //Now let's do the North diagonal. Offset by -(ncells_y).
+      entry = arp.scalar_array_x(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x-1,y))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc-params.ncells_y,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc-params.ncells_y,-entry );
+      coefficients_location++;
+
+       }
+      else{
+      entry =  1. - (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.)) - (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_B[coefficients_location] = T(main_loc,main_loc, entry);
+      entry =  1. + (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.)) + (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_A[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+     //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      entry = arp.scalar_array_y(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x,y+1))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc+1,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc+1,-entry );
+      coefficients_location++;
+
+      //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+      entry = arp.scalar_array_y(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x,y-1))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc-1,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc-1,-entry );
+      coefficients_location++;
+
+      //Now let's do the North diagonal. Offset by -(ncells_y).
+      entry = arp.scalar_array_x(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x-1,y))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc-params.ncells_y,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc-params.ncells_y,-entry );
+      coefficients_location++;
+
+
+      }    }
+    else if (y == 0){
+
+      entry =  1. - (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) - (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_B[coefficients_location] = T(main_loc,main_loc, entry);
+      entry =  1. + (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) + (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
+      coefficients_A[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+     //Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      entry = arp.scalar_array_y(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x,y+1))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc+1,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc+1,-entry );
+      coefficients_location++;
+
+      //Now let's do the North diagonal. Offset by -(ncells_y).
+      entry = arp.scalar_array_x(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x-1,y))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc-params.ncells_y,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc-params.ncells_y,-entry );
+      coefficients_location++;
+
+      //finally, do the South diagonal, offset by +(ncells_y).
+      entry = arp.scalar_array_x(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x+1,y))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc+params.ncells_y,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc+params.ncells_y,-entry );
+      coefficients_location++;
+    }
+    else if (y==params.ncells_y-1){
+
+      entry =  1. - (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) - (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.));
+      coefficients_B[coefficients_location] = T(main_loc,main_loc, entry);
+      entry =  1. + (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) + (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y)/4.));
+      coefficients_A[coefficients_location] = T(main_loc,main_loc, entry);
+      coefficients_location++;
+
+      //Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+      entry = arp.scalar_array_y(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x,y-1))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc-1,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc-1,-entry );
+      coefficients_location++;
+
+      //Now let's do the North diagonal. Offset by -(ncells_y).
+      entry = arp.scalar_array_x(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x-1,y))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc-params.ncells_y,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc-params.ncells_y,-entry );
+      coefficients_location++;
+
+      //finally, do the South diagonal, offset by +(ncells_y).
+      entry = arp.scalar_array_x(x,y)*(arp.transmissivity(x,y) + arp.transmissivity(x+1,y))/4.;
+      coefficients_B[coefficients_location] = T(main_loc,main_loc+params.ncells_y,entry );
+      coefficients_A[coefficients_location] = T(main_loc,main_loc+params.ncells_y,-entry );
+      coefficients_location++;
+    }
+    else{
+
+
       entry =  1. - (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) - (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
       coefficients_B[coefficients_location] = T(main_loc,main_loc, entry);
       entry =  1. + (arp.scalar_array_x(x,y)*(arp.transmissivity(x-1,y)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x+1,y)/4.)) + (arp.scalar_array_y(x,y)*(arp.transmissivity(x,y-1)/4. + arp.transmissivity(x,y)/2. + arp.transmissivity(x,y+1)/4.));
@@ -229,6 +585,7 @@ void second_half(Parameters &params,ArrayPack &arp){
       coefficients_B[coefficients_location] = T(main_loc,main_loc+params.ncells_y,entry );
       coefficients_A[coefficients_location] = T(main_loc,main_loc+params.ncells_y,-entry );
       coefficients_location++;
+    }
   }
 
   std::cerr<<"finished second set of matrices"<<std::endl;
