@@ -461,30 +461,28 @@ void second_half(Parameters& params, ArrayPack& arp) {
   // Recharge is added here because of the form that the equation takes - can't add it prior to doing the B*b multiplication.
   for (int y = 0; y < params.ncells_y; y++)
     for (int x = 0; x < params.ncells_x; x++) {
-      if (arp.land_mask(x, y) == 1) {  // skip ocean cells
-        continue;
-      }
-
-      const double rech_change = arp.rech(x, y) / seconds_in_a_year * params.deltat;
-      params.total_added_recharge += rech_change * arp.cell_area[y];
-      if (arp.original_wtd(x, y) >= 0) {  // there was surface water, so recharge may be negative
-        b(y + (x * params.ncells_y)) += rech_change;
-        guess(y + (x * params.ncells_y)) += rech_change;
-        if (arp.original_wtd(x, y) + rech_change < 0) {
-          const double temp = -(arp.original_wtd(x, y) + rech_change);
-          b(y + (x * params.ncells_y)) += temp;
-          guess(y + (x * params.ncells_y)) += temp;
-          params.total_added_recharge += temp * arp.cell_area[y];  // in this scenario, there has been a negative amount of recharge, so temp here will be positive and remove the extra amount that was spuriously subtracted.
-        }
-      } else if (rech_change > 0) {  // when there is no surface water, only positive changes in recharge are allowed
-        const double GW_space = -arp.original_wtd(x, y) * static_cast<double>(arp.porosity(x, y));
-        if (GW_space > rech_change) {
-          b(y + (x * params.ncells_y)) += rech_change / static_cast<double>(arp.porosity(x, y));
-          guess(y + (x * params.ncells_y)) += rech_change / static_cast<double>(arp.porosity(x, y));
-        } else {
-          const double temp = (rech_change - GW_space) - arp.original_wtd(x, y);
-          b(y + (x * params.ncells_y)) += temp;
-          guess(y + (x * params.ncells_y)) += temp;
+      if (arp.land_mask(x, y) == 1) {  // only add recharge to land cells
+        const double rech_change = arp.rech(x, y) / seconds_in_a_year * params.deltat;
+        params.total_added_recharge += rech_change * arp.cell_area[y];
+        if (arp.original_wtd(x, y) >= 0) {  // there was surface water, so recharge may be negative
+          b(y + (x * params.ncells_y)) += rech_change;
+          guess(y + (x * params.ncells_y)) += rech_change;
+          if (arp.original_wtd(x, y) + rech_change < 0) {
+            const double temp = -(arp.original_wtd(x, y) + rech_change);
+            b(y + (x * params.ncells_y)) += temp;
+            guess(y + (x * params.ncells_y)) += temp;
+            params.total_added_recharge += temp * arp.cell_area[y];  // in this scenario, there has been a negative amount of recharge, so temp here will be positive and remove the extra amount that was spuriously subtracted.
+          }
+        } else if (rech_change > 0) {  // when there is no surface water, only positive changes in recharge are allowed
+          const double GW_space = -arp.original_wtd(x, y) * static_cast<double>(arp.porosity(x, y));
+          if (GW_space > rech_change) {
+            b(y + (x * params.ncells_y)) += rech_change / static_cast<double>(arp.porosity(x, y));
+            guess(y + (x * params.ncells_y)) += rech_change / static_cast<double>(arp.porosity(x, y));
+          } else {
+            const double temp = (rech_change - GW_space) - arp.original_wtd(x, y);
+            b(y + (x * params.ncells_y)) += temp;
+            guess(y + (x * params.ncells_y)) += temp;
+          }
         }
       }
     }
