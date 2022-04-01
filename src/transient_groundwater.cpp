@@ -109,10 +109,10 @@ void first_half(const Parameters& params, ArrayPack& arp) {
         coefficients[coefficients_location++] = T(main_loc, main_loc - 1, diagonal1_method(x, y, 0, -1, 1));
 
         // Now let's do the North diagonal. Offset by -(ncells_y).
-        coefficients[coefficients_location++] = T(main_loc, main_loc - params.ncells_y, diagonal1_method(x, y, -1, 0, 2));
+        coefficients[coefficients_location++] = T(main_loc, main_loc - params.ncells_y, diagonal2_method(x, y, -1, 0, 2));
 
         // finally, do the South diagonal, offset by +(ncells_y).
-        coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, diagonal1_method(x, y, 1, 0, 2));
+        coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, diagonal2_method(x, y, 1, 0, 2));
       } else if (x == 0) {
         if (y == 0) {
           entry                                 = (arp.transmissivity(x, y) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x, y + 1) / 2) * (2 * arp.scalar_array_y(x, y) / (arp.effective_storativity(x, y))) + (arp.transmissivity(x, y) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x + 1, y) / 2) * (params.x_partial / (arp.effective_storativity(x, y))) + 1;
