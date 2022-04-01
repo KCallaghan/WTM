@@ -69,12 +69,14 @@ void first_half(const Parameters& params, ArrayPack& arp) {
 // We also populate a 'guess', which consists of a water table (wtd_T) that in later iterations
 // has already been modified for changing transmissivity closer to the final answer.
 #pragma omp parallel for default(none) shared(arp, b, guess, params) collapse(2)
+
   for (int x = 0; x < params.ncells_x; x++) {
     for (int y = 0; y < params.ncells_y; y++) {
       arp.wtd_T_iteration(x, y)        = arp.wtd_T(x, y);
       b(y + (x * params.ncells_y))     = arp.wtd(x, y) + static_cast<double>(arp.topo(x, y));  // wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
       guess(y + (x * params.ncells_y)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
     }
+
   }
 
   double entry              = std::numeric_limits<double>::signaling_NaN();
@@ -190,7 +192,6 @@ void first_half(const Parameters& params, ArrayPack& arp) {
         coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, diagonal2_method(x, y, 1, 0, 2));
       }
     }
-
   // use the triplet vector to populate the matrix, A.
   A.setFromTriplets(coefficients.begin(), coefficients.end());
 
