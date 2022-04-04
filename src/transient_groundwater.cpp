@@ -200,163 +200,37 @@ void second_half(Parameters& params, ArrayPack& arp) {
       main_loc = y + (x * params.ncells_y);
       // start with the central diagonal, which contains the info for the current cell:
       // This diagonal will be populated for all cells in the domain.
-      if (x != 0 && x != params.ncells_x - 1 && y != 0 && y != params.ncells_y - 1) {
-        coefficients_B[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, -1, -1, 1, -1, 1));
-        coefficients_A[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, 1, -1, 1, -1, 1));
-        coefficients_location++;
 
-        // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-        entry                                 = div4_method_y(x, y, 1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc + 1, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc + 1, -entry);
-        coefficients_location++;
+      coefficients_B[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, -1, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
+      coefficients_A[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, 1, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
+      coefficients_location++;
 
+      if (x != 0) {
+        // Do the North diagonal. Offset by -(ncells_y).
+        entry                                 = div4_method_x(x, y, -1);
+        coefficients_B[coefficients_location] = T(main_loc, main_loc - params.ncells_y, entry);
+        coefficients_A[coefficients_location] = T(main_loc, main_loc - params.ncells_y, -entry);
+        coefficients_location++;
+      }
+      if (x != params.ncells_x - 1) {
+        // Do the South diagonal, offset by +(ncells_y).
+        entry                                 = div4_method_x(x, y, 1);
+        coefficients_B[coefficients_location] = T(main_loc, main_loc + params.ncells_y, entry);
+        coefficients_A[coefficients_location] = T(main_loc, main_loc + params.ncells_y, -entry);
+        coefficients_location++;
+      }
+      if (y != 0) {
         // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
         entry                                 = div4_method_y(x, y, -1);
         coefficients_B[coefficients_location] = T(main_loc, main_loc - 1, entry);
         coefficients_A[coefficients_location] = T(main_loc, main_loc - 1, -entry);
         coefficients_location++;
-
-        // Now let's do the North diagonal. Offset by -(ncells_y).
-        entry                                 = div4_method_x(x, y, -1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc - params.ncells_y, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc - params.ncells_y, -entry);
-        coefficients_location++;
-
-        // finally, do the South diagonal, offset by +(ncells_y).
-        entry                                 = div4_method_x(x, y, 1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc + params.ncells_y, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc + params.ncells_y, -entry);
-        coefficients_location++;
-      } else if (x == 0) {
-        if (y == 0) {
-          coefficients_B[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, -1, 0, 1, 0, 1));
-          coefficients_A[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, 1, 0, 1, 0, 1));
-          coefficients_location++;
-
-          // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-          entry                                 = div4_method_y(x, y, 1);
-          coefficients_B[coefficients_location] = T(main_loc, main_loc + 1, entry);
-          coefficients_A[coefficients_location] = T(main_loc, main_loc + 1, -entry);
-          coefficients_location++;
-        } else if (y == params.ncells_y - 1) {
-          coefficients_B[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, -1, 0, 1, -1, 0));
-          coefficients_A[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, 1, 0, 1, -1, 0));
-          coefficients_location++;
-
-          // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-          entry                                 = div4_method_y(x, y, -1);
-          coefficients_B[coefficients_location] = T(main_loc, main_loc - 1, entry);
-          coefficients_A[coefficients_location] = T(main_loc, main_loc - 1, -entry);
-          coefficients_location++;
-        } else {
-          coefficients_B[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, -1, 0, 1, -1, 1));
-          coefficients_A[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, 1, 0, 1, -1, 1));
-          coefficients_location++;
-
-          // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-          entry                                 = div4_method_y(x, y, 1);
-          coefficients_B[coefficients_location] = T(main_loc, main_loc + 1, entry);
-          coefficients_A[coefficients_location] = T(main_loc, main_loc + 1, -entry);
-          coefficients_location++;
-
-          // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-          entry                                 = div4_method_y(x, y, -1);
-          coefficients_B[coefficients_location] = T(main_loc, main_loc - 1, entry);
-          coefficients_A[coefficients_location] = T(main_loc, main_loc - 1, -entry);
-          coefficients_location++;
-        }
-        // finally, do the South diagonal, offset by +(ncells_y).
-        entry                                 = div4_method_x(x, y, 1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc + params.ncells_y, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc + params.ncells_y, -entry);
-        coefficients_location++;
-      } else if (x == params.ncells_x - 1) {
-        if (y == 0) {
-          coefficients_B[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, -1, -1, 0, 0, 1));
-          coefficients_A[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, 1, -1, 0, 0, 1));
-          coefficients_location++;
-
-          // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-          entry                                 = div4_method_y(x, y, 1);
-          coefficients_B[coefficients_location] = T(main_loc, main_loc + 1, entry);
-          coefficients_A[coefficients_location] = T(main_loc, main_loc + 1, -entry);
-          coefficients_location++;
-        } else if (y == params.ncells_y - 1) {
-          coefficients_B[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, -1, -1, 0, -1, 0));
-          coefficients_A[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, 1, -1, 0, -1, 0));
-          coefficients_location++;
-
-          // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-          entry                                 = div4_method_y(x, y, -1);
-          coefficients_B[coefficients_location] = T(main_loc, main_loc - 1, entry);
-          coefficients_A[coefficients_location] = T(main_loc, main_loc - 1, -entry);
-          coefficients_location++;
-        } else {
-          coefficients_B[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, -1, -1, 0, -1, 1));
-          coefficients_A[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, 1, -1, 0, -1, 1));
-          coefficients_location++;
-
-          // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-          entry                                 = div4_method_y(x, y, 1);
-          coefficients_B[coefficients_location] = T(main_loc, main_loc + 1, entry);
-          coefficients_A[coefficients_location] = T(main_loc, main_loc + 1, -entry);
-          coefficients_location++;
-
-          // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-          entry                                 = div4_method_y(x, y, -1);
-          coefficients_B[coefficients_location] = T(main_loc, main_loc - 1, entry);
-          coefficients_A[coefficients_location] = T(main_loc, main_loc - 1, -entry);
-          coefficients_location++;
-        }
-        // Now let's do the North diagonal. Offset by -(ncells_y).
-        entry                                 = div4_method_x(x, y, -1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc - params.ncells_y, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc - params.ncells_y, -entry);
-        coefficients_location++;
-      } else if (y == 0) {
-        coefficients_B[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, -1, -1, 1, 0, 1));
-        coefficients_A[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, 1, -1, 1, 0, 1));
-        coefficients_location++;
-
+      }
+      if (y != params.ncells_y - 1) {
         // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
         entry                                 = div4_method_y(x, y, 1);
         coefficients_B[coefficients_location] = T(main_loc, main_loc + 1, entry);
         coefficients_A[coefficients_location] = T(main_loc, main_loc + 1, -entry);
-        coefficients_location++;
-
-        // Now let's do the North diagonal. Offset by -(ncells_y).
-        entry                                 = div4_method_x(x, y, -1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc - params.ncells_y, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc - params.ncells_y, -entry);
-        coefficients_location++;
-
-        // finally, do the South diagonal, offset by +(ncells_y).
-        entry                                 = div4_method_x(x, y, 1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc + params.ncells_y, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc + params.ncells_y, -entry);
-        coefficients_location++;
-      } else if (y == params.ncells_y - 1) {
-        coefficients_B[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, -1, -1, 1, -1, 0));
-        coefficients_A[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, 1, -1, 1, -1, 0));
-        coefficients_location++;
-
-        // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-        entry                                 = div4_method_y(x, y, -1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc - 1, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc - 1, -entry);
-        coefficients_location++;
-
-        // Now let's do the North diagonal. Offset by -(ncells_y).
-        entry                                 = div4_method_x(x, y, -1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc - params.ncells_y, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc - params.ncells_y, -entry);
-        coefficients_location++;
-
-        // finally, do the South diagonal, offset by +(ncells_y).
-        entry                                 = div4_method_x(x, y, 1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc + params.ncells_y, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc + params.ncells_y, -entry);
         coefficients_location++;
       }
     }
