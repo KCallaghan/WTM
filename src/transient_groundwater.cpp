@@ -88,7 +88,7 @@ void first_half(const Parameters& params, ArrayPack& arp) {
 
   const auto diagonal2_method = [&](const int x, const int y, const int dx, const int dy, const double div) { return -params.x_partial / (arp.effective_storativity(x, y)) * ((arp.transmissivity(x + dx, y + dy) + arp.transmissivity(x, y)) / div); };
 
-  const auto diagonal3_method = [&](const int x, const int y, const int dx1, const int d2, const int dy1, const int dy2) {
+  const auto diagonal3_method = [&](const int x, const int y, const int dx1, const int dx2, const int dy1, const int dy2) {
     return (arp.transmissivity(x, y + dy1) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x, y + dy2) / 2) * (2 * arp.scalar_array_y(x, y) / (arp.effective_storativity(x, y))) + (arp.transmissivity(x + dx1, y) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x + dx2, y) / 2) * (params.x_partial / (arp.effective_storativity(x, y))) + 1;
   };
 
