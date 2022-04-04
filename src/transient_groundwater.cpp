@@ -91,61 +91,134 @@ void first_half(const Parameters& params, ArrayPack& arp) {
     return (arp.transmissivity(x, y + dy1) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x, y + dy2) / 2) * (2 * arp.scalar_array_y(x, y) / (arp.effective_storativity(x, y))) + (arp.transmissivity(x + dx1, y) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x + dx2, y) / 2) * (params.x_partial / (arp.effective_storativity(x, y))) + 1;
   };
 
-  for (int x = 0; x < params.ncells_x; x++)
-    for (int y = 0; y < params.ncells_y; y++) {
+  // first edge loop: the edge where x = 0
+  for (int y = 0; y < params.ncells_y; y++) {
+    const int x = 0;
+    // The row and column that the current cell will be stored in in matrix A.
+    // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
+    // All of the N,E,S,W directions should be in the same row, but the column will differ.
+    main_loc = y + (x * params.ncells_y);
+    // start with the central diagonal, which contains the info for the current cell:
+    // This diagonal will be populated for all cells in the domain.
+
+    // populate the main diagonal:
+    coefficients[coefficients_location++] = T(main_loc, main_loc, diagonal3_method(x, y, 0, 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
+
+    // Do the South diagonal, offset by +(ncells_y). When x == 0, there is no north diagonal.
+    coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, diagonal2_method(x, y, 1, 0, 2));
+
+    if (y != 0) {
+      // West diagonal. Opposite of the East. Located at (i,j-1). Doesn't exist when y == 0.
+      coefficients[coefficients_location++] = T(main_loc, main_loc - 1, diagonal1_method(x, y, 0, -1, 1));
+    }
+    if (y != params.ncells_y - 1) {
+      // East diagonal. Because C++ is row-major, the East location is at (i,j+1). Does not exist when y == params.ncells_y -1.
+      coefficients[coefficients_location++] = T(main_loc, main_loc + 1, diagonal1_method(x, y, 0, 1, 1));
+    }
+  }
+
+  // second edge loop: the edge where x = params.ncells_x - 1
+  for (int y = 0; y < params.ncells_y; y++) {
+    const int x = params.ncells_x - 1;
+    // The row and column that the current cell will be stored in in matrix A.
+    // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
+    // All of the N,E,S,W directions should be in the same row, but the column will differ.
+    main_loc = y + (x * params.ncells_y);
+    // start with the central diagonal, which contains the info for the current cell:
+    // This diagonal will be populated for all cells in the domain.
+
+    // populate the main diagonal:
+    coefficients[coefficients_location++] = T(main_loc, main_loc, diagonal3_method(x, y, -1, 0, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
+
+    // Do the North diagonal. Offset by -(ncells_y). When x == params.ncells_x-1, there is no south diagonal.
+    coefficients[coefficients_location++] = T(main_loc, main_loc - params.ncells_y, diagonal2_method(x, y, -1, 0, 2));
+
+    if (y != 0) {
+      // West diagonal. Opposite of the East. Located at (i,j-1). Doesn't exist when y == 0.
+      coefficients[coefficients_location++] = T(main_loc, main_loc - 1, diagonal1_method(x, y, 0, -1, 1));
+    }
+    if (y != params.ncells_y - 1) {
+      // East diagonal. Because C++ is row-major, the East location is at (i,j+1). Does not exist when y == params.ncells_y -1.
+      coefficients[coefficients_location++] = T(main_loc, main_loc + 1, diagonal1_method(x, y, 0, 1, 1));
+    }
+  }
+
+  // third edge loop: the edge where y = 0
+  for (int x = 0; x < params.ncells_x; x++) {
+    const int y = 0;
+    // The row and column that the current cell will be stored in in matrix A.
+    // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
+    // All of the N,E,S,W directions should be in the same row, but the column will differ.
+    main_loc = y + (x * params.ncells_y);
+    // start with the central diagonal, which contains the info for the current cell:
+    // This diagonal will be populated for all cells in the domain.
+
+    // populate the main diagonal:
+    coefficients[coefficients_location++] = T(main_loc, main_loc, diagonal3_method(x, y, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, 0, 1));
+
+    // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1). When y == 0, there is no west diagonal.
+    coefficients[coefficients_location++] = T(main_loc, main_loc + 1, diagonal1_method(x, y, 0, 1, 1));
+
+    if (x != 0) {
+      // Do the North diagonal. Offset by -(ncells_y). Doesn't exist when x == 0.
+      coefficients[coefficients_location++] = T(main_loc, main_loc - params.ncells_y, diagonal2_method(x, y, -1, 0, 2));
+    }
+    if (x != params.ncells_x - 1) {
+      // Do the South diagonal, offset by +(ncells_y). Doesn't exist when x == params.ncells_x -1.
+      coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, diagonal2_method(x, y, 1, 0, 2));
+    }
+  }
+
+  // fourth edge loop: the edge where y == params.ncells_y
+  for (int x = 0; x < params.ncells_x; x++) {
+    const int y = params.ncells_y - 1;
+    // The row and column that the current cell will be stored in in matrix A.
+    // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
+    // All of the N,E,S,W directions should be in the same row, but the column will differ.
+    main_loc = y + (x * params.ncells_y);
+    // start with the central diagonal, which contains the info for the current cell:
+    // This diagonal will be populated for all cells in the domain.
+
+    // populate the main diagonal:
+    coefficients[coefficients_location++] = T(main_loc, main_loc, diagonal3_method(x, y, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, -1, 0));
+
+    // Next is the West diagonal. Opposite of the East. Located at (i,j-1). When y == params.ncells_y-1, there is no east diagonal.
+    coefficients[coefficients_location++] = T(main_loc, main_loc - 1, diagonal1_method(x, y, 0, -1, 1));
+
+    if (x != 0) {
+      // Do the North diagonal. Offset by -(ncells_y). Doesn't exist when x == 0.
+      coefficients[coefficients_location++] = T(main_loc, main_loc - params.ncells_y, diagonal2_method(x, y, -1, 0, 2));
+    }
+    if (x != params.ncells_x - 1) {
+      // Do the South diagonal, offset by +(ncells_y). Doesn't exist when x == params.ncells_x -1.
+      coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, diagonal2_method(x, y, 1, 0, 2));
+    }
+  }
+
+  // populate all non-edge cases
+  for (int x = 1; x < params.ncells_x - 1; x++)
+    for (int y = 1; y < params.ncells_y - 1; y++) {
       // The row and column that the current cell will be stored in in matrix A.
       // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
       // All of the N,E,S,W directions should be in the same row, but the column will differ.
       main_loc = y + (x * params.ncells_y);
-      // start with the central diagonal, which contains the info for the current cell:
-      // This diagonal will be populated for all cells in the domain.
-      int dx1 = -1;
-      int dx2 = 1;
-      int dy1 = -1;
-      int dy2 = 1;
-
-      // if we are at the borders of the matrix, then we can't get neighbouring cells' values from the direction of the border.
-      // instead, we estimate these values as == the value for the current cell. To do so, we set the offset to 0 for that direction.
-      if (x == 0)
-        dx1 = 0;
-      else if (x == params.ncells_x - 1)
-        dx2 = 0;
-      if (y == 0)
-        dy1 = 0;
-      else if (y == params.ncells_y - 1)
-        dy2 = 0;
 
       // populate the main diagonal:
-      coefficients[coefficients_location++] = T(main_loc, main_loc, diagonal3_method(x, y, dx1, dx2, dy1, dy2));
+      coefficients[coefficients_location++] = T(main_loc, main_loc, diagonal3_method(x, y, -1, 1, -1, 1));
 
-      if (x != 0 && x != params.ncells_x - 1) {
-        // Now let's do the North diagonal. Offset by -(ncells_y).
-        coefficients[coefficients_location++] = T(main_loc, main_loc - params.ncells_y, diagonal2_method(x, y, -1, 0, 2));
+      // Now let's do the North diagonal. Offset by -(ncells_y).
+      coefficients[coefficients_location++] = T(main_loc, main_loc - params.ncells_y, diagonal2_method(x, y, -1, 0, 2));
 
-        // next, do the South diagonal, offset by +(ncells_y).
-        coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, diagonal2_method(x, y, 1, 0, 2));
-      } else if (x == 0) {
-        // Do the South diagonal, offset by +(ncells_y). When x == 0, there is no north diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, diagonal2_method(x, y, 1, 0, 2));
-      } else if (x == params.ncells_x - 1) {
-        // Do the North diagonal. Offset by -(ncells_y). When x == params.ncells_x-1, there is no south diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc - params.ncells_y, diagonal2_method(x, y, -1, 0, 2));
-      }
+      // next, do the South diagonal, offset by +(ncells_y).
+      coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, diagonal2_method(x, y, 1, 0, 2));
 
-      if (y != 0 && y != params.ncells_y - 1) {
-        // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-        coefficients[coefficients_location++] = T(main_loc, main_loc + 1, diagonal1_method(x, y, 0, 1, 1));
+      // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+      coefficients[coefficients_location++] = T(main_loc, main_loc + 1, diagonal1_method(x, y, 0, 1, 1));
 
-        // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-        coefficients[coefficients_location++] = T(main_loc, main_loc - 1, diagonal1_method(x, y, 0, -1, 1));
-      } else if (y == 0) {
-        // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1). When y == 0, there is no west diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc + 1, diagonal1_method(x, y, 0, 1, 1));
-      } else if (y == params.ncells_y - 1) {
-        // Next is the West diagonal. Opposite of the East. Located at (i,j-1). When y == params.ncells_y-1, there is no east diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc - 1, diagonal1_method(x, y, 0, -1, 1));
-      }
+      // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+      coefficients[coefficients_location++] = T(main_loc, main_loc - 1, diagonal1_method(x, y, 0, -1, 1));
     }
+
   // use the triplet vector to populate the matrix, A.
   A.setFromTriplets(coefficients.begin(), coefficients.end());
 
