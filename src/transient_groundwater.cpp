@@ -175,7 +175,6 @@ void second_half(Parameters& params, ArrayPack& arp) {
       guess(y + (x * params.ncells_y)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
     }
 
-  double entry;
   int main_loc              = 0;
   int coefficients_location = 0;
 
@@ -207,28 +206,28 @@ void second_half(Parameters& params, ArrayPack& arp) {
 
       if (x != 0) {
         // Do the North diagonal. Offset by -(ncells_y).
-        entry                                 = div4_method_x(x, y, -1);
+        const auto entry                      = div4_method_x(x, y, -1);
         coefficients_B[coefficients_location] = T(main_loc, main_loc - params.ncells_y, entry);
         coefficients_A[coefficients_location] = T(main_loc, main_loc - params.ncells_y, -entry);
         coefficients_location++;
       }
       if (x != params.ncells_x - 1) {
         // Do the South diagonal, offset by +(ncells_y).
-        entry                                 = div4_method_x(x, y, 1);
+        const auto entry                      = div4_method_x(x, y, 1);
         coefficients_B[coefficients_location] = T(main_loc, main_loc + params.ncells_y, entry);
         coefficients_A[coefficients_location] = T(main_loc, main_loc + params.ncells_y, -entry);
         coefficients_location++;
       }
       if (y != 0) {
         // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-        entry                                 = div4_method_y(x, y, -1);
+        const auto entry                      = div4_method_y(x, y, -1);
         coefficients_B[coefficients_location] = T(main_loc, main_loc - 1, entry);
         coefficients_A[coefficients_location] = T(main_loc, main_loc - 1, -entry);
         coefficients_location++;
       }
       if (y != params.ncells_y - 1) {
         // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-        entry                                 = div4_method_y(x, y, 1);
+        const auto entry                      = div4_method_y(x, y, 1);
         coefficients_B[coefficients_location] = T(main_loc, main_loc + 1, entry);
         coefficients_A[coefficients_location] = T(main_loc, main_loc + 1, -entry);
         coefficients_location++;
