@@ -132,12 +132,16 @@ void first_half(const Parameters& params, ArrayPack& arp) {
   std::cout << "compute" << std::endl;
   solver.compute(A);
 
-  assert(solver.info() == Eigen::Success);
+  if (solver.info() != Eigen::Success) {
+    throw std::runtime_error("Eigen sparse solver failed at the compute step!");
+  }
 
   std::cout << "solve" << std::endl;
   vec_x = solver.solveWithGuess(b, guess);
 
-  assert(solver.info() == Eigen::Success);
+  if (solver.info() != Eigen::Success) {
+    throw std::runtime_error("Eigen sparse solver failed at the solve step!");
+  }
 
   std::cout << "#iterations:     " << solver.iterations() << std::endl;
   std::cout << "estimated error: " << solver.error() << std::endl;
@@ -281,12 +285,16 @@ void second_half(Parameters& params, ArrayPack& arp) {
   std::cout << "compute" << std::endl;
   solver.compute(A);
 
-  assert(solver.info() == Eigen::Success);
+  if (solver.info() != Eigen::Success) {
+    throw std::runtime_error("Eigen sparse solver failed at the compute step!");
+  }
 
   std::cout << "solve" << std::endl;
   vec_x = solver.solveWithGuess(b, guess);
 
-  assert(solver.info() == Eigen::Success);
+  if (solver.info() != Eigen::Success) {
+    throw std::runtime_error("Eigen sparse solver failed at the solve step!");
+  }
 
   std::cout << "#iterations:     " << solver.iterations() << std::endl;
   std::cout << "estimated error: " << solver.error() << std::endl;
