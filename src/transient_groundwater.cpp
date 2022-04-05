@@ -83,12 +83,12 @@ void first_half(const Parameters& params, ArrayPack& arp) {
   // HALFWAY SOLVE
   // populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
 
-  const auto construct_e_w_diagonal_one = [&](const int x, const int y, const int dy) { return -arp.scalar_array_y(x, y) / (arp.effective_storativity(x, y)) * (arp.transmissivity(x, y + dy) + arp.transmissivity(x, y)); };
+  const auto construct_e_w_diagonal_one = [&](const int x, const int y, const int dy) { return -arp.scalar_array_y(x, y) * ((arp.transmissivity(x, y + dy) + arp.transmissivity(x, y)) / 2); };
 
-  const auto construct_n_s_diagonal_one = [&](const int x, const int y, const int dx) { return -params.x_partial / (arp.effective_storativity(x, y)) * ((arp.transmissivity(x + dx, y) + arp.transmissivity(x, y)) / 2); };
+  const auto construct_n_s_diagonal_one = [&](const int x, const int y, const int dx) { return -arp.scalar_array_x(x, y) * ((arp.transmissivity(x + dx, y) + arp.transmissivity(x, y)) / 2); };
 
   const auto construct_major_diagonal_one = [&](const int x, const int y, const int dx1, const int dx2, const int dy1, const int dy2) {
-    return (arp.transmissivity(x, y + dy1) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x, y + dy2) / 2) * (2 * arp.scalar_array_y(x, y) / (arp.effective_storativity(x, y))) + (arp.transmissivity(x + dx1, y) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x + dx2, y) / 2) * (params.x_partial / (arp.effective_storativity(x, y))) + 1;
+    return (arp.transmissivity(x, y + dy1) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x, y + dy2) / 2) * arp.scalar_array_y(x, y) + (arp.transmissivity(x + dx1, y) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x + dx2, y) / 2) * arp.scalar_array_x(x, y) + 1;
   };
 
   for (int x = 0; x < params.ncells_x; x++)
@@ -358,7 +358,8 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
           arp.effective_storativity(x, y) = static_cast<double>(arp.porosity(x, y));
         }
       }
-      arp.scalar_array_y(x, y) = params.deltat / (2. * arp.cellsize_e_w_metres[y] * arp.cellsize_e_w_metres[y]);
+      arp.scalar_array_y(x, y) = params.deltat / (arp.effective_storativity(x, y) * arp.cellsize_e_w_metres[y] * arp.cellsize_e_w_metres[y]);
+      arp.scalar_array_x(x, y) = params.x_partial / arp.effective_storativity(x, y);
     }
 
   for (int continue_picard = 0; continue_picard < 3; continue_picard++) {
@@ -371,6 +372,8 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
       for (int x = 0; x < params.ncells_x; x++) {
         if (arp.land_mask(x, y) != 0.f) {
           arp.effective_storativity(x, y) = updateEffectiveStorativity(arp.original_wtd(x, y), arp.wtd_T(x, y), arp.porosity(x, y), arp.effective_storativity(x, y));
+          arp.scalar_array_y(x, y)        = params.deltat / (arp.effective_storativity(x, y) * arp.cellsize_e_w_metres[y] * arp.cellsize_e_w_metres[y]);
+          arp.scalar_array_x(x, y)        = params.x_partial / arp.effective_storativity(x, y);
         }
       }
   }
