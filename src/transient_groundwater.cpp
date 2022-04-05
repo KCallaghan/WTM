@@ -40,48 +40,33 @@ double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, co
   }
 }
 
-// update the entire transmissivity array
-void updateTransmissivity(Parameters& params, ArrayPack& arp) {
-#pragma omp parallel for default(none) shared(arp, params) collapse(2)
-  for (int y = 0; y < params.ncells_y; y++)
-    for (int x = 0; x < params.ncells_x; x++) {
-      if (arp.land_mask(x, y) != 0.f) {
-        const double my_last_wtd = (arp.wtd_T(x, y) + arp.wtd_T_iteration(x, y)) / 2.;
-        arp.transmissivity(x, y) = depthIntegratedTransmissivity(my_last_wtd, arp.fdepth(x, y), static_cast<double>(arp.ksat(x, y)));
-      }
-    }
-}
-
 // The midpoint method consists of two main steps.
 // In the first step, we compute water tables at the time that is *half* of the full time-step.
 // To do so, we use an implicit backward-difference Euler method.
 // Using these half-time water tables, we compute the new transmissivity values
 // That will be used in the second step of the midpoint method below.
-void first_half(const Parameters& params, ArrayPack& arp) {
-  std::vector<T> coefficients((params.ncells_x) * (params.ncells_y) * 5);
-  Eigen::VectorXd b(params.ncells_x * params.ncells_y);
-  Eigen::VectorXd vec_x(params.ncells_x * params.ncells_y);
-  Eigen::VectorXd guess(params.ncells_x * params.ncells_y);
-  SpMat A(params.ncells_x * params.ncells_y, params.ncells_x * params.ncells_y);
+void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
+  std::vector<T> coefficients(ncells_x * ncells_y * 5);
+  Eigen::VectorXd b(ncells_x * ncells_y);
+  Eigen::VectorXd vec_x(ncells_x * ncells_y);
+  Eigen::VectorXd guess(ncells_x * ncells_y);
+  SpMat A(ncells_x * ncells_y, ncells_x * ncells_y);
 
 // We need to solve the vector-matrix equation Ax=b.
 // b consists of the current head values (i.e. water table depth + topography)
 // We also populate a 'guess', which consists of a water table (wtd_T) that in later iterations
 // has already been modified for changing transmissivity closer to the final answer.
-#pragma omp parallel for default(none) shared(arp, b, guess, params) collapse(2)
+#pragma omp parallel for default(none) shared(arp, b, guess, ncells_x, ncells_y) collapse(2)
 
-  for (int x = 0; x < params.ncells_x; x++) {
-    for (int y = 0; y < params.ncells_y; y++) {
-      arp.wtd_T_iteration(x, y)        = arp.wtd_T(x, y);
-      b(y + (x * params.ncells_y))     = arp.wtd(x, y) + static_cast<double>(arp.topo(x, y));  // wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
-      guess(y + (x * params.ncells_y)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
+  for (int y = 0; y < ncells_y; y++)
+    for (int x = 0; x < ncells_x; x++) {
+      arp.wtd_T_iteration(x, y) = arp.wtd_T(x, y);
+      b(y + (x * ncells_y))     = arp.wtd(x, y) + static_cast<double>(arp.topo(x, y));  // wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
+      guess(y + (x * ncells_y)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
     }
-  }
 
-  int main_loc              = 0;  // the cell to populate in the A matrix.
-  int coefficients_location = 0;
-  // HALFWAY SOLVE
-  // populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
+  //  HALFWAY SOLVE
+  //  populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
 
   const auto construct_e_w_diagonal_one = [&](const int x, const int y, const int dy) { return -arp.scalar_array_y(x, y) * ((arp.transmissivity(x, y + dy) + arp.transmissivity(x, y)) / 2); };
 
@@ -91,36 +76,40 @@ void first_half(const Parameters& params, ArrayPack& arp) {
     return (arp.transmissivity(x, y + dy1) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x, y + dy2) / 2) * arp.scalar_array_y(x, y) + (arp.transmissivity(x + dx1, y) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x + dx2, y) / 2) * arp.scalar_array_x(x, y) + 1;
   };
 
-  for (int x = 0; x < params.ncells_x; x++)
-    for (int y = 0; y < params.ncells_y; y++) {
+#pragma omp parallel for default(none) shared(arp, ncells_x, ncells_y, construct_major_diagonal_one, construct_e_w_diagonal_one, construct_n_s_diagonal_one, coefficients) collapse(2)
+  for (int x = 0; x < ncells_x; x++)
+    for (int y = 0; y < ncells_y; y++) {
       // The row and column that the current cell will be stored in in matrix A.
       // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
       // All of the N,E,S,W directions should be in the same row, but the column will differ.
-      main_loc = y + (x * params.ncells_y);
+      int main_loc              = y + (x * ncells_y);
+      int coefficients_location = main_loc * 5;
       // start with the central diagonal, which contains the info for the current cell:
       // This diagonal will be populated for all cells in the domain.
 
       // populate the main diagonal:
-      coefficients[coefficients_location++] = T(main_loc, main_loc, construct_major_diagonal_one(x, y, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
+      coefficients[coefficients_location++] = T(main_loc, main_loc, construct_major_diagonal_one(x, y, (x == 0) ? 0 : -1, (x == ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == ncells_y - 1) ? 0 : 1));
 
       if (x != 0) {
-        // Do the North diagonal. Offset by -(ncells_y). When x == params.ncells_x-1, there is no south diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc - params.ncells_y, construct_n_s_diagonal_one(x, y, -1));
+        // Do the North diagonal. Offset by -(ncells_y). When x == ncells_x-1, there is no south diagonal.
+        coefficients[coefficients_location++] = T(main_loc, main_loc - ncells_y, construct_n_s_diagonal_one(x, y, -1));
       }
-      if (x != params.ncells_x - 1) {
+      if (x != ncells_x - 1) {
         // Do the South diagonal, offset by +(ncells_y). When x == 0, there is no north diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, construct_n_s_diagonal_one(x, y, 1));
+        coefficients[coefficients_location++] = T(main_loc, main_loc + ncells_y, construct_n_s_diagonal_one(x, y, 1));
       }
-
       if (y != 0) {
-        // Next is the West diagonal. Opposite of the East. Located at (i,j-1). When y == params.ncells_y-1, there is no east diagonal.
+        // Next is the West diagonal. Opposite of the East. Located at (i,j-1). When y == ncells_y-1, there is no east diagonal.
         coefficients[coefficients_location++] = T(main_loc, main_loc - 1, construct_e_w_diagonal_one(x, y, -1));
       }
-      if (y != params.ncells_y - 1) {
+      if (y != ncells_y - 1) {
         // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1). When y == 0, there is no west diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc + 1, construct_e_w_diagonal_one(x, y, 1));
+        coefficients[coefficients_location] = T(main_loc, main_loc + 1, construct_e_w_diagonal_one(x, y, 1));
       }
     }
+
+  std::cerr << "finished first set of matrices" << std::endl;
+
   // use the triplet vector to populate the matrix, A.
   A.setFromTriplets(coefficients.begin(), coefficients.end());
 
@@ -146,11 +135,11 @@ void first_half(const Parameters& params, ArrayPack& arp) {
   std::cout << "#iterations:     " << solver.iterations() << std::endl;
   std::cout << "estimated error: " << solver.error() << std::endl;
 
-#pragma omp parallel for default(none) shared(arp, params, vec_x) collapse(2)
-  for (int x = 0; x < params.ncells_x; x++)
-    for (int y = 0; y < params.ncells_y; y++) {
+#pragma omp parallel for default(none) shared(arp, ncells_x, ncells_y, vec_x) collapse(2)
+  for (int x = 0; x < ncells_x; x++)
+    for (int y = 0; y < ncells_y; y++) {
       // copy result into the wtd_T array:
-      arp.wtd_T(x, y) = vec_x(y + (x * params.ncells_y)) - static_cast<double>(arp.topo(x, y));
+      arp.wtd_T(x, y) = vec_x(y + (x * ncells_y)) - static_cast<double>(arp.topo(x, y));
     }
 }
 
@@ -173,14 +162,11 @@ void second_half(Parameters& params, ArrayPack& arp) {
 // We also populate a 'guess', which consists of a water table (wtd_T) that
 // has already been modified for changing transmissivity closer to the final answer.
 #pragma omp parallel for default(none) shared(arp, b, guess, params) collapse(2)
-  for (int x = 0; x < params.ncells_x; x++)
-    for (int y = 0; y < params.ncells_y; y++) {
+  for (int y = 0; y < params.ncells_y; y++)
+    for (int x = 0; x < params.ncells_x; x++) {
       b(y + (x * params.ncells_y))     = arp.original_wtd(x, y) + static_cast<double>(arp.topo(x, y));  // original wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
       guess(y + (x * params.ncells_y)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
     }
-
-  int main_loc              = 0;
-  int coefficients_location = 0;
 
   ////SECOND SOLVE
   // populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
@@ -195,12 +181,15 @@ void second_half(Parameters& params, ArrayPack& arp) {
     return 1 + onemult * (term1 + term2);
   };
 
+#pragma omp parallel for default(none) shared(arp, params, construct_major_diagonal_two, construct_e_w_diagonal_two, construct_n_s_diagonal_two, coefficients_A, coefficients_B) collapse(2)
   for (int x = 0; x < params.ncells_x; x++)
     for (int y = 0; y < params.ncells_y; y++) {
       // The row and column that the current cell will be stored in in matrix A.
       // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
       // All of the N,E,S,W directions should be in the same row, but the column will differ.
-      main_loc = y + (x * params.ncells_y);
+      int main_loc              = y + (x * params.ncells_y);
+      int coefficients_location = main_loc * 5;
+
       // start with the central diagonal, which contains the info for the current cell:
       // This diagonal will be populated for all cells in the domain.
 
@@ -252,26 +241,27 @@ void second_half(Parameters& params, ArrayPack& arp) {
   for (int y = 0; y < params.ncells_y; y++)
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 1) {  // only add recharge to land cells
+        const int index          = y + (x * params.ncells_y);
         const double rech_change = arp.rech(x, y) / seconds_in_a_year * params.deltat;
         params.total_added_recharge += rech_change * arp.cell_area[y];
         if (arp.original_wtd(x, y) >= 0) {  // there was surface water, so recharge may be negative
-          b(y + (x * params.ncells_y)) += rech_change;
-          guess(y + (x * params.ncells_y)) += rech_change;
+          b(index) += rech_change;
+          guess(index) += rech_change;
           if (arp.original_wtd(x, y) + rech_change < 0) {
             const double temp = -(arp.original_wtd(x, y) + rech_change);
-            b(y + (x * params.ncells_y)) += temp;
-            guess(y + (x * params.ncells_y)) += temp;
+            b(index) += temp;
+            guess(index) += temp;
             params.total_added_recharge += temp * arp.cell_area[y];  // in this scenario, there has been a negative amount of recharge, so temp here will be positive and remove the extra amount that was spuriously subtracted.
           }
         } else if (rech_change > 0) {  // when there is no surface water, only positive changes in recharge are allowed
           const double GW_space = -arp.original_wtd(x, y) * static_cast<double>(arp.porosity(x, y));
           if (GW_space > rech_change) {
-            b(y + (x * params.ncells_y)) += rech_change / static_cast<double>(arp.porosity(x, y));
-            guess(y + (x * params.ncells_y)) += rech_change / static_cast<double>(arp.porosity(x, y));
+            b(index) += rech_change / static_cast<double>(arp.porosity(x, y));
+            guess(index) += rech_change / static_cast<double>(arp.porosity(x, y));
           } else {
             const double temp = (rech_change - GW_space) - arp.original_wtd(x, y);
-            b(y + (x * params.ncells_y)) += temp;
-            guess(y + (x * params.ncells_y)) += temp;
+            b(index) += temp;
+            guess(index) += temp;
           }
         }
       }
@@ -363,11 +353,19 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
     }
 
   for (int continue_picard = 0; continue_picard < 3; continue_picard++) {
-    std::cout << "updateTransmissivity: " << std::endl;
-    updateTransmissivity(params, arp);
+    std::cout << "update Transmissivity: " << std::endl;
+#pragma omp parallel for default(none) shared(arp, params) collapse(2)
+    for (int x = 0; x < params.ncells_x; x++)
+      for (int y = 0; y < params.ncells_y; y++) {
+        if (arp.land_mask(x, y) != 0.f) {
+          arp.transmissivity(x, y) = depthIntegratedTransmissivity((arp.wtd_T(x, y) + arp.wtd_T_iteration(x, y)) / 2., arp.fdepth(x, y), static_cast<double>(arp.ksat(x, y)));
+        }
+      }
+
     std::cout << "first_half: " << std::endl;
-    first_half(params, arp);
-    // update the effective storativity to use during the next iteration of the first half:
+    first_half(params.ncells_x, params.ncells_y, arp);
+// update the effective storativity to use during the next iteration of the first half:
+#pragma omp parallel for default(none) shared(arp, params) collapse(2)
     for (int y = 0; y < params.ncells_y; y++)
       for (int x = 0; x < params.ncells_x; x++) {
         if (arp.land_mask(x, y) != 0.f) {
