@@ -83,11 +83,11 @@ void first_half(const Parameters& params, ArrayPack& arp) {
   // HALFWAY SOLVE
   // populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
 
-  const auto diagonal1_method = [&](const int x, const int y, const int dx, const int dy, const double div) { return -arp.scalar_array_y(x, y) / (arp.effective_storativity(x, y)) * ((arp.transmissivity(x + dx, y + dy) + arp.transmissivity(x, y)) / div); };
+  const auto construct_e_w_diagonal_one = [&](const int x, const int y, const int dy) { return -arp.scalar_array_y(x, y) / (arp.effective_storativity(x, y)) * (arp.transmissivity(x, y + dy) + arp.transmissivity(x, y)); };
 
-  const auto diagonal2_method = [&](const int x, const int y, const int dx, const int dy, const double div) { return -params.x_partial / (arp.effective_storativity(x, y)) * ((arp.transmissivity(x + dx, y + dy) + arp.transmissivity(x, y)) / div); };
+  const auto construct_n_s_diagonal_one = [&](const int x, const int y, const int dx) { return -params.x_partial / (arp.effective_storativity(x, y)) * ((arp.transmissivity(x + dx, y) + arp.transmissivity(x, y)) / 2); };
 
-  const auto diagonal3_method = [&](const int x, const int y, const int dx1, const int dx2, const int dy1, const int dy2) {
+  const auto construct_major_diagonal_one = [&](const int x, const int y, const int dx1, const int dx2, const int dy1, const int dy2) {
     return (arp.transmissivity(x, y + dy1) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x, y + dy2) / 2) * (2 * arp.scalar_array_y(x, y) / (arp.effective_storativity(x, y))) + (arp.transmissivity(x + dx1, y) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x + dx2, y) / 2) * (params.x_partial / (arp.effective_storativity(x, y))) + 1;
   };
 
@@ -101,24 +101,24 @@ void first_half(const Parameters& params, ArrayPack& arp) {
       // This diagonal will be populated for all cells in the domain.
 
       // populate the main diagonal:
-      coefficients[coefficients_location++] = T(main_loc, main_loc, diagonal3_method(x, y, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
+      coefficients[coefficients_location++] = T(main_loc, main_loc, construct_major_diagonal_one(x, y, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
 
       if (x != 0) {
         // Do the North diagonal. Offset by -(ncells_y). When x == params.ncells_x-1, there is no south diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc - params.ncells_y, diagonal2_method(x, y, -1, 0, 2));
+        coefficients[coefficients_location++] = T(main_loc, main_loc - params.ncells_y, construct_n_s_diagonal_one(x, y, -1));
       }
       if (x != params.ncells_x - 1) {
         // Do the South diagonal, offset by +(ncells_y). When x == 0, there is no north diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, diagonal2_method(x, y, 1, 0, 2));
+        coefficients[coefficients_location++] = T(main_loc, main_loc + params.ncells_y, construct_n_s_diagonal_one(x, y, 1));
       }
 
       if (y != 0) {
         // Next is the West diagonal. Opposite of the East. Located at (i,j-1). When y == params.ncells_y-1, there is no east diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc - 1, diagonal1_method(x, y, 0, -1, 1));
+        coefficients[coefficients_location++] = T(main_loc, main_loc - 1, construct_e_w_diagonal_one(x, y, -1));
       }
       if (y != params.ncells_y - 1) {
         // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1). When y == 0, there is no west diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc + 1, diagonal1_method(x, y, 0, 1, 1));
+        coefficients[coefficients_location++] = T(main_loc, main_loc + 1, construct_e_w_diagonal_one(x, y, 1));
       }
     }
   // use the triplet vector to populate the matrix, A.
@@ -181,11 +181,11 @@ void second_half(Parameters& params, ArrayPack& arp) {
   ////SECOND SOLVE
   // populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
 
-  const auto div4_method_y = [&](const int x, const int y, const int dy) { return arp.scalar_array_y(x, y) * (arp.transmissivity(x, y) + arp.transmissivity(x, y + dy)) / 4.; };
+  const auto construct_e_w_diagonal_two = [&](const int x, const int y, const int dy) { return arp.scalar_array_y(x, y) * (arp.transmissivity(x, y) + arp.transmissivity(x, y + dy)) / 4.; };
 
-  const auto div4_method_x = [&](const int x, const int y, const int dx) { return arp.scalar_array_x(x, y) * (arp.transmissivity(x, y) + arp.transmissivity(x + dx, y)) / 4.; };
+  const auto construct_n_s_diagonal_two = [&](const int x, const int y, const int dx) { return arp.scalar_array_x(x, y) * (arp.transmissivity(x, y) + arp.transmissivity(x + dx, y)) / 4.; };
 
-  const auto div4_method_both = [&](const int x, const int y, const int onemult, const int dx1, const int dx2, const int dy1, const int dy2) {
+  const auto construct_major_diagonal_two = [&](const int x, const int y, const int onemult, const int dx1, const int dx2, const int dy1, const int dy2) {
     const auto term1 = (arp.scalar_array_x(x, y) * (arp.transmissivity(x + dx1, y) / 4. + arp.transmissivity(x, y) / 2. + arp.transmissivity(x + dx2, y) / 4.));
     const auto term2 = (arp.scalar_array_y(x, y) * (arp.transmissivity(x, y + dy1) / 4. + arp.transmissivity(x, y) / 2. + arp.transmissivity(x, y + dy2) / 4.));
     return 1 + onemult * (term1 + term2);
@@ -200,34 +200,34 @@ void second_half(Parameters& params, ArrayPack& arp) {
       // start with the central diagonal, which contains the info for the current cell:
       // This diagonal will be populated for all cells in the domain.
 
-      coefficients_B[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, -1, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
-      coefficients_A[coefficients_location] = T(main_loc, main_loc, div4_method_both(x, y, 1, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
+      coefficients_B[coefficients_location] = T(main_loc, main_loc, construct_major_diagonal_two(x, y, -1, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
+      coefficients_A[coefficients_location] = T(main_loc, main_loc, construct_major_diagonal_two(x, y, 1, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
       coefficients_location++;
 
       if (x != 0) {
         // Do the North diagonal. Offset by -(ncells_y).
-        const auto entry                      = div4_method_x(x, y, -1);
+        const auto entry                      = construct_n_s_diagonal_two(x, y, -1);
         coefficients_B[coefficients_location] = T(main_loc, main_loc - params.ncells_y, entry);
         coefficients_A[coefficients_location] = T(main_loc, main_loc - params.ncells_y, -entry);
         coefficients_location++;
       }
       if (x != params.ncells_x - 1) {
         // Do the South diagonal, offset by +(ncells_y).
-        const auto entry                      = div4_method_x(x, y, 1);
+        const auto entry                      = construct_n_s_diagonal_two(x, y, 1);
         coefficients_B[coefficients_location] = T(main_loc, main_loc + params.ncells_y, entry);
         coefficients_A[coefficients_location] = T(main_loc, main_loc + params.ncells_y, -entry);
         coefficients_location++;
       }
       if (y != 0) {
         // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-        const auto entry                      = div4_method_y(x, y, -1);
+        const auto entry                      = construct_e_w_diagonal_two(x, y, -1);
         coefficients_B[coefficients_location] = T(main_loc, main_loc - 1, entry);
         coefficients_A[coefficients_location] = T(main_loc, main_loc - 1, -entry);
         coefficients_location++;
       }
       if (y != params.ncells_y - 1) {
         // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-        const auto entry                      = div4_method_y(x, y, 1);
+        const auto entry                      = construct_e_w_diagonal_two(x, y, 1);
         coefficients_B[coefficients_location] = T(main_loc, main_loc + 1, entry);
         coefficients_A[coefficients_location] = T(main_loc, main_loc + 1, -entry);
         coefficients_location++;
