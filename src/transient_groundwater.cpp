@@ -370,8 +370,6 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
       if (arp.land_mask(x, y) != 0.f) {
         arp.transmissivity(x, y) = depthIntegratedTransmissivity(arp.wtd_T(x, y), arp.fdepth(x, y), static_cast<double>(arp.ksat(x, y)));
       }
-      arp.scalar_array_x(x, y) = params.x_partial / arp.effective_storativity(x, y);
-      arp.scalar_array_y(x, y) = params.deltat / (arp.effective_storativity(x, y) * arp.cellsize_e_w_metres[y] * arp.cellsize_e_w_metres[y]);
     }
 
   // Do the second half of the midpoint method:
