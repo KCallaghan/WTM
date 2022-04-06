@@ -134,8 +134,8 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
   std::cout << "estimated error: " << solver.error() << std::endl;
 
 #pragma omp parallel for default(none) shared(arp, ncells_x, ncells_y, vec_x) collapse(2)
-  for (int x = 0; x < ncells_x; x++)
-    for (int y = 0; y < ncells_y; y++) {
+  for (int y = 0; y < ncells_y; y++)
+    for (int x = 0; x < ncells_x; x++) {
       // copy result into the wtd_T array:
       arp.wtd_T(x, y) = vec_x(y + (x * ncells_y)) - static_cast<double>(arp.topo(x, y));
     }
@@ -342,8 +342,8 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
   for (int continue_picard = 0; continue_picard < 3; continue_picard++) {
     std::cout << "update Transmissivity: " << std::endl;
 #pragma omp parallel for default(none) shared(arp, params) collapse(2)
-    for (int x = 0; x < params.ncells_x; x++)
-      for (int y = 0; y < params.ncells_y; y++) {
+    for (int y = 0; y < params.ncells_y; y++)
+      for (int x = 0; x < params.ncells_x; x++) {
         if (arp.land_mask(x, y) != 0.f) {
           arp.transmissivity(x, y) = depthIntegratedTransmissivity((arp.wtd_T(x, y) + arp.wtd_T_iteration(x, y)) / 2., arp.fdepth(x, y), static_cast<double>(arp.ksat(x, y)));
         }
