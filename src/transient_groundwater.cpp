@@ -228,7 +228,7 @@ void second_half(Parameters& params, ArrayPack& arp) {
   for (int y = 0; y < params.ncells_y; y++)
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 1) {  // only add recharge to land cells
-        const int index          = y + (x * params.ncells_y);
+        const int index          = x + (y * params.ncells_x);
         const double rech_change = arp.rech(x, y) / seconds_in_a_year * params.deltat;
         params.total_added_recharge += rech_change * arp.cell_area[y];
         if (arp.original_wtd(x, y) >= 0) {  // there was surface water, so recharge may be negative
