@@ -60,8 +60,8 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
   for (int y = 0; y < ncells_y; y++)
     for (int x = 0; x < ncells_x; x++) {
       arp.wtd_T_iteration(x, y) = arp.wtd_T(x, y);
-      b(y + (x * ncells_y))     = arp.wtd(x, y) + static_cast<double>(arp.topo(x, y));  // wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
-      guess(y + (x * ncells_y)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
+      b(x + (y * ncells_x))     = arp.wtd(x, y) + static_cast<double>(arp.topo(x, y));  // wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
+      guess(x + (y * ncells_x)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
     }
 
   //  HALFWAY SOLVE
@@ -76,22 +76,22 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
   };
 
 #pragma omp parallel for default(none) shared(arp, ncells_x, ncells_y, construct_major_diagonal_one, construct_e_w_diagonal_one, construct_n_s_diagonal_one, A) collapse(2)
-  for (int x = 0; x < ncells_x; x++)
-    for (int y = 0; y < ncells_y; y++) {
+  for (int y = 0; y < ncells_y; y++)
+    for (int x = 0; x < ncells_x; x++) {
       // The row and column that the current cell will be stored in in matrix A.
       // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
       // All of the N,E,S,W directions should be in the same row, but the column will differ.
-      int main_loc = y + (x * ncells_y);
+      int main_loc = x + (y * ncells_x);
 
       // I need to insert the items in index order for best efficiency, so start with 2 off-diagonals, then the major diagonal, then the other 2 off-diagonals.
       if (x != 0) {
         // Do the North diagonal. Offset by -(ncells_y). When x == ncells_x-1, there is no south diagonal.
-        A.insert(main_loc, main_loc - ncells_y) = construct_n_s_diagonal_one(x, y, -1);
+        A.insert(main_loc, main_loc - 1) = construct_n_s_diagonal_one(x, y, -1);
       }
 
       if (y != 0) {
         // Next is the West diagonal. Opposite of the East. Located at (i,j-1). When y == 0, there is no west diagonal.
-        A.insert(main_loc, main_loc - 1) = construct_e_w_diagonal_one(x, y, -1);
+        A.insert(main_loc, main_loc - ncells_x) = construct_e_w_diagonal_one(x, y, -1);
       }
 
       // major diagonal:
@@ -99,12 +99,12 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
 
       if (y != ncells_y - 1) {
         // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1). When y == ncells_y -1, there is no east diagonal.
-        A.insert(main_loc, main_loc + 1) = construct_e_w_diagonal_one(x, y, 1);
+        A.insert(main_loc, main_loc + ncells_x) = construct_e_w_diagonal_one(x, y, 1);
       }
 
       if (x != ncells_x - 1) {
         // Do the South diagonal, offset by +(ncells_y). When x == 0, there is no north diagonal.
-        A.insert(main_loc, main_loc + ncells_y) = construct_n_s_diagonal_one(x, y, 1);
+        A.insert(main_loc, main_loc + 1) = construct_n_s_diagonal_one(x, y, 1);
       }
     }
 
@@ -137,7 +137,7 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
   for (int y = 0; y < ncells_y; y++)
     for (int x = 0; x < ncells_x; x++) {
       // copy result into the wtd_T array:
-      arp.wtd_T(x, y) = vec_x(y + (x * ncells_y)) - static_cast<double>(arp.topo(x, y));
+      arp.wtd_T(x, y) = vec_x(x + (y * ncells_x)) - static_cast<double>(arp.topo(x, y));
     }
 }
 
@@ -161,8 +161,8 @@ void second_half(Parameters& params, ArrayPack& arp) {
 #pragma omp parallel for default(none) shared(arp, b, guess, params) collapse(2)
   for (int y = 0; y < params.ncells_y; y++)
     for (int x = 0; x < params.ncells_x; x++) {
-      b(y + (x * params.ncells_y))     = arp.original_wtd(x, y) + static_cast<double>(arp.topo(x, y));  // original wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
-      guess(y + (x * params.ncells_y)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
+      b(x + (y * params.ncells_x))     = arp.original_wtd(x, y) + static_cast<double>(arp.topo(x, y));  // original wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
+      guess(x + (y * params.ncells_x)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
     }
 
   // SECOND SOLVE
@@ -179,25 +179,25 @@ void second_half(Parameters& params, ArrayPack& arp) {
   };
 
 #pragma omp parallel for default(none) shared(arp, params, construct_major_diagonal_two, construct_e_w_diagonal_two, construct_n_s_diagonal_two, A, B) collapse(2)
-  for (int x = 0; x < params.ncells_x; x++)
-    for (int y = 0; y < params.ncells_y; y++) {
+  for (int y = 0; y < params.ncells_y; y++)
+    for (int x = 0; x < params.ncells_x; x++) {
       // The row and column that the current cell will be stored in in matrix A.
       // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
       // All of the N,E,S,W directions should be in the same row, but the column will differ.
-      int main_loc = y + (x * params.ncells_y);
+      int main_loc = x + (y * params.ncells_x);
 
       if (x != 0) {
         // Do the North diagonal. Offset by -(ncells_y).
-        const auto entry                               = construct_n_s_diagonal_two(x, y, -1);
-        B.insert(main_loc, main_loc - params.ncells_y) = entry;
-        A.insert(main_loc, main_loc - params.ncells_y) = -entry;
+        const auto entry                 = construct_n_s_diagonal_two(x, y, -1);
+        B.insert(main_loc, main_loc - 1) = entry;
+        A.insert(main_loc, main_loc - 1) = -entry;
       }
 
       if (y != 0) {
         // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-        const auto entry                 = construct_e_w_diagonal_two(x, y, -1);
-        B.insert(main_loc, main_loc - 1) = entry;
-        A.insert(main_loc, main_loc - 1) = -entry;
+        const auto entry                               = construct_e_w_diagonal_two(x, y, -1);
+        B.insert(main_loc, main_loc - params.ncells_x) = entry;
+        A.insert(main_loc, main_loc - params.ncells_x) = -entry;
       }
 
       B.insert(main_loc, main_loc) = construct_major_diagonal_two(x, y, -1, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1);
@@ -205,16 +205,16 @@ void second_half(Parameters& params, ArrayPack& arp) {
 
       if (y != params.ncells_y - 1) {
         // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-        const auto entry                 = construct_e_w_diagonal_two(x, y, 1);
-        B.insert(main_loc, main_loc + 1) = entry;
-        A.insert(main_loc, main_loc + 1) = -entry;
+        const auto entry                               = construct_e_w_diagonal_two(x, y, 1);
+        B.insert(main_loc, main_loc + params.ncells_x) = entry;
+        A.insert(main_loc, main_loc + params.ncells_x) = -entry;
       }
 
       if (x != params.ncells_x - 1) {
         // Do the South diagonal, offset by +(ncells_y).
-        const auto entry                               = construct_n_s_diagonal_two(x, y, 1);
-        B.insert(main_loc, main_loc + params.ncells_y) = entry;
-        A.insert(main_loc, main_loc + params.ncells_y) = -entry;
+        const auto entry                 = construct_n_s_diagonal_two(x, y, 1);
+        B.insert(main_loc, main_loc + 1) = entry;
+        A.insert(main_loc, main_loc + 1) = -entry;
       }
     }
 
@@ -228,7 +228,7 @@ void second_half(Parameters& params, ArrayPack& arp) {
   for (int y = 0; y < params.ncells_y; y++)
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 1) {  // only add recharge to land cells
-        const int index          = y + (x * params.ncells_y);
+        const int index          = x + (y * params.ncells_x);
         const double rech_change = arp.rech(x, y) / seconds_in_a_year * params.deltat;
         params.total_added_recharge += rech_change * arp.cell_area[y];
         if (arp.original_wtd(x, y) >= 0) {  // there was surface water, so recharge may be negative
@@ -280,7 +280,7 @@ void second_half(Parameters& params, ArrayPack& arp) {
   for (int y = 0; y < params.ncells_y; y++)
     for (int x = 0; x < params.ncells_x; x++) {
       // copy result into the wtd array:
-      arp.wtd(x, y) = vec_x(y + (x * params.ncells_y)) - static_cast<double>(arp.topo(x, y));
+      arp.wtd(x, y) = vec_x(x + (y * params.ncells_x)) - static_cast<double>(arp.topo(x, y));
     }
   std::cerr << "finished assigning the new wtd" << std::endl;
 }
