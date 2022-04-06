@@ -46,18 +46,17 @@ double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, co
 // Using these half-time water tables, we compute the new transmissivity values
 // That will be used in the second step of the midpoint method below.
 void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
-  std::vector<T> coefficients(ncells_x * ncells_y * 5);
   Eigen::VectorXd b(ncells_x * ncells_y);
   Eigen::VectorXd vec_x(ncells_x * ncells_y);
   Eigen::VectorXd guess(ncells_x * ncells_y);
   SpMat A(ncells_x * ncells_y, ncells_x * ncells_y);
+  A.reserve(Eigen::VectorXi::Constant(ncells_x * ncells_y, 5));  // reserve the needed space in the A matrix. We know there is a maximum of 5 items per matrix row or column.
 
 // We need to solve the vector-matrix equation Ax=b.
 // b consists of the current head values (i.e. water table depth + topography)
 // We also populate a 'guess', which consists of a water table (wtd_T) that in later iterations
 // has already been modified for changing transmissivity closer to the final answer.
 #pragma omp parallel for default(none) shared(arp, b, guess, ncells_x, ncells_y) collapse(2)
-
   for (int y = 0; y < ncells_y; y++)
     for (int x = 0; x < ncells_x; x++) {
       arp.wtd_T_iteration(x, y) = arp.wtd_T(x, y);
@@ -66,7 +65,7 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
     }
 
   //  HALFWAY SOLVE
-  //  populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
+  //  populate the A matrix.
 
   const auto construct_e_w_diagonal_one = [&](const int x, const int y, const int dy) { return -arp.scalar_array_y(x, y) * ((arp.transmissivity(x, y + dy) + arp.transmissivity(x, y)) / 2); };
 
@@ -76,42 +75,41 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
     return (arp.transmissivity(x, y + dy1) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x, y + dy2) / 2) * arp.scalar_array_y(x, y) + (arp.transmissivity(x + dx1, y) / 2 + arp.transmissivity(x, y) + arp.transmissivity(x + dx2, y) / 2) * arp.scalar_array_x(x, y) + 1;
   };
 
-#pragma omp parallel for default(none) shared(arp, ncells_x, ncells_y, construct_major_diagonal_one, construct_e_w_diagonal_one, construct_n_s_diagonal_one, coefficients) collapse(2)
+#pragma omp parallel for default(none) shared(arp, ncells_x, ncells_y, construct_major_diagonal_one, construct_e_w_diagonal_one, construct_n_s_diagonal_one, A) collapse(2)
   for (int x = 0; x < ncells_x; x++)
     for (int y = 0; y < ncells_y; y++) {
       // The row and column that the current cell will be stored in in matrix A.
       // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
       // All of the N,E,S,W directions should be in the same row, but the column will differ.
-      int main_loc              = y + (x * ncells_y);
-      int coefficients_location = main_loc * 5;
-      // start with the central diagonal, which contains the info for the current cell:
-      // This diagonal will be populated for all cells in the domain.
+      int main_loc = y + (x * ncells_y);
 
-      // populate the main diagonal:
-      coefficients[coefficients_location++] = T(main_loc, main_loc, construct_major_diagonal_one(x, y, (x == 0) ? 0 : -1, (x == ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == ncells_y - 1) ? 0 : 1));
-
+      // I need to insert the items in index order for best efficiency, so start with 2 off-diagonals, then the major diagonal, then the other 2 off-diagonals.
       if (x != 0) {
         // Do the North diagonal. Offset by -(ncells_y). When x == ncells_x-1, there is no south diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc - ncells_y, construct_n_s_diagonal_one(x, y, -1));
+        A.insert(main_loc, main_loc - ncells_y) = construct_n_s_diagonal_one(x, y, -1);
       }
+
+      if (y != 0) {
+        // Next is the West diagonal. Opposite of the East. Located at (i,j-1). When y == 0, there is no west diagonal.
+        A.insert(main_loc, main_loc - 1) = construct_e_w_diagonal_one(x, y, -1);
+      }
+
+      // major diagonal:
+      A.insert(main_loc, main_loc) = construct_major_diagonal_one(x, y, (x == 0) ? 0 : -1, (x == ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == ncells_y - 1) ? 0 : 1);
+
+      if (y != ncells_y - 1) {
+        // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1). When y == ncells_y -1, there is no east diagonal.
+        A.insert(main_loc, main_loc + 1) = construct_e_w_diagonal_one(x, y, 1);
+      }
+
       if (x != ncells_x - 1) {
         // Do the South diagonal, offset by +(ncells_y). When x == 0, there is no north diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc + ncells_y, construct_n_s_diagonal_one(x, y, 1));
-      }
-      if (y != 0) {
-        // Next is the West diagonal. Opposite of the East. Located at (i,j-1). When y == ncells_y-1, there is no east diagonal.
-        coefficients[coefficients_location++] = T(main_loc, main_loc - 1, construct_e_w_diagonal_one(x, y, -1));
-      }
-      if (y != ncells_y - 1) {
-        // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1). When y == 0, there is no west diagonal.
-        coefficients[coefficients_location] = T(main_loc, main_loc + 1, construct_e_w_diagonal_one(x, y, 1));
+        A.insert(main_loc, main_loc + ncells_y) = construct_n_s_diagonal_one(x, y, 1);
       }
     }
 
   std::cerr << "finished first set of matrices" << std::endl;
-
-  // use the triplet vector to populate the matrix, A.
-  A.setFromTriplets(coefficients.begin(), coefficients.end());
+  A.makeCompressed();
 
   // Biconjugate gradient solver with guess
   Eigen::BiCGSTAB<SpMat> solver;
@@ -147,11 +145,10 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
 // obtained after the calculation in the first step above.
 // We then compute the new water table depths after a full time-step has passed.
 void second_half(Parameters& params, ArrayPack& arp) {
-  std::vector<T> coefficients_A((params.ncells_x) * (params.ncells_y) * 5);
-  std::vector<T> coefficients_B((params.ncells_x) * (params.ncells_y) * 5);
-
   SpMat A(params.ncells_x * params.ncells_y, params.ncells_x * params.ncells_y);
   SpMat B(params.ncells_x * params.ncells_y, params.ncells_x * params.ncells_y);
+  A.reserve(Eigen::VectorXi::Constant(params.ncells_x * params.ncells_y, 5));
+  B.reserve(Eigen::VectorXi::Constant(params.ncells_x * params.ncells_y, 5));
 
   Eigen::VectorXd b(params.ncells_x * params.ncells_y);
   Eigen::VectorXd vec_x(params.ncells_x * params.ncells_y);
@@ -168,8 +165,8 @@ void second_half(Parameters& params, ArrayPack& arp) {
       guess(y + (x * params.ncells_y)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
     }
 
-  ////SECOND SOLVE
-  // populate the coefficients triplet vector. This should have row index, column index, value of what is needed in the final matrix A.
+  // SECOND SOLVE
+  // Populate the matrices A and B.
 
   const auto construct_e_w_diagonal_two = [&](const int x, const int y, const int dy) { return arp.scalar_array_y(x, y) * (arp.transmissivity(x, y) + arp.transmissivity(x, y + dy)) / 4.; };
 
@@ -181,57 +178,47 @@ void second_half(Parameters& params, ArrayPack& arp) {
     return 1 + onemult * (term1 + term2);
   };
 
-#pragma omp parallel for default(none) shared(arp, params, construct_major_diagonal_two, construct_e_w_diagonal_two, construct_n_s_diagonal_two, coefficients_A, coefficients_B) collapse(2)
+#pragma omp parallel for default(none) shared(arp, params, construct_major_diagonal_two, construct_e_w_diagonal_two, construct_n_s_diagonal_two, A, B) collapse(2)
   for (int x = 0; x < params.ncells_x; x++)
     for (int y = 0; y < params.ncells_y; y++) {
       // The row and column that the current cell will be stored in in matrix A.
       // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
       // All of the N,E,S,W directions should be in the same row, but the column will differ.
-      int main_loc              = y + (x * params.ncells_y);
-      int coefficients_location = main_loc * 5;
-
-      // start with the central diagonal, which contains the info for the current cell:
-      // This diagonal will be populated for all cells in the domain.
-
-      coefficients_B[coefficients_location] = T(main_loc, main_loc, construct_major_diagonal_two(x, y, -1, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
-      coefficients_A[coefficients_location] = T(main_loc, main_loc, construct_major_diagonal_two(x, y, 1, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1));
-      coefficients_location++;
+      int main_loc = y + (x * params.ncells_y);
 
       if (x != 0) {
         // Do the North diagonal. Offset by -(ncells_y).
-        const auto entry                      = construct_n_s_diagonal_two(x, y, -1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc - params.ncells_y, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc - params.ncells_y, -entry);
-        coefficients_location++;
+        const auto entry                               = construct_n_s_diagonal_two(x, y, -1);
+        B.insert(main_loc, main_loc - params.ncells_y) = entry;
+        A.insert(main_loc, main_loc - params.ncells_y) = -entry;
       }
-      if (x != params.ncells_x - 1) {
-        // Do the South diagonal, offset by +(ncells_y).
-        const auto entry                      = construct_n_s_diagonal_two(x, y, 1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc + params.ncells_y, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc + params.ncells_y, -entry);
-        coefficients_location++;
-      }
+
       if (y != 0) {
         // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
-        const auto entry                      = construct_e_w_diagonal_two(x, y, -1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc - 1, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc - 1, -entry);
-        coefficients_location++;
+        const auto entry                 = construct_e_w_diagonal_two(x, y, -1);
+        B.insert(main_loc, main_loc - 1) = entry;
+        A.insert(main_loc, main_loc - 1) = -entry;
       }
+
+      B.insert(main_loc, main_loc) = construct_major_diagonal_two(x, y, -1, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1);
+      A.insert(main_loc, main_loc) = construct_major_diagonal_two(x, y, 1, (x == 0) ? 0 : -1, (x == params.ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == params.ncells_y - 1) ? 0 : 1);
+
       if (y != params.ncells_y - 1) {
         // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
-        const auto entry                      = construct_e_w_diagonal_two(x, y, 1);
-        coefficients_B[coefficients_location] = T(main_loc, main_loc + 1, entry);
-        coefficients_A[coefficients_location] = T(main_loc, main_loc + 1, -entry);
-        coefficients_location++;
+        const auto entry                 = construct_e_w_diagonal_two(x, y, 1);
+        B.insert(main_loc, main_loc + 1) = entry;
+        A.insert(main_loc, main_loc + 1) = -entry;
+      }
+
+      if (x != params.ncells_x - 1) {
+        // Do the South diagonal, offset by +(ncells_y).
+        const auto entry                               = construct_n_s_diagonal_two(x, y, 1);
+        B.insert(main_loc, main_loc + params.ncells_y) = entry;
+        A.insert(main_loc, main_loc + params.ncells_y) = -entry;
       }
     }
 
   std::cerr << "finished second set of matrices" << std::endl;
-
-  // use the triplet vector to populate the matrices, A and B.
-  A.setFromTriplets(coefficients_A.begin(), coefficients_A.end());
-  B.setFromTriplets(coefficients_B.begin(), coefficients_B.end());
 
   b     = B * b;
   guess = B * guess;
@@ -304,8 +291,8 @@ void second_half(Parameters& params, ArrayPack& arp) {
 
 void UpdateCPU(Parameters& params, ArrayPack& arp) {
   Eigen::initParallel();
-  omp_set_num_threads(8);
-  Eigen::setNbThreads(8);
+  omp_set_num_threads(4);
+  Eigen::setNbThreads(4);
 
   // Picard iteration through solver
   params.x_partial         = params.deltat / (params.cellsize_n_s_metres * params.cellsize_n_s_metres);
