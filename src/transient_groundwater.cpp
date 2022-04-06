@@ -60,8 +60,8 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
   for (int y = 0; y < ncells_y; y++)
     for (int x = 0; x < ncells_x; x++) {
       arp.wtd_T_iteration(x, y) = arp.wtd_T(x, y);
-      b(y + (x * ncells_y))     = arp.wtd(x, y) + static_cast<double>(arp.topo(x, y));  // wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
-      guess(y + (x * ncells_y)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
+      b(x + (y * ncells_x))     = arp.wtd(x, y) + static_cast<double>(arp.topo(x, y));  // wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
+      guess(x + (y * ncells_x)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
     }
 
   //  HALFWAY SOLVE
@@ -137,7 +137,7 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
   for (int y = 0; y < ncells_y; y++)
     for (int x = 0; x < ncells_x; x++) {
       // copy result into the wtd_T array:
-      arp.wtd_T(x, y) = vec_x(y + (x * ncells_y)) - static_cast<double>(arp.topo(x, y));
+      arp.wtd_T(x, y) = vec_x(x + (y * ncells_x)) - static_cast<double>(arp.topo(x, y));
     }
 }
 
@@ -161,8 +161,8 @@ void second_half(Parameters& params, ArrayPack& arp) {
 #pragma omp parallel for default(none) shared(arp, b, guess, params) collapse(2)
   for (int y = 0; y < params.ncells_y; y++)
     for (int x = 0; x < params.ncells_x; x++) {
-      b(y + (x * params.ncells_y))     = arp.original_wtd(x, y) + static_cast<double>(arp.topo(x, y));  // original wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
-      guess(y + (x * params.ncells_y)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
+      b(x + (y * params.ncells_x))     = arp.original_wtd(x, y) + static_cast<double>(arp.topo(x, y));  // original wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to differentiate between ocean vs land.
+      guess(x + (y * params.ncells_x)) = arp.wtd_T(x, y) + static_cast<double>(arp.topo(x, y));
     }
 
   // SECOND SOLVE
@@ -280,7 +280,7 @@ void second_half(Parameters& params, ArrayPack& arp) {
   for (int y = 0; y < params.ncells_y; y++)
     for (int x = 0; x < params.ncells_x; x++) {
       // copy result into the wtd array:
-      arp.wtd(x, y) = vec_x(y + (x * params.ncells_y)) - static_cast<double>(arp.topo(x, y));
+      arp.wtd(x, y) = vec_x(x + (y * params.ncells_x)) - static_cast<double>(arp.topo(x, y));
     }
   std::cerr << "finished assigning the new wtd" << std::endl;
 }
