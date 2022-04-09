@@ -1,21 +1,15 @@
-#ifndef _array_pack_
-#define _array_pack_
+#pragma once
 
 #include <richdem/common/Array2D.hpp>
+#include "dephier.hpp"
 
-namespace rd = richdem;
+typedef richdem::Array2D<float> f2d;
+typedef richdem::Array2D<double> d2d;
 
-typedef richdem::Array2D<float>  f2d;
-typedef richdem::Array2D<double>  d2d;
-
-typedef richdem::Array2D<uint8_t>  ui82d;
+typedef richdem::Array2D<uint8_t> ui82d;
 typedef std::vector<double> dvec;
-typedef int32_t dh_label_t;
-typedef uint32_t flat_c_idx;
 
-class ArrayPack {
- public:
-
+struct ArrayPack {
   f2d porosity;
   d2d effective_storativity;
   f2d land_mask;
@@ -64,20 +58,15 @@ class ArrayPack {
   d2d wtd_T_iteration;
   d2d original_wtd;
 
-  dh_label_t flowdir_t;
-
   dvec latitude_radians;
   dvec cell_area;
   dvec cellsize_e_w_metres;
   dvec cellsize_e_w_metres_N;
   dvec cellsize_e_w_metres_S;
 
-  rd::Array2D<dh_label_t> label; //No cells are part of a depression
-  rd::Array2D<dh_label_t> final_label; //No cells are part of a depression
-  rd::Array2D<rd::flowdir_t>  flowdirs; //No cells flow anywhere
-
+  richdem::Array2D<richdem::dephier::dh_label_t> label;        // No cells are part of a depression
+  richdem::Array2D<richdem::dephier::dh_label_t> final_label;  // No cells are part of a depression
+  richdem::Array2D<richdem::flowdir_t> flowdirs;               // No cells flow anywhere
 
   void check() const;
 };
-
-#endif

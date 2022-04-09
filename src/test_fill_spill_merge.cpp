@@ -1,21 +1,25 @@
 #include "doctest.h"
 #include "irf.cpp"
-//#include "add_recharge.hpp"
+#include "transient_groundwater.hpp"
 
-#include <random>
+#include <fmt/core.h>
 #include <richdem/depressions/Zhou2016.hpp>
 #include <richdem/terrain_generation.hpp>
+
+#include <random>
 #include <sstream>
 
 using namespace richdem;
 using namespace richdem::dephier;
 
 #ifdef CODE_COVERAGE
-#pragma message "FSM is using a small number of test cases for code coverage estimation. Disable code coverage to enable more extensive tests."
+#pragma message \
+    "FSM is using a small number of test cases for code coverage estimation. Disable code coverage to enable more extensive tests."
 const int number_of_small_tests = 50;
 const int number_of_large_tests = 5;
 #else
-#pragma message "FSM is using a large number of test cases to judge correctness. Enabling code coverage will reduce the number of test cases used."
+#pragma message \
+    "FSM is using a large number of test cases to judge correctness. Enabling code coverage will reduce the number of test cases used."
 constexpr int number_of_small_tests = 1000;
 constexpr int number_of_large_tests = 200;
 #endif
@@ -64,22 +68,44 @@ Array2D<double> random_integer_terrain(std::mt19937_64& gen, const int min_size,
 
 TEST_CASE("Determine water level") {
   const Array2D<double> topo = {
-      {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9}, {-9, 2, 2, 2, 2, 2, 2, 2, 2, -9}, {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9}, {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9}, {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},
-      {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},         {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9}, {-9, 2, 2, 2, 2, 2, 2, 2, 2, -9}, {-9, 2, 2, 2, 2, 2, 2, 2, 2, -9}, {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9},
+      {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9},
+      {-9, 2, 2, 2, 2, 2, 2, 2, 2, -9},
+      {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},
+      {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},
+      {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},
+      {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},
+      {-9, 2, 2, 2, 1, 2, 2, 2, 2, -9},
+      {-9, 2, 2, 2, 2, 2, 2, 2, 2, -9},
+      {-9, 2, 2, 2, 2, 2, 2, 2, 2, -9},
+      {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9},
   };
 
   const Array2D<double> porosity = {
-      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3}, {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3}, {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
-      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3}, {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3}, {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
-      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3}, {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3}, {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
+      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
+      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
+      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
+      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
+      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
+      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
+      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
+      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
+      {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
       {0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3},
   };
 
   const std::vector<double> cell_area = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
   Array2D<double> wtd = {
-      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, -1, 0, 0, 0, 0, 0, 0},
-      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, -1, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
   };
 
   const int cx                            = 3;
@@ -89,45 +115,72 @@ TEST_CASE("Determine water level") {
   const double area_times_elevation_total = 5.;
 
   SUBCASE("Depression volume exactly equals water volume") {
-    const auto water_level = DetermineWaterLevel(topo, porosity, cell_area, wtd, 5, cx, cy, current_volume, current_area, area_times_elevation_total);
+    const auto water_level = DetermineWaterLevel(
+        topo, porosity, cell_area, wtd, 5, cx, cy, current_volume, current_area, area_times_elevation_total);
     CHECK(water_level == 2);  // Water elevation equals the sill elevation
   }
 
   SUBCASE("Water volume is less than the depression volume") {
-    const auto water_level = DetermineWaterLevel(topo, porosity, cell_area, wtd, 4, cx, cy, current_volume, current_area, area_times_elevation_total);
+    const auto water_level = DetermineWaterLevel(
+        topo, porosity, cell_area, wtd, 4, cx, cy, current_volume, current_area, area_times_elevation_total);
     CHECK(water_level == 9 / 5.0);
   }
 
   SUBCASE("Water volume is greater than the depression volume") {
-    const auto water_level = DetermineWaterLevel(topo, porosity, cell_area, wtd, 5.5, cx, cy, current_volume, current_area, area_times_elevation_total);
+    const auto water_level = DetermineWaterLevel(
+        topo, porosity, cell_area, wtd, 5.5, cx, cy, current_volume, current_area, area_times_elevation_total);
     CHECK(water_level == 2);
   }
 }
 
 TEST_CASE("Backfill Depression") {
   const Array2D<double> topo = {
-      {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9}, {-9, 6, 6, 6, 6, 6, 6, 6, 6, -9}, {-9, 6, 1, 6, 1, 1, 6, 1, 6, -9}, {-9, 6, 1, 6, 1, 3, 6, 1, 6, -9}, {-9, 6, 1, 6, 2, 1, 4, 1, 6, -9},
-      {-9, 6, 1, 6, 1, 1, 6, 1, 6, -9},         {-9, 6, 1, 6, 6, 6, 6, 1, 6, -9}, {-9, 6, 1, 1, 1, 1, 1, 1, 6, -9}, {-9, 6, 6, 6, 6, 6, 6, 6, 6, -9}, {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9},
+      {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9},
+      {-9, 6, 6, 6, 6, 6, 6, 6, 6, -9},
+      {-9, 6, 1, 6, 1, 1, 6, 1, 6, -9},
+      {-9, 6, 1, 6, 1, 3, 6, 1, 6, -9},
+      {-9, 6, 1, 6, 2, 1, 4, 1, 6, -9},
+      {-9, 6, 1, 6, 1, 1, 6, 1, 6, -9},
+      {-9, 6, 1, 6, 6, 6, 6, 1, 6, -9},
+      {-9, 6, 1, 1, 1, 1, 1, 1, 6, -9},
+      {-9, 6, 6, 6, 6, 6, 6, 6, 6, -9},
+      {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9},
   };
 
   Array2D<double> wtd(topo.width(), topo.height());
 
   std::vector<flat_c_idx> cells_affected = {
-      topo.xyToI(4, 2), topo.xyToI(5, 2), topo.xyToI(4, 3), topo.xyToI(5, 3), topo.xyToI(4, 4), topo.xyToI(5, 4), topo.xyToI(4, 5), topo.xyToI(5, 5),
+      topo.xyToI(4, 2),
+      topo.xyToI(5, 2),
+      topo.xyToI(4, 3),
+      topo.xyToI(5, 3),
+      topo.xyToI(4, 4),
+      topo.xyToI(5, 4),
+      topo.xyToI(4, 5),
+      topo.xyToI(5, 5),
   };
 
   BackfillDepression(4.0, topo, wtd, cells_affected);
 
   const Array2D<double> wtd_good = {
-      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 3, 3, 0, 0, 0, 0}, {0, 0, 0, 0, 3, 1, 0, 0, 0, 0}, {0, 0, 0, 0, 2, 3, 0, 0, 0, 0},
-      {0, 0, 0, 0, 3, 3, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 3, 3, 0, 0, 0, 0},
+      {0, 0, 0, 0, 3, 1, 0, 0, 0, 0},
+      {0, 0, 0, 0, 2, 3, 0, 0, 0, 0},
+      {0, 0, 0, 0, 3, 3, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
   };
 
   CHECK(ArrayValuesEqual(wtd, wtd_good));
 }
 
 // TEST_CASE("Add recharge"){
-// //double add_recharge(const double deltat, const double my_rech, double my_wtd, const int my_mask, const double my_porosity){
+// //double add_recharge(const double deltat, const double my_rech, double my_wtd, const int my_mask, const double
+// my_porosity){
 
 //   //positive wtd, positive rech
 //   double new_wtd = add_recharge(31536000., 1., 1., 1, 0.4);
@@ -184,11 +237,20 @@ TEST_CASE("Fill a full depression") {
     arp.cell_area = std::vector<double>(arp.topo.height(), 1.);
 
     const Array2D<double> wtd_good = {
-        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 1, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 1, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 1, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 1, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     };
 
-    auto DH = GetDepressionHierarchy<float, Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
+    auto DH =
+        GetDepressionHierarchy<float, Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
     FillAFullDepression(my_stdi, DH, arp);
 
@@ -200,8 +262,16 @@ TEST_CASE("Fill a full depression") {
     arp.topo.setEdges(-9);
 
     arp.topo = {
-        {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9}, {-9, 4, 4, 3, 3, 3, 3, 3, 4, -9}, {-9, 4, 3, 3, 1, 2, 0, 3, 4, -9}, {-9, 3, 3, 3, 1, 2, 0, 1, 4, -9}, {-9, 3, 4, 3, 1, 0, 0, 1, 4, -9},
-        {-9, 4, 5, 4, 1, 2, 0, 2, 4, -9},         {-9, 4, 5, 5, 1, 2, 0, 2, 4, -9}, {-9, 4, 5, 6, 6, 3, 3, 3, 4, -9}, {-9, 4, 4, 6, 6, 3, 3, 3, 4, -9}, {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9},
+        {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9},
+        {-9, 4, 4, 3, 3, 3, 3, 3, 4, -9},
+        {-9, 4, 3, 3, 1, 2, 0, 3, 4, -9},
+        {-9, 3, 3, 3, 1, 2, 0, 1, 4, -9},
+        {-9, 3, 4, 3, 1, 0, 0, 1, 4, -9},
+        {-9, 4, 5, 4, 1, 2, 0, 2, 4, -9},
+        {-9, 4, 5, 5, 1, 2, 0, 2, 4, -9},
+        {-9, 4, 5, 6, 6, 3, 3, 3, 4, -9},
+        {-9, 4, 4, 6, 6, 3, 3, 3, 4, -9},
+        {-9, -9, -9, -9, -9, -9, -9, -9, -9, -9},
     };
 
     arp.wtd   = Array2D<double>(arp.topo.width(), arp.topo.height(), 0.);
@@ -215,11 +285,20 @@ TEST_CASE("Fill a full depression") {
     arp.cell_area = std::vector<double>(arp.topo.height(), 1.);
 
     const Array2D<double> wtd_good = {
-        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 2, 1, 3, 0, 0, 0}, {0, 0, 0, 0, 2, 1, 3, 2, 0, 0}, {0, 0, 0, 0, 2, 3, 3, 2, 0, 0},
-        {0, 0, 0, 0, 2, 1, 3, 1, 0, 0}, {0, 0, 0, 0, 2, 1, 3, 1, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 2, 1, 3, 0, 0, 0},
+        {0, 0, 0, 0, 2, 1, 3, 2, 0, 0},
+        {0, 0, 0, 0, 2, 3, 3, 2, 0, 0},
+        {0, 0, 0, 0, 2, 1, 3, 1, 0, 0},
+        {0, 0, 0, 0, 2, 1, 3, 1, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     };
 
-    auto DH = GetDepressionHierarchy<float, Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
+    auto DH =
+        GetDepressionHierarchy<float, Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
     FillAFullDepression(my_stdi, DH, arp);
 
@@ -306,7 +385,8 @@ void CheckMassLoss(const int count, const int min_size, const int max_size) {
 
     params.deltat = 10000;
 
-    auto deps = GetDepressionHierarchy<float, Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
+    auto deps =
+        GetDepressionHierarchy<float, Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
     std::cerr << "DH done" << std::endl;
 
     double change_in_rech        = 0.;
@@ -328,9 +408,9 @@ void CheckMassLoss(const int count, const int min_size, const int max_size) {
 #pragma omp parallel for default(none) shared(arp)
         for (unsigned int i = 0; i < arp.topo.size(); i++) {
           if (arp.wtd(i) > 0) {  // if there is surface water present
-            arp.rech(i) = static_cast<double>(arp.precip(i)) - static_cast<double>(arp.open_water_evap(i));
+            arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
           } else {  // water table is below the surface
-            arp.rech(i) = static_cast<double>(arp.precip(i)) - static_cast<double>(arp.starting_evap(i));
+            arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
             if (arp.rech(i) < 0) {  // Recharge is always positive.
               arp.rech(i) = 0.;
             }
@@ -339,7 +419,6 @@ void CheckMassLoss(const int count, const int min_size, const int max_size) {
       }
 
       double wtd_sum = 0.0;
-
       for (int y = 0; y < params.ncells_y; y++) {
         for (int x = 0; x < params.ncells_x; x++) {
           if (arp.wtd(x, y) > 0)
@@ -355,9 +434,12 @@ void CheckMassLoss(const int count, const int min_size, const int max_size) {
 
       mass_loss = (change_in_rech - change_in_water_table - change_in_ocean_loss) / change_in_rech * 100.;
 
-      std::cout << "change in rech is " << change_in_rech << " total_added_recharge " << params.total_added_recharge << " rech old " << rech_old << std::endl;
-      std::cout << "change in ocean loss " << change_in_ocean_loss << " total loss to ocean " << params.total_loss_to_ocean << " ocean loss old " << ocean_loss_old << std::endl;
-      std::cout << "change in water table " << change_in_water_table << " wtd sum " << wtd_sum << " water table old " << water_table_old << std::endl;
+      std::cout << "change in rech is " << change_in_rech << " total_added_recharge " << params.total_added_recharge
+                << " rech old " << rech_old << std::endl;
+      std::cout << "change in ocean loss " << change_in_ocean_loss << " total loss to ocean "
+                << params.total_loss_to_ocean << " ocean loss old " << ocean_loss_old << std::endl;
+      std::cout << "change in water table " << change_in_water_table << " wtd sum " << wtd_sum << " water table old "
+                << water_table_old << std::endl;
       std::cout << "mass loss as a percentage of recharge is " << mass_loss << std::endl;
 
       water_table_old = wtd_sum;
@@ -406,8 +488,8 @@ TEST_CASE("Check mass loss for random cases") {
 //    arp.wtd = Array2D<double> (arp.topo.width(), arp.topo.height(), 0. );
 // std::cerr<<"ive set all of those"<<std::endl;
 //
-//    auto DH = GetDepressionHierarchy<float,Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
-//    std::cerr<<"DH done"<<std::endl;
+//    auto DH = GetDepressionHierarchy<float,Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label,
+//    arp.flowdirs); std::cerr<<"DH done"<<std::endl;
 //
 //
 //    for(i=1;i<arp.label.size();i++){
@@ -415,7 +497,8 @@ TEST_CASE("Check mass loss for random cases") {
 //      my_stdi.my_labels.emplace(arp.label(i));
 //      my_stdi.top_label = arp.label(i);
 //      FillAFullDepression(my_stdi, DH, arp);
-// std::cerr<<std::setprecision(15)<<"and set the labels, "<<arp.label(i)<<" my out cell is "<<DH.at(my_stdi.top_label).out_elev<<std::endl;
+// std::cerr<<std::setprecision(15)<<"and set the labels, "<<arp.label(i)<<" my out cell is
+// "<<DH.at(my_stdi.top_label).out_elev<<std::endl;
 //    	}
 //
 //
@@ -448,7 +531,8 @@ TEST_CASE("Check mass loss for random cases") {
 // std::cerr<<std::setprecision(15)<<"test wtd "<<arp.wtd(5,5)<<std::endl;
 //
 //
-//    CHECK_MESSAGE(MaxArrayDiff(comparison_dem,arp.topo)<1e-6, "Randomized full depression vs Priority-Flood failed with width = "+std::to_string(arp.topo.width())+" height =
+//    CHECK_MESSAGE(MaxArrayDiff(comparison_dem,arp.topo)<1e-6, "Randomized full depression vs Priority-Flood failed
+//    with width = "+std::to_string(arp.topo.width())+" height =
 //    "+std::to_string(arp.topo.height())+" state = " + oss.str());
 //  }
 //}
@@ -487,7 +571,8 @@ void RandomizedHeavyFloodingVsPriorityFlood(const int count, const int min_size,
     arp.topo.setEdges(-1);
     arp.label.setEdges(OCEAN);
 
-    auto deps = GetDepressionHierarchy<double, Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
+    auto deps =
+        GetDepressionHierarchy<double, Topology::D8>(arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
     // wtd with a *lot* of initial surface water
     arp.wtd.resize(arp.topo.width(), arp.topo.height());
@@ -502,7 +587,13 @@ void RandomizedHeavyFloodingVsPriorityFlood(const int count, const int min_size,
     try {
       FillSpillMerge(params, deps, arp);
     } catch (const std::exception& e) {
-      std::cerr << "FillSpillMerge failed because of \"" << e.what() << "\" with width = " << arp.topo.width() << " height = " << arp.topo.height() << " state = " << oss.str() << std::endl;
+      std::cerr << fmt::format(
+                       "FillSpillMerge failed because of \"{}\" with width = {}, height = {}, state = {}",
+                       e.what(),
+                       arp.topo.width(),
+                       arp.topo.height(),
+                       oss.str())
+                << std::endl;
       throw e;
     }
 
@@ -514,8 +605,13 @@ void RandomizedHeavyFloodingVsPriorityFlood(const int count, const int min_size,
     auto comparison_dem = arp.topo;
     PriorityFlood_Zhou2016(comparison_dem);
 
-    CHECK_MESSAGE(MaxArrayDiff(comparison_dem, arp.topo) < 1e-6,
-                  "Randomized Heavy Flooding vs Priority-Flood failed with width = " + std::to_string(arp.topo.width()) + " height = " + std::to_string(arp.topo.height()) + " state = " + oss.str());
+    CHECK_MESSAGE(
+        MaxArrayDiff(comparison_dem, arp.topo) < 1e-6,
+        fmt::format(
+            "Randomized Heavy Flooding vs Priority-Flood failed with width = {}, height = {}, state = {}",
+            arp.topo.width(),
+            arp.topo.height(),
+            oss.str()));
   }
 }
 

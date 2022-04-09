@@ -1,3 +1,6 @@
 [submodule "common/richdem"]
 	path = common/richdem
 	url = https://github.com/r-barnes/richdem
+[submodule "common/fmt"]
+	path = common/fmt
+	url = https://github.com/fmtlib/fmt.git
