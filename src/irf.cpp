@@ -112,10 +112,10 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
 
   // arp.ice_mask = rd::Array2D<float>(params.surfdatadir + params.region +  params.time_end + "_ice_mask.tif");
 
-  arp.precip          = rd::Array2D<float>(params.get_path(params.time_start, "precipitation");           // Units: m/yr.
-  arp.starting_evap   = rd::Array2D<float>(params.get_path(params.time_start, "evaporation");             // Units: m/yr.
-  arp.open_water_evap = rd::Array2D<float>(params.get_path(params.time_start, "open_water_evaporation");  // Units: m/yr.
-  arp.winter_temp     = rd::Array2D<float>(params.get_path(params.time_start, "winter_temperature");      // Units: degrees Celsius
+  arp.precip          = rd::Array2D<float>(params.get_path(params.time_start, "precipitation"));           // Units: m/yr.
+  arp.starting_evap   = rd::Array2D<float>(params.get_path(params.time_start, "evaporation"));             // Units: m/yr.
+  arp.open_water_evap = rd::Array2D<float>(params.get_path(params.time_start, "open_water_evaporation"));  // Units: m/yr.
+  arp.winter_temp     = rd::Array2D<float>(params.get_path(params.time_start, "winter_temperature"));      // Units: degrees Celsius
 
   arp.scalar_array_x = rd::Array2D<double>(arp.topo, 0.0);
   arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
