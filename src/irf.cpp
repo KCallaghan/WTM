@@ -12,13 +12,13 @@ namespace dh = richdem::dephier;
 
 constexpr double UNDEF = -1.0e7;
 
-double setup_fdepth(const Parameters& params, const ArrayPack& arp, const double slope, const double temperature) {
+double setup_fdepth(const Parameters& params, const double slope, const double temperature) {
   // TODO: allow user to vary these calibration constants depending on their
   // input cellsize? Or do some kind of auto variation of them?
   const auto fdepth = std::max(params.fdepth_a / (1 + params.fdepth_b * slope), params.fdepth_fmin);
-  if (arp.winter_temp_start(i) > -5) {  // then fdepth = f from Ying's equation S7.
+  if (temperature > -5) {  // then fdepth = f from Ying's equation S7.
     return fdepth;
-  } else if (arp.winter_temp_start(i) < -14) {  // then fdpth = f*fT, Ying's equations S7 and S8.
+  } else if (temperature < -14) {  // then fdpth = f*fT, Ying's equations S7 and S8.
     return fdepth * std::max(0.05, 0.17 + 0.005 * temperature);
   } else {
     return fdepth * std::min(1.0, 1.5 + 0.1 * temperature);
@@ -74,8 +74,8 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   // TODO: allow user to vary these calibration constants depending on their
   // input cellsize? Or do some kind of auto variation of them?
   for (size_t i = 0; i < arp.topo_start.size(); i++) {
-    arp.fdepth_start(i) = setup_fdepth(params, arp, arp.slope_start(i), arp.winter_temp_start(i));
-    arp.fdepth_end(i)   = setup_fdepth(params, arp, arp.slope_end(i), arp.winter_temp_end(i));
+    arp.fdepth_start(i) = setup_fdepth(params, arp.slope_start(i), arp.winter_temp_start(i));
+    arp.fdepth_end(i)   = setup_fdepth(params, arp.slope_end(i), arp.winter_temp_end(i));
   }
 
   // initialise the arrays to be as at the starting time:
@@ -139,7 +139,7 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
 
   arp.fdepth = rd::Array2D<double>(arp.topo, 0);
   for (unsigned int i = 0; i < arp.topo.size(); i++) {
-    arp.fdepth(i) = setup_fdepth(params, arp, arp.slope(i), arp.winter_temp(i));
+    arp.fdepth(i) = setup_fdepth(params, arp.slope(i), arp.winter_temp(i));
   }
 }
 
