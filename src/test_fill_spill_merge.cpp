@@ -42,7 +42,7 @@ bool ArrayValuesEqual(const Array2D<T>& a, const Array2D<T>& b) {
   return true;
 }
 
-std::mt19937_64 gen;
+std::mt19937_64 test_prng;
 
 Array2D<double> random_terrain(std::mt19937_64& gen, const int min_size, const int max_size) {
   static std::uniform_int_distribution<uint32_t> seed_dist;
@@ -307,7 +307,7 @@ TEST_CASE("Fill a full depression") {
 }
 
 void CheckMassLoss(const int count, const int min_size, const int max_size) {
-  for (int i = 0; i < count; i++) {
+  for (int test_num = 0; test_num < count; test_num++) {
     std::stringstream oss;
 
     ArrayPack arp;
@@ -316,9 +316,9 @@ void CheckMassLoss(const int count, const int min_size, const int max_size) {
     Array2D<double> dem;
 
     {
-      oss << gen;
-      dem = random_terrain(gen, min_size, max_size);
-      std::cerr << "checking mass loss #" << i << std::endl;
+      oss << test_prng;
+      dem = random_terrain(test_prng, min_size, max_size);
+      std::cerr << "checking mass loss #" << test_num << std::endl;
     }
 
     arp.topo  = dem;
@@ -545,7 +545,7 @@ TEST_CASE("Check mass loss for random cases") {
 
 void RandomizedHeavyFloodingVsPriorityFlood(const int count, const int min_size, const int max_size) {
 #pragma omp parallel for
-  for (int i = 0; i < count; i++) {
+  for (int test_num = 0; test_num < count; test_num++) {
     std::stringstream oss;
 
     ArrayPack arp;
@@ -556,9 +556,9 @@ void RandomizedHeavyFloodingVsPriorityFlood(const int count, const int min_size,
 
 #pragma omp critical
     {
-      oss << gen;
-      dem = random_terrain(gen, min_size, max_size);
-      std::cerr << "Randomized Heavy Flooding vs Priority-Flood #" << i << std::endl;
+      oss << test_prng;
+      dem = random_terrain(test_prng, min_size, max_size);
+      std::cerr << "Randomized Heavy Flooding vs Priority-Flood #" << test_num << std::endl;
     }
 
     arp.topo        = dem;

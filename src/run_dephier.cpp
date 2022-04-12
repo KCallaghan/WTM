@@ -72,22 +72,22 @@ int main(int argc, char** argv) {
   // cell area (metres squared)
   arp.cell_area.resize(params.ncells_y);
 
-  for (unsigned int j = 0; j < params.ncells_y; j++) {
+  for (int32_t j = 0; j < params.ncells_y; j++) {
     // southern edge of the domain in degrees, plus the number of cells up
     // from this location/the number of cells per degree, converted to radians.
     // latitude at the southern edge of a cell (subtract half a cell):
-    const double latitude_radians_S = ((float(j))      / params.cells_per_degree + params.southern_edge) * DEG_TO_RAD;
+    const double latitude_radians_S = ((float(j)) / params.cells_per_degree + params.southern_edge) * DEG_TO_RAD;
     // latitude at the northern edge of a cell (add half a cell):
     const double latitude_radians_N = ((float(j) + 1.) / params.cells_per_degree + params.southern_edge) * DEG_TO_RAD;
 
-   // distance at the northern edge of the cell for the given latitude:
+    // distance at the northern edge of the cell for the given latitude:
     double cellsize_e_w_metres_N = params.cellsize_n_s_metres * std::cos(latitude_radians_N);
     // distance at the southern edge of the cell for the given latitude:
     double cellsize_e_w_metres_S = params.cellsize_n_s_metres * std::cos(latitude_radians_S);
 
     // distance between lines of longitude varies with latitude.
     // This is the distance at the centre of a cell for a given latitude:
-     arp.cellsize_e_w_metres[j] = (cellsize_e_w_metres_N + cellsize_e_w_metres_S) / 2.;
+    arp.cellsize_e_w_metres[j] = (cellsize_e_w_metres_N + cellsize_e_w_metres_S) / 2.;
 
     // cell area computed as a trapezoid, using unchanging north-south distance,
     // and east-west distances at the northern and southern edges of the cell:

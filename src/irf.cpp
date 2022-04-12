@@ -60,7 +60,7 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
 
   // load in the wtd result from the previous time:
-  arp.wtd = rd::Array2D<double>(params.get_path(params.time_start, "wtd.tif"));
+  arp.wtd = rd::Array2D<double>(params.get_path(params.time_start, "wtd"));
 
   // calculate the fdepth (e-folding depth, representing rate of decay of the
   // hydraulic conductivity with depth) arrays:
@@ -102,10 +102,12 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
 
   // arp.ice_mask = rd::Array2D<float>(params.surfdatadir + params.region +  params.time_end + "_ice_mask.tif");
 
-  arp.precip          = rd::Array2D<float>(params.get_path(params.time_start, "precipitation"));           // Units: m/yr.
-  arp.starting_evap   = rd::Array2D<float>(params.get_path(params.time_start, "evaporation"));             // Units: m/yr.
-  arp.open_water_evap = rd::Array2D<float>(params.get_path(params.time_start, "open_water_evaporation"));  // Units: m/yr.
-  arp.winter_temp     = rd::Array2D<float>(params.get_path(params.time_start, "winter_temperature"));      // Units: degrees Celsius
+  arp.precip        = rd::Array2D<float>(params.get_path(params.time_start, "precipitation"));  // Units: m/yr.
+  arp.starting_evap = rd::Array2D<float>(params.get_path(params.time_start, "evaporation"));    // Units: m/yr.
+  arp.open_water_evap =
+      rd::Array2D<float>(params.get_path(params.time_start, "open_water_evaporation"));  // Units: m/yr.
+  arp.winter_temp =
+      rd::Array2D<float>(params.get_path(params.time_start, "winter_temperature"));  // Units: degrees Celsius
 
   arp.scalar_array_x = rd::Array2D<double>(arp.topo, 0.0);
   arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
@@ -115,7 +117,7 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
   }
 
   if (params.supplied_wt == true) {
-    arp.wtd             = rd::Array2D<double>(params.get_path("starting_wt.tif"));
+    arp.wtd             = rd::Array2D<double>(params.get_path("starting_wt"));
     arp.wtd_T           = arp.wtd;
     arp.wtd_T_iteration = arp.wtd;
     arp.original_wtd    = arp.wtd;
@@ -145,9 +147,9 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
     arp.vert_ksat = rd::Array2D<float>(arp.topo, 0.00001);  // Units of ksat are m/s.
   }
 
+  // A binary mask that is 1 where there is land and 0 in the ocean
   arp.land_mask = rd::Array2D<uint8_t>(arp.topo, 1);
   arp.land_mask.setEdges(0);
-  // A binary mask that is 1 where there is land and 0 in the ocean
 
   // binary mask that is 0 where there is no ice and 1 where there is ice
   arp.ice_mask = rd::Array2D<uint8_t>(arp.topo, 0);
@@ -169,17 +171,17 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.evap   = arp.starting_evap;
   arp.fdepth = rd::Array2D<double>(arp.topo, 2.5);
 
+  // border of 'ocean' with land everywhere else
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask.isEdgeCell(x, y)) {
         arp.land_mask(x, y) = 0;
       } else {
         arp.land_mask(x, y) = 1;
-        if (!(arp.topo(x, y) < 0 || arp.topo(x, y) >= 0)) {
+        if (std::isnan(arp.topo(x, y))) {
           arp.topo(x, y) = 0;
         }
       }
-      // border of 'ocean' with land everywhere else
     }
   }
 
@@ -206,12 +208,12 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.transmissivity = rd::Array2D<double>(arp.ksat, 0);
 
   // These are populated during the calculation of the depression hierarchy:
+  // No cells are part of a depression
   arp.label = rd::Array2D<dh::dh_label_t>(params.ncells_x, params.ncells_y, dh::NO_DEP);
   // No cells are part of a depression
   arp.final_label = rd::Array2D<dh::dh_label_t>(params.ncells_x, params.ncells_y, dh::NO_DEP);
-  // No cells are part of a depression
-  arp.flowdirs = rd::Array2D<rd::flowdir_t>(params.ncells_x, params.ncells_y, rd::NO_FLOW);
   // No cells flow anywhere
+  arp.flowdirs = rd::Array2D<rd::flowdir_t>(params.ncells_x, params.ncells_y, rd::NO_FLOW);
 
   // Change undefined cells to 0
   for (size_t i = 0; i < arp.topo.size(); i++) {
@@ -263,8 +265,8 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
   // compute changing cell size and distances between
   // cells as these change with latitude:
 
-  constexpr double earth_radius = 6371000.;   // metres
-  constexpr double deg_to_rad   = M_PI / 180; // convert degrees to radians
+  constexpr double earth_radius = 6371000.;    // metres
+  constexpr double deg_to_rad   = M_PI / 180;  // convert degrees to radians
 
   // Radius * Pi = Distance from N to S pole
   // Distance / 180 = Meters / degree latitude
@@ -280,14 +282,14 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
   // cell area (metres squared)
   arp.cell_area.resize(params.ncells_y);
 
-  //used to calculate cell latitude in radians.
-  //southern edge of the domain in degrees, plus the number of cells up from this
-  //location/the number of cells per degree, converted to radians.
+  // used to calculate cell latitude in radians.
+  // southern edge of the domain in degrees, plus the number of cells up from this
+  // location/the number of cells per degree, converted to radians.
   const auto cell_position_latitude = [&](const auto cell_idx) {
     return (cell_idx / params.cells_per_degree + params.southern_edge) * deg_to_rad;
   };
 
-  for (size_t j = 0; j < params.ncells_y; j++) {
+  for (int j = 0; j < params.ncells_y; j++) {
     // latitude, in radians, at the southern edge of a cell:
     const double latitude_radians_S = cell_position_latitude(j);
     // latitude, in radians, at the northern edge of a cell (add a cell; equal to the southern edge of the next cell):
@@ -296,9 +298,9 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
     // distance between lines of longitude varies with latitude.
 
     // distance at the northern edge of the cell for the given latitude:
-    double cellsize_e_w_metres_N = params.cellsize_n_s_metres * std::cos(latitude_radians_N);
+    const double cellsize_e_w_metres_N = params.cellsize_n_s_metres * std::cos(latitude_radians_N);
     // distance at the southern edge of the cell for the given latitude:
-    double cellsize_e_w_metres_S = params.cellsize_n_s_metres * std::cos(latitude_radians_S);
+    const double cellsize_e_w_metres_S = params.cellsize_n_s_metres * std::cos(latitude_radians_S);
 
     arp.cellsize_e_w_metres[j] = (cellsize_e_w_metres_N + cellsize_e_w_metres_S) / 2.;
 
@@ -423,7 +425,7 @@ void UpdateTransientArrays(const Parameters& params, ArrayPack& arp) {
 /// informational purposes to help us understand how much the water table
 /// is changing per iteration, and where in
 /// the code that change is occurring. We print these values to a text file.
-void PrintValues(Parameters& params, ArrayPack& arp) {
+void PrintValues(Parameters& params, const ArrayPack& arp) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);
 
   params.abs_total_wtd_change = 0.0;

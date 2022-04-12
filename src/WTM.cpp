@@ -5,12 +5,22 @@
 #include <fmt/core.h>
 #include <richdem/common/timer.hpp>
 
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <string>
 
 namespace dh = richdem::dephier;
 namespace rd = richdem;
+
+std::string get_current_time_and_date_as_str() {
+  const auto now       = std::chrono::system_clock::now();
+  const auto in_time_t = std::chrono::system_clock::to_time_t(now);
+
+  std::stringstream ss;
+  ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S");
+  return ss.str();
+}
 
 void initialise(Parameters& params, ArrayPack& arp) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);
@@ -66,10 +76,10 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
   if (params.run_type == "transient") {
     UpdateTransientArrays(params, arp);
     // linear interpolation of input data from start to end times.
-    auto deps = dh::GetDepressionHierarchy<float, rd::Topology::D8>(
-        arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
     // with transient runs, we have to redo the depression hierarchy every time,
     // since the topography is changing.
+    deps = dh::GetDepressionHierarchy<float, rd::Topology::D8>(
+        arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
   }
 
   // TODO: How should equilibrium know when to exit?
@@ -86,10 +96,7 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
   // Move groundwater //
   //////////////////////
 
-  time_t now = time(nullptr);
-  char* dt   = ctime(&now);
-
-  std::cerr << "Before GW time: " << dt << std::endl;
+  std::cerr << "Before GW time: " << get_current_time_and_date_as_str() << std::endl;
 
   richdem::Timer time_groundwater;
   time_groundwater.start();
@@ -102,10 +109,8 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
     FanDarcyGroundwater::update(params, arp);
   }
 
-  now = time(nullptr);
-  dt  = ctime(&now);
   std::cerr << "t GW time = " << time_groundwater.lap() << std::endl;
-  std::cerr << "After GW time: " << dt << std::endl;
+  std::cerr << "After GW time: " << get_current_time_and_date_as_str() << std::endl;
 
   arp.wtd_mid = arp.wtd;
 
@@ -119,10 +124,8 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
 
     dh::FillSpillMerge(params, deps, arp);
 
-    now = time(nullptr);
-    dt  = ctime(&now);
     std::cerr << "t FSM time = " << fsm_timer.lap() << std::endl;
-    std::cerr << "After FSM time: " << dt << std::endl;
+    std::cerr << "After FSM time: " << get_current_time_and_date_as_str() << std::endl;
   }
 
   /////////////////////////////
@@ -167,14 +170,14 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
   }
 
   std::cerr << "t Evaporation time = " << evaporation_timer.lap() << std::endl;
-  std::cerr << "After evaporation_update: " << dt << std::endl;
+  std::cerr << "After evaporation_update: " << get_current_time_and_date_as_str() << std::endl;
 
   // Print values about the change in water table depth to the text file.
   PrintValues(params, arp);
 
   arp.wtd_old = arp.wtd;
   params.cycles_done += 1;
-  std::cerr << "Done time: " << dt << std::endl;
+  std::cerr << "Done time: " << get_current_time_and_date_as_str() << std::endl;
   std::cerr << "t TWSM update time = " << timer_overall.lap() << std::endl;
 }
 
