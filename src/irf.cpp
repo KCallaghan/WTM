@@ -12,6 +12,19 @@ namespace dh = richdem::dephier;
 
 constexpr double UNDEF = -1.0e7;
 
+double setup_fdepth(const Parameters& params, const ArrayPack& arp, const double slope, const double temperature) {
+  // TODO: allow user to vary these calibration constants depending on their
+  // input cellsize? Or do some kind of auto variation of them?
+  const auto fdepth = std::max(params.fdepth_a / (1 + params.fdepth_b * slope), params.fdepth_fmin);
+  if (arp.winter_temp_start(i) > -5) {  // then fdepth = f from Ying's equation S7.
+    return fdepth;
+  } else if (arp.winter_temp_start(i) < -14) {  // then fdpth = f*fT, Ying's equations S7 and S8.
+    return fdepth * std::max(0.05, 0.17 + 0.005 * temperature);
+  } else {
+    return fdepth * std::min(1.0, 1.5 + 0.1 * temperature);
+  }
+}
+
 /// This function initialises those arrays that are needed only for transient
 /// model runs. This includes both start and end states for slope, precipitation,
 /// temperature, topography, ET, and relative humidity. We also have a land vs
@@ -22,42 +35,37 @@ constexpr double UNDEF = -1.0e7;
 /// on cell-size. How to deal with this when a user may
 /// have differing cell size inputs? Should these be user-set values?
 void InitialiseTransient(Parameters& params, ArrayPack& arp) {
-  const auto path_start = params.surfdatadir + params.region + params.time_start;
-  const auto path_end   = params.surfdatadir + params.region + params.time_end;
-
-  arp.topo_start = rd::Array2D<float>(path_start + "_topography.tif");
-
   // width and height in number of cells in the array
   params.ncells_x = arp.topo_start.width();
   params.ncells_y = arp.topo_start.height();
 
-  arp.slope_start           = rd::Array2D<float>(path_start + "_slope.tif");
-  arp.precip_start          = rd::Array2D<float>(path_start + "_precipitation.tif");
-  arp.starting_evap_start   = rd::Array2D<float>(path_start + "_evaporation.tif");
-  arp.open_water_evap_start = rd::Array2D<float>(path_start + "_open_water_evaporation.tif");
-  arp.winter_temp_start     = rd::Array2D<float>(path_start + "_winter_temperature.tif");
-  arp.topo_end              = rd::Array2D<float>(path_end + "_topography.tif");
-  arp.slope_end             = rd::Array2D<float>(path_end + "_slope.tif");
-  arp.land_mask             = rd::Array2D<float>(path_end + "_mask.tif");
-  arp.ice_mask              = rd::Array2D<float>(path_end + "_ice_mask.tif");
+  arp.slope_start           = rd::Array2D<float>(params.get_path(params.time_start, "slope"));
+  arp.precip_start          = rd::Array2D<float>(params.get_path(params.time_start, "precipitation"));
+  arp.starting_evap_start   = rd::Array2D<float>(params.get_path(params.time_start, "evaporation"));
+  arp.open_water_evap_start = rd::Array2D<float>(params.get_path(params.time_start, "open_water_evaporation"));
+  arp.winter_temp_start     = rd::Array2D<float>(params.get_path(params.time_start, "winter_temperature"));
+  arp.topo_end              = rd::Array2D<float>(params.get_path(params.time_end, "topography"));
+  arp.slope_end             = rd::Array2D<float>(params.get_path(params.time_end, "slope"));
+  arp.land_mask             = rd::Array2D<float>(params.get_path(params.time_end, "mask"));
+  arp.ice_mask              = rd::Array2D<float>(params.get_path(params.time_end, "ice_mask"));
 
   // there is land and 0 in the ocean
   arp.land_mask.setEdges(0);
 
-  arp.precip_end          = rd::Array2D<float>(path_end + "_precipitation.tif");
-  arp.starting_evap_end   = rd::Array2D<float>(path_end + "_evaporation.tif");
-  arp.open_water_evap_end = rd::Array2D<float>(path_end + "_open_water_evaporation.tif");
-  arp.winter_temp_end     = rd::Array2D<float>(path_end + "_winter_temperature.tif");
+  arp.precip_end          = rd::Array2D<float>(params.get_path(params.time_end, "precipitation"));
+  arp.starting_evap_end   = rd::Array2D<float>(params.get_path(params.time_end, "evaporation"));
+  arp.open_water_evap_end = rd::Array2D<float>(params.get_path(params.time_end, "open_water_evaporation"));
+  arp.winter_temp_end     = rd::Array2D<float>(params.get_path(params.time_end, "winter_temperature"));
 
-  if (params.infiltration_on == true) {
-    arp.vert_ksat = rd::Array2D<float>(params.surfdatadir + params.region + "vertical_ksat.tif");
+  if (params.infiltration_on) {
+    arp.vert_ksat = rd::Array2D<float>(params.get_path("vertical_ksat"));
   }
 
   arp.scalar_array_x = rd::Array2D<double>(arp.topo, 0.0);
   arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
 
   // load in the wtd result from the previous time:
-  arp.wtd = rd::Array2D<double>(path_start + "_wtd.tif");
+  arp.wtd = rd::Array2D<double>(params.get_path(params.time_start, "wtd.tif"));
 
   // calculate the fdepth (e-folding depth, representing rate of decay of the
   // hydraulic conductivity with depth) arrays:
@@ -65,31 +73,9 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   arp.fdepth_end   = rd::Array2D<double>(arp.topo_start, 0);
   // TODO: allow user to vary these calibration constants depending on their
   // input cellsize? Or do some kind of auto variation of them?
-  for (unsigned int i = 0; i < arp.topo_start.size(); i++) {
-    if (arp.winter_temp_start(i) > -5)  // then fdepth = f from Ying's equation S7.
-      arp.fdepth_start(i) = std::max(params.fdepth_a / (1 + params.fdepth_b * arp.slope_start(i)), params.fdepth_fmin);
-    else {  // then fdpth = f*fT, Ying's equations S7 and S8.
-      if (arp.winter_temp_start(i) < -14) {
-        arp.fdepth_start(i) =
-            std::max(params.fdepth_a / (1 + params.fdepth_b * arp.slope_start(i)), params.fdepth_fmin) *
-            std::max(0.05, 0.17 + 0.005 * arp.winter_temp_start(i));
-      } else {
-        arp.fdepth_start(i) =
-            std::max(params.fdepth_a / (1 + params.fdepth_b * arp.slope_start(i)), params.fdepth_fmin) *
-            std::min(1.0, 1.5 + 0.1 * arp.winter_temp_start(i));
-      }
-    }
-    if (arp.winter_temp_end(i) > -5) {  // then fdepth = f from Ying's equation S7.
-      arp.fdepth_end(i) = std::max(params.fdepth_a / (1 + params.fdepth_b * arp.slope_end(i)), params.fdepth_fmin);
-    } else {  // then fdpth = f*fT, Ying's equations S7 and S8.
-      if (arp.winter_temp_end(i) < -14) {
-        arp.fdepth_end(i) = std::max(params.fdepth_a / (1 + params.fdepth_b * arp.slope_end(i)), params.fdepth_fmin) *
-                            std::max(0.05, 0.17 + 0.005 * arp.winter_temp_end(i));
-      } else {
-        arp.fdepth_end(i) = std::max(params.fdepth_a / (1 + params.fdepth_b * arp.slope_end(i)), params.fdepth_fmin) *
-                            std::min(1.0, 1.5 + 0.1 * arp.winter_temp_end(i));
-      }
-    }
+  for (size_t i = 0; i < arp.topo_start.size(); i++) {
+    arp.fdepth_start(i) = setup_fdepth(params, arp, arp.slope_start(i), arp.winter_temp_start(i));
+    arp.fdepth_end      = setup_fdepth(params, arp, arp.slope_end(i), arp.winter_temp_end(i));
   }
 
   // initialise the arrays to be as at the starting time:
@@ -113,36 +99,33 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
 /// on cell-size. How to deal with this when a user may
 /// have differing cell size inputs? Should these be user-set values?
 void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
-  const auto path_start = params.surfdatadir + params.region + params.time_start;
-
-  arp.topo = rd::Array2D<float>(path_start + "_topography.tif");
+  arp.topo = rd::Array2D<float>(params.get_path(params.time_start, "topography"));
 
   // width and height in number of cells in the array
   params.ncells_x = arp.topo.width();
   params.ncells_y = arp.topo.height();
 
-  arp.slope = rd::Array2D<float>(path_start + "_slope.tif");
-  arp.land_mask =
-      rd::Array2D<float>(path_start + "_mask.tif");  // A binary mask that is 1 where there is land and 0 in the ocean
+  arp.slope     = rd::Array2D<float>(params.get_path(params.time_start, "slope"));
+  arp.land_mask = rd::Array2D<float>(
+      params.get_path(params.time_start, "mask"));  // A binary mask that is 1 where there is land and 0 in the ocean
   arp.land_mask.setEdges(0);
 
   // arp.ice_mask = rd::Array2D<float>(params.surfdatadir + params.region +  params.time_end + "_ice_mask.tif");
 
-  arp.precip          = rd::Array2D<float>(path_start + "_precipitation.tif");           // Units: m/yr.
-  arp.starting_evap   = rd::Array2D<float>(path_start + "_evaporation.tif");             // Units: m/yr.
-  arp.open_water_evap = rd::Array2D<float>(path_start + "_open_water_evaporation.tif");  // Units: m/yr.
-  arp.winter_temp     = rd::Array2D<float>(path_start + "_winter_temperature.tif");      // Units: degrees Celsius
+  arp.precip          = rd::Array2D<float>(params.get_path(params.time_start, "precipitation");           // Units: m/yr.
+  arp.starting_evap   = rd::Array2D<float>(params.get_path(params.time_start, "evaporation");             // Units: m/yr.
+  arp.open_water_evap = rd::Array2D<float>(params.get_path(params.time_start, "open_water_evaporation");  // Units: m/yr.
+  arp.winter_temp     = rd::Array2D<float>(params.get_path(params.time_start, "winter_temperature");      // Units: degrees Celsius
 
   arp.scalar_array_x = rd::Array2D<double>(arp.topo, 0.0);
   arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
 
   if (params.infiltration_on == true) {
-    arp.vert_ksat =
-        rd::Array2D<float>(params.surfdatadir + params.region + "vertical_ksat.tif");  // Units of ksat are m/s.
+    arp.vert_ksat = rd::Array2D<float>(params.get_path("vertical_ksat"));  // Units of ksat are m/s.
   }
 
   if (params.supplied_wt == true) {
-    arp.wtd             = rd::Array2D<double>(path_start + "_starting_wt.tif");
+    arp.wtd             = rd::Array2D<double>(params.get_path("starting_wt.tif"));
     arp.wtd_T           = arp.wtd;
     arp.wtd_T_iteration = arp.wtd;
     arp.original_wtd    = arp.wtd;
@@ -156,26 +139,13 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
 
   arp.fdepth = rd::Array2D<double>(arp.topo, 0);
   for (unsigned int i = 0; i < arp.topo.size(); i++) {
-    // TODO: allow user to vary these calibration constants depending on their
-    // input cellsize? Or do some kind of auto variation of them?
-    if (arp.winter_temp(i) > -5)  // then fdepth = f from Ying's equation S7.
-      arp.fdepth(i) = std::max(params.fdepth_a / (1 + params.fdepth_b * arp.slope(i)), params.fdepth_fmin);
-    else {  // then fdpth = f*fT, Ying's equations S7 and S8.
-      if (arp.winter_temp(i) < -14)
-        arp.fdepth(i) = std::max(params.fdepth_a / (1 + params.fdepth_b * arp.slope(i)), params.fdepth_fmin) *
-                        std::max(0.05, 0.17 + 0.005 * arp.winter_temp(i));
-      else
-        arp.fdepth(i) = std::max(params.fdepth_a / (1 + params.fdepth_b * arp.slope(i)), params.fdepth_fmin) *
-                        std::min(1.0, 1.5 + 0.1 * arp.winter_temp(i));
-    }
+    arp.fdepth(i) = setup_fdepth(params, arp, arp.slope(i), arp.winter_temp(i));
   }
 }
 
 void InitialiseTest(Parameters& params, ArrayPack& arp) {
-  const auto path_start = params.surfdatadir + params.region + params.time_start;
-
-  arp.topo  = rd::Array2D<float>(path_start + "_topography.tif");
-  arp.slope = rd::Array2D<float>(path_start + "_slope.tif");  // Slope as a value from 0 to 1.
+  arp.topo  = rd::Array2D<float>(params.get_path("topography"));
+  arp.slope = rd::Array2D<float>(params.get_path("slope"));  // Slope as a value from 0 to 1.
 
   // width and height in number of cells in the array
   params.ncells_x = arp.topo.width();
@@ -189,8 +159,8 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.land_mask.setEdges(0);
   // A binary mask that is 1 where there is land and 0 in the ocean
 
-  arp.ice_mask =
-      rd::Array2D<uint8_t>(arp.topo, 0);  // binary mask that is 0 where there is no ice and 1 where there is ice
+  // binary mask that is 0 where there is no ice and 1 where there is ice
+  arp.ice_mask = rd::Array2D<uint8_t>(arp.topo, 0);
 
   arp.precip          = rd::Array2D<float>(arp.topo, 0.03);  // Units: m/yr.
   arp.starting_evap   = rd::Array2D<float>(arp.topo, 0.);    // Units: m/yr.
@@ -209,14 +179,16 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.evap   = arp.starting_evap;
   arp.fdepth = rd::Array2D<double>(arp.topo, 2.5);
 
+  // TODO: Why are these loops asymmetric on the domain boundary?
   for (int y = 1; y < params.ncells_y; y++) {
     for (int x = 1; x < params.ncells_x; x++) {
-      if (x == 0 || y == 0 || x == params.ncells_x - 1 || y == params.ncells_y - 1)
+      if (arp.land_mask.isEdgeCell(x, y)) {
         arp.land_mask(x, y) = 0;
-      else {
+      } else {
         arp.land_mask(x, y) = 1;
-        if (!(arp.topo(x, y) < 0 || arp.topo(x, y) >= 0))
+        if (!(arp.topo(x, y) < 0 || arp.topo(x, y) >= 0)) {
           arp.topo(x, y) = 0;
+        }
       }
       // border of 'ocean' with land everywhere else
     }
@@ -253,7 +225,7 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   // No cells flow anywhere
 
   // Change undefined cells to 0
-  for (unsigned int i = 0; i < arp.topo.size(); i++) {
+  for (size_t i = 0; i < arp.topo.size(); i++) {
     if (arp.topo(i) <= UNDEF) {
       arp.topo(i) = 0;
     }
@@ -261,8 +233,8 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
 
 // get the starting runoff using precip and evap inputs:
 #pragma omp parallel for default(none) shared(arp)
-  for (unsigned int i = 0; i < arp.topo.size(); i++) {
-    arp.rech(i) = (arp.precip(i) - arp.starting_evap(i));
+  for (size_t i = 0; i < arp.topo.size(); i++) {
+    arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
     if (arp.rech(i) < 0) {  // Recharge is always positive.
       arp.rech(i) = 0.0f;
     }
@@ -273,7 +245,7 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
 
 // Wtd is 0 in the ocean and under the ice:
 #pragma omp parallel for default(none) shared(arp)
-  for (unsigned int i = 0; i < arp.topo.size(); i++) {
+  for (size_t i = 0; i < arp.topo.size(); i++) {
     if (arp.land_mask(i) == 0) {  // || arp.ice_mask(i) == 1){
       arp.wtd(i)             = 0.;
       arp.wtd_T(i)           = 0.;
@@ -302,68 +274,69 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
   // compute changing cell size and distances between
   // cells as these change with latitude:
 
-  const double earth_radius = 6371000.;  // metres
+  constexpr double earth_radius = 6371000.;  // metres
+  constexpr double deg_to_rad   = M_PI / 180;
 
-  // distance between lines of latitude is a constant.
-  params.cellsize_n_s_metres = (earth_radius * (M_PI / 180.)) / double(params.cells_per_degree);
+  // Radius * Pi = Distance from N to S pole
+  // Distance / 180 = Meters / degree latitude
+  const auto meters_per_degree = earth_radius * deg_to_rad;
+
+  // N-S Meters per cell; distance between lines of latitude is a constant
+  params.cellsize_n_s_metres = meters_per_degree / params.cells_per_degree;
 
   // initialise some arrays
-  arp.latitude_radians.resize(params.ncells_y);
+
   // the latitude of each row of cells
-  arp.cellsize_e_w_metres.resize(params.ncells_y);
+  arp.latitude_radians.resize(params.ncells_y);
   // size of a cell in the east-west direction at the centre of the cell (metres)
-  arp.cellsize_e_w_metres_N.resize(params.ncells_y);
+  arp.cellsize_e_w_metres.resize(params.ncells_y);
   // size of a cell in the east-west direction at the
   // northern edge of the cell (metres)
-  arp.cellsize_e_w_metres_S.resize(params.ncells_y);
+  arp.cellsize_e_w_metres_N.resize(params.ncells_y);
   // size of a cell in the east-west direction at the
   // southern edge of the cell (metres)
-  arp.cell_area.resize(params.ncells_y);
+  arp.cellsize_e_w_metres_S.resize(params.ncells_y);
   // cell area (metres squared)
+  arp.cell_area.resize(params.ncells_y);
 
-  for (unsigned int j = 0; j < arp.latitude_radians.size(); j++) {
+  const auto cell_position_latitude = [&](const auto cell_idx) {
+    return (cell_idx / params.cells_per_degree + params.southern_edge) + deg_to_rad;
+  };
+
+  for (size_t j = 0; j < arp.latitude_radians.size(); j++) {
     // latitude at the centre of a cell:
-    arp.latitude_radians[j] =
-        (double(j) / double(params.cells_per_degree) + double(params.southern_edge)) * (M_PI / 180.);
     // southern edge of the domain in degrees, plus the number of cells up
     // from this location/the number of cells per degree, converted to radians.
+    arp.latitude_radians[j] = cell_position_latitude(j);
 
     // cells_per_degree = 120, there are this many 30 arc-second pieces in
     // one degree. (or however many pieces per degree the user has)
     // j/cells_per_degree gives the number  of degrees up from the southern edge,
     // add southern_edge since the southern edge may not be at 0 latitude.
-    //*pi/180 to convert to radians.
+    // *pi/180 to convert to radians.
     // latitude_radians is now the latitude in radians.
 
     // latitude at the southern edge of a cell (subtract half a cell):
-    const double latitude_radians_S =
-        ((double(j) - 0.5) / double(params.cells_per_degree) + double(params.southern_edge)) * (M_PI / 180.);
+    const double latitude_radians_S = cell_position_latitude(j - 0.5);
     // latitude at the northern edge of a cell (add half a cell):
-    const double latitude_radians_N =
-        ((double(j) + 0.5) / double(params.cells_per_degree) + double(params.southern_edge)) * (M_PI / 180.);
+    const double latitude_radians_N = cell_position_latitude(j + 0.5);
 
     // distance between lines of longitude varies with latitude.
     // This is the distance at the centre of a cell for a given latitude:
 
     // distance at the northern edge of the cell for the given latitude:
-    arp.cellsize_e_w_metres_N[j] =
-        earth_radius * std::cos(latitude_radians_N) * (M_PI / 180.) / double(params.cells_per_degree);
+    arp.cellsize_e_w_metres_N[j] = params.cellsize_n_s_metres * std::cos(latitude_radians_N);
     // distance at the southern edge of the cell for the given latitude:
-    arp.cellsize_e_w_metres_S[j] =
-        earth_radius * std::cos(latitude_radians_S) * (M_PI / 180.) / double(params.cells_per_degree);
+    arp.cellsize_e_w_metres_S[j] = params.cellsize_n_s_metres * std::cos(latitude_radians_S);
 
     arp.cellsize_e_w_metres[j] = (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j]) / 2.;
     // cell area computed as a trapezoid, using unchanging north-south distance,
     // and east-west distances at the northern and southern edges of the cell:
-    arp.cell_area[j] = (params.cellsize_n_s_metres) * arp.cellsize_e_w_metres[j];
+    arp.cell_area[j] = params.cellsize_n_s_metres * arp.cellsize_e_w_metres[j];
 
     if (arp.cell_area[j] < 0) {
-      std::cout << "how can this be? ns size " << params.cellsize_n_s_metres << " ew size N "
-                << arp.cellsize_e_w_metres_N[j] << " ew size S " << arp.cellsize_e_w_metres_S[j] << " area "
-                << arp.cell_area[j] << std::endl;
+      throw std::runtime_error("Cell with a negative area was found!");
     }
-    // TODO: see which, if any, arrays can be cleared after use to free up memory.
-    // How to do this?
   }
 }
 
@@ -371,8 +344,8 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
 /// and transient model runs. This includes arrays that start off with zero
 /// values, as well as the label, final_label, and flowdirs arrays.
 void InitialiseBoth(const Parameters& params, ArrayPack& arp) {
-  arp.ksat     = rd::Array2D<float>(params.surfdatadir + params.region + "horizontal_ksat.tif");
-  arp.porosity = rd::Array2D<float>(params.surfdatadir + params.region + "porosity.tif");
+  arp.ksat     = rd::Array2D<float>(params.get_path("horizontal_ksat"));
+  arp.porosity = rd::Array2D<float>(params.get_path("porosity"));
 
   arp.effective_storativity = rd::Array2D<double>(arp.topo, 0.);
   // Set arrays that start off with zero or other values,
@@ -489,7 +462,7 @@ void PrintValues(Parameters& params, ArrayPack& arp) {
   params.GW_wtd_change        = 0.0;
   params.wtd_sum              = 0.0;
 
-  for (int y = 0; y < params.ncells_y; y++)
+  for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
       params.abs_total_wtd_change += std::abs(arp.wtd(x, y) - arp.wtd_old(x, y));
       params.abs_wtd_mid_change += std::abs(arp.wtd(x, y) - arp.wtd_mid(x, y));
@@ -504,6 +477,7 @@ void PrintValues(Parameters& params, ArrayPack& arp) {
         params.wtd_sum += arp.wtd(x, y) * arp.porosity(x, y) * arp.cell_area[y];
       }
     }
+  }
 
   textfile << params.cycles_done << " " << params.total_wtd_change << " " << params.GW_wtd_change << " "
            << params.wtd_mid_change << " " << params.abs_total_wtd_change << " " << params.abs_GW_wtd_change << " "

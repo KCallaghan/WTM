@@ -216,10 +216,10 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  ArrayPack arp;
-  std::cerr << "Argv" << argv << std::endl;
+  std::cerr << "Reading configuration file '" << argv << "'..." << std::endl;
   Parameters params(argv[1]);
 
+  ArrayPack arp;
   initialise(params, arp);
   run(params, arp);
   finalise(params, arp);
