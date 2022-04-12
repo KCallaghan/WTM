@@ -75,7 +75,7 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   // input cellsize? Or do some kind of auto variation of them?
   for (size_t i = 0; i < arp.topo_start.size(); i++) {
     arp.fdepth_start(i) = setup_fdepth(params, arp, arp.slope_start(i), arp.winter_temp_start(i));
-    arp.fdepth_end      = setup_fdepth(params, arp, arp.slope_end(i), arp.winter_temp_end(i));
+    arp.fdepth_end(i)   = setup_fdepth(params, arp, arp.slope_end(i), arp.winter_temp_end(i));
   }
 
   // initialise the arrays to be as at the starting time:
