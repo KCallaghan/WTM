@@ -1610,8 +1610,7 @@ static void FillDepressions(
 
     // Add focal cell's neighbours to expand the search for more volume.
     for (int n = 1; n <= neighbours; n++) {
-      const int nx = c.x + dx[n];  // Get neighbour's x-coordinate using an offset and wrapping
-      // TODO ModFloor(x+dx[n],topo.width());
+      const int nx = c.x + dx[n];             // Get neighbour's x-coordinate using an offset and wrapping
       const int ny = c.y + dy[n];             // Get neighbour's y-coordinate using an offset
       if (!arp.topo.inGrid(nx, ny))           // Is this cell in the grid?
         continue;                             // Nope: out of bounds.

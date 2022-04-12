@@ -175,13 +175,6 @@ struct OutletHash {
   }
 };
 
-// The regular mod function allows negative numbers to stay negative. This mod
-// function wraps negative numbers around. For instance, if a=-1 and n=100, then
-// the result is 99.
-static int ModFloor(int a, int n) {
-  return ((a % n) + n) % n;
-}
-
 template <class elev_t>
 using PriorityQueue = radix_heap::pair_radix_heap<elev_t, uint64_t>;
 
@@ -383,7 +376,6 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       bool has_lower     = false;              // Pretend we have no lower neighbours
       for (int n = 1; n <= neighbours; n++) {  // Check out our neighbours
         // Use offset to get neighbour x coordinate, wrapping as needed
-        // const int nx = ModFloor(x+dx[n],dem.width());
         const int nx = x + dx[n];
         // Use offset to get neighbour y coordinate
         const int ny = y + dy[n];
