@@ -290,7 +290,7 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
     // latitude at the centre of a cell:
     // southern edge of the domain in degrees, plus the number of cells up
     // from this location/the number of cells per degree, converted to radians.
-    arp.latitude_radians[j] = cell_position_latitude(j);
+    arp.latitude_radians[j] = cell_position_latitude(j + 0.5);  //since we have the southern edge, we need to add 0.5 of a cell to get the latitude at the centre of the cell
 
     // cells_per_degree = 120, there are this many 30 arc-second pieces in
     // one degree. (or however many pieces per degree the user has)
@@ -299,10 +299,10 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
     // *pi/180 to convert to radians.
     // latitude_radians is now the latitude in radians.
 
-    // latitude at the southern edge of a cell (subtract half a cell):
-    const double latitude_radians_S = cell_position_latitude(j - 0.5);
-    // latitude at the northern edge of a cell (add half a cell):
-    const double latitude_radians_N = cell_position_latitude(j + 0.5);
+    // latitude at the southern edge of a cell:
+    const double latitude_radians_S = cell_position_latitude(j);
+    // latitude at the northern edge of a cell (add a cell; equal to the southern edge of the next cell):
+    const double latitude_radians_N = cell_position_latitude(j + 1);
 
     // distance between lines of longitude varies with latitude.
     // This is the distance at the centre of a cell for a given latitude:
