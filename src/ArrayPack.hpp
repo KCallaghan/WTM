@@ -61,8 +61,6 @@ struct ArrayPack {
   dvec latitude_radians;
   dvec cell_area;
   dvec cellsize_e_w_metres;
-  dvec cellsize_e_w_metres_N;
-  dvec cellsize_e_w_metres_S;
 
   richdem::Array2D<richdem::dephier::dh_label_t> label;        // No cells are part of a depression
   richdem::Array2D<richdem::dephier::dh_label_t> final_label;  // No cells are part of a depression

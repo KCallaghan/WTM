@@ -68,12 +68,6 @@ int main(int argc, char** argv) {
   // the latitude of each row of cells
   arp.cellsize_e_w_metres.resize(params.ncells_y);
   // size of a cell in the east-west direction at the centre of the cell (metres)
-  arp.cellsize_e_w_metres_N.resize(params.ncells_y);
-  // size of a cell in the east-west direction at the
-  // northern edge of the cell (metres)
-  arp.cellsize_e_w_metres_S.resize(params.ncells_y);
-  // size of a cell in the east-west direction at the
-  // southern edge of the cell (metres)
   arp.cell_area.resize(params.ncells_y);
   // cell area (metres squared)
 
@@ -101,13 +95,13 @@ int main(int argc, char** argv) {
         earth_radius * std::cos(arp.latitude_radians[j]) * DEG_TO_RAD / params.cells_per_degree;
 
     // distance at the northern edge of the cell for the given latitude:
-    arp.cellsize_e_w_metres_N[j] = earth_radius * std::cos(latitude_radians_N) * DEG_TO_RAD / params.cells_per_degree;
+    double cellsize_e_w_metres_N = earth_radius * std::cos(latitude_radians_N) * DEG_TO_RAD / params.cells_per_degree;
     // distance at the southern edge of the cell for the given latitude:
-    arp.cellsize_e_w_metres_S[j] = earth_radius * std::cos(latitude_radians_S) * DEG_TO_RAD / params.cells_per_degree;
+    double cellsize_e_w_metres_S = earth_radius * std::cos(latitude_radians_S) * DEG_TO_RAD / params.cells_per_degree;
 
     // cell area computed as a trapezoid, using unchanging north-south distance,
     // and east-west distances at the northern and southern edges of the cell:
-    arp.cell_area[j] = params.cellsize_n_s_metres * (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j]) / 2;
+    arp.cell_area[j] = params.cellsize_n_s_metres * (cellsize_e_w_metres_N + cellsize_e_w_metres_S) / 2;
 
     // TODO(kcallaghan): see which, if any, arrays can be cleared after use to free up memory.
     // How to do this?

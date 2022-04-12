@@ -12,9 +12,8 @@ namespace dh = richdem::dephier;
 
 constexpr double UNDEF = -1.0e7;
 
+/// We calculate the e-folding depth here, using temperature and slope.
 double setup_fdepth(const Parameters& params, const double slope, const double temperature) {
-  // TODO: allow user to vary these calibration constants depending on their
-  // input cellsize? Or do some kind of auto variation of them?
   const auto fdepth = std::max(params.fdepth_a / (1 + params.fdepth_b * slope), params.fdepth_fmin);
   if (temperature > -5) {  // then fdepth = f from Ying's equation S7.
     return fdepth;
@@ -30,10 +29,6 @@ double setup_fdepth(const Parameters& params, const double slope, const double t
 /// temperature, topography, ET, and relative humidity. We also have a land vs
 /// ocean mask for the end time. It also includes the starting water table depth
 /// array, a requirement for transient runs.
-/// We also calculate the e-folding depth here, using temperature and slope.
-/// TODO: the e-folding depth uses some calibration constants that are dependent
-/// on cell-size. How to deal with this when a user may
-/// have differing cell size inputs? Should these be user-set values?
 void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   // width and height in number of cells in the array
   params.ncells_x = arp.topo_start.width();
@@ -71,8 +66,7 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   // hydraulic conductivity with depth) arrays:
   arp.fdepth_start = rd::Array2D<double>(arp.topo_start, 0);
   arp.fdepth_end   = rd::Array2D<double>(arp.topo_start, 0);
-  // TODO: allow user to vary these calibration constants depending on their
-  // input cellsize? Or do some kind of auto variation of them?
+
   for (size_t i = 0; i < arp.topo_start.size(); i++) {
     arp.fdepth_start(i) = setup_fdepth(params, arp.slope_start(i), arp.winter_temp_start(i));
     arp.fdepth_end(i)   = setup_fdepth(params, arp.slope_end(i), arp.winter_temp_end(i));
@@ -94,10 +88,6 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
 /// topography, ET, land vs ocean mask, and relative humidity.
 /// It also includes setting the starting water table depth array to
 /// zero everywhere.
-/// We also calculate the e-folding depth here, using temperature and slope.
-/// TODO: the e-folding depth uses some calibration constants that are dependent
-/// on cell-size. How to deal with this when a user may
-/// have differing cell size inputs? Should these be user-set values?
 void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
   arp.topo = rd::Array2D<float>(params.get_path(params.time_start, "topography"));
 
@@ -289,12 +279,6 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
   arp.latitude_radians.resize(params.ncells_y);
   // size of a cell in the east-west direction at the centre of the cell (metres)
   arp.cellsize_e_w_metres.resize(params.ncells_y);
-  // size of a cell in the east-west direction at the
-  // northern edge of the cell (metres)
-  arp.cellsize_e_w_metres_N.resize(params.ncells_y);
-  // size of a cell in the east-west direction at the
-  // southern edge of the cell (metres)
-  arp.cellsize_e_w_metres_S.resize(params.ncells_y);
   // cell area (metres squared)
   arp.cell_area.resize(params.ncells_y);
 
@@ -324,11 +308,11 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
     // This is the distance at the centre of a cell for a given latitude:
 
     // distance at the northern edge of the cell for the given latitude:
-    arp.cellsize_e_w_metres_N[j] = params.cellsize_n_s_metres * std::cos(latitude_radians_N);
+    double cellsize_e_w_metres_N = params.cellsize_n_s_metres * std::cos(latitude_radians_N);
     // distance at the southern edge of the cell for the given latitude:
-    arp.cellsize_e_w_metres_S[j] = params.cellsize_n_s_metres * std::cos(latitude_radians_S);
+    double cellsize_e_w_metres_S = params.cellsize_n_s_metres * std::cos(latitude_radians_S);
 
-    arp.cellsize_e_w_metres[j] = (arp.cellsize_e_w_metres_N[j] + arp.cellsize_e_w_metres_S[j]) / 2.;
+    arp.cellsize_e_w_metres[j] = (cellsize_e_w_metres_N + cellsize_e_w_metres_S) / 2.;
     // cell area computed as a trapezoid, using unchanging north-south distance,
     // and east-west distances at the northern and southern edges of the cell:
     arp.cell_area[j] = params.cellsize_n_s_metres * arp.cellsize_e_w_metres[j];
