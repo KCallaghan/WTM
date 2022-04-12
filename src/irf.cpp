@@ -300,7 +300,7 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
   arp.cell_area.resize(params.ncells_y);
 
   const auto cell_position_latitude = [&](const auto cell_idx) {
-    return (cell_idx / params.cells_per_degree + params.southern_edge) + deg_to_rad;
+    return (cell_idx / params.cells_per_degree + params.southern_edge) * deg_to_rad;
   };
 
   for (size_t j = 0; j < arp.latitude_radians.size(); j++) {
