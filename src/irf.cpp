@@ -263,8 +263,8 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
   // compute changing cell size and distances between
   // cells as these change with latitude:
 
-  constexpr double earth_radius = 6371000.;  // metres
-  constexpr double deg_to_rad   = M_PI / 180;
+  constexpr double earth_radius = 6371000.;   // metres
+  constexpr double deg_to_rad   = M_PI / 180; // convert degrees to radians
 
   // Radius * Pi = Distance from N to S pole
   // Distance / 180 = Meters / degree latitude
@@ -275,37 +275,25 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
 
   // initialise some arrays
 
-  // the latitude of each row of cells
-  arp.latitude_radians.resize(params.ncells_y);
   // size of a cell in the east-west direction at the centre of the cell (metres)
   arp.cellsize_e_w_metres.resize(params.ncells_y);
   // cell area (metres squared)
   arp.cell_area.resize(params.ncells_y);
 
+  //used to calculate cell latitude in radians.
+  //southern edge of the domain in degrees, plus the number of cells up from this
+  //location/the number of cells per degree, converted to radians.
   const auto cell_position_latitude = [&](const auto cell_idx) {
     return (cell_idx / params.cells_per_degree + params.southern_edge) * deg_to_rad;
   };
 
-  for (size_t j = 0; j < arp.latitude_radians.size(); j++) {
-    // latitude at the centre of a cell:
-    // southern edge of the domain in degrees, plus the number of cells up
-    // from this location/the number of cells per degree, converted to radians.
-    arp.latitude_radians[j] = cell_position_latitude(j + 0.5);  //since we have the southern edge, we need to add 0.5 of a cell to get the latitude at the centre of the cell
-
-    // cells_per_degree = 120, there are this many 30 arc-second pieces in
-    // one degree. (or however many pieces per degree the user has)
-    // j/cells_per_degree gives the number  of degrees up from the southern edge,
-    // add southern_edge since the southern edge may not be at 0 latitude.
-    // *pi/180 to convert to radians.
-    // latitude_radians is now the latitude in radians.
-
-    // latitude at the southern edge of a cell:
+  for (size_t j = 0; j < params.ncells_y; j++) {
+    // latitude, in radians, at the southern edge of a cell:
     const double latitude_radians_S = cell_position_latitude(j);
-    // latitude at the northern edge of a cell (add a cell; equal to the southern edge of the next cell):
+    // latitude, in radians, at the northern edge of a cell (add a cell; equal to the southern edge of the next cell):
     const double latitude_radians_N = cell_position_latitude(j + 1);
 
     // distance between lines of longitude varies with latitude.
-    // This is the distance at the centre of a cell for a given latitude:
 
     // distance at the northern edge of the cell for the given latitude:
     double cellsize_e_w_metres_N = params.cellsize_n_s_metres * std::cos(latitude_radians_N);
@@ -313,8 +301,9 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
     double cellsize_e_w_metres_S = params.cellsize_n_s_metres * std::cos(latitude_radians_S);
 
     arp.cellsize_e_w_metres[j] = (cellsize_e_w_metres_N + cellsize_e_w_metres_S) / 2.;
+
     // cell area computed as a trapezoid, using unchanging north-south distance,
-    // and east-west distances at the northern and southern edges of the cell:
+    // and east-west average distance.
     arp.cell_area[j] = params.cellsize_n_s_metres * arp.cellsize_e_w_metres[j];
 
     if (arp.cell_area[j] < 0) {
