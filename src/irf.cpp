@@ -179,9 +179,8 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.evap   = arp.starting_evap;
   arp.fdepth = rd::Array2D<double>(arp.topo, 2.5);
 
-  // TODO: Why are these loops asymmetric on the domain boundary?
-  for (int y = 1; y < params.ncells_y; y++) {
-    for (int x = 1; x < params.ncells_x; x++) {
+  for (int y = 0; y < params.ncells_y; y++) {
+    for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask.isEdgeCell(x, y)) {
         arp.land_mask(x, y) = 0;
       } else {
