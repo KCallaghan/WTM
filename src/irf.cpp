@@ -428,35 +428,35 @@ void UpdateTransientArrays(const Parameters& params, ArrayPack& arp) {
 void PrintValues(Parameters& params, const ArrayPack& arp) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);
 
-  params.abs_total_wtd_change = 0.0;
-  params.abs_wtd_mid_change   = 0.0;
-  params.abs_GW_wtd_change    = 0.0;
-  params.total_wtd_change     = 0.0;
-  params.wtd_mid_change       = 0.0;
-  params.GW_wtd_change        = 0.0;
-  params.wtd_sum              = 0.0;
+  double abs_total_wtd_change = 0.0;
+  double abs_wtd_mid_change   = 0.0;
+  double abs_GW_wtd_change    = 0.0;
+  double total_wtd_change     = 0.0;
+  double wtd_mid_change       = 0.0;
+  double GW_wtd_change        = 0.0;
+  double wtd_sum              = 0.0;
 
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
-      params.abs_total_wtd_change += std::abs(arp.wtd(x, y) - arp.wtd_old(x, y));
-      params.abs_wtd_mid_change += std::abs(arp.wtd(x, y) - arp.wtd_mid(x, y));
-      params.abs_GW_wtd_change += std::abs(arp.wtd_mid(x, y) - arp.wtd_old(x, y));
-      params.total_wtd_change += (arp.wtd(x, y) - arp.wtd_old(x, y));
-      params.wtd_mid_change += (arp.wtd(x, y) - arp.wtd_mid(x, y));
-      params.GW_wtd_change += (arp.wtd_mid(x, y) - arp.wtd_old(x, y));
+      abs_total_wtd_change += std::abs(arp.wtd(x, y) - arp.wtd_old(x, y));
+      abs_wtd_mid_change += std::abs(arp.wtd(x, y) - arp.wtd_mid(x, y));
+      abs_GW_wtd_change += std::abs(arp.wtd_mid(x, y) - arp.wtd_old(x, y));
+      total_wtd_change += (arp.wtd(x, y) - arp.wtd_old(x, y));
+      wtd_mid_change += (arp.wtd(x, y) - arp.wtd_mid(x, y));
+      GW_wtd_change += (arp.wtd_mid(x, y) - arp.wtd_old(x, y));
       params.infiltration_change += arp.infiltration_array(x, y);
       if (arp.wtd(x, y) > 0) {
-        params.wtd_sum += arp.wtd(x, y) * arp.cell_area[y];
+        wtd_sum += arp.wtd(x, y) * arp.cell_area[y];
       } else {
-        params.wtd_sum += arp.wtd(x, y) * arp.porosity(x, y) * arp.cell_area[y];
+        wtd_sum += arp.wtd(x, y) * arp.porosity(x, y) * arp.cell_area[y];
       }
     }
   }
 
-  textfile << params.cycles_done << " " << params.total_wtd_change << " " << params.GW_wtd_change << " "
-           << params.wtd_mid_change << " " << params.abs_total_wtd_change << " " << params.abs_GW_wtd_change << " "
-           << params.abs_wtd_mid_change << " " << params.infiltration_change << " " << params.total_added_recharge
-           << " " << params.total_loss_to_ocean << " " << params.wtd_sum << " " << std::endl;
+  textfile << params.cycles_done << " " << total_wtd_change << " " << GW_wtd_change << " "
+           << wtd_mid_change << " " << abs_total_wtd_change << " " << abs_GW_wtd_change << " "
+           << abs_wtd_mid_change << " " << params.infiltration_change << " " << params.total_added_recharge
+           << " " << params.total_loss_to_ocean << " " << wtd_sum << " " << std::endl;
 
   textfile.close();
 }

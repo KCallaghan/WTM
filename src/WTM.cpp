@@ -110,7 +110,7 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
   }
 
   std::cerr << "t GW time = " << time_groundwater.lap() << std::endl;
-  std::cerr << "After GW time: " << get_current_time_and_date_as_str() << std::endl;
+  std::cerr << "t After GW time: " << get_current_time_and_date_as_str() << std::endl;
 
   arp.wtd_mid = arp.wtd;
 
@@ -125,7 +125,7 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
     dh::FillSpillMerge(params, deps, arp);
 
     std::cerr << "t FSM time = " << fsm_timer.lap() << std::endl;
-    std::cerr << "After FSM time: " << get_current_time_and_date_as_str() << std::endl;
+    std::cerr << "t After FSM time: " << get_current_time_and_date_as_str() << std::endl;
   }
 
   /////////////////////////////
@@ -139,32 +139,27 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
 
   // Evap mode 1: Use the computed open-water evaporation rate
   if (params.evap_mode) {
-    std::cout << "updating the evaporation field" << std::endl;
+    std::cout << "p updating the evaporation field" << std::endl;
 #pragma omp parallel for default(none) shared(arp)
     for (unsigned int i = 0; i < arp.topo.size(); i++) {
       if (arp.wtd(i) > 0) {  // if there is surface water present
-        arp.rech(i) = static_cast<double>(arp.precip(i)) - static_cast<double>(arp.open_water_evap(i));
+        arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
       } else {  // water table is below the surface
-        arp.rech(i) = static_cast<double>(arp.precip(i)) - static_cast<double>(arp.starting_evap(i));
-        if (arp.rech(i) < 0) {  // Recharge is always positive.
-          arp.rech(i) = 0.;
-        }
+        // Recharge is always positive.
+        arp.rech(i) = std::max(0., static_cast<double>(arp.precip(i)) - arp.starting_evap(i));
       }
     }
   }
 
   // Evap mode 0: remove all surface water (like Fan Reinfelder et al., 2013)
   else {
-    std::cout << "removing all surface water" << std::endl;
+    std::cout << "p removing all surface water" << std::endl;
 #pragma omp parallel for default(none) shared(arp)
     for (unsigned int i = 0; i < arp.topo.size(); i++) {
       if (arp.wtd(i) > 0) {  // if there is surface water present
         arp.wtd(i) = 0;      // use this option when testing GW component alone
       } else {               // water table is below the surface
-        arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
-        if (arp.rech(i) < 0) {  // Recharge is always positive.
-          arp.rech(i) = 0.0f;
-        }
+        arp.rech(i) = std::max(0., static_cast<double>(arp.precip(i)) - arp.starting_evap(i));
       }
     }
   }
@@ -177,7 +172,7 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
 
   arp.wtd_old = arp.wtd;
   params.cycles_done += 1;
-  std::cerr << "Done time: " << get_current_time_and_date_as_str() << std::endl;
+  std::cerr << "t Done time = " << get_current_time_and_date_as_str() << std::endl;
   std::cerr << "t TWSM update time = " << timer_overall.lap() << std::endl;
 }
 
@@ -187,13 +182,8 @@ void run(Parameters& params, ArrayPack& arp) {
   auto deps = dh::GetDepressionHierarchy<float, rd::Topology::D8>(
       arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
-  while (true) {
+  while (params.cycles_done <= params.total_cycles) {
     update(params, arp, deps);
-    // For transient - user set param that I am setting for now
-    // at 50 to get 500 years total.
-    if (params.cycles_done == params.total_cycles) {
-      break;
-    }
   }
 }
 
@@ -201,13 +191,12 @@ void run(Parameters& params, ArrayPack& arp) {
 // automatically when the program terminates, but could be something
 // we need to do.
 void finalise(Parameters& params, ArrayPack& arp) {
-  std::ofstream textfile;
-  textfile.open(params.textfilename, std::ios_base::app);
+  std::ofstream textfile(params.textfilename, std::ios_base::app);
 
-  textfile << "done with processing" << std::endl;
-  auto cycles_str = std::to_string(params.cycles_done);
-  arp.wtd.saveGDAL(params.outfile_prefix + cycles_str + ".tif");
+  textfile << "p done with processing" << std::endl;
+  const auto cycles_str = std::to_string(params.cycles_done);
   // save the final answer for water table depth.
+  arp.wtd.saveGDAL(params.outfile_prefix + cycles_str + ".tif");
 
   textfile.close();
 }
