@@ -48,6 +48,8 @@ Parameters::Parameters(const std::string& config_file) {
       ss >> maxiter;
     } else if (key == "outfile_prefix") {
       ss >> outfile_prefix;
+    } else if (key == "parallel_threads") {
+      ss >> parallel_threads;
     } else if (key == "picard_iterations") {
       ss >> picard_iterations;
     } else if (key == "region") {
@@ -103,6 +105,7 @@ void Parameters::print() const {
   std::cout << "c infiltration_on  = " << infiltration_on << std::endl;
   std::cout << "c maxiter          = " << maxiter << std::endl;
   std::cout << "c outfile_prefix   = " << outfile_prefix << std::endl;
+  std::cout << "c parallel_threads = " << parallel_threads << std::endl;
   std::cout << "c picard_iterations= " << picard_iterations << std::endl;
   std::cout << "c region           = " << region << std::endl;
   std::cout << "c run_type         = " << run_type << std::endl;
