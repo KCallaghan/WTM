@@ -194,9 +194,8 @@ void finalise(Parameters& params, ArrayPack& arp) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);
 
   textfile << "p done with processing" << std::endl;
-  const auto cycles_str = std::to_string(params.cycles_done);
   // save the final answer for water table depth.
-  arp.wtd.saveGDAL(params.outfile_prefix + cycles_str + ".tif");
+  arp.wtd.saveGDAL(fmt::format("{}{:09}.tif", params.outfile_prefix, params.cycles_done));
 
   textfile.close();
 }
