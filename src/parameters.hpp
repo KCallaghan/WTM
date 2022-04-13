@@ -42,20 +42,14 @@ struct Parameters {
   double southern_edge      = std::numeric_limits<double>::signaling_NaN();
   int32_t picard_iterations = 1;  // Default only one iteration
   int32_t total_cycles      = -1;
+  int32_t parallel_threads  = 1;  // one thread by default to accommodate computer architecture
 
-  double abs_GW_wtd_change    = 0.;
-  double abs_total_wtd_change = 0.;
-  double abs_wtd_mid_change   = 0.;
   double cellsize_n_s_metres  = std::numeric_limits<double>::signaling_NaN();
   int32_t cycles_done         = 0;
-  double total_wtd_change     = 0.;
-  double wtd_mid_change       = 0.;
-  double GW_wtd_change        = 0.;
   double infiltration_change  = 0.;
   double x_partial            = 0.;
   double total_added_recharge = 0.;
   double total_loss_to_ocean  = 0.;
-  double wtd_sum              = 0.;
 
   // Set for convenience within the code
   int32_t ncells_x = -1;
