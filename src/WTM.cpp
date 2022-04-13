@@ -182,7 +182,7 @@ void run(Parameters& params, ArrayPack& arp) {
   auto deps = dh::GetDepressionHierarchy<float, rd::Topology::D8>(
       arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
-  while (params.cycles_done <= params.total_cycles) {
+  while (params.cycles_done < params.total_cycles) {
     update(params, arp, deps);
   }
 }
