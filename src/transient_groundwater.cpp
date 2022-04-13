@@ -47,22 +47,21 @@ double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, co
 // To do so, we use an implicit backward-difference Euler method.
 // Using these half-time water tables, we compute the new transmissivity values
 // That will be used in the second step of the midpoint method below.
-void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
-  Eigen::VectorXd b(ncells_x * ncells_y);
-  Eigen::VectorXd vec_x(ncells_x * ncells_y);
-  Eigen::VectorXd guess(ncells_x * ncells_y);
-  SpMat A(ncells_x * ncells_y, ncells_x * ncells_y);
-  A.reserve(Eigen::VectorXi::Constant(
-      ncells_x * ncells_y,
-      5));  // reserve the needed space in the A matrix. We know there is a maximum of 5 items per matrix row or column.
+void first_half(const Parameters& params, ArrayPack& arp) {
+  Eigen::VectorXd b(params.ncells_x * params.ncells_y);
+  Eigen::VectorXd vec_x(params.ncells_x * params.ncells_y);
+  Eigen::VectorXd guess(params.ncells_x * params.ncells_y);
+  SpMat A(params.ncells_x * params.ncells_y, params.ncells_x * params.ncells_y);
+  // reserve the needed space in the A matrix. We know there is a maximum of 5 items per matrix row or column.
+  A.reserve(Eigen::VectorXi::Constant(params.ncells_x * params.ncells_y, 5));
 
 // We need to solve the vector-matrix equation Ax=b.
 // b consists of the current head values (i.e. water table depth + topography)
 // We also populate a 'guess', which consists of a water table (wtd_T) that in later iterations
 // has already been modified for changing transmissivity closer to the final answer.
-#pragma omp parallel for default(none) shared(arp, b, guess, ncells_x, ncells_y) collapse(2)
-  for (int y = 0; y < ncells_y; y++) {
-    for (int x = 0; x < ncells_x; x++) {
+#pragma omp parallel for default(none) shared(arp, b, guess, params) collapse(2)
+  for (int y = 0; y < params.ncells_y; y++) {
+    for (int x = 0; x < params.ncells_x; x++) {
       arp.wtd_T_iteration(x, y) = arp.wtd_T(x, y);
       b(arp.wtd_T.xyToI(x, y)) =
           arp.wtd(x, y) + arp.topo(x, y);  // wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to
@@ -91,14 +90,14 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
         return x_term + y_term + 1;
       };
 
-#pragma omp parallel for collapse(2) default(none) shared( \
-    arp, ncells_x, ncells_y, construct_major_diagonal_one, construct_e_w_diagonal_one, construct_n_s_diagonal_one, A)
-  for (int y = 0; y < ncells_y; y++) {
-    for (int x = 0; x < ncells_x; x++) {
+#pragma omp parallel for collapse(2) default(none) \
+    shared(arp, params, construct_major_diagonal_one, construct_e_w_diagonal_one, construct_n_s_diagonal_one, A)
+  for (int y = 0; y < params.ncells_y; y++) {
+    for (int x = 0; x < params.ncells_x; x++) {
       // The row and column that the current cell will be stored in in matrix A.
       // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
       // All of the N,E,S,W directions should be in the same row, but the column will differ.
-      int main_loc = arp.wtd_T.xyToI(x, y);
+      const auto main_loc = arp.wtd_T.xyToI(x, y);
 
       // I need to insert the items in index order for best efficiency, so start with 2 off-diagonals, then the major
       // diagonal, then the other 2 off-diagonals.
@@ -109,20 +108,25 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
 
       if (y != 0) {
         // Next is the West diagonal. Opposite of the East. Located at (i,j-1). When y == 0, there is no west diagonal.
-        A.insert(main_loc, main_loc - ncells_x) = construct_e_w_diagonal_one(x, y, -1);
+        A.insert(main_loc, main_loc - params.ncells_x) = construct_e_w_diagonal_one(x, y, -1);
       }
 
       // major diagonal:
       A.insert(main_loc, main_loc) = construct_major_diagonal_one(
-          x, y, (x == 0) ? 0 : -1, (x == ncells_x - 1) ? 0 : 1, (y == 0) ? 0 : -1, (y == ncells_y - 1) ? 0 : 1);
+          x,
+          y,
+          (x == 0) ? 0 : -1,
+          (x == params.ncells_x - 1) ? 0 : 1,
+          (y == 0) ? 0 : -1,
+          (y == params.ncells_y - 1) ? 0 : 1);
 
-      if (y != ncells_y - 1) {
+      if (y != params.ncells_y - 1) {
         // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1). When y == ncells_y -1,
         // there is no east diagonal.
-        A.insert(main_loc, main_loc + ncells_x) = construct_e_w_diagonal_one(x, y, 1);
+        A.insert(main_loc, main_loc + params.ncells_x) = construct_e_w_diagonal_one(x, y, 1);
       }
 
-      if (x != ncells_x - 1) {
+      if (x != params.ncells_x - 1) {
         // Do the South diagonal, offset by +(ncells_y). When x == 0, there is no north diagonal.
         A.insert(main_loc, main_loc + 1) = construct_n_s_diagonal_one(x, y, 1);
       }
@@ -155,9 +159,9 @@ void first_half(const int ncells_x, const int ncells_y, ArrayPack& arp) {
   std::cout << "#iterations:     " << solver.iterations() << std::endl;
   std::cout << "estimated error: " << solver.error() << std::endl;
 
-#pragma omp parallel for default(none) shared(arp, ncells_x, ncells_y, vec_x) collapse(2)
-  for (int y = 0; y < ncells_y; y++) {
-    for (int x = 0; x < ncells_x; x++) {
+#pragma omp parallel for default(none) shared(arp, params, vec_x) collapse(2)
+  for (int y = 0; y < params.ncells_y; y++) {
+    for (int x = 0; x < params.ncells_x; x++) {
       // copy result into the wtd_T array:
       arp.wtd_T(x, y) = vec_x(arp.wtd_T.xyToI(x, y)) - arp.topo(x, y);
     }
@@ -216,7 +220,7 @@ void second_half(Parameters& params, ArrayPack& arp) {
 #pragma omp parallel for default(none)                                                                              \
     shared(arp, params, construct_major_diagonal_two, construct_e_w_diagonal_two, construct_n_s_diagonal_two, A, B) \
         collapse(2)
-  for (int y = 0; y < params.ncells_y; y++)
+  for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
       // The row and column that the current cell will be stored in in matrix A.
       // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
@@ -268,6 +272,7 @@ void second_half(Parameters& params, ArrayPack& arp) {
         A.insert(main_loc, main_loc + 1) = -entry;
       }
     }
+  }
 
   std::cerr << "finished second set of matrices" << std::endl;
 
@@ -349,7 +354,7 @@ void second_half(Parameters& params, ArrayPack& arp) {
 
 void UpdateCPU(Parameters& params, ArrayPack& arp) {
   Eigen::initParallel();
-  omp_set_num_threads(4);
+  omp_set_num_threads(4);  // TODO: Make this configurable or use environment variables
   Eigen::setNbThreads(4);
 
   // Picard iteration through solver
@@ -357,8 +362,8 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
 
   // This assumes a ksat of 0.000001 and an e-folding depth of 25.
   // 1.5 is a standard value based on the shallow depths to which soil textures are known.
-  constexpr double ocean_T =
-      0.000001 * (1.5 + 25.);  // some constant for all T values in ocean - TODO look up representative values
+  // some constant for all T values in ocean - TODO look up representative values
+  constexpr double ocean_T = 0.000001 * (1.5 + 25.);
 
   std::cout << "create some needed arrays " << std::endl;
 
@@ -387,12 +392,10 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
         arp.effective_storativity(x, y) = 1.;
       } else {
         arp.original_wtd(x, y) = arp.wtd(x, y);
-        arp.wtd(x, y)          = add_recharge(
-            params.deltat / 2.,
-            arp.rech(x, y),
-            arp.wtd(x, y),
-            arp.porosity(x, y));  // use regular porosity for adding recharge since this checks
-                                           // for underground space within add_recharge.
+        // use regular porosity for adding recharge since this checks
+        // for underground space within add_recharge.
+        arp.wtd(x, y) = add_recharge(params.deltat / 2, arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y));
+
         arp.wtd_T(x, y)           = arp.wtd(x, y);
         arp.wtd_T_iteration(x, y) = arp.wtd_T(x, y);
 
@@ -420,8 +423,8 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
       }
     }
 
-    std::cout << "first_half: " << std::endl;
-    first_half(params.ncells_x, params.ncells_y, arp);
+    std::cout << "p first_half" << std::endl;
+    first_half(params, arp);
 // update the effective storativity to use during the next iteration of the first half:
 #pragma omp parallel for default(none) shared(arp, params) collapse(2)
     for (int y = 0; y < params.ncells_y; y++) {
@@ -448,7 +451,7 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
   }
 
   // Do the second half of the midpoint method:
-  std::cout << "second_half: " << std::endl;
+  std::cout << "p second_half" << std::endl;
   second_half(params, arp);
 
   for (int y = 0; y < params.ncells_y; y++) {
@@ -468,9 +471,9 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
 }
 
 void update(Parameters& params, ArrayPack& arp) {
-  std::cout << "entering the transient_groundwater module" << std::endl;
+  std::cout << "p entering the transient_groundwater module" << std::endl;
   UpdateCPU(params, arp);
-  std::cout << "leaving the transient_groundwater module" << std::endl;
+  std::cout << "p leaving the transient_groundwater module" << std::endl;
 }
 
 }  // namespace FanDarcyGroundwater
