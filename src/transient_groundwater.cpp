@@ -354,8 +354,8 @@ void second_half(Parameters& params, ArrayPack& arp) {
 
 void UpdateCPU(Parameters& params, ArrayPack& arp) {
   Eigen::initParallel();
-  omp_set_num_threads(4);  // TODO: Make this configurable or use environment variables
-  Eigen::setNbThreads(4);
+  omp_set_num_threads(params.parallel_threads);  // TODO: Make this configurable or use environment variables
+  Eigen::setNbThreads(params.parallel_threads);
 
   // Picard iteration through solver
   params.x_partial = params.deltat / (params.cellsize_n_s_metres * params.cellsize_n_s_metres);
