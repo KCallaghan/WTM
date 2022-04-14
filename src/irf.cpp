@@ -52,14 +52,12 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   arp.open_water_evap_end = rd::Array2D<float>(params.get_path(params.time_end, "open_water_evaporation"));
   arp.winter_temp_end     = rd::Array2D<float>(params.get_path(params.time_end, "winter_temperature"));
 
-
-  if(params.runoff_ratio_on){
-    arp.runoff_ratio_start  = rd::Array2D<float>(params.get_path(params.time_start, "runoff_ratio"));
-    arp.runoff_ratio_end    = rd::Array2D<float>(params.get_path(params.time_end, "runoff_ratio"));
-  }
-  else{
-    arp.runoff_ratio_start  = rd::Array2D<float>(arp.topo,0.0);
-    arp.runoff_ratio_end    = rd::Array2D<float>(arp.topo,0.0);
+  if (params.runoff_ratio_on) {
+    arp.runoff_ratio_start = rd::Array2D<float>(params.get_path(params.time_start, "runoff_ratio"));
+    arp.runoff_ratio_end   = rd::Array2D<float>(params.get_path(params.time_end, "runoff_ratio"));
+  } else {
+    arp.runoff_ratio_start = rd::Array2D<float>(arp.topo, 0.0);
+    arp.runoff_ratio_end   = rd::Array2D<float>(arp.topo, 0.0);
   }
 
   if (params.infiltration_on) {
@@ -86,7 +84,7 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   arp.topo            = arp.topo_start;
   arp.slope           = arp.slope_start;
   arp.precip          = arp.precip_start;
-  arp.runoff_ratio        = arp.runoff_ratio_start;
+  arp.runoff_ratio    = arp.runoff_ratio_start;
   arp.starting_evap   = arp.starting_evap_start;
   arp.open_water_evap = arp.open_water_evap_start;
   arp.winter_temp     = arp.winter_temp_start;
@@ -123,11 +121,10 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
   arp.scalar_array_x = rd::Array2D<double>(arp.topo, 0.0);
   arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
 
-  if(params.runoff_ratio_on){
-    arp.runoff_ratio        = rd::Array2D<float>(params.get_path(params.time_start, "runoff_ratio"));  // Units: m/yr.
-  }
-  else{
-    arp.runoff_ratio        = rd::Array2D<float>(arp.topo,0.0);  // Units: m/yr.
+  if (params.runoff_ratio_on) {
+    arp.runoff_ratio = rd::Array2D<float>(params.get_path(params.time_start, "runoff_ratio"));  // Units: m/yr.
+  } else {
+    arp.runoff_ratio = rd::Array2D<float>(arp.topo, 0.0);  // Units: m/yr.
   }
 
   if (params.infiltration_on == true) {
@@ -473,10 +470,10 @@ void PrintValues(Parameters& params, const ArrayPack& arp) {
     }
   }
 
-  textfile << params.cycles_done << " " << total_wtd_change << " " << GW_wtd_change << " "
-           << wtd_mid_change << " " << abs_total_wtd_change << " " << abs_GW_wtd_change << " "
-           << abs_wtd_mid_change << " " << params.infiltration_change << " " << params.total_added_recharge
-           << " " << params.total_loss_to_ocean << " " << wtd_sum << " " << std::endl;
+  textfile << params.cycles_done << " " << total_wtd_change << " " << GW_wtd_change << " " << wtd_mid_change << " "
+           << abs_total_wtd_change << " " << abs_GW_wtd_change << " " << abs_wtd_mid_change << " "
+           << params.infiltration_change << " " << params.total_added_recharge << " " << params.total_loss_to_ocean
+           << " " << wtd_sum << " " << std::endl;
 
   textfile.close();
 }
