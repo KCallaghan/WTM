@@ -124,7 +124,7 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
   arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
 
   if(params.runoff_ratio_on){
-    arp.runoff_ratio        = rd::Array2D<float>(params.get_path(params.time_start, "precipitation"));  // Units: m/yr.
+    arp.runoff_ratio        = rd::Array2D<float>(params.get_path(params.time_start, "runoff_ratio"));  // Units: m/yr.
   }
   else{
     arp.runoff_ratio        = rd::Array2D<float>(arp.topo,0.0);  // Units: m/yr.
