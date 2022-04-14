@@ -11,13 +11,12 @@ void ArrayPack::check() const {
   assert( topo.width()==rech.           width() && topo.height()==rech.           height() );
   assert( topo.width()==starting_evap.  width() && topo.height()==starting_evap.  height() );
   assert( topo.width()==transmissivity. width() && topo.height()==transmissivity. height() );
-  assert( topo.width()==head.           width() && topo.height()==head.           height() );
   assert( topo.width()==porosity.       width() && topo.height()==porosity.       height() );
   assert( topo.width()==winter_temp.    width() && topo.height()==winter_temp.    height() );
   assert( topo.width()==open_water_evap.width() && topo.height()==open_water_evap.height() );
   assert( topo.width()==runoff.         width() && topo.height()==runoff.         height() );
 
-  if(fdepth_end.size()>0){
+  if(!fdepth_end.empty()){
     assert( topo.width()==fdepth_end.     width()  && topo.height()==fdepth_end.     height()   );
     assert( topo.width()==topo_end.       width()  && topo.height()==topo_end.       height()   );
     assert( topo.width()==winter_temp_end.width()  && topo.height()==winter_temp_end.height()   );

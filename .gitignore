@@ -46,3 +46,12 @@ build/
 # Code editor stuff
 .vscode/
 *.swp
+
+# Ignore test runs unless explicitly told to add files
+*.tif
+*.tif.aux.xml
+*.txt
+*.cfg
+
+# Profiling artifacts
+perf.data*
