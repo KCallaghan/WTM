@@ -32,9 +32,9 @@ struct Parameters {
 
   bool infiltration_on;
   bool supplied_wt;
-  bool evap_mode = 1;  // Default potential evaporation
-  bool fsm_on    = 1;  // Default surface water on
-  bool runoff_ratio_on = 0; //Default no runoff ratio supplied
+  bool evap_mode       = 1;  // Default potential evaporation
+  bool fsm_on          = 1;  // Default surface water on
+  bool runoff_ratio_on = 0;  // Default no runoff ratio supplied
 
   double deltat             = std::numeric_limits<double>::signaling_NaN();
   double fdepth_a           = 0.;

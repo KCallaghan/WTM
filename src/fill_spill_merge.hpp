@@ -311,9 +311,10 @@ static void MoveWaterIntoPits(Parameters& params, DepressionHierarchy<elev_t>& d
     // move the water to the appropriate depression's water_vol.
     for (int y = 0; y < arp.topo.height(); y++)
       for (int x = 0; x < arp.topo.width(); x++) {
-        if (arp.wtd(x,y) > 0) {
-          arp.runoff(x,y) += arp.wtd(x,y);
-          arp.wtd(x,y) = 0;  // And we reset any cells that contained surface water to 0: this is now stored in arp.runoff.
+        if (arp.wtd(x, y) > 0) {
+          arp.runoff(x, y) += arp.wtd(x, y);
+          arp.wtd(x, y) =
+              0;  // And we reset any cells that contained surface water to 0: this is now stored in arp.runoff.
         }
         if (arp.runoff(x, y) > 0) {  // There is surface water in the cell.
           if (arp.label(x, y) ==
@@ -329,7 +330,7 @@ static void MoveWaterIntoPits(Parameters& params, DepressionHierarchy<elev_t>& d
             if (deps[arp.label(x, y)].water_vol < 0)
               deps[arp.label(x, y)].water_vol = 0.0;
             arp.runoff(x, y) = 0;  // Clean up as we go: all surface water from the cell has now been recorded in the
-                                // depression hierarchy.
+                                   // depression hierarchy.
           }
         }
       }
