@@ -13,6 +13,8 @@
 namespace dh = richdem::dephier;
 namespace rd = richdem;
 
+constexpr double seconds_in_a_year      = 31536000.;
+
 std::string get_current_time_and_date_as_str() {
   const auto now       = std::chrono::system_clock::now();
   const auto in_time_t = std::chrono::system_clock::to_time_t(now);
@@ -140,13 +142,17 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
   // Evap mode 1: Use the computed open-water evaporation rate
   if (params.evap_mode) {
     std::cout << "p updating the evaporation field" << std::endl;
-#pragma omp parallel for default(none) shared(arp)
+#pragma omp parallel for default(none) shared(arp,params)
     for (unsigned int i = 0; i < arp.topo.size(); i++) {
       if (arp.wtd(i) > 0) {  // if there is surface water present
         arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
       } else {  // water table is below the surface
         // Recharge is always positive.
         arp.rech(i) = std::max(0., static_cast<double>(arp.precip(i)) - arp.starting_evap(i));
+      }
+      if(arp.rech(i) > 0){
+        arp.runoff(i) = arp.runoff_ratio(i)*arp.rech(i)/seconds_in_a_year*params.deltat;
+        arp.rech(i)  -= arp.runoff_ratio(i)*arp.rech(i);
       }
     }
   }

@@ -311,20 +311,24 @@ static void MoveWaterIntoPits(Parameters& params, DepressionHierarchy<elev_t>& d
     // move the water to the appropriate depression's water_vol.
     for (int y = 0; y < arp.topo.height(); y++)
       for (int x = 0; x < arp.topo.width(); x++) {
-        if (arp.wtd(x, y) > 0) {  // There is surface water in the cell.
+        if (arp.wtd(x,y) > 0) {
+          arp.runoff(x,y) += arp.wtd(x,y);
+          arp.wtd(x,y) = 0;  // And we reset any cells that contained surface water to 0: this is now stored in arp.runoff.
+        }
+        if (arp.runoff(x, y) > 0) {  // There is surface water in the cell.
           if (arp.label(x, y) ==
               OCEAN) {  // If downstream neighbour is the ocean, we drop our water into it and the ocean is unaffected.
             deps.at(OCEAN).water_vol +=
-                arp.wtd(x, y) * arp.cell_area[y];  // recording the volume that has ended up in the ocean.
-            params.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
-            arp.wtd(x, y) = 0.0;  // all surface water from the cell has flowed into the ocean.
+                arp.runoff(x, y) * arp.cell_area[y];  // recording the volume that has ended up in the ocean.
+            params.total_loss_to_ocean += arp.runoff(x, y) * arp.cell_area[y];
+            arp.runoff(x, y) = 0.0;  // all surface water from the cell has flowed into the ocean.
           } else {
-            deps[arp.label(x, y)].water_vol += arp.wtd(x, y) * arp.cell_area[y];
+            deps[arp.label(x, y)].water_vol += arp.runoff(x, y) * arp.cell_area[y];
             // wtd is a depth of water and water_vol is a volume, so multiply by the area of the cell to convert.
             assert(fp_ge(deps[arp.label(x, y)].water_vol, 0));
             if (deps[arp.label(x, y)].water_vol < 0)
               deps[arp.label(x, y)].water_vol = 0.0;
-            arp.wtd(x, y) = 0;  // Clean up as we go: all surface water from the cell has now been recorded in the
+            arp.runoff(x, y) = 0;  // Clean up as we go: all surface water from the cell has now been recorded in the
                                 // depression hierarchy.
           }
         }
@@ -344,7 +348,7 @@ static void MoveWaterIntoPits(Parameters& params, DepressionHierarchy<elev_t>& d
 #pragma omp parallel for default(none) shared(arp)
     for (unsigned int i = 0; i < arp.topo.size(); i++) {
       if (arp.wtd(i) > 0) {
-        arp.runoff(i) = arp.wtd(i);
+        arp.runoff(i) += arp.wtd(i);
         arp.wtd(i) = 0;  // And we reset any cells that contained surface water to 0: this is now stored in arp.runoff.
         arp.infiltration_array(i) = 0;  // The infiltration array is informational, to record the total infiltration
                                         // that has occured in one round of FSM, so here we reset this to 0.

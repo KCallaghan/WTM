@@ -37,6 +37,8 @@ struct ArrayPack {
   d2d fdepth_end;
   f2d precip_start;
   f2d precip_end;
+  f2d runoff_ratio_start;
+  f2d runoff_ratio_end;
   f2d starting_evap_start;
   f2d starting_evap_end;
   f2d open_water_evap_start;
@@ -48,6 +50,7 @@ struct ArrayPack {
   d2d fdepth;
   f2d open_water_evap;
   f2d precip;
+  f2d runoff_ratio;
   f2d starting_evap;
   f2d winter_temp;
 

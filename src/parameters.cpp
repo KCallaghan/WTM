@@ -56,6 +56,8 @@ Parameters::Parameters(const std::string& config_file) {
       ss >> region;
     } else if (key == "run_type") {
       ss >> run_type;
+    } else if (key == "runoff_ratio_on") {
+      ss >> runoff_ratio_on;
     } else if (key == "southern_edge") {
       ss >> southern_edge;
     } else if (key == "supplied_wt") {
@@ -109,6 +111,7 @@ void Parameters::print() const {
   std::cout << "c picard_iterations= " << picard_iterations << std::endl;
   std::cout << "c region           = " << region << std::endl;
   std::cout << "c run_type         = " << run_type << std::endl;
+  std::cout << "c runoff_ratio_on  = " << runoff_ratio_on << std::endl;
   std::cout << "c southern_edge    = " << southern_edge << std::endl;
   std::cout << "c supplied_wt      = " << supplied_wt << std::endl;
   std::cout << "c surfdatadir      = " << surfdatadir << std::endl;

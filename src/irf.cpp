@@ -52,6 +52,16 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   arp.open_water_evap_end = rd::Array2D<float>(params.get_path(params.time_end, "open_water_evaporation"));
   arp.winter_temp_end     = rd::Array2D<float>(params.get_path(params.time_end, "winter_temperature"));
 
+
+  if(params.runoff_ratio_on){
+    arp.runoff_ratio_start  = rd::Array2D<float>(params.get_path(params.time_start, "runoff_ratio"));
+    arp.runoff_ratio_end    = rd::Array2D<float>(params.get_path(params.time_end, "runoff_ratio"));
+  }
+  else{
+    arp.runoff_ratio_start  = rd::Array2D<float>(arp.topo,0.0);
+    arp.runoff_ratio_end    = rd::Array2D<float>(arp.topo,0.0);
+  }
+
   if (params.infiltration_on) {
     arp.vert_ksat = rd::Array2D<float>(params.get_path("vertical_ksat"));
   }
@@ -76,6 +86,7 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   arp.topo            = arp.topo_start;
   arp.slope           = arp.slope_start;
   arp.precip          = arp.precip_start;
+  arp.runoff_ratio        = arp.runoff_ratio_start;
   arp.starting_evap   = arp.starting_evap_start;
   arp.open_water_evap = arp.open_water_evap_start;
   arp.winter_temp     = arp.winter_temp_start;
@@ -111,6 +122,13 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
 
   arp.scalar_array_x = rd::Array2D<double>(arp.topo, 0.0);
   arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
+
+  if(params.runoff_ratio_on){
+    arp.runoff_ratio        = rd::Array2D<float>(params.get_path(params.time_start, "precipitation"));  // Units: m/yr.
+  }
+  else{
+    arp.runoff_ratio        = rd::Array2D<float>(arp.topo,0.0);  // Units: m/yr.
+  }
 
   if (params.infiltration_on == true) {
     arp.vert_ksat = rd::Array2D<float>(params.get_path("vertical_ksat"));  // Units of ksat are m/s.
@@ -155,6 +173,7 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.ice_mask = rd::Array2D<uint8_t>(arp.topo, 0);
 
   arp.precip          = rd::Array2D<float>(arp.topo, 0.03);  // Units: m/yr.
+  arp.runoff_ratio    = rd::Array2D<float>(arp.topo, 0.);    // Units: m/yr.
   arp.starting_evap   = rd::Array2D<float>(arp.topo, 0.);    // Units: m/yr.
   arp.open_water_evap = rd::Array2D<float>(arp.topo, 0.5);   // Units: m/yr.
 
@@ -402,6 +421,7 @@ void UpdateTransientArrays(const Parameters& params, ArrayPack& arp) {
     arp.topo(i)            = (1 - f) * arp.topo_start(i) + f * arp.topo_end(i);
     arp.slope(i)           = (1 - f) * arp.slope_start(i) + f * arp.slope_end(i);
     arp.precip(i)          = (1 - f) * arp.precip_start(i) + f * arp.precip_end(i);
+    arp.runoff_ratio(i)    = (1 - f) * arp.runoff_ratio_start(i) + f * arp.runoff_ratio_end(i);
     arp.starting_evap(i)   = (1 - f) * arp.starting_evap_start(i) + f * arp.starting_evap_end(i);
     arp.open_water_evap(i) = (1 - f) * arp.open_water_evap_start(i) + f * arp.open_water_evap_end(i);
     arp.winter_temp(i)     = (1 - f) * arp.winter_temp_start(i) + f * arp.winter_temp_end(i);
