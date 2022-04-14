@@ -58,7 +58,6 @@ struct ArrayPack {
   d2d wtd_T_iteration;
   d2d original_wtd;
 
-  dvec latitude_radians;
   dvec cell_area;
   dvec cellsize_e_w_metres;
 
