@@ -354,16 +354,17 @@ void second_half(Parameters& params, ArrayPack& arp) {
 
 void UpdateCPU(Parameters& params, ArrayPack& arp) {
   Eigen::initParallel();
-  omp_set_num_threads(params.parallel_threads);  // TODO: Make this configurable or use environment variables
+  omp_set_num_threads(params.parallel_threads);
   Eigen::setNbThreads(params.parallel_threads);
 
   // Picard iteration through solver
   params.x_partial = params.deltat / (params.cellsize_n_s_metres * params.cellsize_n_s_metres);
 
-  // This assumes a ksat of 0.000001 and an e-folding depth of 25.
+  // This assumes a ksat of 0.00005, which is an approximate global mean value, and an e-folding depth of 60.
+  // e-folding depth of 60 corresponds to fdepth_a of 100, fdepth_b of 150, and slope of ~0.00443.
+  // this should also be a reasonable e-folding depth for a range of other fdepth_a and _b parameters.
   // 1.5 is a standard value based on the shallow depths to which soil textures are known.
-  // some constant for all T values in ocean - TODO look up representative values
-  constexpr double ocean_T = 0.000001 * (1.5 + 25.);
+  constexpr double ocean_T = 0.00005 * (1.5 + 60.);
 
   std::cout << "create some needed arrays " << std::endl;
 
