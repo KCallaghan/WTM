@@ -36,19 +36,18 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
 
   arp.slope_start           = rd::Array2D<float>(params.get_path(params.time_start, "slope"));
   arp.precip_start          = rd::Array2D<float>(params.get_path(params.time_start, "precipitation"));
-  arp.starting_evap_start   = rd::Array2D<float>(params.get_path(params.time_start, "evaporation"));
+  arp.evap_start            = rd::Array2D<float>(params.get_path(params.time_start, "evaporation"));
   arp.open_water_evap_start = rd::Array2D<float>(params.get_path(params.time_start, "open_water_evaporation"));
   arp.winter_temp_start     = rd::Array2D<float>(params.get_path(params.time_start, "winter_temperature"));
   arp.topo_end              = rd::Array2D<float>(params.get_path(params.time_end, "topography"));
   arp.slope_end             = rd::Array2D<float>(params.get_path(params.time_end, "slope"));
   arp.land_mask             = rd::Array2D<float>(params.get_path(params.time_end, "mask"));
-  arp.ice_mask              = rd::Array2D<float>(params.get_path(params.time_end, "ice_mask"));
 
   // there is land and 0 in the ocean
   arp.land_mask.setEdges(0);
 
   arp.precip_end          = rd::Array2D<float>(params.get_path(params.time_end, "precipitation"));
-  arp.starting_evap_end   = rd::Array2D<float>(params.get_path(params.time_end, "evaporation"));
+  arp.evap_end            = rd::Array2D<float>(params.get_path(params.time_end, "evaporation"));
   arp.open_water_evap_end = rd::Array2D<float>(params.get_path(params.time_end, "open_water_evaporation"));
   arp.winter_temp_end     = rd::Array2D<float>(params.get_path(params.time_end, "winter_temperature"));
 
@@ -85,7 +84,7 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   arp.slope           = arp.slope_start;
   arp.precip          = arp.precip_start;
   arp.runoff_ratio    = arp.runoff_ratio_start;
-  arp.starting_evap   = arp.starting_evap_start;
+  arp.evap            = arp.evap_start;
   arp.open_water_evap = arp.open_water_evap_start;
   arp.winter_temp     = arp.winter_temp_start;
   arp.fdepth          = arp.fdepth_start;
@@ -109,10 +108,8 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
       params.get_path(params.time_start, "mask"));  // A binary mask that is 1 where there is land and 0 in the ocean
   arp.land_mask.setEdges(0);
 
-  // arp.ice_mask = rd::Array2D<float>(params.surfdatadir + params.region +  params.time_end + "_ice_mask.tif");
-
-  arp.precip        = rd::Array2D<float>(params.get_path(params.time_start, "precipitation"));  // Units: m/yr.
-  arp.starting_evap = rd::Array2D<float>(params.get_path(params.time_start, "evaporation"));    // Units: m/yr.
+  arp.precip = rd::Array2D<float>(params.get_path(params.time_start, "precipitation"));  // Units: m/yr.
+  arp.evap   = rd::Array2D<float>(params.get_path(params.time_start, "evaporation"));    // Units: m/yr.
   arp.open_water_evap =
       rd::Array2D<float>(params.get_path(params.time_start, "open_water_evaporation"));  // Units: m/yr.
   arp.winter_temp =
@@ -166,12 +163,9 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.land_mask = rd::Array2D<uint8_t>(arp.topo, 1);
   arp.land_mask.setEdges(0);
 
-  // binary mask that is 0 where there is no ice and 1 where there is ice
-  arp.ice_mask = rd::Array2D<uint8_t>(arp.topo, 0);
-
   arp.precip          = rd::Array2D<float>(arp.topo, 0.03);  // Units: m/yr.
   arp.runoff_ratio    = rd::Array2D<float>(arp.topo, 0.);    // Units: m/yr.
-  arp.starting_evap   = rd::Array2D<float>(arp.topo, 0.);    // Units: m/yr.
+  arp.evap            = rd::Array2D<float>(arp.topo, 0.);    // Units: m/yr.
   arp.open_water_evap = rd::Array2D<float>(arp.topo, 0.5);   // Units: m/yr.
 
   arp.winter_temp     = rd::Array2D<float>(arp.topo, 0);  // Units: deg C
@@ -183,8 +177,6 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.scalar_array_x = rd::Array2D<double>(arp.topo, 0.0);
   arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
 
-  // we start with a water table below the surface for testing.
-  arp.evap   = arp.starting_evap;
   arp.fdepth = rd::Array2D<double>(arp.topo, 2.5);
 
   // border of 'ocean' with land everywhere else
@@ -241,7 +233,7 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
 // get the starting runoff using precip and evap inputs:
 #pragma omp parallel for default(none) shared(arp)
   for (size_t i = 0; i < arp.topo.size(); i++) {
-    arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
+    arp.rech(i) = arp.precip(i) - arp.evap(i);
     if (arp.rech(i) < 0) {  // Recharge is always positive.
       arp.rech(i) = 0.0f;
     }
@@ -374,7 +366,7 @@ void InitialiseBoth(const Parameters& params, ArrayPack& arp) {
   // get the starting runoff using precip and evap inputs:
 #pragma omp parallel for default(none) shared(arp)
   for (unsigned int i = 0; i < arp.topo.size(); i++) {
-    arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
+    arp.rech(i) = arp.precip(i) - arp.evap(i);
     if (arp.rech(i) < 0) {  // Recharge is always positive.
       arp.rech(i) = 0.0f;
     }
@@ -419,7 +411,7 @@ void UpdateTransientArrays(const Parameters& params, ArrayPack& arp) {
     arp.slope(i)           = (1 - f) * arp.slope_start(i) + f * arp.slope_end(i);
     arp.precip(i)          = (1 - f) * arp.precip_start(i) + f * arp.precip_end(i);
     arp.runoff_ratio(i)    = (1 - f) * arp.runoff_ratio_start(i) + f * arp.runoff_ratio_end(i);
-    arp.starting_evap(i)   = (1 - f) * arp.starting_evap_start(i) + f * arp.starting_evap_end(i);
+    arp.evap(i)            = (1 - f) * arp.evap_start(i) + f * arp.evap_end(i);
     arp.open_water_evap(i) = (1 - f) * arp.open_water_evap_start(i) + f * arp.open_water_evap_end(i);
     arp.winter_temp(i)     = (1 - f) * arp.winter_temp_start(i) + f * arp.winter_temp_end(i);
     arp.fdepth(i)          = (1 - f) * arp.fdepth_start(i) + f * arp.fdepth_end(i);

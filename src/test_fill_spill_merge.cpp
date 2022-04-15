@@ -333,7 +333,7 @@ void CheckMassLoss(const int count, const int min_size, const int max_size) {
     arp.original_wtd    = Array2D<double>(arp.topo.width(), arp.topo.height(), 0.);
 
     arp.precip                = Array2D<double>(arp.topo.width(), arp.topo.height(), 1.5);
-    arp.starting_evap         = Array2D<double>(arp.topo.width(), arp.topo.height(), 1.0);
+    arp.evap                  = Array2D<double>(arp.topo.width(), arp.topo.height(), 1.0);
     arp.open_water_evap       = Array2D<double>(arp.topo.width(), arp.topo.height(), 1.3);
     arp.ksat                  = Array2D<double>(arp.topo.width(), arp.topo.height(), 0.00001);
     arp.fdepth                = Array2D<double>(arp.topo.width(), arp.topo.height(), 50.);
@@ -364,7 +364,7 @@ void CheckMassLoss(const int count, const int min_size, const int max_size) {
       for (int x = 0; x < params.ncells_x; x++) {
         arp.topo(x, y)                  = dem(x, y);
         arp.precip(x, y)                = 1.5;
-        arp.starting_evap(x, y)         = 1.;
+        arp.evap(x, y)                  = 1.;
         arp.open_water_evap(x, y)       = 1.3;
         arp.ksat(x, y)                  = 0.00001;
         arp.fdepth(x, y)                = 50.;
@@ -410,7 +410,7 @@ void CheckMassLoss(const int count, const int min_size, const int max_size) {
           if (arp.wtd(i) > 0) {  // if there is surface water present
             arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
           } else {  // water table is below the surface
-            arp.rech(i) = arp.precip(i) - arp.starting_evap(i);
+            arp.rech(i) = arp.precip(i) - arp.evap(i);
             if (arp.rech(i) < 0) {  // Recharge is always positive.
               arp.rech(i) = 0.;
             }

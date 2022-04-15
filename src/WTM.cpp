@@ -148,7 +148,7 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
         arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
       } else {  // water table is below the surface
         // Recharge is always positive.
-        arp.rech(i) = std::max(0., static_cast<double>(arp.precip(i)) - arp.starting_evap(i));
+        arp.rech(i) = std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i));
       }
       if (arp.rech(i) > 0) {
         arp.runoff(i) = arp.runoff_ratio(i) * arp.rech(i) / seconds_in_a_year * params.deltat;
@@ -165,7 +165,7 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
       if (arp.wtd(i) > 0) {  // if there is surface water present
         arp.wtd(i) = 0;      // use this option when testing GW component alone
       } else {               // water table is below the surface
-        arp.rech(i) = std::max(0., static_cast<double>(arp.precip(i)) - arp.starting_evap(i));
+        arp.rech(i) = std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i));
       }
     }
   }
