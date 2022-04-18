@@ -168,7 +168,8 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
       if (arp.wtd(i) > 0) {  // if there is surface water present
         arp.wtd(i) = 0;      // use this option when testing GW component alone
       } else {               // water table is below the surface
-        arp.rech(i) = std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i));
+        arp.rech(i) =
+            (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
       }
     }
   }
