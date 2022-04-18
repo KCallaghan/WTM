@@ -352,23 +352,16 @@ void second_half(Parameters& params, ArrayPack& arp) {
 // PUBLIC FUNCTIONS //
 //////////////////////
 
-void UpdateCPU(Parameters& params, ArrayPack& arp) {
-  Eigen::initParallel();
-  omp_set_num_threads(params.parallel_threads);
-  Eigen::setNbThreads(params.parallel_threads);
-
-  // Picard iteration through solver
-  params.x_partial = params.deltat / (params.cellsize_n_s_metres * params.cellsize_n_s_metres);
-
+void set_starting_values(Parameters& params, ArrayPack& arp) {
   // This assumes a ksat of 0.00005, which is an approximate global mean value, and an e-folding depth of 60.
   // e-folding depth of 60 corresponds to fdepth_a of 100, fdepth_b of 150, and slope of ~0.00443.
   // this should also be a reasonable e-folding depth for a range of other fdepth_a and _b parameters.
   // 1.5 is a standard value based on the shallow depths to which soil textures are known.
   constexpr double ocean_T = 0.00005 * (1.5 + 60.);
 
-  std::cout << "create some needed arrays " << std::endl;
-
   // no pragma because we're editing params.total_loss_to_ocean
+  // check to see if there is any non-zero water table in ocean
+  // cells, and if so, record these values as changes to the ocean.
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 0.f) {
@@ -378,14 +371,11 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
     }
   }
 
-// Apply the first half of the recharge to the water-table depth grid (wtd)
-// Its clone (wtd_T) is used and updated in the Picard iteration
-// also set the starting porosity
-// set the scalar arrays for x and y directions
 #pragma omp parallel for default(none) shared(arp, params) collapse(2)
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 0.f) {
+        // in the ocean, we set several arrays to default values
         arp.transmissivity(x, y)        = ocean_T;
         arp.wtd_T(x, y)                 = 0.;
         arp.original_wtd(x, y)          = 0.;
@@ -393,6 +383,8 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
         arp.effective_storativity(x, y) = 1.;
       } else {
         arp.original_wtd(x, y) = arp.wtd(x, y);
+        // Apply the first half of the recharge to the water-table depth grid (wtd)
+        // Its clone (wtd_T) is used and updated in the Picard iteration
         // use regular porosity for adding recharge since this checks
         // for underground space within add_recharge.
         arp.wtd(x, y) = add_recharge(params.deltat / 2, arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y));
@@ -400,17 +392,30 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
         arp.wtd_T(x, y)           = arp.wtd(x, y);
         arp.wtd_T_iteration(x, y) = arp.wtd_T(x, y);
 
+        // also set the starting effective storativity
         if (arp.original_wtd(x, y) > 0) {
           arp.effective_storativity(x, y) = 1;
         } else {
           arp.effective_storativity(x, y) = arp.porosity(x, y);
         }
       }
+      // set the scalar arrays for x and y directions
       arp.scalar_array_y(x, y) =
           params.deltat / (arp.effective_storativity(x, y) * arp.cellsize_e_w_metres[y] * arp.cellsize_e_w_metres[y]);
       arp.scalar_array_x(x, y) = params.x_partial / arp.effective_storativity(x, y);
     }
   }
+}
+
+void update(Parameters& params, ArrayPack& arp) {
+  Eigen::initParallel();
+  omp_set_num_threads(params.parallel_threads);
+  Eigen::setNbThreads(params.parallel_threads);
+
+  std::cout << "set starting values and arrays for the groundwater calculation " << std::endl;
+  set_starting_values(params, arp);
+
+  // Picard iteration through solver
 
   for (int continue_picard = 0; continue_picard < params.picard_iterations; continue_picard++) {
     std::cout << "update Transmissivity: " << std::endl;
@@ -469,12 +474,6 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
       arp.wtd(x, y) = 0.;
     }
   }
-}
-
-void update(Parameters& params, ArrayPack& arp) {
-  std::cout << "p entering the transient_groundwater module" << std::endl;
-  UpdateCPU(params, arp);
-  std::cout << "p leaving the transient_groundwater module" << std::endl;
 }
 
 }  // namespace FanDarcyGroundwater

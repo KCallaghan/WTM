@@ -163,7 +163,7 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
   // Evap mode 0: remove all surface water (like Fan Reinfelder et al., 2013)
   else {
     std::cout << "p removing all surface water" << std::endl;
-#pragma omp parallel for default(none) shared(arp)
+#pragma omp parallel for default(none) shared(arp, params)
     for (unsigned int i = 0; i < arp.topo.size(); i++) {
       if (arp.wtd(i) > 0) {  // if there is surface water present
         arp.wtd(i) = 0;      // use this option when testing GW component alone

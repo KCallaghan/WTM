@@ -320,6 +320,10 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
       throw std::runtime_error("Cell with a negative area was found!");
     }
   }
+  // This parameter is used in transient_groundwater. By setting it here,
+  // immediately after cellsize has been calcualted, we don't have to
+  // repeatedly calculate it every time we run transient_groundwater.
+  params.x_partial = params.deltat / (params.cellsize_n_s_metres * params.cellsize_n_s_metres);
 }
 
 /// This function initialises those arrays that are used for both equilibrium
