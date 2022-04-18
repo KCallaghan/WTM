@@ -130,18 +130,18 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
     std::cerr << "t After FSM time: " << get_current_time_and_date_as_str() << std::endl;
   }
 
-  /////////////////////////////
-  // Evaporate surface water //
-  /////////////////////////////
+  /////////////////////////
+  // Set recharge values //
+  /////////////////////////
 
   // Check to see where there is surface water, and adjust how evaporation works
   // at these locations.
-  richdem::Timer evaporation_timer;
-  evaporation_timer.start();
+  richdem::Timer recharge_timer;
+  recharge_timer.start();
 
   // Evap mode 1: Use the computed open-water evaporation rate
   if (params.evap_mode) {
-    std::cout << "p updating the evaporation field" << std::endl;
+    std::cout << "p updating the recharge field" << std::endl;
 #pragma omp parallel for default(none) shared(arp, params)
     for (unsigned int i = 0; i < arp.topo.size(); i++) {
       if (arp.wtd(i) > 0) {  // if there is surface water present
@@ -183,8 +183,8 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
     }
   }
 
-  std::cerr << "t Evaporation time = " << evaporation_timer.lap() << std::endl;
-  std::cerr << "After evaporation_update: " << get_current_time_and_date_as_str() << std::endl;
+  std::cerr << "t Set recharge time = " << recharge_timer.lap() << std::endl;
+  std::cerr << "After setting recharge values: " << get_current_time_and_date_as_str() << std::endl;
 
   // Print values about the change in water table depth to the text file.
   PrintValues(params, arp);
