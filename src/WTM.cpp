@@ -167,9 +167,18 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
     for (unsigned int i = 0; i < arp.topo.size(); i++) {
       if (arp.wtd(i) > 0) {  // if there is surface water present
         arp.wtd(i) = 0;      // use this option when testing GW component alone
-      } else {               // water table is below the surface
+        // still set recharge because it could be positive in this cell, and some may run off or move to neighbouring
+        // cells
+        arp.rech(i) = (arp.precip(i) - arp.open_water_evap(i)) / seconds_in_a_year * params.deltat;
+      } else {  // water table is below the surface
         arp.rech(i) =
             (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
+      }
+      if (arp.rech(i) > 0) {
+        // if there is positive recharge, some of it may run off.
+        // set the amount of runoff based on runoff_ratio, and subtract this amount from the recharge.
+        arp.runoff(i) = arp.runoff_ratio(i) * arp.rech(i);
+        arp.rech(i) -= arp.runoff(i);
       }
     }
   }
