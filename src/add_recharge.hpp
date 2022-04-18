@@ -5,10 +5,6 @@
 
 // Method for adding recharge where porosity does not change with depth:
 inline double add_recharge(const double deltat, const double my_rech, double my_wtd, const double my_porosity) {
-  constexpr double seconds_in_a_year = 31536000.;
-
-  const double rech_change = my_rech / seconds_in_a_year * deltat;
-
   if (my_wtd >= 0) {  // all the recharge will occur above the land surface; don't worry about porosity.
     my_wtd += rech_change;
     if (my_wtd < 0) {

@@ -85,8 +85,8 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
   }
 
   // TODO: How should equilibrium know when to exit?
-  if ((params.cycles_done % 10) == 0) {
-    // Save the output every x iterations, under a new filename
+  if ((params.cycles_done % params.cycles_to_save) == 0) {
+    // Save the output every "cycles_to_save" iterations, under a new filename
     // so we can compare how the water table has changed through time.
     arp.wtd.saveGDAL(fmt::format("{}{:09}.tif", params.outfile_prefix, params.cycles_done));
   }
@@ -145,14 +145,17 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
 #pragma omp parallel for default(none) shared(arp, params)
     for (unsigned int i = 0; i < arp.topo.size(); i++) {
       if (arp.wtd(i) > 0) {  // if there is surface water present
-        arp.rech(i) = arp.precip(i) - arp.open_water_evap(i);
+        arp.rech(i) = (arp.precip(i) - arp.open_water_evap(i)) / seconds_in_a_year * params.deltat;
       } else {  // water table is below the surface
         // Recharge is always positive.
-        arp.rech(i) = std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i));
+        arp.rech(i) =
+            (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
       }
       if (arp.rech(i) > 0) {
-        arp.runoff(i) = arp.runoff_ratio(i) * arp.rech(i) / seconds_in_a_year * params.deltat;
-        arp.rech(i) -= arp.runoff_ratio(i) * arp.rech(i);
+        // if there is positive recharge, some of it may run off.
+        // set the amount of runoff based on runoff_ratio, and subtract this amount from the recharge.
+        arp.runoff(i) = arp.runoff_ratio(i) * arp.rech(i);
+        arp.rech(i) -= arp.runoff(i);
       }
     }
   }
@@ -193,9 +196,6 @@ void run(Parameters& params, ArrayPack& arp) {
   }
 }
 
-// TODO: how to free up memory? My understanding was that this happens
-// automatically when the program terminates, but could be something
-// we need to do.
 void finalise(Parameters& params, ArrayPack& arp) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);
 
