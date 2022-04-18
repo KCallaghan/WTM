@@ -412,7 +412,7 @@ void UpdateCPU(Parameters& params, ArrayPack& arp) {
     }
   }
 
-  for (int continue_picard = 0; continue_picard < 3; continue_picard++) {
+  for (int continue_picard = 0; continue_picard < params.picard_iterations; continue_picard++) {
     std::cout << "update Transmissivity: " << std::endl;
 #pragma omp parallel for default(none) shared(arp, params) collapse(2)
     for (int y = 0; y < params.ncells_y; y++) {

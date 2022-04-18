@@ -30,20 +30,20 @@ struct Parameters {
 
   double UNDEF = -1.0e7;
 
-  bool infiltration_on;
-  bool supplied_wt;
-  bool evap_mode       = 1;  // Default potential evaporation
-  bool fsm_on          = 1;  // Default surface water on
-  bool runoff_ratio_on = 0;  // Default no runoff ratio supplied
+  int32_t infiltration_on = -1;
+  int32_t supplied_wt     = -1;
+  int32_t evap_mode       = -1;
+  int32_t fsm_on          = -1;
+  int32_t runoff_ratio_on = -1;
 
   double deltat             = std::numeric_limits<double>::signaling_NaN();
-  double fdepth_a           = 0.;
-  double fdepth_b           = 0.;
-  double fdepth_fmin        = 0.;
+  double fdepth_a           = -1.;
+  double fdepth_b           = -1.;
+  double fdepth_fmin        = -1.;
   double southern_edge      = std::numeric_limits<double>::signaling_NaN();
-  int32_t picard_iterations = 1;  // Default only one iteration
+  int32_t picard_iterations = -1;  // Default only one iteration
   int32_t total_cycles      = -1;
-  int32_t parallel_threads  = 1;  // one thread by default to accommodate computer architecture
+  int32_t parallel_threads  = -1;  // one thread by default to accommodate computer architecture
 
   double cellsize_n_s_metres  = std::numeric_limits<double>::signaling_NaN();
   int32_t cycles_done         = 0;
