@@ -285,14 +285,13 @@ void second_half(Parameters& params, ArrayPack& arp) {
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 1) {  // only add recharge to land cells
-        const auto index         = arp.wtd_T.xyToI(x, y);
-        const double rech_change = arp.rech(x, y) / seconds_in_a_year * params.deltat;
-        params.total_added_recharge += rech_change * arp.cell_area[y];
+        const auto index = arp.wtd_T.xyToI(x, y);
+        params.total_added_recharge += arp.rech(x, y) * arp.cell_area[y];
         if (arp.original_wtd(x, y) >= 0) {  // there was surface water, so recharge may be negative
-          b(index) += rech_change;
-          guess(index) += rech_change;
-          if (arp.original_wtd(x, y) + rech_change < 0) {
-            const double temp = -(arp.original_wtd(x, y) + rech_change);
+          b(index) += arp.rech(x, y);
+          guess(index) += arp.rech(x, y);
+          if (arp.original_wtd(x, y) + arp.rech(x, y) < 0) {
+            const double temp = -(arp.original_wtd(x, y) + arp.rech(x, y));
             b(index) += temp;
             guess(index) += temp;
             params.total_added_recharge +=
@@ -300,13 +299,14 @@ void second_half(Parameters& params, ArrayPack& arp) {
                 arp.cell_area[y];  // in this scenario, there has been a negative amount of recharge, so temp here will
                                    // be positive and remove the extra amount that was spuriously subtracted.
           }
-        } else if (rech_change > 0) {  // when there is no surface water, only positive changes in recharge are allowed
+        } else if (arp.rech(x, y) > 0) {  // when there is no surface water, only positive changes in recharge are
+                                          // allowed
           const double GW_space = -arp.original_wtd(x, y) * arp.porosity(x, y);
-          if (GW_space > rech_change) {
-            b(index) += rech_change / arp.porosity(x, y);
-            guess(index) += rech_change / arp.porosity(x, y);
+          if (GW_space > arp.rech(x, y)) {
+            b(index) += arp.rech(x, y) / arp.porosity(x, y);
+            guess(index) += arp.rech(x, y) / arp.porosity(x, y);
           } else {
-            const auto temp = (rech_change - GW_space) - arp.original_wtd(x, y);
+            const auto temp = (arp.rech(x, y) - GW_space) - arp.original_wtd(x, y);
             b(index) += temp;
             guess(index) += temp;
           }
@@ -387,7 +387,7 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         // Its clone (wtd_T) is used and updated in the Picard iteration
         // use regular porosity for adding recharge since this checks
         // for underground space within add_recharge.
-        arp.wtd(x, y) = add_recharge(params.deltat / 2, arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y));
+        arp.wtd(x, y) = add_recharge(arp.rech(x, y) / 2., arp.wtd(x, y), arp.porosity(x, y));
 
         arp.wtd_T(x, y)           = arp.wtd(x, y);
         arp.wtd_T_iteration(x, y) = arp.wtd_T(x, y);

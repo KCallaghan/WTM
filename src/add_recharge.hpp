@@ -4,7 +4,7 @@
 #include "parameters.hpp"
 
 // Method for adding recharge where porosity does not change with depth:
-inline double add_recharge(const double deltat, const double my_rech, double my_wtd, const double my_porosity) {
+inline double add_recharge(const double my_rech, double my_wtd, const double my_porosity) {
   if (my_wtd >= 0) {  // all the recharge will occur above the land surface; don't worry about porosity.
     my_wtd += my_rech;
     if (my_wtd < 0) {
