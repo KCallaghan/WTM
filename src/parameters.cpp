@@ -30,6 +30,8 @@ Parameters::Parameters(const std::string& config_file) {
     if (key.empty()) {
     } else if (key == "cells_per_degree") {
       ss >> cells_per_degree;
+    } else if (key == "cycles_to_save") {
+      ss >> cycles_to_save;
     } else if (key == "deltat") {
       ss >> deltat;
     } else if (key == "evap_mode") {
@@ -84,6 +86,9 @@ Parameters::Parameters(const std::string& config_file) {
 void Parameters::check() const {
   if (cells_per_degree < 0) {
     throw std::runtime_error("please enter a positive value for cells_per_degree!");
+  }
+  if (cycles_to_save < 0) {
+    throw std::runtime_error("please enter a positive value for cycles_to_save!");
   }
   if (std::isnan(deltat) || deltat < 0) {
     throw std::runtime_error("please enter a positive value for deltat!");

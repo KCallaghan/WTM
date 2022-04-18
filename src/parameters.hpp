@@ -43,6 +43,7 @@ struct Parameters {
   double southern_edge      = std::numeric_limits<double>::signaling_NaN();
   int32_t picard_iterations = -1;  // Default only one iteration
   int32_t total_cycles      = -1;
+  int32_t cycles_to_save    = -1;
   int32_t parallel_threads  = -1;  // one thread by default to accommodate computer architecture
 
   double cellsize_n_s_metres  = std::numeric_limits<double>::signaling_NaN();

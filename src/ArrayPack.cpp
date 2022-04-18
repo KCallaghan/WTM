@@ -1,6 +1,7 @@
 #include "ArrayPack.hpp"
 #include <cassert>
 
+// Check to see that all initalised arrays have the same dimensions, to help avoid incorrect input data
 void ArrayPack::check() const {
   assert(topo.width() == evap.width() && topo.height() == evap.height());
   assert(topo.width() == open_water_evap.width() && topo.height() == open_water_evap.height());
