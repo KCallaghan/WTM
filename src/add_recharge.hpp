@@ -4,11 +4,25 @@
 #include "parameters.hpp"
 
 // Method for adding recharge where porosity does not change with depth:
-inline double add_recharge(const double my_rech, double my_wtd, const double my_porosity) {
+inline double add_recharge(
+    const double my_rech,
+    double my_wtd,
+    const double my_porosity,
+    const double cell_area,
+    const bool count_recharge,
+    Parameters& params) {
+  double recharge_to_add = 0.;
+  if (count_recharge) {
+    params.total_added_recharge += my_rech * cell_area;
+  }
   if (my_wtd >= 0) {  // all the recharge will occur above the land surface; don't worry about porosity.
-    my_wtd += my_rech;
-    if (my_wtd < 0) {
-      my_wtd = 0;  // however, if we had evaporation, don't evaporate more surface water than is available.
+    recharge_to_add = my_rech;
+    if (my_wtd + recharge_to_add < 0) {
+      recharge_to_add =
+          -my_wtd;  // however, if we had evaporation, don't evaporate more surface water than is available.
+      if (count_recharge) {
+        params.total_added_recharge -= my_rech * cell_area;
+      }
     }
   } else if (my_rech > 0) {  // at least some of the water will be added into the ground, so we need to think about
                              // porosity. If my_rech was < 0 we don't add it here since there is no surface
@@ -16,10 +30,11 @@ inline double add_recharge(const double my_rech, double my_wtd, const double my_
     const double GW_space = -my_wtd * my_porosity;  // if wtd is negative, this is the amount of above-ground equivalent
                                                     // recharge that can be accommodated below ground.
     if (GW_space > my_rech) {  // all of the recharge will be below the ground; GW will not be completely filled.
-      my_wtd += my_rech / my_porosity;
-    } else {                        // we will have some below-ground and some above-ground water added.
-      my_wtd = my_rech - GW_space;  // some is used up in GW space and the remainder goes above the ground.
+      recharge_to_add = my_rech / my_porosity;
+    } else {  // we will have some below-ground and some above-ground water added.
+      recharge_to_add =
+          my_rech - GW_space - my_wtd;  // some is used up in GW space and the remainder goes above the ground.
     }
   }
-  return my_wtd;
+  return recharge_to_add;
 }
