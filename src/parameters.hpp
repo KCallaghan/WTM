@@ -36,15 +36,16 @@ struct Parameters {
   int32_t fsm_on          = -1;
   int32_t runoff_ratio_on = -1;
 
-  double deltat             = std::numeric_limits<double>::signaling_NaN();
-  double fdepth_a           = -1.;
-  double fdepth_b           = -1.;
-  double fdepth_fmin        = -1.;
-  double southern_edge      = std::numeric_limits<double>::signaling_NaN();
-  int32_t picard_iterations = -1;  // Default only one iteration
-  int32_t total_cycles      = -1;
-  int32_t cycles_to_save    = -1;
-  int32_t parallel_threads  = -1;  // one thread by default to accommodate computer architecture
+  double deltat                 = std::numeric_limits<double>::signaling_NaN();
+  double fdepth_a               = -1.;
+  double fdepth_b               = -1.;
+  double fdepth_fmin            = -1.;
+  double southern_edge          = std::numeric_limits<double>::signaling_NaN();
+  double solver_tolerance_value = -1;
+  int32_t picard_iterations     = -1;  // Default only one iteration
+  int32_t total_cycles          = -1;
+  int32_t cycles_to_save        = -1;
+  int32_t parallel_threads      = -1;  // one thread by default to accommodate computer architecture
 
   double cellsize_n_s_metres  = std::numeric_limits<double>::signaling_NaN();
   int32_t cycles_done         = 0;

@@ -9,8 +9,7 @@
 
 using SpMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;  // declares a row-major sparse matrix type of double
 
-constexpr double solver_tolerance_value = 0.00001;
-constexpr double seconds_in_a_year      = 31536000.;
+constexpr double seconds_in_a_year = 31536000.;
 
 ///////////////////////
 // PRIVATE FUNCTIONS //
@@ -135,7 +134,7 @@ void first_half(const Parameters& params, ArrayPack& arp) {
 
   // Biconjugate gradient solver with guess
   Eigen::BiCGSTAB<SpMat> solver;
-  solver.setTolerance(solver_tolerance_value);
+  solver.setTolerance(params.solver_tolerance_value);
   // NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means
   // that BiCGSTAB will not run in parallel. It is faster without.
 
@@ -291,7 +290,7 @@ void second_half(Parameters& params, ArrayPack& arp) {
 
   // Biconjugate gradient solver with guess
   Eigen::BiCGSTAB<SpMat> solver;
-  solver.setTolerance(solver_tolerance_value);
+  solver.setTolerance(params.solver_tolerance_value);
   // NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means
   // that BiCGSTAB will not run in parallel. It is faster without.
 

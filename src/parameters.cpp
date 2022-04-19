@@ -60,6 +60,8 @@ Parameters::Parameters(const std::string& config_file) {
       ss >> run_type;
     } else if (key == "runoff_ratio_on") {
       ss >> runoff_ratio_on;
+    } else if (key == "solver_tolerance_value") {
+      ss >> solver_tolerance_value;
     } else if (key == "southern_edge") {
       ss >> southern_edge;
     } else if (key == "supplied_wt") {
@@ -126,6 +128,9 @@ void Parameters::check() const {
         "set runoff_ratio_on to 1 to supply a runoff ratio array, or 0 to assume all P-ET infiltrates in the cell "
         "where it falls.");
   }
+  if (solver_tolerance_value < 0) {
+    throw std::runtime_error("select a positive value for solver_tolerance_value");
+  }
   if (supplied_wt != 0 && supplied_wt != 1) {
     throw std::runtime_error(
         "set supplied_wt to 1 to supply a starting water table, or 0 to set starting water table == 0 (only available "
@@ -174,28 +179,28 @@ std::string Parameters::get_path(const std::string& layer_name) const {
 }
 
 void Parameters::print() const {
-  std::cout << "c cells_per_degree = " << cells_per_degree << std::endl;
-  std::cout << "c deltat           = " << deltat << std::endl;
-  std::cout << "c evap_mode        = " << evap_mode << std::endl;
-  std::cout << "c fdepth_a         = " << fdepth_a << std::endl;
-  std::cout << "c fdepth_b         = " << fdepth_b << std::endl;
-  std::cout << "c fdepth_fmin      = " << fdepth_fmin << std::endl;
-  std::cout << "c fsm_on           = " << fsm_on << std::endl;
-  std::cout << "c infiltration_on  = " << infiltration_on << std::endl;
-  std::cout << "c maxiter          = " << maxiter << std::endl;
-  std::cout << "c outfile_prefix   = " << outfile_prefix << std::endl;
-  std::cout << "c parallel_threads = " << parallel_threads << std::endl;
-  std::cout << "c picard_iterations= " << picard_iterations << std::endl;
-  std::cout << "c region           = " << region << std::endl;
-  std::cout << "c run_type         = " << run_type << std::endl;
-  std::cout << "c runoff_ratio_on  = " << runoff_ratio_on << std::endl;
-  std::cout << "c southern_edge    = " << southern_edge << std::endl;
-  std::cout << "c supplied_wt      = " << supplied_wt << std::endl;
-  std::cout << "c surfdatadir      = " << surfdatadir << std::endl;
-  std::cout << "c textfilename     = " << textfilename << std::endl;
-  std::cout << "c time_end         = " << time_end << std::endl;
-  std::cout << "c time_start       = " << time_start << std::endl;
-  std::cout << "c total_cycles     = " << total_cycles << std::endl;
-
-  // TODO(kcallaghan): Synchronize with structure
+  std::cout << "c cells_per_degree       = " << cells_per_degree << std::endl;
+  std::cout << "c cycles_to_save         = " << cycles_to_save << std::endl;
+  std::cout << "c deltat                 = " << deltat << std::endl;
+  std::cout << "c evap_mode              = " << evap_mode << std::endl;
+  std::cout << "c fdepth_a               = " << fdepth_a << std::endl;
+  std::cout << "c fdepth_b               = " << fdepth_b << std::endl;
+  std::cout << "c fdepth_fmin            = " << fdepth_fmin << std::endl;
+  std::cout << "c fsm_on                 = " << fsm_on << std::endl;
+  std::cout << "c infiltration_on        = " << infiltration_on << std::endl;
+  std::cout << "c maxiter                = " << maxiter << std::endl;
+  std::cout << "c outfile_prefix         = " << outfile_prefix << std::endl;
+  std::cout << "c parallel_threads       = " << parallel_threads << std::endl;
+  std::cout << "c picard_iterations      = " << picard_iterations << std::endl;
+  std::cout << "c region                 = " << region << std::endl;
+  std::cout << "c run_type               = " << run_type << std::endl;
+  std::cout << "c runoff_ratio_on        = " << runoff_ratio_on << std::endl;
+  std::cout << "c southern_edge          = " << southern_edge << std::endl;
+  std::cout << "c solver_tolerance_value = " << solver_tolerance_value << std::endl;
+  std::cout << "c supplied_wt            = " << supplied_wt << std::endl;
+  std::cout << "c surfdatadir            = " << surfdatadir << std::endl;
+  std::cout << "c textfilename           = " << textfilename << std::endl;
+  std::cout << "c time_end               = " << time_end << std::endl;
+  std::cout << "c time_start             = " << time_start << std::endl;
+  std::cout << "c total_cycles           = " << total_cycles << std::endl;
 }
