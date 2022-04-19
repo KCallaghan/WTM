@@ -37,14 +37,9 @@ int main(int argc, char** argv) {
 
   std::cout << params.surfdatadir << std::endl;
 
-  arp.topo = rd::Array2D<float>(params.surfdatadir + params.region + params.time_start + "_topography.tif");
+  arp.topo = rd::Array2D<float>(params.get_path(params.time_start, "topography"));
 
-  arp.land_mask = rd::Array2D<float>(params.surfdatadir + params.region + params.time_start + "_mask.tif");
-
-  //  arp.topo          = LoadData<float>(params.surfdatadir + params.region
-  //  + params.time_start + "_topo.nc",    "value");
-  //  arp.land_mask     = LoadData<uint8_t>(params.surfdatadir + params.region +
-  //  params.time_start + "_mask.nc",   "value");
+  arp.land_mask = rd::Array2D<float>(params.get_path(params.time_start, "mask"));
 
   // width and height in number of cells in the array
   params.ncells_x = arp.topo.width();
@@ -72,18 +67,24 @@ int main(int argc, char** argv) {
   // cell area (metres squared)
   arp.cell_area.resize(params.ncells_y);
 
+  // used to calculate cell latitude in radians.
+  // southern edge of the domain in degrees, plus the number of cells up from this
+  // location/the number of cells per degree, converted to radians.
+  const auto cell_position_latitude = [&](const auto cell_idx) {
+    return (cell_idx / params.cells_per_degree + params.southern_edge) * deg_to_rad;
+  };
   for (int32_t j = 0; j < params.ncells_y; j++) {
     // southern edge of the domain in degrees, plus the number of cells up
     // from this location/the number of cells per degree, converted to radians.
     // latitude at the southern edge of a cell (subtract half a cell):
-    const double latitude_radians_S = ((float(j)) / params.cells_per_degree + params.southern_edge) * DEG_TO_RAD;
+    const double latitude_radians_S = cell_position_latitude(j);
     // latitude at the northern edge of a cell (add half a cell):
-    const double latitude_radians_N = ((float(j) + 1.) / params.cells_per_degree + params.southern_edge) * DEG_TO_RAD;
+    const double latitude_radians_N = cell_position_latitude(j + 1);
 
     // distance at the northern edge of the cell for the given latitude:
-    double cellsize_e_w_metres_N = params.cellsize_n_s_metres * std::cos(latitude_radians_N);
+    const double cellsize_e_w_metres_N = params.cellsize_n_s_metres * std::cos(latitude_radians_N);
     // distance at the southern edge of the cell for the given latitude:
-    double cellsize_e_w_metres_S = params.cellsize_n_s_metres * std::cos(latitude_radians_S);
+    const double cellsize_e_w_metres_S = params.cellsize_n_s_metres * std::cos(latitude_radians_S);
 
     // distance between lines of longitude varies with latitude.
     // This is the distance at the centre of a cell for a given latitude:
@@ -92,6 +93,10 @@ int main(int argc, char** argv) {
     // cell area computed as a trapezoid, using unchanging north-south distance,
     // and east-west distances at the northern and southern edges of the cell:
     arp.cell_area[j] = params.cellsize_n_s_metres * arp.cellsize_e_w_metres[j];
+
+    if (arp.cell_area[j] < 0) {
+      throw std::runtime_error("Cell with a negative area was found!");
+    }
   }
 
   // Label the ocean cells. This is a precondition for using
@@ -113,11 +118,8 @@ int main(int argc, char** argv) {
   // We are finished, save the result.
   std::cout << "done with processing" << std::endl;
 
-  //  label.saveGDAL("label.tif");
-  //  final_label.saveGDAL("final_label.tif");
-
-  //  SaveAsNetCDF(label,"label.nc","value");
-  //  SaveAsNetCDF(final_label,"final_label.nc","value");
+  label.saveGDAL("label.tif");
+  final_label.saveGDAL("final_label.tif");
 
   return 0;
 }
