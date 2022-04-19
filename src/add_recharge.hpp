@@ -3,7 +3,9 @@
 #include "ArrayPack.hpp"
 #include "parameters.hpp"
 
-// Method for adding recharge where porosity does not change with depth:
+// Determine how much recharge to add to each cell based on porosity,
+// water table depth, and available P-ET.
+// Note that we assume that porosity does not change with depth:
 inline double add_recharge(
     const double my_rech,
     double my_wtd,
