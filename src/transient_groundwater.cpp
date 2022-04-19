@@ -7,8 +7,7 @@
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
 
-using SpMat   = Eigen::SparseMatrix<double, Eigen::RowMajor>;  // declares a row-major sparse matrix type of double
-using Triplet = Eigen::Triplet<double>;                        // used to populate the matrices
+using SpMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;  // declares a row-major sparse matrix type of double
 
 constexpr double solver_tolerance_value = 0.00001;
 constexpr double seconds_in_a_year      = 31536000.;
