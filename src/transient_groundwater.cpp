@@ -98,15 +98,14 @@ void first_half(const Parameters& params, ArrayPack& arp) {
       // All of the N,E,S,W directions should be in the same row, but the column will differ.
       const auto main_loc = arp.wtd_T.xyToI(x, y);
 
-      // I need to insert the items in index order for best efficiency, so start with 2 off-diagonals, then the major
-      // diagonal, then the other 2 off-diagonals.
       if (x != 0) {
-        // Do the North diagonal. Offset by -(ncells_y). When x == ncells_x-1, there is no south diagonal.
+        // Do the North diagonal. Offset by -1. When x == 0, there is no north diagonal.
         A.insert(main_loc, main_loc - 1) = construct_n_s_diagonal_one(x, y, -1);
       }
 
       if (y != 0) {
-        // Next is the West diagonal. Opposite of the East. Located at (i,j-1). When y == 0, there is no west diagonal.
+        // Next is the West diagonal. Opposite of the East. Located at (i,j-params.ncells_x). When y == 0, there is no
+        // west diagonal.
         A.insert(main_loc, main_loc - params.ncells_x) = construct_e_w_diagonal_one(x, y, -1);
       }
 
@@ -120,13 +119,13 @@ void first_half(const Parameters& params, ArrayPack& arp) {
           (y == params.ncells_y - 1) ? 0 : 1);
 
       if (y != params.ncells_y - 1) {
-        // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1). When y == ncells_y -1,
+        // Now do the East diagonal. The East location is at (i,j+params.ncells_x). When y == params.ncells_y -1,
         // there is no east diagonal.
         A.insert(main_loc, main_loc + params.ncells_x) = construct_e_w_diagonal_one(x, y, 1);
       }
 
       if (x != params.ncells_x - 1) {
-        // Do the South diagonal, offset by +(ncells_y). When x == 0, there is no north diagonal.
+        // Do the South diagonal, offset by +1. When x == params.ncells_x, there is no south diagonal.
         A.insert(main_loc, main_loc + 1) = construct_n_s_diagonal_one(x, y, 1);
       }
     }
@@ -224,19 +223,20 @@ void second_half(Parameters& params, ArrayPack& arp) {
       const auto main_loc = arp.wtd_T.xyToI(x, y);
 
       if (x != 0) {
-        // Do the North diagonal. Offset by -(ncells_y).
+        // Do the North diagonal. Offset by -1.
         const auto entry                 = construct_n_s_diagonal_two(x, y, -1);
         B.insert(main_loc, main_loc - 1) = entry;
         A.insert(main_loc, main_loc - 1) = -entry;
       }
 
       if (y != 0) {
-        // Next is the West diagonal. Opposite of the East. Located at (i,j-1).
+        // Next is the West diagonal. Opposite of the East. Located at (i,j-params.ncells_X).
         const auto entry                               = construct_e_w_diagonal_two(x, y, -1);
         B.insert(main_loc, main_loc - params.ncells_x) = entry;
         A.insert(main_loc, main_loc - params.ncells_x) = -entry;
       }
 
+      // major diagonal
       B.insert(main_loc, main_loc) = construct_major_diagonal_two(
           x,
           y,
@@ -255,14 +255,14 @@ void second_half(Parameters& params, ArrayPack& arp) {
           (y == params.ncells_y - 1) ? 0 : 1);
 
       if (y != params.ncells_y - 1) {
-        // Now do the East diagonal. Because C++ is row-major, the East location is at (i,j+1).
+        // Now do the East diagonal. The East location is at (i,j+params.ncells_x).
         const auto entry                               = construct_e_w_diagonal_two(x, y, 1);
         B.insert(main_loc, main_loc + params.ncells_x) = entry;
         A.insert(main_loc, main_loc + params.ncells_x) = -entry;
       }
 
       if (x != params.ncells_x - 1) {
-        // Do the South diagonal, offset by +(ncells_y).
+        // Do the South diagonal, offset by +1.
         const auto entry                 = construct_n_s_diagonal_two(x, y, 1);
         B.insert(main_loc, main_loc + 1) = entry;
         A.insert(main_loc, main_loc + 1) = -entry;
@@ -276,6 +276,7 @@ void second_half(Parameters& params, ArrayPack& arp) {
   // Apply the recharge to the water-table depth grid. The full amount of recharge is added to b, which was created
   // based on original_wtd. Recharge is added here because of the form that the equation takes - can't add it prior to
   // doing the B*b multiplication.
+  // do not use pragma because recharge added is modified within the add_recharge function
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 1) {  // only add recharge to land cells
@@ -294,14 +295,12 @@ void second_half(Parameters& params, ArrayPack& arp) {
   // NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means
   // that BiCGSTAB will not run in parallel. It is faster without.
 
-  std::cout << "compute" << std::endl;
   solver.compute(A);
 
   if (solver.info() != Eigen::Success) {
     throw std::runtime_error("Eigen sparse solver failed at the compute step!");
   }
 
-  std::cout << "solve" << std::endl;
   vec_x = solver.solveWithGuess(b, guess);
 
   if (solver.info() != Eigen::Success) {
