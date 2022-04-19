@@ -133,7 +133,6 @@ void first_half(const Parameters& params, ArrayPack& arp) {
     }
   }
 
-  std::cerr << "finished first set of matrices" << std::endl;
   A.makeCompressed();
 
   // Biconjugate gradient solver with guess
@@ -142,14 +141,12 @@ void first_half(const Parameters& params, ArrayPack& arp) {
   // NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means
   // that BiCGSTAB will not run in parallel. It is faster without.
 
-  std::cout << "compute" << std::endl;
   solver.compute(A);
 
   if (solver.info() != Eigen::Success) {
     throw std::runtime_error("Eigen sparse solver failed at the compute step!");
   }
 
-  std::cout << "solve" << std::endl;
   vec_x = solver.solveWithGuess(b, guess);
 
   if (solver.info() != Eigen::Success) {
@@ -274,8 +271,6 @@ void second_half(Parameters& params, ArrayPack& arp) {
     }
   }
 
-  std::cerr << "finished second set of matrices" << std::endl;
-
   b     = B * b;
   guess = B * guess;
 
@@ -324,7 +319,6 @@ void second_half(Parameters& params, ArrayPack& arp) {
       arp.wtd(x, y) = vec_x(arp.wtd_T.xyToI(x, y)) - arp.topo(x, y);
     }
   }
-  std::cerr << "finished assigning the new wtd" << std::endl;
 }
 
 //////////////////////
@@ -392,13 +386,17 @@ void update(Parameters& params, ArrayPack& arp) {
   omp_set_num_threads(params.parallel_threads);
   Eigen::setNbThreads(params.parallel_threads);
 
-  std::cout << "set starting values and arrays for the groundwater calculation " << std::endl;
+  // set starting values and arrays for the groundwater calculation
   set_starting_values(params, arp);
 
-  // Picard iteration through solver
-
+  // Picard iteration through solver:
+  // Repeat the first solve params.picard_iterations number of times.
+  // This helps us to get a more accurate halfway transmissivity
+  // to use in the second_half.
   for (int continue_picard = 0; continue_picard < params.picard_iterations; continue_picard++) {
-    std::cout << "update Transmissivity: " << std::endl;
+// update the transmissivity using the mean current water table estimate, wtd_T,
+// and the previous estimate, wtd_T_iteration. Using the mean helps to prevent
+// spurious jumps from fluctuating water tables.
 #pragma omp parallel for default(none) shared(arp, params) collapse(2)
     for (int y = 0; y < params.ncells_y; y++) {
       for (int x = 0; x < params.ncells_x; x++) {
@@ -409,9 +407,12 @@ void update(Parameters& params, ArrayPack& arp) {
       }
     }
 
+    // Run the first half solver: solve for water table at half of the total deltat.
     std::cout << "p first_half" << std::endl;
     first_half(params, arp);
+
 // update the effective storativity to use during the next iteration of the first half:
+// also update scalar_array_x and _y, which use effective_storativity.
 #pragma omp parallel for default(none) shared(arp, params) collapse(2)
     for (int y = 0; y < params.ncells_y; y++) {
       for (int x = 0; x < params.ncells_x; x++) {
@@ -427,6 +428,7 @@ void update(Parameters& params, ArrayPack& arp) {
   }
 
 // get the final T for the halfway point
+// Use wtd_T, which is the final estimate for the halfway water table.
 #pragma omp parallel for default(none) shared(arp, params) collapse(2)
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
@@ -437,6 +439,7 @@ void update(Parameters& params, ArrayPack& arp) {
   }
 
   // Do the second half of the midpoint method:
+  // Solve for water table after the full time step.
   std::cout << "p second_half" << std::endl;
   second_half(params, arp);
 
@@ -445,13 +448,13 @@ void update(Parameters& params, ArrayPack& arp) {
       if (arp.land_mask(x, y) != 0) {
         continue;
       }
-
+      // count up any water lost to the ocean so that we can compute a water balance
       if (arp.wtd(x, y) > 0) {
         params.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
       } else {
         params.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y] * arp.porosity(x, y);
       }
-      arp.wtd(x, y) = 0.;
+      arp.wtd(x, y) = 0.;  // reset ocean water tables to 0.
     }
   }
 }
