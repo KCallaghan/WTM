@@ -4,9 +4,6 @@
 
 #include <richdem/common/Array2D.hpp>
 
-#include <cmath>
-#include <iostream>
-
 namespace rd = richdem;
 namespace dh = richdem::dephier;
 
