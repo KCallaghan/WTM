@@ -1,27 +1,14 @@
 #include "ArrayPack.hpp"
-#include "fill_spill_merge.hpp"
 #include "parameters.hpp"
-#include "transient_groundwater.hpp"
 
 #include <richdem/common/Array2D.hpp>
 #include <richdem/common/ProgressBar.hpp>
 #include <richdem/common/timer.hpp>
 
-#include <cassert>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <stdexcept>
-#include <string>
-#include <vector>
-
-using namespace std;
-
 namespace rd = richdem;
 namespace dh = richdem::dephier;
 
-constexpr double DEG_TO_RAD = M_PI / 180.0;
+constexpr double deg_to_rad = M_PI / 180.0;
 
 int main(int argc, char** argv) {
   if (argc != 2) {
@@ -34,9 +21,6 @@ int main(int argc, char** argv) {
   Parameters params(argv[1]);
 
   // load in the data files: topography and mask.
-
-  std::cout << params.surfdatadir << std::endl;
-
   arp.topo = rd::Array2D<float>(params.get_path(params.time_start, "topography"));
 
   arp.land_mask = rd::Array2D<float>(params.get_path(params.time_start, "mask"));
@@ -56,7 +40,7 @@ int main(int argc, char** argv) {
   constexpr float earth_radius = 6371000.;  // metres
   // Radius * Pi = Distance from N to S pole
   // Distance / 180 = Meters / degree latitude
-  const auto meters_per_degree = earth_radius * DEG_TO_RAD;
+  const auto meters_per_degree = earth_radius * deg_to_rad;
 
   // distance between lines of latitude is a constant.
   params.cellsize_n_s_metres = meters_per_degree / params.cells_per_degree;
