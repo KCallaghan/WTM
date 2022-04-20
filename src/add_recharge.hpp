@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ArrayPack.hpp"
-#include "parameters.hpp"
 
 // Determine how much recharge to add to each cell based on porosity,
 // water table depth, and available P-ET.
@@ -12,11 +11,11 @@ inline double add_recharge(
     const double my_porosity,
     const double cell_area,
     const bool count_recharge,
-    Parameters& params) {
+    ArrayPack& arp) {
   double recharge_to_add = 0.;
 
   if (count_recharge) {
-    params.total_added_recharge += my_rech * cell_area;
+    arp.total_added_recharge += my_rech * cell_area;
   }
 
   if (my_wtd >= 0) {  // all the recharge will occur above the land surface; don't worry about porosity.
@@ -25,7 +24,7 @@ inline double add_recharge(
       // however, if we had evaporation, don't evaporate more surface water than is available.
       recharge_to_add = -my_wtd;
       if (count_recharge) {
-        params.total_added_recharge -= my_rech * cell_area;
+        arp.total_added_recharge -= my_rech * cell_area;
       }
     }
   } else if (my_rech > 0) {  // at least some of the water will be added into the ground, so we need to think about
