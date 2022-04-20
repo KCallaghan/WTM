@@ -465,8 +465,8 @@ void PrintValues(Parameters& params, const ArrayPack& arp) {
 
   textfile << params.cycles_done << " " << total_wtd_change << " " << GW_wtd_change << " " << wtd_mid_change << " "
            << abs_total_wtd_change << " " << abs_GW_wtd_change << " " << abs_wtd_mid_change << " "
-           << params.infiltration_change << " " << params.total_added_recharge << " " << params.total_loss_to_ocean
-           << " " << wtd_sum << " " << std::endl;
+           << params.infiltration_change << " " << arp.total_added_recharge << " " << arp.total_loss_to_ocean << " "
+           << wtd_sum << " " << std::endl;
 
   textfile.close();
 }

@@ -86,86 +86,64 @@ Parameters::Parameters(const std::string& config_file) {
 }
 
 void Parameters::check() const {
-  if (cells_per_degree < 0) {
-    throw std::runtime_error("please enter a positive value for cells_per_degree!");
-  }
-  if (cycles_to_save < 0) {
-    throw std::runtime_error("please enter a positive value for cycles_to_save!");
-  }
-  if (std::isnan(deltat) || deltat < 0) {
-    throw std::runtime_error("please enter a positive value for deltat!");
-  }
+  const auto check_positive = [](const std::string name, const auto val) {
+    if (std::isnan(val) || val < 0) {
+      throw std::runtime_error("Please enter a positive value for " + name);
+    }
+  };
+
+  const auto check_string_init = [&](const std::string name, const std::string& val) {
+    if (val == UNINIT_STR) {
+      throw std::runtime_error("Please provide a value for " + name);
+    }
+  };
+
+  const auto check_binary = [](const auto val, const std::string& msg) {
+    if (val != 0 && val != 1) {
+      throw std::runtime_error(msg);
+    }
+  };
+
+  check_positive("cells_per_degree", cells_per_degree);
+  check_positive("cycles_to_save", cycles_to_save);
+  check_positive("deltat", deltat);
   if (std::isnan(southern_edge) || southern_edge < -90 || southern_edge > 90) {
     throw std::runtime_error("please enter a value between -90 and 90 degrees for the southern_edge!");
   }
-  if (evap_mode != 0 && evap_mode != 1) {
-    throw std::runtime_error(
-        "set evap_mode to 0 to remove all surface water, or 1 to use a grid of potential evaporation for lakes.");
-  }
-  if (fdepth_a < 0) {
-    throw std::runtime_error("please enter a positive value for fdepth_a!");
-  }
-  if (fdepth_b < 0) {
-    throw std::runtime_error("please enter a positive value for fdepth_b!");
-  }
-  if (fdepth_fmin < 0) {
-    throw std::runtime_error("please enter a positive value for fdepth_fmin!");
-  }
-  if (picard_iterations < 0) {
-    throw std::runtime_error("please enter a positive value for picard_iterations!");
-  }
-  if (fsm_on != 0 && fsm_on != 1) {
-    throw std::runtime_error(
-        "set fsm_on to 1 to allow Fill-Spill-Merge to move surface water, or 0 to disable Fill-Spill-Merge.");
-  }
-  if (infiltration_on != 0 && infiltration_on != 1) {
-    throw std::runtime_error(
-        "set infiltration_on to 1 to allow water to infiltrate as it flows downslope, or 0 to neglect infiltration and "
-        "assume impermeable substrates while flowing downslope.");
-  }
-  if (runoff_ratio_on != 0 && runoff_ratio_on != 1) {
-    throw std::runtime_error(
-        "set runoff_ratio_on to 1 to supply a runoff ratio array, or 0 to assume all P-ET infiltrates in the cell "
-        "where it falls.");
-  }
-  if (solver_tolerance_value < 0) {
-    throw std::runtime_error("select a positive value for solver_tolerance_value");
-  }
-  if (supplied_wt != 0 && supplied_wt != 1) {
-    throw std::runtime_error(
-        "set supplied_wt to 1 to supply a starting water table, or 0 to set starting water table == 0 (only available "
-        "for equilibrium runs).");
-  }
+  check_binary(
+      evap_mode,
+      "set evap_mode to 0 to remove all surface water, or 1 to use a grid of potential evaporation for lakes.");
+  check_positive("fdepth_a", fdepth_a);
+  check_positive("fdepth_b", fdepth_b);
+  check_positive("fdepth_fmin", fdepth_fmin);
+  check_positive("picard_iterations", picard_iterations);
+  check_binary(
+      fsm_on, "set fsm_on to 1 to allow Fill-Spill-Merge to move surface water, or 0 to disable Fill-Spill-Merge.");
+  check_binary(
+      infiltration_on,
+      "set infiltration_on to 1 to allow water to infiltrate as it flows downslope, or 0 to neglect infiltration and "
+      "assume impermeable substrates while flowing downslope.");
+  check_binary(
+      runoff_ratio_on,
+      "set runoff_ratio_on to 1 to supply a runoff ratio array, or 0 to assume all P-ET infiltrates in the cell "
+      "where it falls.");
+  check_positive("solver_tolerance_value", solver_tolerance_value);
+  check_binary(
+      supplied_wt,
+      "set supplied_wt to 1 to supply a starting water table, or 0 to set starting water table == 0 (only available "
+      "for equilibrium runs).");
   if (maxiter == -1 || maxiter != static_cast<int32_t>(maxiter)) {
     throw std::runtime_error("please enter a positive integer value for maxiter!");
   }
-  if (outfile_prefix == UNINIT_STR) {
-    throw std::runtime_error("please provide an outfile_prefix!");
-  }
-  if (region == UNINIT_STR) {
-    throw std::runtime_error("please provide a region!");
-  }
-  if (run_type == UNINIT_STR) {
-    throw std::runtime_error("please provide a run_type!");
-  }
-  if (surfdatadir == UNINIT_STR) {
-    throw std::runtime_error("please provide a surfdatadir!");
-  }
-  if (textfilename == UNINIT_STR) {
-    throw std::runtime_error("please provide a textfilename!");
-  }
-  if (time_start == UNINIT_STR) {
-    throw std::runtime_error("please provide a time_start!");
-  }
-  if (time_end == UNINIT_STR) {
-    throw std::runtime_error("please provide a time_end!");
-  }
-  if (parallel_threads == -1) {
-    throw std::runtime_error("please enter a positive integer value for parallel_threads!");
-  }
-  if (total_cycles == -1) {
-    throw std::runtime_error("please enter a positive integer value for total_cycles!");
-  }
+  check_string_init("outfile_prefix", outfile_prefix);
+  check_string_init("region", region);
+  check_string_init("run_type", run_type);
+  check_string_init("surfdatadir", surfdatadir);
+  check_string_init("textfilename", textfilename);
+  check_string_init("time_start", time_start);
+  check_string_init("time_end", time_end);
+  check_positive("parallel_threads", parallel_threads);
+  check_positive("total_cycles", total_cycles);
 }
 
 std::string Parameters::get_path(const std::string& time, const std::string& layer_name) const {
