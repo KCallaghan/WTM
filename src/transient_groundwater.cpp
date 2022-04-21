@@ -371,6 +371,7 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
       // set the scalar arrays for x and y directions
       arp.scalar_array_y(x, y) =
           params.deltat / (arp.effective_storativity(x, y) * arp.cellsize_e_w_metres[y] * arp.cellsize_e_w_metres[y]);
+      params.x_partial         = params.deltat / (params.cellsize_n_s_metres * params.cellsize_n_s_metres);
       arp.scalar_array_x(x, y) = params.x_partial / arp.effective_storativity(x, y);
     }
   }
