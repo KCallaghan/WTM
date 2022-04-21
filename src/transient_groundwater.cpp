@@ -329,13 +329,13 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
   // 1.5 is a standard value based on the shallow depths to which soil textures are known.
   constexpr double ocean_T = 0.00005 * (1.5 + 60.);
 
-  // no pragma because we're editing params.total_loss_to_ocean
+  // no pragma because we're editing arp.total_loss_to_ocean
   // check to see if there is any non-zero water table in ocean
   // cells, and if so, record these values as changes to the ocean.
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 0.f) {
-        params.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
+        arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
         arp.wtd(x, y) = 0.;
       }
     }
@@ -447,9 +447,9 @@ void update(Parameters& params, ArrayPack& arp) {
       }
       // count up any water lost to the ocean so that we can compute a water balance
       if (arp.wtd(x, y) > 0) {
-        params.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
+        arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
       } else {
-        params.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y] * arp.porosity(x, y);
+        arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y] * arp.porosity(x, y);
       }
       arp.wtd(x, y) = 0.;  // reset ocean water tables to 0.
     }
