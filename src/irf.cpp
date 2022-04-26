@@ -31,6 +31,9 @@ double setup_fdepth(const Parameters& params, const double slope, const double t
 /// array, a requirement for transient runs.
 void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   // width and height in number of cells in the array
+
+  arp.topo_start = rd::Array2D<float>(params.get_path(params.time_start, "topography"));
+
   params.ncells_x = arp.topo_start.width();
   params.ncells_y = arp.topo_start.height();
 
