@@ -47,12 +47,10 @@ struct Parameters {
   int32_t cycles_to_save        = -1;
   int32_t parallel_threads      = -1;  // one thread by default to accommodate computer architecture
 
-  double cellsize_n_s_metres  = std::numeric_limits<double>::signaling_NaN();
-  int32_t cycles_done         = 0;
-  double infiltration_change  = 0.;
-  double x_partial            = 0.;
-  double total_added_recharge = 0.;
-  double total_loss_to_ocean  = 0.;
+  double cellsize_n_s_metres = std::numeric_limits<double>::signaling_NaN();
+  int32_t cycles_done        = 0;
+  double infiltration_change = 0.;
+  double x_partial           = 0.;
 
   // Set for convenience within the code
   int32_t ncells_x = -1;

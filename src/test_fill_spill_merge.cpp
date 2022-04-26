@@ -428,23 +428,23 @@ void CheckMassLoss(const int count, const int min_size, const int max_size) {
         }
       }
 
-      change_in_rech        = params.total_added_recharge - rech_old;
-      change_in_ocean_loss  = params.total_loss_to_ocean - ocean_loss_old;
+      change_in_rech        = arp.total_added_recharge - rech_old;
+      change_in_ocean_loss  = arp.total_loss_to_ocean - ocean_loss_old;
       change_in_water_table = wtd_sum - water_table_old;
 
       mass_loss = (change_in_rech - change_in_water_table - change_in_ocean_loss) / change_in_rech * 100.;
 
-      std::cout << "change in rech is " << change_in_rech << " total_added_recharge " << params.total_added_recharge
+      std::cout << "change in rech is " << change_in_rech << " total_added_recharge " << arp.total_added_recharge
                 << " rech old " << rech_old << std::endl;
-      std::cout << "change in ocean loss " << change_in_ocean_loss << " total loss to ocean "
-                << params.total_loss_to_ocean << " ocean loss old " << ocean_loss_old << std::endl;
+      std::cout << "change in ocean loss " << change_in_ocean_loss << " total loss to ocean " << arp.total_loss_to_ocean
+                << " ocean loss old " << ocean_loss_old << std::endl;
       std::cout << "change in water table " << change_in_water_table << " wtd sum " << wtd_sum << " water table old "
                 << water_table_old << std::endl;
       std::cout << "mass loss as a percentage of recharge is " << mass_loss << std::endl;
 
       water_table_old = wtd_sum;
-      ocean_loss_old  = params.total_loss_to_ocean;
-      rech_old        = params.total_added_recharge;
+      ocean_loss_old  = arp.total_loss_to_ocean;
+      rech_old        = arp.total_added_recharge;
     }
 
     CHECK_MESSAGE(mass_loss < 100, "failed mass loss check");

@@ -151,6 +151,7 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
         arp.rech(i) =
             (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
       }
+
       if (arp.rech(i) > 0) {
         // if there is positive recharge, some of it may run off.
         // set the amount of runoff based on runoff_ratio, and subtract this amount from the recharge.
@@ -192,7 +193,7 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
   arp.wtd_old = arp.wtd;
   params.cycles_done += 1;
   std::cerr << "t Done time = " << get_current_time_and_date_as_str() << std::endl;
-  std::cerr << "t TWSM update time = " << timer_overall.lap() << std::endl;
+  std::cerr << "t WTM update time = " << timer_overall.lap() << std::endl;
 }
 
 void run(Parameters& params, ArrayPack& arp) {

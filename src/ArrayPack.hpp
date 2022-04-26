@@ -78,5 +78,9 @@ struct ArrayPack {
   richdem::Array2D<richdem::dephier::dh_label_t> final_label;  // No cells are part of a depression
   richdem::Array2D<richdem::flowdir_t> flowdirs;               // No cells flow anywhere
 
+  // Cumulative state variables
+  double total_added_recharge = 0;
+  double total_loss_to_ocean  = 0;
+
   void check() const;
 };

@@ -280,10 +280,9 @@ void second_half(Parameters& params, ArrayPack& arp) {
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 1) {  // only add recharge to land cells
         const auto index = arp.wtd_T.xyToI(x, y);
-        b(index) +=
-            add_recharge(arp.rech(x, y), arp.original_wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 1, params);
+        b(index) += add_recharge(arp.rech(x, y), arp.original_wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 1, arp);
         guess(index) +=
-            add_recharge(arp.rech(x, y), arp.original_wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 0, params);
+            add_recharge(arp.rech(x, y), arp.original_wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 0, arp);
       }
     }
   }
@@ -329,13 +328,13 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
   // 1.5 is a standard value based on the shallow depths to which soil textures are known.
   constexpr double ocean_T = 0.00005 * (1.5 + 60.);
 
-  // no pragma because we're editing params.total_loss_to_ocean
+  // no pragma because we're editing arp.total_loss_to_ocean
   // check to see if there is any non-zero water table in ocean
   // cells, and if so, record these values as changes to the ocean.
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 0.f) {
-        params.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
+        arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
         arp.wtd(x, y) = 0.;
       }
     }
@@ -357,8 +356,7 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         // Its clone (wtd_T) is used and updated in the Picard iteration
         // use regular porosity for adding recharge since this checks
         // for underground space within add_recharge.
-        arp.wtd(x, y) +=
-            add_recharge(arp.rech(x, y) / 2., arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 0, params);
+        arp.wtd(x, y) += add_recharge(arp.rech(x, y) / 2., arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 0, arp);
 
         arp.wtd_T(x, y)           = arp.wtd(x, y);
         arp.wtd_T_iteration(x, y) = arp.wtd_T(x, y);
@@ -373,6 +371,7 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
       // set the scalar arrays for x and y directions
       arp.scalar_array_y(x, y) =
           params.deltat / (arp.effective_storativity(x, y) * arp.cellsize_e_w_metres[y] * arp.cellsize_e_w_metres[y]);
+      params.x_partial         = params.deltat / (params.cellsize_n_s_metres * params.cellsize_n_s_metres);
       arp.scalar_array_x(x, y) = params.x_partial / arp.effective_storativity(x, y);
     }
   }
@@ -447,9 +446,9 @@ void update(Parameters& params, ArrayPack& arp) {
       }
       // count up any water lost to the ocean so that we can compute a water balance
       if (arp.wtd(x, y) > 0) {
-        params.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
+        arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
       } else {
-        params.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y] * arp.porosity(x, y);
+        arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y] * arp.porosity(x, y);
       }
       arp.wtd(x, y) = 0.;  // reset ocean water tables to 0.
     }

@@ -4,9 +4,6 @@
 
 #include <richdem/common/Array2D.hpp>
 
-#include <cmath>
-#include <iostream>
-
 namespace rd = richdem;
 namespace dh = richdem::dephier;
 
@@ -323,10 +320,6 @@ void cell_size_area(Parameters& params, ArrayPack& arp) {
       throw std::runtime_error("Cell with a negative area was found!");
     }
   }
-  // This parameter is used in transient_groundwater. By setting it here,
-  // immediately after cellsize has been calcualted, we don't have to
-  // repeatedly calculate it every time we run transient_groundwater.
-  params.x_partial = params.deltat / (params.cellsize_n_s_metres * params.cellsize_n_s_metres);
 }
 
 /// This function initialises those arrays that are used for both equilibrium
@@ -471,8 +464,8 @@ void PrintValues(Parameters& params, const ArrayPack& arp) {
 
   textfile << params.cycles_done << " " << total_wtd_change << " " << GW_wtd_change << " " << wtd_mid_change << " "
            << abs_total_wtd_change << " " << abs_GW_wtd_change << " " << abs_wtd_mid_change << " "
-           << params.infiltration_change << " " << params.total_added_recharge << " " << params.total_loss_to_ocean
-           << " " << wtd_sum << " " << std::endl;
+           << params.infiltration_change << " " << arp.total_added_recharge << " " << arp.total_loss_to_ocean << " "
+           << wtd_sum << " " << std::endl;
 
   textfile.close();
 }
