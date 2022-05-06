@@ -88,6 +88,11 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   arp.open_water_evap = arp.open_water_evap_start;
   arp.winter_temp     = arp.winter_temp_start;
   arp.fdepth          = arp.fdepth_start;
+  arp.wtd_T           = arp.wtd;
+  arp.wtd_T_iteration = arp.wtd;
+  arp.original_wtd    = arp.wtd;
+  arp.scalar_array_x  = rd::Array2D<double>(arp.topo, 0.0);
+  arp.scalar_array_y  = rd::Array2D<double>(arp.topo, 0.0);
 }
 
 /// This function initialises those arrays that are needed only for equilibrium
