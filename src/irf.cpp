@@ -134,7 +134,7 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
   }
 
   if (params.supplied_wt == true) {
-    arp.wtd             = rd::Array2D<double>(params.get_path("starting_wt"));
+    arp.wtd             = rd::Array2D<double>(params.get_path(params.time_start, "starting_wt"));
     arp.wtd_T           = arp.wtd;
     arp.wtd_T_iteration = arp.wtd;
     arp.original_wtd    = arp.wtd;
