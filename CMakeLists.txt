@@ -43,7 +43,7 @@ add_executable(wtm.x
   src/WTM.cpp
 )
 target_compile_options(wtm.x PRIVATE -Wfloat-conversion)
-target_link_libraries(wtm.x PRIVATE richdem OpenMP::OpenMP_CXX fmt::fmt)
+target_link_libraries(wtm.x PRIVATE ${PETSC_LIBRARIES} ${PETSC_PACKAGE_LIBS} richdem OpenMP::OpenMP_CXX fmt::fmt)
 target_compile_features(wtm.x PRIVATE cxx_std_17)
 target_compile_definitions(wtm.x PRIVATE DOCTEST_CONFIG_DISABLE)
 add_sanitizers(wtm.x)

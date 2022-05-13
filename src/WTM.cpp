@@ -5,9 +5,6 @@
 #include <fmt/core.h>
 #include <richdem/common/timer.hpp>
 
-#include <petscdm.h>
-#include <petscdmda.h>
-#include <petscsnes.h>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -234,16 +231,13 @@ int main(int argc, char** argv) {
 
   ArrayPack arp;
 
-  PetscErrorCode ierr;
-  ierr = PetscInitialize(&argc, &argv, (char*)0, help);
-  if (ierr)
-    return ierr;
+  PetscCall(PetscInitialize(&argc, &argv, (char*)0, help));
 
   initialise(params, arp);
   run(params, arp);
   finalise(params, arp);
 
-  PetscFinalize();
+  PetscCall(PetscFinalize());
 
   return 0;
 }
