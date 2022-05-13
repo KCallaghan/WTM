@@ -4,8 +4,8 @@ project(WTM LANGUAGES CXX)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-set(CMAKE_CXX_FLAGS_RELTESTING "-O3 -g -Wall -Wextra -pedantic -Wshadow")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -Wall -Wextra -pedantic -Wshadow")
+set(CMAKE_CXX_FLAGS_RELTESTING "-O3 -g -Wall -Wextra -pedantic -Wshadow -lpetsc")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -Wall -Wextra -pedantic -Wshadow -lpetsc")
 
 # RichDEM requires GDAL
 set(USE_GDAL ON)
@@ -23,9 +23,12 @@ if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache) # Less useful to do it for linking, see edit2
 endif(CCACHE_FOUND)
 
+find_package(PkgConfig REQUIRED)
 find_package(OpenMP)
 find_package(Sanitizers)
 find_package(GDAL REQUIRED)
+
+pkg_search_module(PETSC PETSc>3.5.0 IMPORTED_TARGET REQUIRED)
 # use -fsanitize=address (above) to check for memory errors
 
 add_subdirectory(common/richdem EXCLUDE_FROM_ALL)

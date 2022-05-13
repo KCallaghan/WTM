@@ -5,6 +5,9 @@
 #include <fmt/core.h>
 #include <richdem/common/timer.hpp>
 
+#include <petscdm.h>
+#include <petscdmda.h>
+#include <petscsnes.h>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -23,6 +26,8 @@ std::string get_current_time_and_date_as_str() {
   ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S");
   return ss.str();
 }
+
+static char help[] = "trying petsc method to solve the problem using Newton";
 
 void initialise(Parameters& params, ArrayPack& arp) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);
@@ -228,9 +233,17 @@ int main(int argc, char** argv) {
   Parameters params(argv[1]);
 
   ArrayPack arp;
+
+  PetscErrorCode ierr;
+  ierr = PetscInitialize(&argc, &argv, (char*)0, help);
+  if (ierr)
+    return ierr;
+
   initialise(params, arp);
   run(params, arp);
   finalise(params, arp);
+
+  PetscFinalize();
 
   return 0;
 }
