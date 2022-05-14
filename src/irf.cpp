@@ -161,17 +161,17 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   params.ncells_y = arp.topo.height();
 
   if (params.infiltration_on) {
-    arp.vert_ksat = rd::Array2D<float>(arp.topo, 0.00001);  // Units of ksat are m/s.
+    arp.vert_ksat = rd::Array2D<float>(arp.topo, 0.00001f);  // Units of ksat are m/s.
   }
 
   // A binary mask that is 1 where there is land and 0 in the ocean
   arp.land_mask = rd::Array2D<uint8_t>(arp.topo, 1);
   arp.land_mask.setEdges(0);
 
-  arp.precip          = rd::Array2D<float>(arp.topo, 0.03);  // Units: m/yr.
-  arp.runoff_ratio    = rd::Array2D<float>(arp.topo, 0.);    // Units: m/yr.
-  arp.evap            = rd::Array2D<float>(arp.topo, 0.);    // Units: m/yr.
-  arp.open_water_evap = rd::Array2D<float>(arp.topo, 0.5);   // Units: m/yr.
+  arp.precip          = rd::Array2D<float>(arp.topo, 0.03f);  // Units: m/yr.
+  arp.runoff_ratio    = rd::Array2D<float>(arp.topo, 0.);     // Units: m/yr.
+  arp.evap            = rd::Array2D<float>(arp.topo, 0.);     // Units: m/yr.
+  arp.open_water_evap = rd::Array2D<float>(arp.topo, 0.5);    // Units: m/yr.
 
   arp.winter_temp     = rd::Array2D<float>(arp.topo, 0);  // Units: deg C
   arp.wtd             = rd::Array2D<double>(arp.topo, 0.0);
@@ -198,8 +198,8 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
     }
   }
 
-  arp.ksat                  = rd::Array2D<float>(arp.topo, 0.0001);  // Units of ksat are m/s.
-  arp.porosity              = rd::Array2D<float>(arp.topo, 0.25);    // Units: unitless
+  arp.ksat                  = rd::Array2D<float>(arp.topo, 0.0001f);  // Units of ksat are m/s.
+  arp.porosity              = rd::Array2D<float>(arp.topo, 0.25);     // Units: unitless
   arp.effective_storativity = rd::Array2D<double>(arp.topo, 0.);
 
   // Set arrays that start off with zero or other values,
@@ -243,7 +243,7 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
       arp.rech(i) = 0.0f;
     }
     if (arp.porosity(i) <= 0) {
-      arp.porosity(i) = 0.0000001;  // not sure why it is sometimes processing cells with 0 porosity?
+      arp.porosity(i) = 0.0000001f;  // not sure why it is sometimes processing cells with 0 porosity?
     }
   }
 
@@ -376,7 +376,7 @@ void InitialiseBoth(const Parameters& params, ArrayPack& arp) {
       arp.rech(i) = 0.0f;
     }
     if (arp.porosity(i) <= 0) {
-      arp.porosity(i) = 0.0000001;  // not sure why it is sometimes processing cells with 0 porosity?
+      arp.porosity(i) = 0.0000001f;  // not sure why it is sometimes processing cells with 0 porosity?
     }
   }
 
