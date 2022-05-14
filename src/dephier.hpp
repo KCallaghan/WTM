@@ -26,11 +26,10 @@
 
 namespace richdem::dephier {
 
-typedef int32_t dh_label_t;
-typedef uint32_t flat_c_idx;
-
 // We use a 32-bit integer for labeling depressions. This allows for a maximum of
 // 2,147,483,647 depressions. This should be enough for most practical purposes.
+typedef int32_t dh_label_t;
+typedef uint32_t flat_c_idx;
 
 // Some special values
 constexpr dh_label_t NO_PARENT = std::numeric_limits<dh_label_t>::max();
@@ -43,8 +42,7 @@ constexpr dh_label_t NO_VALUE  = std::numeric_limits<dh_label_t>::max();
 // one outlet at the same level one of them is arbitrarily chosen; hopefully this
 // happens only rarely in natural environments.
 template <class elev_t>
-class Depression {
- public:
+struct Depression {
   // Flat index of the pit cell, the lowest cell in the depression. If more than
   // one cell shares this lowest elevation, then one is arbitrarily chosen.
   flat_c_idx pit_cell = NO_VALUE;
@@ -114,8 +112,7 @@ class Depression {
 
 // The OutletLink is used as a key for a hashtable which stores information about
 // the outlets.
-class OutletLink {
- public:
+struct OutletLink {
   dh_label_t depa;
   dh_label_t depb;
   OutletLink() = default;
@@ -128,8 +125,7 @@ class OutletLink {
 // The outlet class stores, again, the depressions being linked as well as
 // information about the link
 template <class elev_t>
-class Outlet {
- public:
+struct Outlet {
   dh_label_t depa;                 // Depression A
   dh_label_t depb;                 // Depression B
   flat_c_idx out_cell = NO_VALUE;  // Flat-index of cell at which A and B meet.
@@ -170,7 +166,7 @@ struct OutletHash {
     // about which order the invoking code called them in and our hash function
     // doesn't need to be symmetric with respect to depa and depb.
 
-    // Hash function from: https://stackoverflow.com/a/27952689/752843
+    // Boost hash combine function: https://stackoverflow.com/a/27952689/752843
     return out.depa ^ (out.depb + 0x9e3779b9 + (out.depa << 6) + (out.depa >> 2));
   }
 };
@@ -179,10 +175,10 @@ template <class elev_t>
 using PriorityQueue = radix_heap::pair_radix_heap<elev_t, uint64_t>;
 
 // Cell is not part of a depression
-const dh_label_t NO_DEP = std::numeric_limits<dh_label_t>::max();
+constexpr dh_label_t NO_DEP = std::numeric_limits<dh_label_t>::max();
 // Cell is part of the ocean and a place from which we begin searching for
 // depressions.
-const dh_label_t OCEAN = 0;
+constexpr dh_label_t OCEAN = 0;
 
 template <typename elev_t>
 using DepressionHierarchy = std::vector<Depression<elev_t>>;
@@ -256,7 +252,7 @@ std::ostream& operator<<(std::ostream& out, const DepressionHierarchy<elev_t>& d
 //
 // @param cell_area - vector indicating the cell areas based on latitude
 //                   throughout the array.
-// @return label    - A label indiciating which depression the cell belongs to.
+// @return label    - A label indicating which depression the cell belongs to.
 //                   The indicated label is always the leaf of the depression
 //                   hierarchy, or the OCEAN.
 //
@@ -342,6 +338,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   if (ocean_cells == 0) {
     throw std::runtime_error("No OCEAN cells found, could not make a DepressionHierarchy!");
   }
+
   // The 0th depression is the ocean. We add it to the list of depressions now
   // that we're sure there is an ocean!
   {  // Use a little scope to avoid having `oceandep` linger around
@@ -388,7 +385,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
       }
       if (!has_lower) {  // The cell can't drain, so it is a pit cell
         land_seeds.emplace_back(dem.xyToI(x, y));
-        pit_cell_count++;
+        pit_cell_count++;  // Add to pit cell count. Parallel safe because of reduction.
       }
     }
   progress.stop();
@@ -828,7 +825,7 @@ void CalculateTotalVolumes(DepressionHierarchy<elev_t>& deps) {
   RDLOG_PROGRESS << "p Calculating depression total volumes...";
   // Calculate total depression volumes and areas
   progress.start(deps.size());
-  for (int d = 0; d < (int)deps.size(); d++) {
+  for (size_t d = 0; d < deps.size(); d++) {
     ++progress;
 
     auto& dep = deps.at(d);
