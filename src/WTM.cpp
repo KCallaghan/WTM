@@ -3,6 +3,10 @@
 #include "transient_groundwater.hpp"
 
 #include <fmt/core.h>
+#include <petscdm.h>
+#include <petscdmda.h>
+#include <petscerror.h>
+#include <petscsnes.h>
 #include <richdem/common/timer.hpp>
 
 #include <chrono>
@@ -24,7 +28,7 @@ std::string get_current_time_and_date_as_str() {
   return ss.str();
 }
 
-static char help[] = "trying petsc method to solve the problem using Newton";
+static constexpr char help[] = "trying petsc method to solve the problem using Newton";
 
 void initialise(Parameters& params, ArrayPack& arp) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);

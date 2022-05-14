@@ -4,6 +4,10 @@
 
 #include <omp.h>
 
+#include <petscdm.h>
+#include <petscdmda.h>
+#include <petscerror.h>
+#include <petscsnes.h>
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
 
