@@ -25,9 +25,6 @@ PetscErrorCode FormJacobian(SNES, Vec, Mat, Mat, void*);
 PetscErrorCode FormFunction(SNES, Vec, Vec, void*);
 PetscErrorCode FormInitialGuess(Vec, Parameters& params, ArrayPack& arp);
 PetscErrorCode Monitor(SNES, PetscInt, PetscReal, void*);
-PetscErrorCode PreCheck(SNESLineSearch, Vec, Vec, PetscBool*, void*);
-PetscErrorCode PostCheck(SNESLineSearch, Vec, Vec, Vec, PetscBool*, PetscBool*, void*);
-PetscErrorCode PostSetSubKSP(SNESLineSearch, Vec, Vec, Vec, PetscBool*, PetscBool*, void*);
 PetscErrorCode MatrixFreePreconditioner(PC, Vec, Vec);
 
 /*
@@ -42,6 +39,7 @@ typedef struct {
   PetscReal h;      /* mesh spacing */
   PetscBool sjerr;  /* if or not to test jacobian domain error */
   PetscReal timestep;
+  PetscReal ncells_x;
 } ApplicationCtx;
 
 /*
@@ -160,6 +158,7 @@ int update(Parameters& params, ArrayPack& arp) {
   ctx.h        = 1.0 / (N - 1);
   ctx.sjerr    = PETSC_FALSE;
   ctx.timestep = params.deltat;
+  ctx.ncells_x = params.ncells_x;
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_jacobian_domain_error", &ctx.sjerr, NULL));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-view_initial", &viewinitial, NULL));
 
@@ -266,8 +265,8 @@ int update(Parameters& params, ArrayPack& arp) {
   PetscCall(MatCreate(PETSC_COMM_WORLD, &J));
   PetscCall(MatSetSizes(J, PETSC_DECIDE, PETSC_DECIDE, N, N));
   PetscCall(MatSetFromOptions(J));
-  PetscCall(MatSeqAIJSetPreallocation(J, 3, NULL));
-  PetscCall(MatMPIAIJSetPreallocation(J, 3, NULL, 3, NULL));
+  PetscCall(MatSeqAIJSetPreallocation(J, 5, NULL));
+  PetscCall(MatMPIAIJSetPreallocation(J, 3, NULL, 2, NULL));
 
   /*
      Set Jacobian matrix data structure and default Jacobian evaluation
@@ -323,8 +322,8 @@ int update(Parameters& params, ArrayPack& arp) {
   */
   xp = ctx.h * xs;
   for (i = xs; i < xs + xm; i++) {
-    FF[i] = 6.0 * xp + PetscPowScalar(xp + 1.e-12, 6.0); /* +1.e-12 is to prevent 0^6 */
-    UU[i] = xp * xp * xp;
+    FF[i] = 1;  // 6.0 * xp + PetscPowScalar(xp + 1.e-12, 6.0); /* +1.e-12 is to prevent 0^6 */
+    UU[i] = 1;  // xp * xp * xp;
     xp += ctx.h;
   }
 
@@ -360,14 +359,14 @@ int update(Parameters& params, ArrayPack& arp) {
   /*
      Check the error
   */
-  PetscCall(VecAXPY(x, none, U));
-  PetscCall(VecNorm(x, NORM_2, &norm));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Norm of error %g Iterations %" PetscInt_FMT "\n", (double)norm, its));
-  if (ctx.sjerr) {
-    SNESType snestype;
-    PetscCall(SNESGetType(snes, &snestype));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "SNES Type %s\n", snestype));
-  }
+  //  PetscCall(VecAXPY(x, none, U));
+  //  PetscCall(VecNorm(x, NORM_2, &norm));
+  //  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Norm of error %g Iterations %" PetscInt_FMT "\n", (double)norm, its));
+  //  if (ctx.sjerr) {
+  //    SNESType snestype;
+  //    PetscCall(SNESGetType(snes, &snestype));
+  //    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "SNES Type %s\n", snestype));
+  //  }
 
   /*
      Free work space.  All PETSc objects should be destroyed when they
@@ -394,18 +393,18 @@ int update(Parameters& params, ArrayPack& arp) {
   PetscCall(SNESDestroy(&snes));
   PetscCall(DMDestroy(&ctx.da));
 
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      if (arp.land_mask(x, y) != 0) {
+  for (int count_y = 0; count_y < params.ncells_y; count_y++) {
+    for (int count_x = 0; count_x < params.ncells_x; count_x++) {
+      if (arp.land_mask(count_x, count_y) != 0) {
         continue;
       }
       // count up any water lost to the ocean so that we can compute a water balance
-      if (arp.wtd(x, y) > 0) {
-        arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
+      if (arp.wtd(count_x, count_y) > 0) {
+        arp.total_loss_to_ocean += arp.wtd(count_x, count_y) * arp.cell_area[count_y];
       } else {
-        arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y] * arp.porosity(x, y);
+        arp.total_loss_to_ocean += arp.wtd(count_x, count_y) * arp.cell_area[count_y] * arp.porosity(count_x, count_y);
       }
-      arp.wtd(x, y) = 0.;  // reset ocean water tables to 0.
+      //   arp.wtd(count_x, count_y) = 0.;  // reset ocean water tables to 0.
     }
   }
 
@@ -512,8 +511,7 @@ PetscErrorCode FormFunction(SNES snes, Vec x, Vec f, void* ctx) {
 
   // d = 1.0/(user->h*user->h);
   for (i = xs; i < xs + xm; i++)
-    ff[i] = storativity[i] * (xx[i] - head[i]) / timestep - QS[i] + QN[i] - QE[i] + QW[i];  // NO
-  // idea if this is the right way to access 'timestep' here
+    ff[i] = storativity[i] * (xx[i] - head[i]) / timestep - QS[i] + QN[i] - QE[i] + QW[i];
 
   /*
      Restore vectors
@@ -548,8 +546,10 @@ PetscErrorCode FormFunction(SNES snes, Vec x, Vec f, void* ctx) {
 */
 PetscErrorCode FormJacobian(SNES snes, Vec x, Mat jac, Mat B, void* ctx) {
   ApplicationCtx* user = (ApplicationCtx*)ctx;
-  PetscScalar *xx, d, A[3];
-  PetscInt i, j[3], M, xs, xm;
+  double ncells_x      = user->ncells_x;
+
+  PetscScalar *xx, d, A[5];
+  PetscInt i, j[5], M, xs, xm;
   DM da = user->da;
 
   PetscFunctionBeginUser;
@@ -595,11 +595,18 @@ PetscErrorCode FormJacobian(SNES snes, Vec x, Mat jac, Mat B, void* ctx) {
   */
   d = 1.0 / (user->h * user->h);
   for (i = xs; i < xs + xm; i++) {
-    j[0] = i - 1;
-    j[1] = i;
-    j[2] = i + 1;
-    A[0] = A[2] = d;
-    A[1]        = -2.0 * d + 2.0 * xx[i];
+    j[0] = i - ncells_x;
+    j[1] = i - 1;
+    j[2] = i;
+    j[3] = i + 1;
+    j[4] = i + ncells_x;
+    // A[0] = A[2] = d;
+    // A[1]        = -2.0 * d + 2.0 * xx[i];
+    A[0] = 1;
+    A[1] = 1;
+    A[2] = 1;
+    A[3] = 1;
+    A[4] = 1;
     PetscCall(MatSetValues(jac, 1, &i, 3, j, A, INSERT_VALUES));
   }
 
@@ -643,180 +650,6 @@ PetscErrorCode Monitor(SNES snes, PetscInt its, PetscReal fnorm, void* ctx) {
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "iter = %" PetscInt_FMT ",SNES Function norm %g\n", its, (double)fnorm));
   PetscCall(SNESGetSolution(snes, &x));
   PetscCall(VecView(x, monP->viewer));
-  PetscFunctionReturn(0);
-}
-
-/* ------------------------------------------------------------------- */
-/*
-   PreCheck - Optional user-defined routine that checks the validity of
-   candidate steps of a line search method.  Set by SNESLineSearchSetPreCheck().
-
-   Input Parameters:
-   snes - the SNES context
-   xcurrent - current solution
-   y - search direction and length
-
-   Output Parameters:
-   y         - proposed step (search direction and length) (possibly changed)
-   changed_y - tells if the step has changed or not
- */
-PetscErrorCode PreCheck(SNESLineSearch linesearch, Vec xcurrent, Vec y, PetscBool* changed_y, void* ctx) {
-  PetscFunctionBeginUser;
-  *changed_y = PETSC_FALSE;
-  PetscFunctionReturn(0);
-}
-
-/* ------------------------------------------------------------------- */
-/*
-   PostCheck - Optional user-defined routine that checks the validity of
-   candidate steps of a line search method.  Set by SNESLineSearchSetPostCheck().
-
-   Input Parameters:
-   snes - the SNES context
-   ctx  - optional user-defined context for private data for the
-          monitor routine, as set by SNESLineSearchSetPostCheck()
-   xcurrent - current solution
-   y - search direction and length
-   x    - the new candidate iterate
-
-   Output Parameters:
-   y    - proposed step (search direction and length) (possibly changed)
-   x    - current iterate (possibly modified)
-
- */
-PetscErrorCode PostCheck(
-    SNESLineSearch linesearch,
-    Vec xcurrent,
-    Vec y,
-    Vec x,
-    PetscBool* changed_y,
-    PetscBool* changed_x,
-    void* ctx) {
-  PetscInt i, iter, xs, xm;
-  StepCheckCtx* check;
-  ApplicationCtx* user;
-  PetscScalar *xa, *xa_last, tmp;
-  PetscReal rdiff;
-  DM da;
-  SNES snes;
-
-  PetscFunctionBeginUser;
-  *changed_x = PETSC_FALSE;
-  *changed_y = PETSC_FALSE;
-
-  PetscCall(SNESLineSearchGetSNES(linesearch, &snes));
-  check = (StepCheckCtx*)ctx;
-  user  = check->user;
-  PetscCall(SNESGetIterationNumber(snes, &iter));
-
-  /* iteration 1 indicates we are working on the second iteration */
-  if (iter > 0) {
-    da = user->da;
-    PetscCall(PetscPrintf(
-        PETSC_COMM_WORLD,
-        "Checking candidate step at iteration %" PetscInt_FMT " with tolerance %g\n",
-        iter,
-        (double)check->tolerance));
-
-    /* Access local array data */
-    PetscCall(DMDAVecGetArray(da, check->last_step, &xa_last));
-    PetscCall(DMDAVecGetArray(da, x, &xa));
-    PetscCall(DMDAGetCorners(da, &xs, NULL, NULL, &xm, NULL, NULL));
-
-    /*
-       If we fail the user-defined check for validity of the candidate iterate,
-       then modify the iterate as we like.  (Note that the particular modification
-       below is intended simply to demonstrate how to manipulate this data, not
-       as a meaningful or appropriate choice.)
-    */
-    for (i = xs; i < xs + xm; i++) {
-      if (!PetscAbsScalar(xa[i]))
-        rdiff = 2 * check->tolerance;
-      else
-        rdiff = PetscAbsScalar((xa[i] - xa_last[i]) / xa[i]);
-      if (rdiff > check->tolerance) {
-        tmp        = xa[i];
-        xa[i]      = .5 * (xa[i] + xa_last[i]);
-        *changed_x = PETSC_TRUE;
-        PetscCall(PetscPrintf(
-            PETSC_COMM_WORLD,
-            "  Altering entry %" PetscInt_FMT ": x=%g, x_last=%g, diff=%g, x_new=%g\n",
-            i,
-            (double)PetscAbsScalar(tmp),
-            (double)PetscAbsScalar(xa_last[i]),
-            (double)rdiff,
-            (double)PetscAbsScalar(xa[i])));
-      }
-    }
-    PetscCall(DMDAVecRestoreArray(da, check->last_step, &xa_last));
-    PetscCall(DMDAVecRestoreArray(da, x, &xa));
-  }
-  PetscCall(VecCopy(x, check->last_step));
-  PetscFunctionReturn(0);
-}
-
-/* ------------------------------------------------------------------- */
-/*
-   PostSetSubKSP - Optional user-defined routine that reset SubKSP options when hierarchical bjacobi PC is used
-   e.g,
-     mpiexec -n 8 ./ex3 -nox -n 10000 -ksp_type fgmres -pc_type bjacobi -pc_bjacobi_blocks 4 -sub_ksp_type gmres
-   -sub_ksp_max_it 3 -post_setsubksp -sub_ksp_rtol 1.e-16 Set by SNESLineSearchSetPostCheck().
-
-   Input Parameters:
-   linesearch - the LineSearch context
-   xcurrent - current solution
-   y - search direction and length
-   x    - the new candidate iterate
-
-   Output Parameters:
-   y    - proposed step (search direction and length) (possibly changed)
-   x    - current iterate (possibly modified)
-
- */
-PetscErrorCode PostSetSubKSP(
-    SNESLineSearch linesearch,
-    Vec xcurrent,
-    Vec y,
-    Vec x,
-    PetscBool* changed_y,
-    PetscBool* changed_x,
-    void* ctx) {
-  SetSubKSPCtx* check;
-  PetscInt iter, its, sub_its, maxit;
-  KSP ksp, sub_ksp, *sub_ksps;
-  PC pc;
-  PetscReal ksp_ratio;
-  SNES snes;
-
-  PetscFunctionBeginUser;
-  PetscCall(SNESLineSearchGetSNES(linesearch, &snes));
-  check = (SetSubKSPCtx*)ctx;
-  PetscCall(SNESGetIterationNumber(snes, &iter));
-  PetscCall(SNESGetKSP(snes, &ksp));
-  PetscCall(KSPGetPC(ksp, &pc));
-  PetscCall(PCBJacobiGetSubKSP(pc, NULL, NULL, &sub_ksps));
-  sub_ksp = sub_ksps[0];
-  PetscCall(KSPGetIterationNumber(ksp, &its));         /* outer KSP iteration number */
-  PetscCall(KSPGetIterationNumber(sub_ksp, &sub_its)); /* inner KSP iteration number */
-
-  if (iter) {
-    PetscCall(PetscPrintf(
-        PETSC_COMM_WORLD,
-        "    ...PostCheck snes iteration %" PetscInt_FMT ", ksp_it %" PetscInt_FMT " %" PetscInt_FMT
-        ", subksp_it %" PetscInt_FMT "\n",
-        iter,
-        check->its0,
-        its,
-        sub_its));
-    ksp_ratio = ((PetscReal)(its)) / check->its0;
-    maxit     = (PetscInt)(ksp_ratio * sub_its + 0.5);
-    if (maxit < 2)
-      maxit = 2;
-    PetscCall(KSPSetTolerances(sub_ksp, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT, maxit));
-    PetscCall(PetscPrintf(
-        PETSC_COMM_WORLD, "    ...ksp_ratio %g, new maxit %" PetscInt_FMT "\n\n", (double)ksp_ratio, maxit));
-  }
-  check->its0 = its; /* save current outer KSP iteration number */
   PetscFunctionReturn(0);
 }
 
