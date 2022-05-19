@@ -322,8 +322,8 @@ int update(Parameters& params, ArrayPack& arp) {
   */
   xp = ctx.h * xs;
   for (i = xs; i < xs + xm; i++) {
-    FF[i] = 1;  // 6.0 * xp + PetscPowScalar(xp + 1.e-12, 6.0); /* +1.e-12 is to prevent 0^6 */
-    UU[i] = 1;  // xp * xp * xp;
+    FF[i] = 6.0 * xp + PetscPowScalar(xp + 1.e-12, 6.0); /* +1.e-12 is to prevent 0^6 */
+    UU[i] = xp * xp * xp;
     xp += ctx.h;
   }
 
@@ -546,10 +546,8 @@ PetscErrorCode FormFunction(SNES snes, Vec x, Vec f, void* ctx) {
 */
 PetscErrorCode FormJacobian(SNES snes, Vec x, Mat jac, Mat B, void* ctx) {
   ApplicationCtx* user = (ApplicationCtx*)ctx;
-  double ncells_x      = user->ncells_x;
-
-  PetscScalar *xx, d, A[5];
-  PetscInt i, j[5], M, xs, xm;
+  PetscScalar *xx, d, A[3];
+  PetscInt i, j[3], M, xs, xm;
   DM da = user->da;
 
   PetscFunctionBeginUser;
@@ -595,18 +593,11 @@ PetscErrorCode FormJacobian(SNES snes, Vec x, Mat jac, Mat B, void* ctx) {
   */
   d = 1.0 / (user->h * user->h);
   for (i = xs; i < xs + xm; i++) {
-    j[0] = i - ncells_x;
-    j[1] = i - 1;
-    j[2] = i;
-    j[3] = i + 1;
-    j[4] = i + ncells_x;
-    // A[0] = A[2] = d;
-    // A[1]        = -2.0 * d + 2.0 * xx[i];
-    A[0] = 1;
-    A[1] = 1;
-    A[2] = 1;
-    A[3] = 1;
-    A[4] = 1;
+    j[0] = i - 1;
+    j[1] = i;
+    j[2] = i + 1;
+    A[0] = A[2] = d;
+    A[1]        = -2.0 * d + 2.0 * xx[i];
     PetscCall(MatSetValues(jac, 1, &i, 3, j, A, INSERT_VALUES));
   }
 
