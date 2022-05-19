@@ -137,7 +137,9 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
 }
 
 int update(Parameters& params, ArrayPack& arp) {
-  SNES snes;                                                                 /* SNES context */
+  SNES snes; /* SNES context */
+  KSP ksp;
+  PC pc;
   SNESLineSearch linesearch;                                                 /* SNESLineSearch context */
   Mat J;                                                                     /* Jacobian matrix */
   ApplicationCtx ctx;                                                        /* user-defined context */
@@ -281,6 +283,7 @@ int update(Parameters& params, ArrayPack& arp) {
   /*
      Optionally allow user-provided preconditioner
    */
+
   PetscCall(PetscOptionsHasName(NULL, NULL, "-user_precond", &flg));
   if (flg) {
     KSP ksp;
@@ -290,6 +293,21 @@ int update(Parameters& params, ArrayPack& arp) {
     PetscCall(PCSetType(pc, PCSHELL));
     PetscCall(PCShellSetApply(pc, MatrixFreePreconditioner));
   }
+
+  //     flg  = PETSC_FALSE;
+  //   PetscOptionsGetBool(NULL,NULL,"-snes_mf",&flg,NULL);
+  //
+  // // PetscCall(PetscOptionsHasName(NULL, NULL, "-user_precond", &flg));
+  //  if (flg) {
+  //     SNESGetKSP(snes,&ksp);
+  //     KSPGetPC(ksp,&pc);
+  //     PetscOptionsHasName(NULL,NULL,"-user_precond",&flg);
+  //     if (flg) { /* user-defined precond */
+  //       PCSetType(pc,PCSHELL);
+  //       PCShellSetApply(pc,MatrixFreePreconditioner);
+  //     } else {PCSetType(pc,PCNONE);}
+  //   }
+  //   SNESSetFromOptions(snes);
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Customize nonlinear solver; set runtime options
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -355,18 +373,6 @@ int update(Parameters& params, ArrayPack& arp) {
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Check solution and clean up
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-  /*
-     Check the error
-  */
-  //  PetscCall(VecAXPY(x, none, U));
-  //  PetscCall(VecNorm(x, NORM_2, &norm));
-  //  PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Norm of error %g Iterations %" PetscInt_FMT "\n", (double)norm, its));
-  //  if (ctx.sjerr) {
-  //    SNESType snestype;
-  //    PetscCall(SNESGetType(snes, &snestype));
-  //    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "SNES Type %s\n", snestype));
-  //  }
 
   /*
      Free work space.  All PETSc objects should be destroyed when they
