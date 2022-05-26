@@ -158,7 +158,7 @@ int update(Parameters& params, ArrayPack& arp) {
   user.p         = 2.0;
   user.epsilon   = 1e-5;
   user.source    = 0.1;
-  user.jtype     = JAC_NEWTON;
+  user.jtype     = JAC_BRATU;
   user.initial   = -1;
   user.blocks[0] = 1;
   user.blocks[1] = 1;
