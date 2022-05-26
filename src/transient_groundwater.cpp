@@ -27,9 +27,9 @@ namespace FanDarcyGroundwater {
    FormFunctionLocal().
 */
 typedef struct {
-  PetscReal lambda, timestep; /* Bratu parameter */
+  PetscReal lambda, timestep, cellsize_NS; /* Bratu parameter */
   DM da;
-  Vec T, S, b;
+  Vec T, S, H_T, cellsize_EW;
 } AppCtx;
 /*
    User-defined routines
@@ -112,21 +112,22 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
 }
 
 int update(Parameters& params, ArrayPack& arp) {
-  SNES snes;                    /* nonlinear solver */
-  Vec x, r, b, T, S;            /* solution, residual, rhs vectors */
-  AppCtx user;                  /* user-defined work context */
-  PetscInt its, xs, ys, xm, ym; /* iterations for convergence */
-  SNESConvergedReason reason;   /* Check convergence */
-  PetscBool alloc_star;         /* Only allocate for the STAR stencil  */
+  SNES snes;                           /* nonlinear solver */
+  Vec x, r, b, T, S, H_T, cellsize_EW; /* solution, residual, rhs vectors */
+  AppCtx user;                         /* user-defined work context */
+  PetscInt its, xs, ys, xm, ym;        /* iterations for convergence */
+  SNESConvergedReason reason;          /* Check convergence */
+  PetscBool alloc_star;                /* Only allocate for the STAR stencil  */
   SNESLineSearch linesearch;
-  PetscScalar **my_T, **my_x, **my_S;
+  PetscScalar **my_T, **my_x, **my_S, **h_t, **cellsize_ew;
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       Initialize problem parameters
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  user.lambda   = 0.0;
-  user.timestep = params.deltat;
-  alloc_star    = PETSC_FALSE;
+  user.lambda      = 0.0;
+  user.timestep    = params.deltat;
+  user.cellsize_NS = params.cellsize_n_s_metres;
+  alloc_star       = PETSC_FALSE;
   PetscOptionsBegin(PETSC_COMM_WORLD, NULL, "p-Bratu options", __FILE__);
   { PetscOptionsReal("-lambda", "Bratu parameter", "", user.lambda, &user.lambda, NULL); }
   PetscOptionsEnd();
@@ -162,22 +163,29 @@ int update(Parameters& params, ArrayPack& arp) {
   DMCreateGlobalVector(user.da, &x);
   VecDuplicate(x, &r);
   VecDuplicate(x, &b);
-  user.b = b;
   PetscCall(VecDuplicate(x, &T));
   user.T = T;
   PetscCall(VecDuplicate(x, &S));
   user.S = S;
+  PetscCall(VecDuplicate(x, &H_T));
+  user.H_T = H_T;
+  PetscCall(VecDuplicate(x, &cellsize_EW));
+  user.cellsize_EW = cellsize_EW;
 
   PetscCall(DMDAVecGetArray(user.da, T, &my_T));
   PetscCall(DMDAVecGetArray(user.da, S, &my_S));
+  PetscCall(DMDAVecGetArray(user.da, H_T, &h_t));
+  PetscCall(DMDAVecGetArray(user.da, cellsize_EW, &cellsize_ew));
 
   PetscCall(DMDAGetCorners(user.da, &xs, &ys, NULL, &xm, &ym, NULL));
 
   // copy the transmissivity back into the T and storativity into the S vector
   for (int j = ys; j < ys + ym; j++)
     for (int i = xs; i < xs + xm; i++) {
-      my_T[j][i] = arp.transmissivity(j, i);
-      my_S[j][i] = arp.effective_storativity(j, i);
+      my_T[j][i]        = arp.transmissivity(j, i);
+      my_S[j][i]        = arp.effective_storativity(j, i);
+      h_t[j][i]         = arp.wtd(j, i) + arp.topo(j, i);  // the current time's head
+      cellsize_ew[j][i] = arp.cellsize_e_w_metres[i];
     }
 
   PetscCall(DMDAVecRestoreArray(user.da, T, &my_T));
@@ -382,7 +390,7 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscInt i, j;
   DM da = user->da;
 
-  PetscScalar **my_S, **my_b;
+  PetscScalar **my_S, **h_t, **cellsize_ew;
   hx  = 1.0 / (PetscReal)(info->mx - 1);
   hy  = 1.0 / (PetscReal)(info->my - 1);
   sc  = hx * hy * user->lambda;
@@ -397,6 +405,10 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
       if (i == 0 || j == 0 || i == info->mx - 1 || j == info->my - 1) {
         f[j][i] = x[j][i];
       } else {
+        PetscCall(DMDAVecGetArray(da, user->S, &my_S));
+        PetscCall(DMDAVecGetArray(da, user->H_T, &h_t));
+        PetscCall(DMDAVecGetArray(da, user->cellsize_EW, &cellsize_ew));
+
         const PetscScalar u = x[j][i], ux_E = dhx * (x[j][i + 1] - x[j][i]),
                           uy_E = 0.25 * dhy * (x[j + 1][i] + x[j + 1][i + 1] - x[j - 1][i] - x[j - 1][i + 1]),
                           ux_W = dhx * (x[j][i] - x[j][i - 1]),
@@ -406,16 +418,15 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
                           ux_S = 0.25 * dhx * (x[j - 1][i + 1] + x[j][i + 1] - x[j - 1][i - 1] - x[j][i - 1]),
                           uy_S = dhy * (x[j][i] - x[j - 1][i]), e_E = eta(user, i, j, ux_E, uy_E, 0, 1),
                           e_W = eta(user, i, j, ux_W, uy_W, 0, -1), e_N = eta(user, i, j, ux_N, uy_N, 1, 0),
-                          e_S = eta(user, i, j, ux_S, uy_S, -1, 0), uxx = -hy * (e_E * ux_E - e_W * ux_W),
-                          uyy = -hx * (e_N * uy_N - e_S * uy_S);
+                          e_S = eta(user, i, j, ux_S, uy_S, -1, 0),
+                          uxx = -cellsize_ew[j][i] * cellsize_ew[j][i] * (e_E * ux_E - e_W * ux_W),
+                          uyy = -user->cellsize_NS * user->cellsize_NS * (e_N * uy_N - e_S * uy_S);
 
-        PetscCall(DMDAVecGetArray(da, user->S, &my_S));
-        PetscCall(DMDAVecGetArray(da, user->b, &my_b));
-
-        f[j][i] = uxx + uyy + my_S[j][i] * ((x[j][i] - my_b[j][i]) / user->timestep);
+        f[j][i] = uxx + uyy + my_S[j][i] * ((x[j][i] - h_t[j][i]) / user->timestep);
 
         PetscCall(DMDAVecRestoreArray(da, user->S, &my_S));
-        PetscCall(DMDAVecRestoreArray(da, user->b, &my_b));
+        PetscCall(DMDAVecRestoreArray(da, user->H_T, &h_t));
+        PetscCall(DMDAVecRestoreArray(da, user->cellsize_EW, &cellsize_ew));
       }
     }
   }
