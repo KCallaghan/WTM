@@ -47,15 +47,16 @@ add_library(wtm
   src/transient_groundwater.cpp
   src/update_effective_storativity.cpp
 )
-target_compile_options(wtm PRIVATE -Wfloat-conversion)
+target_compile_options(wtm PRIVATE -Wfloat-conversion -Wall -Wextra -pedantic -Wshadow)
 target_link_libraries(wtm PUBLIC richdem OpenMP::OpenMP_CXX fmt::fmt PkgConfig::PETSC MPI::MPI_CXX)
-target_compile_features(wtm PUBLIC cxx_std_17)
+target_compile_features(wtm PUBLIC cxx_std_20)
 
 add_executable(wtm.x
   src/WTM.cpp
 )
+target_compile_options(wtm.x PRIVATE -Wfloat-conversion -Wall -Wextra -pedantic -Wshadow)
 target_link_libraries(wtm.x PRIVATE wtm)
-target_compile_features(wtm.x PRIVATE cxx_std_17)
+target_compile_features(wtm.x PRIVATE cxx_std_20)
 target_compile_definitions(wtm PRIVATE DOCTEST_CONFIG_DISABLE)
 
 add_sanitizers(wtm.x)
@@ -65,13 +66,15 @@ add_executable(dephier.x
   src/parameters.cpp
   src/ArrayPack.cpp
 )
+target_compile_options(dephier.x PRIVATE -Wfloat-conversion -Wall -Wextra -pedantic -Wshadow)
 target_link_libraries(dephier.x PRIVATE richdem OpenMP::OpenMP_CXX fmt::fmt)
-target_compile_features(dephier.x PRIVATE cxx_std_17)
+target_compile_features(dephier.x PRIVATE cxx_std_20)
 add_sanitizers(dephier.x)
 
 add_executable(tests.x
   src/parameters.cpp
   src/tests.cpp
 )
+target_compile_options(tests.x PRIVATE -Wfloat-conversion -Wall -Wextra -pedantic -Wshadow)
 target_link_libraries(tests.x PRIVATE wtm)
-target_compile_features(tests.x PRIVATE cxx_std_17)
+target_compile_features(tests.x PRIVATE cxx_std_20)
