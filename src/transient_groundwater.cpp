@@ -30,14 +30,14 @@ struct AppCtx {
   PetscReal cellsize_NS;
   SNES snes;
   DM da;
-  Vec x           = nullptr;  // Solution vector
-  Vec r           = nullptr;  // Residual vector
-  Vec b           = nullptr;  // RHS vector
-  Vec T           = nullptr;
-  Vec S           = nullptr;
-  Vec H_T         = nullptr;
-  Vec cellsize_EW = nullptr;
-  Vec mask        = nullptr;
+  Vec x            = nullptr;  // Solution vector
+  Vec r            = nullptr;  // Residual vector
+  Vec b            = nullptr;  // RHS vector
+  Vec T            = nullptr;
+  Vec S            = nullptr;
+  Vec current_head = nullptr;
+  Vec cellsize_EW  = nullptr;
+  Vec mask         = nullptr;
 
   ~AppCtx() {
     SNESDestroy(&snes);
@@ -47,7 +47,7 @@ struct AppCtx {
     VecDestroy(&b);
     VecDestroy(&T);
     VecDestroy(&S);
-    VecDestroy(&H_T);
+    VecDestroy(&current_head);
     VecDestroy(&cellsize_EW);
     VecDestroy(&mask);
   }
@@ -60,20 +60,20 @@ struct AppCtx {
     VecDuplicate(x, &b);
     VecDuplicate(x, &T);
     VecDuplicate(x, &S);
-    VecDuplicate(x, &H_T);
+    VecDuplicate(x, &current_head);
     VecDuplicate(x, &cellsize_EW);
     VecDuplicate(x, &mask);
   }
 };
 
 struct DMDA_Array_Pack {
-  PetscScalar** x           = nullptr;
-  PetscScalar** T           = nullptr;
-  PetscScalar** S           = nullptr;
-  PetscScalar** H_T         = nullptr;
-  PetscScalar** cellsize_EW = nullptr;
-  PetscScalar** mask        = nullptr;
-  const AppCtx* context     = nullptr;
+  PetscScalar** x            = nullptr;
+  PetscScalar** T            = nullptr;
+  PetscScalar** S            = nullptr;
+  PetscScalar** current_head = nullptr;
+  PetscScalar** cellsize_EW  = nullptr;
+  PetscScalar** mask         = nullptr;
+  const AppCtx* context      = nullptr;
 
   DMDA_Array_Pack(const AppCtx& user) {
     assert(!context);  // Make sure we're not already initialized
@@ -81,7 +81,7 @@ struct DMDA_Array_Pack {
     DMDAVecGetArray(user.da, user.x, &x);
     DMDAVecGetArray(user.da, user.T, &T);
     DMDAVecGetArray(user.da, user.S, &S);
-    DMDAVecGetArray(user.da, user.H_T, &H_T);
+    DMDAVecGetArray(user.da, user.current_head, &current_head);
     DMDAVecGetArray(user.da, user.cellsize_EW, &cellsize_EW);
     DMDAVecGetArray(user.da, user.mask, &mask);
   }
@@ -91,7 +91,7 @@ struct DMDA_Array_Pack {
     DMDAVecRestoreArray(context->da, context->x, &x);
     DMDAVecRestoreArray(context->da, context->T, &T);
     DMDAVecRestoreArray(context->da, context->S, &S);
-    DMDAVecRestoreArray(context->da, context->H_T, &H_T);
+    DMDAVecRestoreArray(context->da, context->current_head, &current_head);
     DMDAVecRestoreArray(context->da, context->cellsize_EW, &cellsize_EW);
     DMDAVecRestoreArray(context->da, context->mask, &mask);
     context = nullptr;
@@ -224,11 +224,11 @@ int update(Parameters& params, ArrayPack& arp) {
   // copy the transmissivity back into the T and storativity into the S vector
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.T[j][i]           = arp.transmissivity(j, i);
-      dmdapack.S[j][i]           = arp.effective_storativity(j, i);
-      dmdapack.H_T[j][i]         = arp.wtd(j, i) + arp.topo(j, i);  // the current time's head
-      dmdapack.cellsize_EW[j][i] = arp.cellsize_e_w_metres[i];
-      dmdapack.mask[j][i]        = arp.land_mask(j, i);
+      dmdapack.T[j][i]            = arp.transmissivity(j, i);
+      dmdapack.S[j][i]            = arp.effective_storativity(j, i);
+      dmdapack.current_head[j][i] = arp.wtd(j, i) + arp.topo(j, i);  // the current time's head
+      dmdapack.cellsize_EW[j][i]  = arp.cellsize_e_w_metres[i];
+      dmdapack.mask[j][i]         = arp.land_mask(j, i);
     }
   }
 
@@ -426,7 +426,7 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         f[j][i] = x[j][i];
       } else {
         PetscCall(DMDAVecGetArray(da, user->S, &my_S));
-        PetscCall(DMDAVecGetArray(da, user->H_T, &h_t));
+        PetscCall(DMDAVecGetArray(da, user->current_head, &h_t));
         PetscCall(DMDAVecGetArray(da, user->cellsize_EW, &cellsize_ew));
 
         const PetscScalar ux_E = dhx * (x[j][i + 1] - x[j][i]);
@@ -443,7 +443,7 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         f[j][i] = uxx + uyy + my_S[j][i] * ((x[j][i] - h_t[j][i]) / user->timestep);
 
         PetscCall(DMDAVecRestoreArray(da, user->S, &my_S));
-        PetscCall(DMDAVecRestoreArray(da, user->H_T, &h_t));
+        PetscCall(DMDAVecRestoreArray(da, user->current_head, &h_t));
         PetscCall(DMDAVecRestoreArray(da, user->cellsize_EW, &cellsize_ew));
       }
     }
