@@ -8,13 +8,6 @@
 #include <petscdmda.h>
 #include <petscerror.h>
 #include <petscsnes.h>
-#include <eigen3/Eigen/Core>
-#include <eigen3/Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
-
-// declares a row-major sparse matrix type of double
-using SpMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;
-
-constexpr double seconds_in_a_year = 31536000.;
 
 ///////////////////////
 // PRIVATE FUNCTIONS //
@@ -44,6 +37,7 @@ struct AppCtx {
   Vec S           = nullptr;
   Vec H_T         = nullptr;
   Vec cellsize_EW = nullptr;
+  Vec mask        = nullptr;
 
   ~AppCtx() {
     SNESDestroy(&snes);
@@ -55,6 +49,7 @@ struct AppCtx {
     VecDestroy(&S);
     VecDestroy(&H_T);
     VecDestroy(&cellsize_EW);
+    VecDestroy(&mask);
   }
 
   // Extract global vectors from DM; then duplicate for remaining
@@ -67,6 +62,7 @@ struct AppCtx {
     VecDuplicate(x, &S);
     VecDuplicate(x, &H_T);
     VecDuplicate(x, &cellsize_EW);
+    VecDuplicate(x, &mask);
   }
 };
 
@@ -76,6 +72,7 @@ struct DMDA_Array_Pack {
   PetscScalar** S           = nullptr;
   PetscScalar** H_T         = nullptr;
   PetscScalar** cellsize_EW = nullptr;
+  PetscScalar** mask        = nullptr;
   const AppCtx* context     = nullptr;
 
   DMDA_Array_Pack(const AppCtx& user) {
@@ -86,6 +83,7 @@ struct DMDA_Array_Pack {
     DMDAVecGetArray(user.da, user.S, &S);
     DMDAVecGetArray(user.da, user.H_T, &H_T);
     DMDAVecGetArray(user.da, user.cellsize_EW, &cellsize_EW);
+    DMDAVecGetArray(user.da, user.mask, &mask);
   }
 
   void release() {
@@ -95,6 +93,7 @@ struct DMDA_Array_Pack {
     DMDAVecRestoreArray(context->da, context->S, &S);
     DMDAVecRestoreArray(context->da, context->H_T, &H_T);
     DMDAVecRestoreArray(context->da, context->cellsize_EW, &cellsize_EW);
+    DMDAVecRestoreArray(context->da, context->mask, &mask);
     context = nullptr;
   }
 };
@@ -229,6 +228,7 @@ int update(Parameters& params, ArrayPack& arp) {
       dmdapack.S[j][i]           = arp.effective_storativity(j, i);
       dmdapack.H_T[j][i]         = arp.wtd(j, i) + arp.topo(j, i);  // the current time's head
       dmdapack.cellsize_EW[j][i] = arp.cellsize_e_w_metres[i];
+      dmdapack.mask[j][i]        = arp.land_mask(j, i);
     }
   }
 
@@ -392,8 +392,7 @@ static PetscErrorCode FormRHS(AppCtx* /*user*/, DM da, Vec B, ArrayPack& arp) {
 
 /* p-Laplacian diffusivity */
 // static inline PetscScalar eta(const AppCtx *ctx,int x,int y,int xplus,int yplus)
-static inline PetscScalar
-eta(const AppCtx* ctx, int x, int y, PetscScalar /*ux*/, PetscScalar /*uy*/, int xplus, int yplus) {
+static inline PetscScalar cell_edge_transmissivity(const AppCtx* ctx, int x, int y, int xplus, int yplus) {
   PetscScalar** my_T;
 
   PetscCall(DMDAVecGetArray(ctx->da, ctx->T, &my_T));
@@ -414,18 +413,18 @@ deta(const AppCtx* /*ctx*/, PetscReal /*x*/, PetscReal /*y*/, PetscScalar /*ux*/
 static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user) {
   DM da = user->da;
 
-  PetscScalar **my_S, **h_t, **cellsize_ew;
+  PetscScalar **my_S, **h_t, **cellsize_ew, **my_mask;
   const auto hx  = 1.0 / static_cast<PetscReal>(info->mx - 1);
   const auto hy  = 1.0 / static_cast<PetscReal>(info->my - 1);
   const auto sc  = hx * hy * user->lambda;
   const auto dhx = 1 / hx;
   const auto dhy = 1 / hy;
 
+  PetscCall(DMDAVecGetArray(da, user->mask, &my_mask));
   // Compute function over the locally owned part of the grid
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
-      PetscReal xx = i * hx, yy = j * hy;
-      if (i == 0 || j == 0 || i == info->mx - 1 || j == info->my - 1) {
+      if (my_mask[j][i] == 0) {
         f[j][i] = x[j][i];
       } else {
         PetscCall(DMDAVecGetArray(da, user->S, &my_S));
@@ -434,17 +433,13 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
 
         const PetscScalar u    = x[j][i];
         const PetscScalar ux_E = dhx * (x[j][i + 1] - x[j][i]);
-        const PetscScalar uy_E = 0.25 * dhy * (x[j + 1][i] + x[j + 1][i + 1] - x[j - 1][i] - x[j - 1][i + 1]);
         const PetscScalar ux_W = dhx * (x[j][i] - x[j][i - 1]);
-        const PetscScalar uy_W = 0.25 * dhy * (x[j + 1][i - 1] + x[j + 1][i] - x[j - 1][i - 1] - x[j - 1][i]);
-        const PetscScalar ux_N = 0.25 * dhx * (x[j][i + 1] + x[j + 1][i + 1] - x[j][i - 1] - x[j + 1][i - 1]);
         const PetscScalar uy_N = dhy * (x[j + 1][i] - x[j][i]);
-        const PetscScalar ux_S = 0.25 * dhx * (x[j - 1][i + 1] + x[j][i + 1] - x[j - 1][i - 1] - x[j][i - 1]);
         const PetscScalar uy_S = dhy * (x[j][i] - x[j - 1][i]);
-        const PetscScalar e_E  = eta(user, i, j, ux_E, uy_E, 0, 1);
-        const PetscScalar e_W  = eta(user, i, j, ux_W, uy_W, 0, -1);
-        const PetscScalar e_N  = eta(user, i, j, ux_N, uy_N, 1, 0);
-        const PetscScalar e_S  = eta(user, i, j, ux_S, uy_S, -1, 0);
+        const PetscScalar e_E  = cell_edge_transmissivity(user, i, j, 0, 1);
+        const PetscScalar e_W  = cell_edge_transmissivity(user, i, j, 0, -1);
+        const PetscScalar e_N  = cell_edge_transmissivity(user, i, j, 1, 0);
+        const PetscScalar e_S  = cell_edge_transmissivity(user, i, j, -1, 0);
         const PetscScalar uxx  = -cellsize_ew[j][i] * cellsize_ew[j][i] * (e_E * ux_E - e_W * ux_W);
         const PetscScalar uyy  = -user->cellsize_NS * user->cellsize_NS * (e_N * uy_N - e_S * uy_S);
 
@@ -456,6 +451,7 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
       }
     }
   }
+  PetscCall(DMDAVecRestoreArray(da, user->mask, &my_mask));
 
   PetscLogFlops(72.0 * info->xm * info->ym);
 
@@ -473,6 +469,7 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
   const auto hxdhy = hx / hy;
   const auto hydhx = hy / hx;
   PetscScalar v[9];
+  PetscScalar** my_mask;
 
   // Compute entries for the locally owned part of the Jacobian.
   //  - PETSc parallel matrix formats are partitioned by
@@ -481,13 +478,15 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
   //    locally (but any non-local elements will be sent to the
   //    appropriate processor during matrix assembly).
   //  - Here, we set all entries for a particular row at once.
+  PetscCall(DMDAVecGetArray(da, user->mask, &my_mask));
+
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
       MatStencil row{.k = 0, .j = j, .i = i, .c = 0};
       PetscReal xx = i * hx, yy = j * hy;
 
       // boundary points
-      if (i == 0 || j == 0 || i == info->mx - 1 || j == info->my - 1) {
+      if (my_mask[j][i] == 0) {
         v[0] = 1.0;
         MatSetValuesStencil(B, 1, &row, 1, &row, v, INSERT_VALUES);
       } else {
@@ -517,6 +516,8 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
       }
     }
   }
+  PetscCall(DMDAVecRestoreArray(da, user->mask, &my_mask));
+
   // Assemble matrix, using the 2-step process:
   //   MatAssemblyBegin(), MatAssemblyEnd().
   MatAssemblyBegin(B, MAT_FINAL_ASSEMBLY);
@@ -603,10 +604,10 @@ PetscErrorCode NonlinearGS(SNES snes, Vec X, Vec B, void* ctx) {
               const PetscScalar ux_W   = dhx * (u - u_W);
               const PetscScalar uy_N   = dhy * (u_N - u);
               const PetscScalar uy_S   = dhy * (u - u_S);
-              const PetscScalar e_E    = eta(user, i, j, ux_E, uy_E, 0, 1);
-              const PetscScalar e_W    = eta(user, i, j, ux_W, uy_W, 0, -1);
-              const PetscScalar e_N    = eta(user, i, j, ux_N, uy_N, 1, 0);
-              const PetscScalar e_S    = eta(user, i, j, ux_S, uy_S, -1, 0);
+              const PetscScalar e_E    = cell_edge_transmissivity(user, i, j, 0, 1);
+              const PetscScalar e_W    = cell_edge_transmissivity(user, i, j, 0, -1);
+              const PetscScalar e_N    = cell_edge_transmissivity(user, i, j, 1, 0);
+              const PetscScalar e_S    = cell_edge_transmissivity(user, i, j, -1, 0);
               const PetscScalar de_E   = deta(user, xx, yy, ux_E, uy_E);
               const PetscScalar de_W   = deta(user, xx, yy, ux_W, uy_W);
               const PetscScalar de_N   = deta(user, xx, yy, ux_N, uy_N);
