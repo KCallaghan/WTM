@@ -472,6 +472,7 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
   const auto sc    = hx * hy * user->lambda;
   const auto hxdhy = hx / hy;
   const auto hydhx = hy / hx;
+  PetscScalar v[9];
 
   // Compute entries for the locally owned part of the Jacobian.
   //  - PETSc parallel matrix formats are partitioned by
