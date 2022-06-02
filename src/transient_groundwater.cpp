@@ -182,7 +182,7 @@ int update(Parameters& params, ArrayPack& arp) {
   SNESConvergedReason convergence_reason;
 
   // Initialize problem parameters
-  user.lambda      = 0.0;
+  user.lambda      = 0.9;
   user.timestep    = params.deltat;
   user.cellsize_NS = params.cellsize_n_s_metres;
 
@@ -224,8 +224,8 @@ int update(Parameters& params, ArrayPack& arp) {
   // copy the transmissivity back into the T and storativity into the S vector
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.T[j][i]           = arp.transmissivity(j, i);
-      dmdapack.S[j][i]           = arp.effective_storativity(j, i);
+      dmdapack.T[j][i]           = 1;                               // arp.transmissivity(j, i);
+      dmdapack.S[j][i]           = 1;                               // arp.effective_storativity(j, i);
       dmdapack.H_T[j][i]         = arp.wtd(j, i) + arp.topo(j, i);  // the current time's head
       dmdapack.cellsize_EW[j][i] = arp.cellsize_e_w_metres[i];
       dmdapack.mask[j][i]        = arp.land_mask(j, i);
@@ -243,6 +243,14 @@ int update(Parameters& params, ArrayPack& arp) {
   DMSetApplicationContext(user.da, &user);
   SNESSetDM(user.snes, user.da);
 
+  // Evaluate initial guess
+  // Note: The user should initialize the vector, x, with the initial guess
+  // for the nonlinear solver prior to calling SNESSolve().  In particular,
+  // to employ an initial guess of zero, the user should explicitly set
+  // this vector to zero by calling VecSet().
+  FormInitialGuess(&user, user.da, user.x, arp);
+  FormRHS(&user, user.da, user.b, arp);
+
   DMDASNESSetFunctionLocal(
       user.da, INSERT_VALUES, (PetscErrorCode(*)(DMDALocalInfo*, void*, void*, void*))FormFunctionLocal, &user);
   DMDASNESSetJacobianLocal(
@@ -254,14 +262,6 @@ int update(Parameters& params, ArrayPack& arp) {
 
   SNESLineSearch linesearch;
   SNESGetLineSearch(user.snes, &linesearch);
-
-  // Evaluate initial guess
-  // Note: The user should initialize the vector, x, with the initial guess
-  // for the nonlinear solver prior to calling SNESSolve().  In particular,
-  // to employ an initial guess of zero, the user should explicitly set
-  // this vector to zero by calling VecSet().
-  FormInitialGuess(&user, user.da, user.x, arp);
-  FormRHS(&user, user.da, user.b, arp);
 
   // Solve nonlinear system
   SNESSolve(user.snes, user.b, user.x);
@@ -333,7 +333,7 @@ static PetscErrorCode FormInitialGuess(AppCtx* /*user*/, DM da, Vec X, ArrayPack
         // boundary conditions are all zero Dirichlet
         x[j][i] = 0.0;
       } else {
-        x[j][i] = arp.wtd(j, i) + arp.topo(j, i);
+        x[j][i] = 0.0;  // arp.wtd(j, i) + arp.topo(j, i);
       }
     }
   }
@@ -429,18 +429,20 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         PetscCall(DMDAVecGetArray(da, user->H_T, &h_t));
         PetscCall(DMDAVecGetArray(da, user->cellsize_EW, &cellsize_ew));
 
-        const PetscScalar ux_E = dhx * (x[j][i + 1] - x[j][i]);
-        const PetscScalar ux_W = dhx * (x[j][i] - x[j][i - 1]);
-        const PetscScalar uy_N = dhy * (x[j + 1][i] - x[j][i]);
-        const PetscScalar uy_S = dhy * (x[j][i] - x[j - 1][i]);
-        const PetscScalar e_E  = cell_edge_transmissivity(user, i, j, 0, 1);
-        const PetscScalar e_W  = cell_edge_transmissivity(user, i, j, 0, -1);
-        const PetscScalar e_N  = cell_edge_transmissivity(user, i, j, 1, 0);
-        const PetscScalar e_S  = cell_edge_transmissivity(user, i, j, -1, 0);
+        const PetscScalar ux_E =
+            /* dhx  *  */ (x[j][i + 1] - x[j][i]);  // how to handle cases where i == 0 or i ==RHS of the array etc?
+        const PetscScalar ux_W = /* dhx  *  */ (x[j][i] - x[j][i - 1]);
+        const PetscScalar uy_N = /* dhy  *  */ (x[j + 1][i] - x[j][i]);
+        const PetscScalar uy_S = /* dhy  *  */ (x[j][i] - x[j - 1][i]);
+        const PetscScalar e_E  = cell_edge_transmissivity(user, j, i, 0, 1);
+        const PetscScalar e_W  = cell_edge_transmissivity(user, j, i, 0, -1);
+        const PetscScalar e_N  = cell_edge_transmissivity(user, j, i, 1, 0);
+        const PetscScalar e_S  = cell_edge_transmissivity(user, j, i, -1, 0);
         const PetscScalar uxx  = -1. / (cellsize_ew[j][i] * cellsize_ew[j][i]) * (e_E * ux_E - e_W * ux_W);
         const PetscScalar uyy  = -1. / (user->cellsize_NS * user->cellsize_NS) * (e_N * uy_N - e_S * uy_S);
 
         f[j][i] = uxx + uyy + my_S[j][i] * ((x[j][i] - h_t[j][i]) / user->timestep);
+        //   std::cout<<"i "<<i<<" j "<<j<<" f "<<f[j][i]<<std::endl;
 
         PetscCall(DMDAVecRestoreArray(da, user->S, &my_S));
         PetscCall(DMDAVecRestoreArray(da, user->H_T, &h_t));
@@ -466,7 +468,7 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
   const auto hxdhy = hx / hy;
   const auto hydhx = hy / hx;
   PetscScalar local_v[9];
-  PetscScalar** my_mask;
+  PetscScalar **my_mask, **cellsize_ew;
   DM da = user->da;
 
   // Compute entries for the locally owned part of the Jacobian.
@@ -477,6 +479,7 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
   //    appropriate processor during matrix assembly).
   //  - Here, we set all entries for a particular row at once.
   PetscCall(DMDAVecGetArray(da, user->mask, &my_mask));
+  PetscCall(DMDAVecGetArray(da, user->cellsize_EW, &cellsize_ew));
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
@@ -486,33 +489,57 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
       if (my_mask[j][i] == 0) {
         local_v[0] = 1.0;
         MatSetValuesStencil(B, 1, &row, 1, &row, local_v, INSERT_VALUES);
-      } else {
+      } else {  // TODO what about edges of the domain (if these are not ocean)? E.g. when only 4 or only 3 values
+                // should be inserted?
         // interior grid points
         const PetscScalar u = x[j][i];
         // interior grid points
         // Jacobian from p=2
-        MatStencil col[9];
+        MatStencil col[5];
 
-        local_v[0] = -hxdhy;
+        local_v[0] = 1.0 / (user->cellsize_NS * user->cellsize_NS);
         col[0].j   = j - 1;
         col[0].i   = i;
-        local_v[1] = -hydhx;
+        local_v[1] = 1.0 / (cellsize_ew[j][i] * cellsize_ew[j][i]);
         col[1].j   = j;
         col[1].i   = i - 1;
-        local_v[2] = 2.0 * (hydhx + hxdhy) - sc * PetscExpScalar(u);
+        local_v[2] =
+            2.0 * (1.0 / (user->cellsize_NS * user->cellsize_NS) + 1.0 / (cellsize_ew[j][i] * cellsize_ew[j][i]));
         col[2].j   = row.j;
         col[2].i   = row.i;
-        local_v[3] = -hydhx;
+        local_v[3] = 1.0 / (cellsize_ew[j][i] * cellsize_ew[j][i]);
         col[3].j   = j;
         col[3].i   = i + 1;
-        local_v[4] = -hxdhy;
+        local_v[4] = 1.0 / (user->cellsize_NS * user->cellsize_NS);
         col[4].j   = j + 1;
         col[4].i   = i;
+
+        //      local_v[0] = -hxdhy;
+        //      col[0].j   = j - 1;
+        //      col[0].i   = i;
+        //      local_v[1] = -hydhx;
+        //      col[1].j   = j;
+        //      col[1].i   = i - 1;
+        //      local_v[2] = 2.0 * (hydhx + hxdhy) - sc * PetscExpScalar(u);
+        //      col[2].j   = row.j;
+        //      col[2].i   = row.i;
+        //      local_v[3] = -hydhx;
+        //      col[3].j   = j;
+        //      col[3].i   = i + 1;
+        //      local_v[4] = -hxdhy;
+        //      col[4].j   = j + 1;
+        //      col[4].i   = i;
+        //      std::cout<<"i "<<i<<" j "<<j<<std::endl;
+        //      std::cout<<"sc "<<sc<<" u "<<u<<std::endl;
+        //      std::cout<<"local_v "<<local_v[0]<<" "<<local_v[1]<<" "<<local_v[2]<<" "<<local_v[3]<<"
+        //      "<<local_v[4]<<std::endl; std::cout<<"hxdhy "<<hxdhy<<" hydhx "<<hydhx<<std::endl;
+
         MatSetValuesStencil(B, 1, &row, 5, col, local_v, INSERT_VALUES);
       }
     }
   }
   PetscCall(DMDAVecRestoreArray(da, user->mask, &my_mask));
+  PetscCall(DMDAVecRestoreArray(da, user->cellsize_EW, &cellsize_ew));
 
   // Assemble matrix, using the 2-step process:
   //   MatAssemblyBegin(), MatAssemblyEnd().
