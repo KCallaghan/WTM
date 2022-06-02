@@ -224,11 +224,11 @@ void finalise(Parameters& params, ArrayPack& arp) {
 }
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    // Make sure that the user is running the code with a configuration file.
-    std::cerr << "Syntax: " << argv[0] << " <Configuration File>" << std::endl;
-    return -1;
-  }
+  // if (argc != 2) {
+  //   // Make sure that the user is running the code with a configuration file.
+  //   std::cerr << "Syntax: " << argv[0] << " <Configuration File>" << std::endl;
+  //   return -1;
+  // }
 
   std::cerr << "Reading configuration file '" << argv << "'..." << std::endl;
   Parameters params(argv[1]);
@@ -237,6 +237,7 @@ int main(int argc, char** argv) {
 
   PetscCall(PetscInitialize(&argc, &argv, (char*)0, help));
 
+  std::cout << "fdepth_fmin is " << params.fdepth_fmin << std::endl;
   initialise(params, arp);
   run(params, arp);
   finalise(params, arp);
