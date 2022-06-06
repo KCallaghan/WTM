@@ -224,7 +224,8 @@ void finalise(Parameters& params, ArrayPack& arp) {
 }
 
 int main(int argc, char** argv) {
-  ArrayPack arp;
+
+ArrayPack arp;
 
   PetscCall(PetscInitialize(&argc, &argv, nullptr, help));
 
@@ -249,6 +250,7 @@ int main(int argc, char** argv) {
 
   Parameters params(params_filename);
 
+  std::cout << "fdepth_fmin is " << params.fdepth_fmin << std::endl;
   initialise(params, arp);
   run(params, arp);
   finalise(params, arp);

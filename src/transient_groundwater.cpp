@@ -217,7 +217,7 @@ void update(Parameters& params, ArrayPack& arp) {
   SNESConvergedReason convergence_reason;
 
   // Initialize problem parameters
-  user.lambda      = 0.0;
+  user.lambda      = 0.9;
   user.timestep    = params.deltat;
   user.cellsize_NS = params.cellsize_n_s_metres;
 
@@ -249,7 +249,6 @@ void update(Parameters& params, ArrayPack& arp) {
   // Get DMDA arrays from the state arrays
   DMDA_Array_Pack dmdapack(user);
 
-  // TODO(kerry): Remove this
   // User can override with:
   // -snes_mf : matrix-free Newton-Krylov method with no preconditioning
   //            (unless user explicitly sets preconditioner)
@@ -260,6 +259,14 @@ void update(Parameters& params, ArrayPack& arp) {
   // Set local function evaluation routine
   DMSetApplicationContext(user.da, &user);
   SNESSetDM(user.snes, user.da);
+
+  // Evaluate initial guess
+  // Note: The user should initialize the vector, x, with the initial guess
+  // for the nonlinear solver prior to calling SNESSolve().  In particular,
+  // to employ an initial guess of zero, the user should explicitly set
+  // this vector to zero by calling VecSet().
+  FormInitialGuess(&user, user.da, user.x, arp);
+  FormRHS(&user, user.da, user.b, arp);
 
   DMDASNESSetFunctionLocal(
       user.da, INSERT_VALUES, (PetscErrorCode(*)(DMDALocalInfo*, void*, void*, void*))FormFunctionLocal, &user);
@@ -287,14 +294,6 @@ void update(Parameters& params, ArrayPack& arp) {
       dmdapack.mask[j][i]        = arp.land_mask(j, i);
     }
   }
-
-  // Evaluate initial guess
-  // Note: The user should initialize the vector, x, with the initial guess
-  // for the nonlinear solver prior to calling SNESSolve().  In particular,
-  // to employ an initial guess of zero, the user should explicitly set
-  // this vector to zero by calling VecSet().
-  FormInitialGuess(&user, user.da, user.x, arp);
-  FormRHS(&user, user.da, user.b, arp);
 
   // Solve nonlinear system
   SNESSolve(user.snes, user.b, user.x);
@@ -347,7 +346,7 @@ static PetscErrorCode FormInitialGuess(AppCtx* /*user*/, DM da, Vec X, ArrayPack
         // boundary conditions are all zero Dirichlet
         x[j][i] = 0.0;
       } else {
-        x[j][i] = arp.wtd(j, i) + arp.topo(j, i);
+        x[j][i] = 0.0;  // arp.wtd(j, i) + arp.topo(j, i);
       }
     }
   }
@@ -429,18 +428,20 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         PETSC_CHECK(DMDAVecGetArray(da, user->H_T, &h_t));
         PETSC_CHECK(DMDAVecGetArray(da, user->cellsize_EW, &cellsize_ew));
 
-        const PetscScalar ux_E = dhx * (x[j][i + 1] - x[j][i]);
-        const PetscScalar ux_W = dhx * (x[j][i] - x[j][i - 1]);
-        const PetscScalar uy_N = dhy * (x[j + 1][i] - x[j][i]);
-        const PetscScalar uy_S = dhy * (x[j][i] - x[j - 1][i]);
-        const PetscScalar e_E  = cell_edge_transmissivity(user, i, j, 0, 1);
-        const PetscScalar e_W  = cell_edge_transmissivity(user, i, j, 0, -1);
-        const PetscScalar e_N  = cell_edge_transmissivity(user, i, j, 1, 0);
-        const PetscScalar e_S  = cell_edge_transmissivity(user, i, j, -1, 0);
+        const PetscScalar ux_E =
+            /* dhx  *  */ (x[j][i + 1] - x[j][i]);  // how to handle cases where i == 0 or i ==RHS of the array etc?
+        const PetscScalar ux_W = /* dhx  *  */ (x[j][i] - x[j][i - 1]);
+        const PetscScalar uy_N = /* dhy  *  */ (x[j + 1][i] - x[j][i]);
+        const PetscScalar uy_S = /* dhy  *  */ (x[j][i] - x[j - 1][i]);
+        const PetscScalar e_E  = cell_edge_transmissivity(user, j, i, 0, 1);
+        const PetscScalar e_W  = cell_edge_transmissivity(user, j, i, 0, -1);
+        const PetscScalar e_N  = cell_edge_transmissivity(user, j, i, 1, 0);
+        const PetscScalar e_S  = cell_edge_transmissivity(user, j, i, -1, 0);
         const PetscScalar uxx  = -1. / (cellsize_ew[j][i] * cellsize_ew[j][i]) * (e_E * ux_E - e_W * ux_W);
         const PetscScalar uyy  = -1. / (user->cellsize_NS * user->cellsize_NS) * (e_N * uy_N - e_S * uy_S);
 
         f[j][i] = uxx + uyy + my_S[j][i] * ((x[j][i] - h_t[j][i]) / user->timestep);
+        //   std::cout<<"i "<<i<<" j "<<j<<" f "<<f[j][i]<<std::endl;
 
         PETSC_CHECK(DMDAVecRestoreArray(da, user->S, &my_S));
         PETSC_CHECK(DMDAVecRestoreArray(da, user->H_T, &h_t));
@@ -467,6 +468,7 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
   const auto hydhx = hy / hx;
   PetscScalar** my_mask;
 
+
   // Compute entries for the locally owned part of the Jacobian.
   //  - PETSc parallel matrix formats are partitioned by
   //    contiguous chunks of rows across the processors.
@@ -475,6 +477,7 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
   //    appropriate processor during matrix assembly).
   //  - Here, we set all entries for a particular row at once.
   PETSC_CHECK(DMDAVecGetArray(user->da, user->mask, &my_mask));
+
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
@@ -485,24 +488,27 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
         std::array<PetscScalar, 1> local_v = {1.0};
         MatSetValuesStencil(B, 1, &row, 1, &row, local_v.data(), INSERT_VALUES);
       } else {
+
         // interior grid points
         // Jacobian from p=2
         std::array<MatStencil, 5> col;
         std::array<PetscScalar, 5> local_v;
 
-        local_v[0] = -hxdhy;
+
+        local_v[0] = 1.0 / (user->cellsize_NS * user->cellsize_NS);
         col[0].j   = j - 1;
         col[0].i   = i;
-        local_v[1] = -hydhx;
+        local_v[1] = 1.0 / (cellsize_ew[j][i] * cellsize_ew[j][i]);
         col[1].j   = j;
         col[1].i   = i - 1;
         local_v[2] = 2.0 * (hydhx + hxdhy) - sc * PetscExpScalar(x[j][i]);
+
         col[2].j   = row.j;
         col[2].i   = row.i;
-        local_v[3] = -hydhx;
+        local_v[3] = 1.0 / (cellsize_ew[j][i] * cellsize_ew[j][i]);
         col[3].j   = j;
         col[3].i   = i + 1;
-        local_v[4] = -hxdhy;
+        local_v[4] = 1.0 / (user->cellsize_NS * user->cellsize_NS);
         col[4].j   = j + 1;
         col[4].i   = i;
         MatSetValuesStencil(B, 1, &row, 5, col.data(), local_v.data(), INSERT_VALUES);
@@ -510,6 +516,7 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
     }
   }
   PETSC_CHECK(DMDAVecRestoreArray(user->da, user->mask, &my_mask));
+
 
   // Assemble matrix, using the 2-step process:
   //   MatAssemblyBegin(), MatAssemblyEnd().
