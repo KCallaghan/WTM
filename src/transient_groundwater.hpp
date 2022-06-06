@@ -7,6 +7,6 @@
 
 namespace FanDarcyGroundwater {
 
-int update(Parameters& params, ArrayPack& arp);
+void update(Parameters& params, ArrayPack& arp);
 
 }

@@ -28,7 +28,7 @@ std::string get_current_time_and_date_as_str() {
   return ss.str();
 }
 
-static constexpr char help[] = "trying petsc method to solve the problem using Newton";
+static constexpr auto help = "trying petsc method to solve the problem using Newton";
 
 void initialise(Parameters& params, ArrayPack& arp) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);
@@ -224,18 +224,31 @@ void finalise(Parameters& params, ArrayPack& arp) {
 }
 
 int main(int argc, char** argv) {
-  // if (argc != 2) {
-  //   // Make sure that the user is running the code with a configuration file.
-  //   std::cerr << "Syntax: " << argv[0] << " <Configuration File>" << std::endl;
-  //   return -1;
-  // }
 
-  std::cerr << "Reading configuration file '" << argv << "'..." << std::endl;
-  Parameters params(argv[1]);
+ArrayPack arp;
 
-  ArrayPack arp;
+  PetscCall(PetscInitialize(&argc, &argv, nullptr, help));
 
-  PetscCall(PetscInitialize(&argc, &argv, (char*)0, help));
+  char params_filename[512];
+  PetscBool supplied_params_filename;
+  PetscOptionsBegin(PETSC_COMM_WORLD, NULL, "TWSM options", __FILE__);
+  PetscOptionsReal("-lambda", "Bratu parameter", "", arp.total_added_recharge, &arp.total_added_recharge, NULL);
+  PetscOptionsString(
+      "-c",
+      "TWSM config file",
+      "",
+      params_filename,
+      params_filename,
+      sizeof(params_filename),
+      &supplied_params_filename);
+  PetscOptionsEnd();
+
+  if (!supplied_params_filename || std::string(params_filename).empty()) {
+    std::cerr << "Need a config file!" << std::endl;
+    return -1;
+  }
+
+  Parameters params(params_filename);
 
   std::cout << "fdepth_fmin is " << params.fdepth_fmin << std::endl;
   initialise(params, arp);

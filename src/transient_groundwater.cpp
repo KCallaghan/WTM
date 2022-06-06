@@ -2,12 +2,14 @@
 #include "add_recharge.hpp"
 #include "update_effective_storativity.hpp"
 
-#include <omp.h>
-
 #include <petscdm.h>
 #include <petscdmda.h>
 #include <petscerror.h>
 #include <petscsnes.h>
+
+#include <omp.h>
+#include <array>
+#include <experimental/source_location>
 
 ///////////////////////
 // PRIVATE FUNCTIONS //
@@ -15,10 +17,43 @@
 
 namespace FanDarcyGroundwater {
 
+void PETSC_CHECK(
+    const PetscErrorCode err,
+    const std::experimental::source_location location = std::experimental::source_location::current()) {
+  if (err) {
+    throw std::runtime_error(
+        "Petsc exception: " + std::to_string(err) + " at " + location.file_name() + ":" +
+        std::to_string(location.line()));
+  }
+}
+
+/// Get local grid boundaries (for 2-dimensional DA):
+///   xs, ys   - starting grid indices (no ghost points)
+///   xm, ym   - widths of local grid (no ghost points)
 std::tuple<PetscInt, PetscInt, PetscInt, PetscInt> get_corners(const DM da) {
-  PetscInt xs, ys, xm, ym;
-  DMDAGetCorners(da, &xs, &ys, nullptr, &xm, &ym, nullptr);
-  return {xs, ys, xm, ym};
+  PetscInt xs, ys, width, height;
+  PETSC_CHECK(DMDAGetCorners(da, &xs, &ys, nullptr, &width, &height, nullptr));
+  return {xs, ys, width, height};
+}
+
+std::tuple<PetscInt, PetscInt> get_dmda_bounds(const DM da) {
+  PetscInt Mx, My;
+  DMDAGetInfo(
+      da,
+      PETSC_IGNORE,
+      &Mx,  // global dimension in first direction of the array
+      &My,  // global dimension in second direction of the array
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE);
+  return {Mx, My};
 }
 
 // User-defined application context - contains data needed by the
@@ -28,8 +63,8 @@ struct AppCtx {
   PetscReal lambda;  // Bratu parameter
   PetscReal timestep;
   PetscReal cellsize_NS;
-  SNES snes;
-  DM da;
+  SNES snes       = nullptr;
+  DM da           = nullptr;
   Vec x           = nullptr;  // Solution vector
   Vec r           = nullptr;  // Residual vector
   Vec b           = nullptr;  // RHS vector
@@ -40,29 +75,29 @@ struct AppCtx {
   Vec mask        = nullptr;
 
   ~AppCtx() {
-    SNESDestroy(&snes);
-    DMDestroy(&da);
-    VecDestroy(&x);
-    VecDestroy(&r);
-    VecDestroy(&b);
-    VecDestroy(&T);
-    VecDestroy(&S);
-    VecDestroy(&H_T);
-    VecDestroy(&cellsize_EW);
-    VecDestroy(&mask);
+    PETSC_CHECK(SNESDestroy(&snes));
+    PETSC_CHECK(DMDestroy(&da));
+    PETSC_CHECK(VecDestroy(&x));
+    PETSC_CHECK(VecDestroy(&r));
+    PETSC_CHECK(VecDestroy(&b));
+    PETSC_CHECK(VecDestroy(&T));
+    PETSC_CHECK(VecDestroy(&S));
+    PETSC_CHECK(VecDestroy(&H_T));
+    PETSC_CHECK(VecDestroy(&cellsize_EW));
+    PETSC_CHECK(VecDestroy(&mask));
   }
 
   // Extract global vectors from DM; then duplicate for remaining
   // vectors that are the same types
   void make_global_vectors() {
-    DMCreateGlobalVector(da, &x);
-    VecDuplicate(x, &r);
-    VecDuplicate(x, &b);
-    VecDuplicate(x, &T);
-    VecDuplicate(x, &S);
-    VecDuplicate(x, &H_T);
-    VecDuplicate(x, &cellsize_EW);
-    VecDuplicate(x, &mask);
+    PETSC_CHECK(DMCreateGlobalVector(da, &x));
+    PETSC_CHECK(VecDuplicate(x, &r));
+    PETSC_CHECK(VecDuplicate(x, &b));
+    PETSC_CHECK(VecDuplicate(x, &T));
+    PETSC_CHECK(VecDuplicate(x, &S));
+    PETSC_CHECK(VecDuplicate(x, &H_T));
+    PETSC_CHECK(VecDuplicate(x, &cellsize_EW));
+    PETSC_CHECK(VecDuplicate(x, &mask));
   }
 };
 
@@ -78,22 +113,22 @@ struct DMDA_Array_Pack {
   DMDA_Array_Pack(const AppCtx& user) {
     assert(!context);  // Make sure we're not already initialized
     context = &user;
-    DMDAVecGetArray(user.da, user.x, &x);
-    DMDAVecGetArray(user.da, user.T, &T);
-    DMDAVecGetArray(user.da, user.S, &S);
-    DMDAVecGetArray(user.da, user.H_T, &H_T);
-    DMDAVecGetArray(user.da, user.cellsize_EW, &cellsize_EW);
-    DMDAVecGetArray(user.da, user.mask, &mask);
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.x, &x));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.T, &T));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.S, &S));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.H_T, &H_T));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.cellsize_EW, &cellsize_EW));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.mask, &mask));
   }
 
   void release() {
     assert(context);  // Make sure we are already initialized
-    DMDAVecRestoreArray(context->da, context->x, &x);
-    DMDAVecRestoreArray(context->da, context->T, &T);
-    DMDAVecRestoreArray(context->da, context->S, &S);
-    DMDAVecRestoreArray(context->da, context->H_T, &H_T);
-    DMDAVecRestoreArray(context->da, context->cellsize_EW, &cellsize_EW);
-    DMDAVecRestoreArray(context->da, context->mask, &mask);
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->x, &x));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->T, &T));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->S, &S));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->H_T, &H_T));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->cellsize_EW, &cellsize_EW));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->mask, &mask));
     context = nullptr;
   }
 };
@@ -176,7 +211,7 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
   }
 }
 
-int update(Parameters& params, ArrayPack& arp) {
+void update(Parameters& params, ArrayPack& arp) {
   AppCtx user;  // User-defined work context
   PetscInt iteration_count;
   SNESConvergedReason convergence_reason;
@@ -186,17 +221,13 @@ int update(Parameters& params, ArrayPack& arp) {
   user.timestep    = params.deltat;
   user.cellsize_NS = params.cellsize_n_s_metres;
 
-  PetscOptionsBegin(PETSC_COMM_WORLD, NULL, "p-Bratu options", __FILE__);
-  PetscOptionsReal("-lambda", "Bratu parameter", "", user.lambda, &user.lambda, NULL);
-  PetscOptionsEnd();
-
   set_starting_values(params, arp);
 
   // Create nonlinear solver and context
-  PetscCall(SNESCreate(PETSC_COMM_WORLD, &user.snes));
+  PETSC_CHECK(SNESCreate(PETSC_COMM_WORLD, &user.snes));
 
   // Create distributed array (DMDA) to manage parallel grid and vectors
-  PetscCall(DMDACreate2d(
+  PETSC_CHECK(DMDACreate2d(
       PETSC_COMM_WORLD,
       DM_BOUNDARY_NONE,
       DM_BOUNDARY_NONE,
@@ -210,27 +241,13 @@ int update(Parameters& params, ArrayPack& arp) {
       nullptr,
       nullptr,
       &user.da));
-  PetscCall(DMSetFromOptions(user.da));
-  PetscCall(DMSetUp(user.da));
+  PETSC_CHECK(DMSetFromOptions(user.da));
+  PETSC_CHECK(DMSetUp(user.da));
 
   user.make_global_vectors();
 
   // Get DMDA arrays from the state arrays
   DMDA_Array_Pack dmdapack(user);
-
-  // Get local array bounds
-  const auto [xs, ys, xm, ym] = get_corners(user.da);
-
-  // copy the transmissivity back into the T and storativity into the S vector
-  for (auto j = ys; j < ys + ym; j++) {
-    for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.T[j][i]           = 1;                               // arp.transmissivity(j, i);
-      dmdapack.S[j][i]           = 1;                               // arp.effective_storativity(j, i);
-      dmdapack.H_T[j][i]         = arp.wtd(j, i) + arp.topo(j, i);  // the current time's head
-      dmdapack.cellsize_EW[j][i] = arp.cellsize_e_w_metres[i];
-      dmdapack.mask[j][i]        = arp.land_mask(j, i);
-    }
-  }
 
   // User can override with:
   // -snes_mf : matrix-free Newton-Krylov method with no preconditioning
@@ -260,8 +277,23 @@ int update(Parameters& params, ArrayPack& arp) {
   SNESSetFromOptions(user.snes);
   SNESSetNGS(user.snes, NonlinearGS, &user);
 
-  SNESLineSearch linesearch;
-  SNESGetLineSearch(user.snes, &linesearch);
+  // TODO(kerry): Only needed if we need a precheck for the line search, I think.
+  // SNESLineSearch linesearch;
+  // SNESGetLineSearch(user.snes, &linesearch);
+
+  // Get local array bounds
+  const auto [xs, ys, width, height] = get_corners(user.da);
+
+  // copy the transmissivity back into the T and storativity into the S vector
+  for (auto j = ys; j < ys + height; j++) {
+    for (auto i = xs; i < xs + width; i++) {
+      dmdapack.T[j][i]           = arp.transmissivity(j, i);
+      dmdapack.S[j][i]           = arp.effective_storativity(j, i);
+      dmdapack.H_T[j][i]         = arp.wtd(j, i) + arp.topo(j, i);  // the current time's head
+      dmdapack.cellsize_EW[j][i] = arp.cellsize_e_w_metres[i];
+      dmdapack.mask[j][i]        = arp.land_mask(j, i);
+    }
+  }
 
   // Solve nonlinear system
   SNESSolve(user.snes, user.b, user.x);
@@ -274,15 +306,13 @@ int update(Parameters& params, ArrayPack& arp) {
       iteration_count);
 
   // copy the result back into the wtd array
-  for (int j = ys; j < ys + ym; j++) {
-    for (int i = xs; i < xs + xm; i++) {
+  for (int j = ys; j < ys + height; j++) {
+    for (int i = xs; i < xs + width; i++) {
       arp.wtd(j, i) = dmdapack.x[j][i] - arp.topo(j, i);
     }
   }
 
   dmdapack.release();
-
-  return 0;
 }
 
 /* ------------------------------------------------------------------- */
@@ -295,40 +325,23 @@ int update(Parameters& params, ArrayPack& arp) {
    X - vector
  */
 static PetscErrorCode FormInitialGuess(AppCtx* /*user*/, DM da, Vec X, ArrayPack& arp) {
-  PetscInt Mx, My;
-  PetscScalar** x;
-
-  DMDAGetInfo(
-      da,
-      PETSC_IGNORE,
-      &Mx,
-      &My,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE);
+  // TODO(kerry): These have something to do with scaling the problem by the number of cells used
+  // in the discretization. It doesn't look like we're using this right now.
+  // const auto [Mx, My] = get_dmda_bounds(da);
 
   // Get a pointer to vector data.
   //   - For default PETSc vectors, VecGetArray() returns a pointer to
   //     the data array.  Otherwise, the routine is implementation dependent.
   //   - You MUST call VecRestoreArray() when you no longer need access to
   //     the array.
+  PetscScalar** x;
   DMDAVecGetArray(da, X, &x);
 
-  // Get local grid boundaries (for 2-dimensional DA):
-  //   xs, ys   - starting grid indices (no ghost points)
-  //   xm, ym   - widths of local grid (no ghost points)
-  const auto [xs, ys, xm, ym] = get_corners(da);
+  const auto [xs, ys, width, height] = get_corners(da);
 
   // Compute initial guess over the locally owned part of the grid
-  for (auto j = ys; j < ys + ym; j++) {
-    for (auto i = xs; i < xs + xm; i++) {
+  for (auto j = ys; j < ys + height; j++) {
+    for (auto i = xs; i < xs + width; i++) {
       if (arp.land_mask(j, i) == 0) {
         // boundary conditions are all zero Dirichlet
         x[j][i] = 0.0;
@@ -353,30 +366,16 @@ static PetscErrorCode FormInitialGuess(AppCtx* /*user*/, DM da, Vec X, ArrayPack
    B - vector
  */
 static PetscErrorCode FormRHS(AppCtx* /*user*/, DM da, Vec B, ArrayPack& arp) {
-  PetscInt Mx, My;
+  // TODO(kerry): These have something to do with scaling the problem by the number of cells used
+  // in the discretization. It doesn't look like we're using this right now.
+  // const auto [Mx, My] = get_dmda_bounds(da);
+
   PetscScalar** b;
-
-  DMDAGetInfo(
-      da,
-      PETSC_IGNORE,
-      &Mx,
-      &My,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE);
-
   DMDAVecGetArray(da, B, &b);
 
-  const auto [xs, ys, xm, ym] = get_corners(da);
-  for (auto j = ys; j < ys + ym; j++) {
-    for (auto i = xs; i < xs + xm; i++) {
+  const auto [xs, ys, width, height] = get_corners(da);
+  for (auto j = ys; j < ys + height; j++) {
+    for (auto i = xs; i < xs + width; i++) {
       if (arp.land_mask(j, i) == 0) {
         b[j][i] = 0.0;
       } else {          // trying a case where the RHS is always set to 0
@@ -385,7 +384,7 @@ static PetscErrorCode FormRHS(AppCtx* /*user*/, DM da, Vec B, ArrayPack& arp) {
     }
   }
 
-  DMDAVecRestoreArray(da, B, &b);
+  PETSC_CHECK(DMDAVecRestoreArray(da, B, &b));
 
   return 0;
 }
@@ -394,11 +393,11 @@ static PetscErrorCode FormRHS(AppCtx* /*user*/, DM da, Vec B, ArrayPack& arp) {
 static inline PetscScalar cell_edge_transmissivity(const AppCtx* ctx, int x, int y, int xplus, int yplus) {
   PetscScalar** my_T;
 
-  PetscCall(DMDAVecGetArray(ctx->da, ctx->T, &my_T));
+  PETSC_CHECK(DMDAVecGetArray(ctx->da, ctx->T, &my_T));
 
   const PetscScalar edge_T = 2 / (1 / my_T[x][y] + 1 / my_T[x + xplus][y + yplus]);
 
-  PetscCall(DMDAVecRestoreArray(ctx->da, ctx->T, &my_T));
+  PETSC_CHECK(DMDAVecRestoreArray(ctx->da, ctx->T, &my_T));
 
   return edge_T;
 }
@@ -418,16 +417,16 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   const auto dhx = 1 / hx;
   const auto dhy = 1 / hy;
 
-  PetscCall(DMDAVecGetArray(da, user->mask, &my_mask));
+  PETSC_CHECK(DMDAVecGetArray(da, user->mask, &my_mask));
   // Compute function over the locally owned part of the grid
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
       if (my_mask[j][i] == 0) {
         f[j][i] = x[j][i];
       } else {
-        PetscCall(DMDAVecGetArray(da, user->S, &my_S));
-        PetscCall(DMDAVecGetArray(da, user->H_T, &h_t));
-        PetscCall(DMDAVecGetArray(da, user->cellsize_EW, &cellsize_ew));
+        PETSC_CHECK(DMDAVecGetArray(da, user->S, &my_S));
+        PETSC_CHECK(DMDAVecGetArray(da, user->H_T, &h_t));
+        PETSC_CHECK(DMDAVecGetArray(da, user->cellsize_EW, &cellsize_ew));
 
         const PetscScalar ux_E =
             /* dhx  *  */ (x[j][i + 1] - x[j][i]);  // how to handle cases where i == 0 or i ==RHS of the array etc?
@@ -444,13 +443,13 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         f[j][i] = uxx + uyy + my_S[j][i] * ((x[j][i] - h_t[j][i]) / user->timestep);
         //   std::cout<<"i "<<i<<" j "<<j<<" f "<<f[j][i]<<std::endl;
 
-        PetscCall(DMDAVecRestoreArray(da, user->S, &my_S));
-        PetscCall(DMDAVecRestoreArray(da, user->H_T, &h_t));
-        PetscCall(DMDAVecRestoreArray(da, user->cellsize_EW, &cellsize_ew));
+        PETSC_CHECK(DMDAVecRestoreArray(da, user->S, &my_S));
+        PETSC_CHECK(DMDAVecRestoreArray(da, user->H_T, &h_t));
+        PETSC_CHECK(DMDAVecRestoreArray(da, user->cellsize_EW, &cellsize_ew));
       }
     }
   }
-  PetscCall(DMDAVecRestoreArray(da, user->mask, &my_mask));
+  PETSC_CHECK(DMDAVecRestoreArray(da, user->mask, &my_mask));
 
   PetscLogFlops(72.0 * info->xm * info->ym);
 
@@ -467,9 +466,8 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
   const auto sc    = hx * hy * user->lambda;
   const auto hxdhy = hx / hy;
   const auto hydhx = hy / hx;
-  PetscScalar local_v[9];
-  PetscScalar **my_mask, **cellsize_ew;
-  DM da = user->da;
+  PetscScalar** my_mask;
+
 
   // Compute entries for the locally owned part of the Jacobian.
   //  - PETSc parallel matrix formats are partitioned by
@@ -478,8 +476,8 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
   //    locally (but any non-local elements will be sent to the
   //    appropriate processor during matrix assembly).
   //  - Here, we set all entries for a particular row at once.
-  PetscCall(DMDAVecGetArray(da, user->mask, &my_mask));
-  PetscCall(DMDAVecGetArray(da, user->cellsize_EW, &cellsize_ew));
+  PETSC_CHECK(DMDAVecGetArray(user->da, user->mask, &my_mask));
+
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
@@ -487,15 +485,15 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
 
       // boundary points
       if (my_mask[j][i] == 0) {
-        local_v[0] = 1.0;
-        MatSetValuesStencil(B, 1, &row, 1, &row, local_v, INSERT_VALUES);
-      } else {  // TODO what about edges of the domain (if these are not ocean)? E.g. when only 4 or only 3 values
-                // should be inserted?
-        // interior grid points
-        const PetscScalar u = x[j][i];
+        std::array<PetscScalar, 1> local_v = {1.0};
+        MatSetValuesStencil(B, 1, &row, 1, &row, local_v.data(), INSERT_VALUES);
+      } else {
+
         // interior grid points
         // Jacobian from p=2
-        MatStencil col[5];
+        std::array<MatStencil, 5> col;
+        std::array<PetscScalar, 5> local_v;
+
 
         local_v[0] = 1.0 / (user->cellsize_NS * user->cellsize_NS);
         col[0].j   = j - 1;
@@ -503,8 +501,8 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
         local_v[1] = 1.0 / (cellsize_ew[j][i] * cellsize_ew[j][i]);
         col[1].j   = j;
         col[1].i   = i - 1;
-        local_v[2] =
-            2.0 * (1.0 / (user->cellsize_NS * user->cellsize_NS) + 1.0 / (cellsize_ew[j][i] * cellsize_ew[j][i]));
+        local_v[2] = 2.0 * (hydhx + hxdhy) - sc * PetscExpScalar(x[j][i]);
+
         col[2].j   = row.j;
         col[2].i   = row.i;
         local_v[3] = 1.0 / (cellsize_ew[j][i] * cellsize_ew[j][i]);
@@ -513,33 +511,12 @@ static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Ma
         local_v[4] = 1.0 / (user->cellsize_NS * user->cellsize_NS);
         col[4].j   = j + 1;
         col[4].i   = i;
-
-        //      local_v[0] = -hxdhy;
-        //      col[0].j   = j - 1;
-        //      col[0].i   = i;
-        //      local_v[1] = -hydhx;
-        //      col[1].j   = j;
-        //      col[1].i   = i - 1;
-        //      local_v[2] = 2.0 * (hydhx + hxdhy) - sc * PetscExpScalar(u);
-        //      col[2].j   = row.j;
-        //      col[2].i   = row.i;
-        //      local_v[3] = -hydhx;
-        //      col[3].j   = j;
-        //      col[3].i   = i + 1;
-        //      local_v[4] = -hxdhy;
-        //      col[4].j   = j + 1;
-        //      col[4].i   = i;
-        //      std::cout<<"i "<<i<<" j "<<j<<std::endl;
-        //      std::cout<<"sc "<<sc<<" u "<<u<<std::endl;
-        //      std::cout<<"local_v "<<local_v[0]<<" "<<local_v[1]<<" "<<local_v[2]<<" "<<local_v[3]<<"
-        //      "<<local_v[4]<<std::endl; std::cout<<"hxdhy "<<hxdhy<<" hydhx "<<hydhx<<std::endl;
-
-        MatSetValuesStencil(B, 1, &row, 5, col, local_v, INSERT_VALUES);
+        MatSetValuesStencil(B, 1, &row, 5, col.data(), local_v.data(), INSERT_VALUES);
       }
     }
   }
-  PetscCall(DMDAVecRestoreArray(da, user->mask, &my_mask));
-  PetscCall(DMDAVecRestoreArray(da, user->cellsize_EW, &cellsize_ew));
+  PETSC_CHECK(DMDAVecRestoreArray(user->da, user->mask, &my_mask));
+
 
   // Assemble matrix, using the 2-step process:
   //   MatAssemblyBegin(), MatAssemblyEnd().
@@ -596,13 +573,10 @@ PetscErrorCode NonlinearGS(SNES snes, Vec X, Vec B, void* ctx) {
   DMGlobalToLocalEnd(da, X, INSERT_VALUES, localX);
   DMDAVecGetArray(da, localX, &x);
   for (auto l = 0; l < sweeps; l++) {
-    // Get local grid boundaries (for 2-dimensional DMDA):
-    // xs, ys   - starting grid indices (no ghost points)
-    // xm, ym   - widths of local grid (no ghost points)
-    const auto [xs, ys, xm, ym] = get_corners(da);
+    const auto [xs, ys, width, height] = get_corners(da);
     for (auto m = 0; m < 2; m++) {
-      for (auto j = ys; j < ys + ym; j++) {
-        for (auto i = xs + (m + j) % 2; i < xs + xm; i += 2) {
+      for (auto j = ys; j < ys + height; j++) {
+        for (auto i = xs + (m + j) % 2; i < xs + width; i += 2) {
           PetscReal xx = i * hx, yy = j * hy;
           if (B) {
             bij = b[j][i];
