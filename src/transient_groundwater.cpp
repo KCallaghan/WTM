@@ -320,6 +320,10 @@ int update(Parameters& params, ArrayPack& arp) {
   for (int j = ys; j < ys + ym; j++) {
     for (int i = xs; i < xs + xm; i++) {
       arp.wtd(j, i) = dmdapack.x[j][i] - arp.topo(j, i);
+      if (arp.land_mask(j, i) == 0.f) {
+        arp.total_loss_to_ocean += arp.wtd(j, i) * arp.cell_area[j];
+        arp.wtd(j, i) = 0.;
+      }
     }
   }
 
