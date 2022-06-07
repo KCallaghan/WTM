@@ -182,7 +182,7 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.scalar_array_x = rd::Array2D<double>(arp.topo, 0.0);
   arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
 
-  arp.fdepth = rd::Array2D<double>(arp.topo, 2.5);
+  arp.fdepth = rd::Array2D<double>(arp.topo, 60.);
 
   // border of 'ocean' with land everywhere else
   for (int y = 0; y < params.ncells_y; y++) {
@@ -255,7 +255,7 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
       arp.wtd_T(i)           = 0.;
       arp.wtd_T_iteration(i) = 0.;
       arp.original_wtd(i)    = 0.;
-      arp.topo(i)            = 0.;
+      // arp.topo(i)            = 0.;
     }
   }
 

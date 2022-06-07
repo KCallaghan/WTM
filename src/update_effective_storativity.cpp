@@ -8,7 +8,7 @@ double updateEffectiveStorativity(
     const double my_wtd_T,
     const double my_porosity,
     const double starting_effective_storativity) {
-  const double projected_full_step_wtd = my_original_wtd + (my_wtd_T - my_original_wtd) * 2.;
+  const double projected_full_step_wtd = my_wtd_T;  // my_original_wtd + (my_wtd_T - my_original_wtd) * 2.;
   if (my_original_wtd <= 0. &&
       projected_full_step_wtd <= 0.) {  // both are below ground, so we can use the original porosity
     return my_porosity;
