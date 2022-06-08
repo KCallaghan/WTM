@@ -53,6 +53,8 @@ struct AppCtx {
   Vec fdepth_vec = nullptr;
   Vec ksat_vec   = nullptr;
   Vec mask       = nullptr;
+  Vec porosity   = nullptr;
+  Vec h          = nullptr;
 
   ~AppCtx() {
     SNESDestroy(&snes);
@@ -66,6 +68,8 @@ struct AppCtx {
     VecDestroy(&fdepth_vec);
     VecDestroy(&ksat_vec);
     VecDestroy(&mask);
+    VecDestroy(&porosity);
+    VecDestroy(&h);
   }
 
   // Extract global vectors from DM; then duplicate for remaining
@@ -80,6 +84,8 @@ struct AppCtx {
     VecDuplicate(x, &fdepth_vec);
     VecDuplicate(x, &ksat_vec);
     VecDuplicate(x, &mask);
+    VecDuplicate(x, &porosity);
+    VecDuplicate(x, &h);
   }
 };
 
@@ -91,6 +97,8 @@ struct DMDA_Array_Pack {
   PetscScalar** fdepth_vec  = nullptr;
   PetscScalar** ksat_vec    = nullptr;
   PetscScalar** mask        = nullptr;
+  PetscScalar** porosity    = nullptr;
+  PetscScalar** h           = nullptr;
   const AppCtx* context     = nullptr;
 
   DMDA_Array_Pack(const AppCtx& user) {
@@ -103,6 +111,8 @@ struct DMDA_Array_Pack {
     PETSC_CHECK(DMDAVecGetArray(user.da, user.fdepth_vec, &fdepth_vec));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.ksat_vec, &ksat_vec));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.mask, &mask));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.porosity, &porosity));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.h, &h));
   }
 
   void release() {
@@ -114,22 +124,17 @@ struct DMDA_Array_Pack {
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->fdepth_vec, &fdepth_vec));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->ksat_vec, &ksat_vec));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->mask, &mask));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->porosity, &porosity));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->h, &h));
     context = nullptr;
   }
 };
 
-/*
-   User-defined routines
-*/
+// User-defined routines
+
 static PetscErrorCode FormRHS(AppCtx*, DM, Vec, ArrayPack& arp);
 static PetscErrorCode FormInitialGuess(AppCtx*, DM, Vec, ArrayPack& arp);
 static PetscErrorCode FormFunctionLocal(DMDALocalInfo*, PetscScalar**, PetscScalar**, AppCtx*);
-static PetscErrorCode FormJacobianLocal(DMDALocalInfo*, PetscScalar**, Mat, Mat, AppCtx*);
-
-// User-defined routines
-// static PetscErrorCode FormFunctionLocal(DMDALocalInfo*, PetscScalar**, PetscScalar**, AppCtx*);
-// static PetscErrorCode FormJacobianLocal(DMDALocalInfo*, PetscScalar**, Mat, Mat, AppCtx*);
-// static PetscErrorCode NonlinearGS(SNES, Vec, Vec, void*);
 
 double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, const double ksat) {
   constexpr double shallow = 1.5;
@@ -182,7 +187,6 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 0.f) {
         // in the ocean, we set several arrays to default values
-        arp.transmissivity(x, y)        = ocean_T;
         arp.effective_storativity(x, y) = 1.;
       } else {
         // set the starting effective storativity
@@ -195,8 +199,6 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         // use regular porosity for adding recharge since this checks
         // for underground space within add_recharge.
         arp.wtd(x, y) += add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 1, arp);
-
-        arp.transmissivity(x, y) = depthIntegratedTransmissivity(arp.wtd(x, y), arp.fdepth(x, y), arp.ksat(x, y));
       }
     }
   }
@@ -251,13 +253,15 @@ int update(Parameters& params, ArrayPack& arp) {
   // Get local array bounds
   const auto [xs, ys, xm, ym] = get_corners(user.da);
 
-  // copy the transmissivity back into the T and storativity into the S vector
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
       dmdapack.cellsize_EW[i][j] = arp.cellsize_e_w_metres[j];
       dmdapack.mask[i][j]        = arp.land_mask(i, j);
       dmdapack.fdepth_vec[i][j]  = arp.fdepth(i, j);
       dmdapack.ksat_vec[i][j]    = arp.ksat(i, j);
+      dmdapack.S[i][j]           = arp.effective_storativity(i, j);
+      dmdapack.porosity[i][j]    = arp.porosity(i, j);
+      dmdapack.h[i][j]           = arp.wtd(i, j);
     }
   }
 
@@ -279,8 +283,6 @@ int update(Parameters& params, ArrayPack& arp) {
 
   DMDASNESSetFunctionLocal(
       user.da, INSERT_VALUES, (PetscErrorCode(*)(DMDALocalInfo*, void*, void*, void*))FormFunctionLocal, &user);
-  // DMDASNESSetJacobianLocal(
-  //   user.da, (PetscErrorCode(*)(DMDALocalInfo*, void*, Mat, Mat, void*))FormJacobianLocal, &user);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Customize nonlinear solver; set runtime options
@@ -296,26 +298,6 @@ int update(Parameters& params, ArrayPack& arp) {
   */
   FormInitialGuess(&user, user.da, user.x, arp);
   FormRHS(&user, user.da, user.b, arp);
-
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      if (arp.land_mask(x, y) == 0.f) {
-        // in the ocean, we set several arrays to default values
-        arp.transmissivity(x, y) = 0.00005 * (1.5 + 60.);
-      } else {
-        arp.transmissivity(x, y) = depthIntegratedTransmissivity(dmdapack.x[x][y], arp.fdepth(x, y), arp.ksat(x, y));
-        arp.effective_storativity(x, y) = updateEffectiveStorativity(
-            arp.wtd(x, y), dmdapack.x[x][y], arp.porosity(x, y), arp.effective_storativity(x, y));
-      }
-    }
-  }
-
-  for (auto j = ys; j < ys + ym; j++) {
-    for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.T[i][j] = arp.transmissivity(i, j);
-      dmdapack.S[i][j] = arp.effective_storativity(i, j);
-    }
-  }
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Solve nonlinear system
@@ -336,7 +318,9 @@ int update(Parameters& params, ArrayPack& arp) {
     for (int i = xs; i < xs + xm; i++) {
       arp.wtd(i, j) = dmdapack.x[i][j] - arp.topo(i, j);
       if (arp.land_mask(i, j) == 0.f) {
-        arp.total_loss_to_ocean += arp.wtd(i, j) * arp.cell_area[j];
+        arp.total_loss_to_ocean +=
+            arp.wtd(i, j) * arp.cell_area[j];  // could it be that because ocean cells are just set = x in the formula,
+                                               // that loss to/gain from ocean is not properly recorded?
         arp.wtd(i, j) = 0.;
       }
     }
@@ -443,24 +427,13 @@ static PetscErrorCode FormRHS(AppCtx* user, DM da, Vec B, ArrayPack& arp) {
   return 0;
 }
 
-static inline PetscScalar eta(const AppCtx* ctx, int x, int y, int xplus, int yplus) {
-  PetscScalar** my_T;
-
-  PetscCall(DMDAVecGetArray(ctx->da, ctx->T, &my_T));
-
-  const PetscScalar edge_T = 2. / (1. / my_T[x][y] + 1. / my_T[x + xplus][y + yplus]);
-
-  PetscCall(DMDAVecRestoreArray(ctx->da, ctx->T, &my_T));
-
-  return edge_T;
-}
 /* ------------------------------------------------------------------- */
 /*
    FormFunctionLocal - Evaluates nonlinear function, F(x).
  */
 static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user) {
   DM da = user->da;
-  PetscScalar **my_S, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat;
+  PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity;
   PetscInt Mx, My;
 
   DMDAGetInfo(
@@ -483,10 +456,12 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
     Compute function over the locally owned part of the grid
  */
   PetscCall(DMDAVecGetArray(da, user->mask, &my_mask));
-  PetscCall(DMDAVecGetArray(da, user->S, &my_S));
+  PetscCall(DMDAVecGetArray(da, user->S, &starting_storativity));
   PetscCall(DMDAVecGetArray(da, user->cellsize_EW, &cellsize_ew));
   PetscCall(DMDAVecGetArray(da, user->fdepth_vec, &my_fdepth));
   PetscCall(DMDAVecGetArray(da, user->ksat_vec, &my_ksat));
+  PetscCall(DMDAVecGetArray(da, user->porosity, &my_porosity));
+  PetscCall(DMDAVecGetArray(da, user->h, &my_h));
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
@@ -498,10 +473,6 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar ux_W = (x[i][j] - x[i][j - 1]);
         const PetscScalar uy_N = (x[i + 1][j] - x[i][j]);
         const PetscScalar uy_S = (x[i][j] - x[i - 1][j]);
-        // const PetscScalar e_E  = eta(user, j, i, 0, 1);
-        // const PetscScalar e_W  = eta(user, j, i, 0, -1);
-        // const PetscScalar e_N  = eta(user, j, i, 1, 0);
-        // const PetscScalar e_S  = eta(user, j, i, -1, 0);
         const PetscScalar e_E =
             2. / (1. / depthIntegratedTransmissivity(x[i][j], my_fdepth[i][j], my_ksat[i][j]) +
                   1. / depthIntegratedTransmissivity(x[i][j + 1], my_fdepth[i][j + 1], my_ksat[i][j + 1]));
@@ -518,89 +489,23 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar uxx = -1. / (cellsize_ew[i][j] * cellsize_ew[i][j]) * (e_E * ux_E - e_W * ux_W);
         const PetscScalar uyy = -1. / (user->cellsize_NS * user->cellsize_NS) * (e_N * uy_N - e_S * uy_S);
 
-        /* For p=2, these terms decay to:
-         uxx = (2.0*u - x[j][i-1] - x[j][i+1])*hydhx
-         uyy = (2.0*u - x[j-1][i] - x[j+1][i])*hxdhy
-        */
-        f[i][j] = (uxx + uyy) * (user->timestep / my_S[i][j]) + u;
+        const PetscScalar my_S =
+            updateEffectiveStorativity(my_h[i][j], x[i][j], my_porosity[i][j], starting_storativity[i][j]);
+
+        f[i][j] = (uxx + uyy) * (user->timestep / my_S) + u;
       }
     }
   }
 
-  PetscCall(DMDAVecRestoreArray(da, user->S, &my_S));
+  PetscCall(DMDAVecRestoreArray(da, user->S, &starting_storativity));
   PetscCall(DMDAVecRestoreArray(da, user->cellsize_EW, &cellsize_ew));
   PetscCall(DMDAVecRestoreArray(da, user->fdepth_vec, &my_fdepth));
   PetscCall(DMDAVecRestoreArray(da, user->ksat_vec, &my_ksat));
   PetscCall(DMDAVecRestoreArray(da, user->mask, &my_mask));
+  PetscCall(DMDAVecRestoreArray(da, user->porosity, &my_porosity));
+  PetscCall(DMDAVecRestoreArray(da, user->h, &my_h));
 
   PetscLogFlops(info->xm * info->ym * (72.0));
-  return 0;
-}
-
-/*
-   FormJacobianLocal - Evaluates Jacobian matrix.
-*/
-static PetscErrorCode FormJacobianLocal(DMDALocalInfo* info, PetscScalar** x, Mat J, Mat B, AppCtx* user) {
-  MatZeroEntries(B);
-  PetscScalar **my_mask, **cellsize_ew;
-
-  // Compute entries for the locally owned part of the Jacobian.
-  //  - PETSc parallel matrix formats are partitioned by
-  //    contiguous chunks of rows across the processors.
-  //  - Each processor needs to insert only elements that it owns
-  //    locally (but any non-local elements will be sent to the
-  //    appropriate processor during matrix assembly).
-  //  - Here, we set all entries for a particular row at once.
-  PETSC_CHECK(DMDAVecGetArray(user->da, user->mask, &my_mask));
-  PETSC_CHECK(DMDAVecGetArray(user->da, user->cellsize_EW, &cellsize_ew));
-
-  for (auto j = info->ys; j < info->ys + info->ym; j++) {
-    for (auto i = info->xs; i < info->xs + info->xm; i++) {
-      MatStencil row{.k = 0, .j = j, .i = i, .c = 0};
-
-      // boundary points
-      if (my_mask[j][i] == 0) {
-        std::array<PetscScalar, 1> local_v = {1.0};
-        MatSetValuesStencil(B, 1, &row, 1, &row, local_v.data(), INSERT_VALUES);
-      } else {
-        // interior grid points
-        // Jacobian from p=2
-        std::array<MatStencil, 5> col;
-        std::array<PetscScalar, 5> local_v;
-
-        local_v[0] = 1.0 / (user->cellsize_NS * user->cellsize_NS);
-        col[0].j   = j - 1;
-        col[0].i   = i;
-        local_v[1] = 1.0 / (cellsize_ew[j][i] * cellsize_ew[j][i]);
-        col[1].j   = j;
-        col[1].i   = i - 1;
-        local_v[2] =
-            2.0 * (1.0 / (user->cellsize_NS * user->cellsize_NS) + 1.0 / (cellsize_ew[j][i] * cellsize_ew[j][i]));
-
-        col[2].j   = row.j;
-        col[2].i   = row.i;
-        local_v[3] = 1.0 / (cellsize_ew[j][i] * cellsize_ew[j][i]);
-        col[3].j   = j;
-        col[3].i   = i + 1;
-        local_v[4] = 1.0 / (user->cellsize_NS * user->cellsize_NS);
-        col[4].j   = j + 1;
-        col[4].i   = i;
-        MatSetValuesStencil(B, 1, &row, 5, col.data(), local_v.data(), INSERT_VALUES);
-      }
-    }
-  }
-  PETSC_CHECK(DMDAVecRestoreArray(user->da, user->mask, &my_mask));
-  PETSC_CHECK(DMDAVecRestoreArray(user->da, user->cellsize_EW, &cellsize_ew));
-
-  // Assemble matrix, using the 2-step process:
-  //   MatAssemblyBegin(), MatAssemblyEnd().
-  MatAssemblyBegin(B, MAT_FINAL_ASSEMBLY);
-  MatAssemblyEnd(B, MAT_FINAL_ASSEMBLY);
-  if (J != B) {
-    MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY);
-    MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY);
-  }
-
   return 0;
 }
 
