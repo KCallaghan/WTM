@@ -522,7 +522,7 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
          uxx = (2.0*u - x[j][i-1] - x[j][i+1])*hydhx
          uyy = (2.0*u - x[j-1][i] - x[j+1][i])*hxdhy
         */
-        f[i][j] = (uxx + uyy) * (user->timestep / my_S[j][i]) + u;
+        f[i][j] = (uxx + uyy) * (user->timestep / my_S[i][j]) + u;
       }
     }
   }
