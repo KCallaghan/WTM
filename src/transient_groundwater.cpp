@@ -49,7 +49,10 @@ struct AppCtx {
   Vec T           = nullptr;
   Vec S           = nullptr;
   Vec cellsize_EW = nullptr;
-  Vec mask        = nullptr;
+
+  Vec fdepth_vec = nullptr;
+  Vec ksat_vec   = nullptr;
+  Vec mask       = nullptr;
 
   ~AppCtx() {
     SNESDestroy(&snes);
@@ -60,6 +63,8 @@ struct AppCtx {
     VecDestroy(&T);
     VecDestroy(&S);
     VecDestroy(&cellsize_EW);
+    VecDestroy(&fdepth_vec);
+    VecDestroy(&ksat_vec);
     VecDestroy(&mask);
   }
 
@@ -72,6 +77,8 @@ struct AppCtx {
     VecDuplicate(x, &T);
     VecDuplicate(x, &S);
     VecDuplicate(x, &cellsize_EW);
+    VecDuplicate(x, &fdepth_vec);
+    VecDuplicate(x, &ksat_vec);
     VecDuplicate(x, &mask);
   }
 };
@@ -81,6 +88,8 @@ struct DMDA_Array_Pack {
   PetscScalar** T           = nullptr;
   PetscScalar** S           = nullptr;
   PetscScalar** cellsize_EW = nullptr;
+  PetscScalar** fdepth_vec  = nullptr;
+  PetscScalar** ksat_vec    = nullptr;
   PetscScalar** mask        = nullptr;
   const AppCtx* context     = nullptr;
 
@@ -91,6 +100,8 @@ struct DMDA_Array_Pack {
     PETSC_CHECK(DMDAVecGetArray(user.da, user.T, &T));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.S, &S));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.cellsize_EW, &cellsize_EW));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.fdepth_vec, &fdepth_vec));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.ksat_vec, &ksat_vec));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.mask, &mask));
   }
 
@@ -100,6 +111,8 @@ struct DMDA_Array_Pack {
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->T, &T));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->S, &S));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->cellsize_EW, &cellsize_EW));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->fdepth_vec, &fdepth_vec));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->ksat_vec, &ksat_vec));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->mask, &mask));
     context = nullptr;
   }
@@ -243,6 +256,8 @@ int update(Parameters& params, ArrayPack& arp) {
     for (auto i = xs; i < xs + xm; i++) {
       dmdapack.cellsize_EW[j][i] = arp.cellsize_e_w_metres[i];
       dmdapack.mask[j][i]        = arp.land_mask(j, i);
+      dmdapack.fdepth_vec[j][i]  = arp.fdepth(j, i);
+      dmdapack.ksat_vec[j][i]    = arp.ksat(j, i);
     }
   }
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -281,37 +296,36 @@ int update(Parameters& params, ArrayPack& arp) {
   FormInitialGuess(&user, user.da, user.x, arp);
   FormRHS(&user, user.da, user.b, arp);
 
-  for (int test = 0; test < 10; test++) {
-    for (int y = 0; y < params.ncells_y; y++) {
-      for (int x = 0; x < params.ncells_x; x++) {
-        if (arp.land_mask(x, y) == 0.f) {
-          // in the ocean, we set several arrays to default values
-          arp.transmissivity(x, y) = 0.00005 * (1.5 + 60.);
-        } else {
-          arp.transmissivity(x, y) = depthIntegratedTransmissivity(dmdapack.x[x][y], arp.fdepth(x, y), arp.ksat(x, y));
-          arp.effective_storativity(x, y) = updateEffectiveStorativity(
-              arp.wtd(x, y), dmdapack.x[x][y], arp.porosity(x, y), arp.effective_storativity(x, y));
-        }
+  for (int y = 0; y < params.ncells_y; y++) {
+    for (int x = 0; x < params.ncells_x; x++) {
+      if (arp.land_mask(x, y) == 0.f) {
+        // in the ocean, we set several arrays to default values
+        arp.transmissivity(x, y) = 0.00005 * (1.5 + 60.);
+      } else {
+        arp.transmissivity(x, y) = depthIntegratedTransmissivity(dmdapack.x[x][y], arp.fdepth(x, y), arp.ksat(x, y));
+        arp.effective_storativity(x, y) = updateEffectiveStorativity(
+            arp.wtd(x, y), dmdapack.x[x][y], arp.porosity(x, y), arp.effective_storativity(x, y));
       }
     }
-
-    for (auto j = ys; j < ys + ym; j++) {
-      for (auto i = xs; i < xs + xm; i++) {
-        dmdapack.T[j][i] = arp.transmissivity(j, i);
-        dmdapack.S[j][i] = arp.effective_storativity(j, i);
-      }
-    }
-
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-       Solve nonlinear system
-       - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    SNESSolve(user.snes, user.b, user.x);
-    SNESGetIterationNumber(user.snes, &its);
-    SNESGetConvergedReason(user.snes, &reason);
-
-    PetscPrintf(
-        PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
   }
+
+  for (auto j = ys; j < ys + ym; j++) {
+    for (auto i = xs; i < xs + xm; i++) {
+      dmdapack.T[j][i] = arp.transmissivity(j, i);
+      dmdapack.S[j][i] = arp.effective_storativity(j, i);
+    }
+  }
+
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Solve nonlinear system
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  SNESSolve(user.snes, user.b, user.x);
+  SNESGetIterationNumber(user.snes, &its);
+  SNESGetConvergedReason(user.snes, &reason);
+
+  PetscPrintf(
+      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Free work space.  All PETSc objects should be destroyed when they
      are no longer needed.
@@ -445,7 +459,7 @@ static inline PetscScalar eta(const AppCtx* ctx, int x, int y, int xplus, int yp
  */
 static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user) {
   DM da = user->da;
-  PetscScalar **my_S, **cellsize_ew, **my_mask;
+  PetscScalar **my_S, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat;
   PetscInt Mx, My;
 
   DMDAGetInfo(
@@ -470,6 +484,8 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecGetArray(da, user->mask, &my_mask));
   PetscCall(DMDAVecGetArray(da, user->S, &my_S));
   PetscCall(DMDAVecGetArray(da, user->cellsize_EW, &cellsize_ew));
+  PetscCall(DMDAVecGetArray(da, user->fdepth_vec, &my_fdepth));
+  PetscCall(DMDAVecGetArray(da, user->ksat_vec, &my_ksat));
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
@@ -481,12 +497,25 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar ux_W = (x[j][i] - x[j][i - 1]);
         const PetscScalar uy_N = (x[j + 1][i] - x[j][i]);
         const PetscScalar uy_S = (x[j][i] - x[j - 1][i]);
-        const PetscScalar e_E  = eta(user, j, i, 0, 1);
-        const PetscScalar e_W  = eta(user, j, i, 0, -1);
-        const PetscScalar e_N  = eta(user, j, i, 1, 0);
-        const PetscScalar e_S  = eta(user, j, i, -1, 0);
-        const PetscScalar uxx  = -1. / (cellsize_ew[j][i] * cellsize_ew[j][i]) * (e_E * ux_E - e_W * ux_W);
-        const PetscScalar uyy  = -1. / (user->cellsize_NS * user->cellsize_NS) * (e_N * uy_N - e_S * uy_S);
+        // const PetscScalar e_E  = eta(user, j, i, 0, 1);
+        // const PetscScalar e_W  = eta(user, j, i, 0, -1);
+        // const PetscScalar e_N  = eta(user, j, i, 1, 0);
+        // const PetscScalar e_S  = eta(user, j, i, -1, 0);
+        const PetscScalar e_E =
+            2. / (1. / depthIntegratedTransmissivity(x[j][i], my_fdepth[j][i], my_ksat[j][i]) +
+                  1. / depthIntegratedTransmissivity(x[j][i + 1], my_fdepth[j][i + 1], my_ksat[j][i + 1]));
+        const PetscScalar e_W =
+            2. / (1. / depthIntegratedTransmissivity(x[j][i], my_fdepth[j][i], my_ksat[j][i]) +
+                  1. / depthIntegratedTransmissivity(x[j][i - 1], my_fdepth[j][i - 1], my_ksat[j][i - 1]));
+        const PetscScalar e_N =
+            2. / (1. / depthIntegratedTransmissivity(x[j][i], my_fdepth[j][i], my_ksat[j][i]) +
+                  1. / depthIntegratedTransmissivity(x[j + 1][i], my_fdepth[j + 1][i], my_ksat[j + 1][i]));
+        const PetscScalar e_S =
+            2. / (1. / depthIntegratedTransmissivity(x[j][i], my_fdepth[j][i], my_ksat[j][i]) +
+                  1. / depthIntegratedTransmissivity(x[j - 1][i], my_fdepth[j - 1][i], my_ksat[j - 1][i]));
+
+        const PetscScalar uxx = -1. / (cellsize_ew[j][i] * cellsize_ew[j][i]) * (e_E * ux_E - e_W * ux_W);
+        const PetscScalar uyy = -1. / (user->cellsize_NS * user->cellsize_NS) * (e_N * uy_N - e_S * uy_S);
 
         /* For p=2, these terms decay to:
          uxx = (2.0*u - x[j][i-1] - x[j][i+1])*hydhx
@@ -499,6 +528,8 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
 
   PetscCall(DMDAVecRestoreArray(da, user->S, &my_S));
   PetscCall(DMDAVecRestoreArray(da, user->cellsize_EW, &cellsize_ew));
+  PetscCall(DMDAVecRestoreArray(da, user->fdepth_vec, &my_fdepth));
+  PetscCall(DMDAVecRestoreArray(da, user->ksat_vec, &my_ksat));
   PetscCall(DMDAVecRestoreArray(da, user->mask, &my_mask));
 
   PetscLogFlops(info->xm * info->ym * (72.0));
