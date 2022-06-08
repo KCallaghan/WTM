@@ -52,6 +52,7 @@ struct AppCtx {
   Vec mask        = nullptr;
   Vec porosity    = nullptr;
   Vec h           = nullptr;
+  Vec topo_vec    = nullptr;
 
   ~AppCtx() {
     SNESDestroy(&snes);
@@ -65,6 +66,7 @@ struct AppCtx {
     VecDestroy(&mask);
     VecDestroy(&porosity);
     VecDestroy(&h);
+    VecDestroy(&topo_vec);
   }
 
   // Extract global vectors from DM; then duplicate for remaining
@@ -79,6 +81,7 @@ struct AppCtx {
     VecDuplicate(x, &mask);
     VecDuplicate(x, &porosity);
     VecDuplicate(x, &h);
+    VecDuplicate(x, &topo_vec);
   }
 };
 
@@ -91,6 +94,7 @@ struct DMDA_Array_Pack {
   PetscScalar** mask        = nullptr;
   PetscScalar** porosity    = nullptr;
   PetscScalar** h           = nullptr;
+  PetscScalar** topo_vec    = nullptr;
   const AppCtx* context     = nullptr;
 
   DMDA_Array_Pack(const AppCtx& user) {
@@ -104,6 +108,7 @@ struct DMDA_Array_Pack {
     PETSC_CHECK(DMDAVecGetArray(user.da, user.mask, &mask));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.porosity, &porosity));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.h, &h));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.topo_vec, &topo_vec));
   }
 
   void release() {
@@ -116,6 +121,7 @@ struct DMDA_Array_Pack {
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->mask, &mask));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->porosity, &porosity));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->h, &h));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->topo_vec, &topo_vec));
     context = nullptr;
   }
 };
@@ -240,7 +246,8 @@ int update(Parameters& params, ArrayPack& arp) {
       dmdapack.ksat_vec[i][j]    = arp.ksat(i, j);
       dmdapack.S[i][j]           = arp.effective_storativity(i, j);
       dmdapack.porosity[i][j]    = arp.porosity(i, j);
-      dmdapack.h[i][j]           = arp.wtd(i, j) + arp.topo(i, j);
+      dmdapack.h[i][j]           = arp.wtd(i, j);
+      dmdapack.topo_vec[i][j]    = arp.topo(i, j);
     }
   }
 
@@ -412,7 +419,8 @@ static PetscErrorCode FormRHS(AppCtx* user, DM da, Vec B, ArrayPack& arp) {
  */
 static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user) {
   DM da = user->da;
-  PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity;
+  PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
+      **my_topo;
   PetscInt Mx, My;
 
   DMDAGetInfo(
@@ -441,6 +449,7 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecGetArray(da, user->ksat_vec, &my_ksat));
   PetscCall(DMDAVecGetArray(da, user->porosity, &my_porosity));
   PetscCall(DMDAVecGetArray(da, user->h, &my_h));
+  PetscCall(DMDAVecGetArray(da, user->topo_vec, &my_topo));
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
@@ -468,8 +477,8 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar uxx = -1. / (cellsize_ew[i][j] * cellsize_ew[i][j]) * (e_E * ux_E - e_W * ux_W);
         const PetscScalar uyy = -1. / (user->cellsize_NS * user->cellsize_NS) * (e_N * uy_N - e_S * uy_S);
 
-        const PetscScalar my_S =
-            updateEffectiveStorativity(my_h[i][j], x[i][j], my_porosity[i][j], starting_storativity[i][j]);
+        const PetscScalar my_S = updateEffectiveStorativity(
+            my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
         f[i][j] = (uxx + uyy) * (user->timestep / my_S) + u;
       }
@@ -483,6 +492,7 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecRestoreArray(da, user->ksat_vec, &my_ksat));
   PetscCall(DMDAVecRestoreArray(da, user->porosity, &my_porosity));
   PetscCall(DMDAVecRestoreArray(da, user->h, &my_h));
+  PetscCall(DMDAVecRestoreArray(da, user->topo_vec, &my_topo));
 
   PetscLogFlops(info->xm * info->ym * (72.0));
   return 0;
