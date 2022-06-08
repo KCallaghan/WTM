@@ -44,25 +44,20 @@ struct AppCtx {
   SNES snes       = nullptr;
   DM da           = nullptr;
   Vec x           = nullptr;  // Solution vector
-  Vec r           = nullptr;  // Residual vector
   Vec b           = nullptr;  // RHS vector
-  Vec T           = nullptr;
   Vec S           = nullptr;
   Vec cellsize_EW = nullptr;
-
-  Vec fdepth_vec = nullptr;
-  Vec ksat_vec   = nullptr;
-  Vec mask       = nullptr;
-  Vec porosity   = nullptr;
-  Vec h          = nullptr;
+  Vec fdepth_vec  = nullptr;
+  Vec ksat_vec    = nullptr;
+  Vec mask        = nullptr;
+  Vec porosity    = nullptr;
+  Vec h           = nullptr;
 
   ~AppCtx() {
     SNESDestroy(&snes);
     DMDestroy(&da);
     VecDestroy(&x);
-    VecDestroy(&r);
     VecDestroy(&b);
-    VecDestroy(&T);
     VecDestroy(&S);
     VecDestroy(&cellsize_EW);
     VecDestroy(&fdepth_vec);
@@ -76,9 +71,7 @@ struct AppCtx {
   // vectors that are the same types
   void make_global_vectors() {
     DMCreateGlobalVector(da, &x);
-    VecDuplicate(x, &r);
     VecDuplicate(x, &b);
-    VecDuplicate(x, &T);
     VecDuplicate(x, &S);
     VecDuplicate(x, &cellsize_EW);
     VecDuplicate(x, &fdepth_vec);
@@ -91,7 +84,6 @@ struct AppCtx {
 
 struct DMDA_Array_Pack {
   PetscScalar** x           = nullptr;
-  PetscScalar** T           = nullptr;
   PetscScalar** S           = nullptr;
   PetscScalar** cellsize_EW = nullptr;
   PetscScalar** fdepth_vec  = nullptr;
@@ -105,7 +97,6 @@ struct DMDA_Array_Pack {
     assert(!context);  // Make sure we're not already initialized
     context = &user;
     PETSC_CHECK(DMDAVecGetArray(user.da, user.x, &x));
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.T, &T));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.S, &S));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.cellsize_EW, &cellsize_EW));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.fdepth_vec, &fdepth_vec));
@@ -118,7 +109,6 @@ struct DMDA_Array_Pack {
   void release() {
     assert(context);  // Make sure we are already initialized
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->x, &x));
-    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->T, &T));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->S, &S));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->cellsize_EW, &cellsize_EW));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->fdepth_vec, &fdepth_vec));
@@ -164,12 +154,6 @@ double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, co
 //////////////////////
 
 void set_starting_values(Parameters& params, ArrayPack& arp) {
-  // This assumes a ksat of 0.00005, which is an approximate global mean value, and an e-folding depth of 60.
-  // e-folding depth of 60 corresponds to fdepth_a of 100, fdepth_b of 150, and slope of ~0.00443.
-  // this should also be a reasonable e-folding depth for a range of other fdepth_a and _b parameters.
-  // 1.5 is a standard value based on the shallow depths to which soil textures are known.
-  constexpr double ocean_T = 0.00005 * (1.5 + 60.);
-
   // no pragma because we're editing arp.total_loss_to_ocean
   // check to see if there is any non-zero water table in ocean
   // cells, and if so, record these values as changes to the ocean.
@@ -185,16 +169,11 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
   //#pragma omp parallel for default(none) shared(arp, params) collapse(2)
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
-      if (arp.land_mask(x, y) == 0.f) {
+      if (arp.land_mask(x, y) == 0.f || arp.wtd(x, y) > 0) {
         // in the ocean, we set several arrays to default values
         arp.effective_storativity(x, y) = 1.;
       } else {
-        // set the starting effective storativity
-        if (arp.wtd(x, y) > 0) {
-          arp.effective_storativity(x, y) = 1;
-        } else {
-          arp.effective_storativity(x, y) = arp.porosity(x, y);
-        }
+        arp.effective_storativity(x, y) = arp.porosity(x, y);
         // Apply the first half of the recharge to the water-table depth grid (wtd)
         // use regular porosity for adding recharge since this checks
         // for underground space within add_recharge.
@@ -261,7 +240,7 @@ int update(Parameters& params, ArrayPack& arp) {
       dmdapack.ksat_vec[i][j]    = arp.ksat(i, j);
       dmdapack.S[i][j]           = arp.effective_storativity(i, j);
       dmdapack.porosity[i][j]    = arp.porosity(i, j);
-      dmdapack.h[i][j]           = arp.wtd(i, j);
+      dmdapack.h[i][j]           = arp.wtd(i, j) + arp.topo(i, j);
     }
   }
 
@@ -372,7 +351,7 @@ static PetscErrorCode FormInitialGuess(AppCtx* user, DM da, Vec X, ArrayPack& ar
         /* boundary conditions are all zero Dirichlet */
         x[i][j] = arp.topo(i, j) + 0.0;
       } else {
-        x[i][j] = arp.topo(i, j) + arp.wtd(i, j);  // 0.0;
+        x[i][j] = arp.topo(i, j) + arp.wtd(i, j);
       }
     }
   }
@@ -419,7 +398,7 @@ static PetscErrorCode FormRHS(AppCtx* user, DM da, Vec B, ArrayPack& arp) {
       if (arp.land_mask(i, j) == 0) {
         b[i][j] = arp.topo(i, j) + 0.0;
       } else {
-        b[i][j] = arp.topo(i, j) + arp.wtd(i, j);  // 0.0;
+        b[i][j] = arp.topo(i, j) + arp.wtd(i, j);
       }
     }
   }
@@ -497,11 +476,11 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
     }
   }
 
+  PetscCall(DMDAVecRestoreArray(da, user->mask, &my_mask));
   PetscCall(DMDAVecRestoreArray(da, user->S, &starting_storativity));
   PetscCall(DMDAVecRestoreArray(da, user->cellsize_EW, &cellsize_ew));
   PetscCall(DMDAVecRestoreArray(da, user->fdepth_vec, &my_fdepth));
   PetscCall(DMDAVecRestoreArray(da, user->ksat_vec, &my_ksat));
-  PetscCall(DMDAVecRestoreArray(da, user->mask, &my_mask));
   PetscCall(DMDAVecRestoreArray(da, user->porosity, &my_porosity));
   PetscCall(DMDAVecRestoreArray(da, user->h, &my_h));
 
