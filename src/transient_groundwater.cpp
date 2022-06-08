@@ -254,12 +254,13 @@ int update(Parameters& params, ArrayPack& arp) {
   // copy the transmissivity back into the T and storativity into the S vector
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.cellsize_EW[j][i] = arp.cellsize_e_w_metres[i];
-      dmdapack.mask[j][i]        = arp.land_mask(j, i);
-      dmdapack.fdepth_vec[j][i]  = arp.fdepth(j, i);
-      dmdapack.ksat_vec[j][i]    = arp.ksat(j, i);
+      dmdapack.cellsize_EW[i][j] = arp.cellsize_e_w_metres[j];
+      dmdapack.mask[i][j]        = arp.land_mask(i, j);
+      dmdapack.fdepth_vec[i][j]  = arp.fdepth(i, j);
+      dmdapack.ksat_vec[i][j]    = arp.ksat(i, j);
     }
   }
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      User can override with:
      -snes_mf : matrix-free Newton-Krylov method with no preconditioning
@@ -311,8 +312,8 @@ int update(Parameters& params, ArrayPack& arp) {
 
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.T[j][i] = arp.transmissivity(j, i);
-      dmdapack.S[j][i] = arp.effective_storativity(j, i);
+      dmdapack.T[i][j] = arp.transmissivity(i, j);
+      dmdapack.S[i][j] = arp.effective_storativity(i, j);
     }
   }
 
@@ -333,10 +334,10 @@ int update(Parameters& params, ArrayPack& arp) {
   // copy the result back into the wtd array
   for (int j = ys; j < ys + ym; j++) {
     for (int i = xs; i < xs + xm; i++) {
-      arp.wtd(j, i) = dmdapack.x[j][i] - arp.topo(j, i);
-      if (arp.land_mask(j, i) == 0.f) {
-        arp.total_loss_to_ocean += arp.wtd(j, i) * arp.cell_area[j];
-        arp.wtd(j, i) = 0.;
+      arp.wtd(i, j) = dmdapack.x[i][j] - arp.topo(i, j);
+      if (arp.land_mask(i, j) == 0.f) {
+        arp.total_loss_to_ocean += arp.wtd(i, j) * arp.cell_area[j];
+        arp.wtd(i, j) = 0.;
       }
     }
   }
@@ -383,11 +384,11 @@ static PetscErrorCode FormInitialGuess(AppCtx* user, DM da, Vec X, ArrayPack& ar
 
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      if (arp.land_mask(j, i) == 0) {
+      if (arp.land_mask(i, j) == 0) {
         /* boundary conditions are all zero Dirichlet */
-        x[j][i] = arp.topo(j, i) + 0.0;
+        x[i][j] = arp.topo(i, j) + 0.0;
       } else {
-        x[j][i] = arp.topo(j, i) + arp.wtd(j, i);  // 0.0;
+        x[i][j] = arp.topo(i, j) + arp.wtd(i, j);  // 0.0;
       }
     }
   }
@@ -431,10 +432,10 @@ static PetscErrorCode FormRHS(AppCtx* user, DM da, Vec B, ArrayPack& arp) {
   const auto [xs, ys, xm, ym] = get_corners(da);
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      if (arp.land_mask(j, i) == 0) {
-        b[j][i] = arp.topo(j, i) + 0.0;
+      if (arp.land_mask(i, j) == 0) {
+        b[i][j] = arp.topo(i, j) + 0.0;
       } else {
-        b[j][i] = arp.topo(j, i) + arp.wtd(j, i);  // 0.0;
+        b[i][j] = arp.topo(i, j) + arp.wtd(i, j);  // 0.0;
       }
     }
   }
@@ -489,39 +490,39 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
-      const PetscScalar u = x[j][i];
-      if (my_mask[j][i] == 0) {
-        f[j][i] = u;
+      const PetscScalar u = x[i][j];
+      if (my_mask[i][j] == 0) {
+        f[i][j] = u;
       } else {
-        const PetscScalar ux_E = (x[j][i + 1] - x[j][i]);
-        const PetscScalar ux_W = (x[j][i] - x[j][i - 1]);
-        const PetscScalar uy_N = (x[j + 1][i] - x[j][i]);
-        const PetscScalar uy_S = (x[j][i] - x[j - 1][i]);
+        const PetscScalar ux_E = (x[i][j + 1] - x[i][j]);
+        const PetscScalar ux_W = (x[i][j] - x[i][j - 1]);
+        const PetscScalar uy_N = (x[i + 1][j] - x[i][j]);
+        const PetscScalar uy_S = (x[i][j] - x[i - 1][j]);
         // const PetscScalar e_E  = eta(user, j, i, 0, 1);
         // const PetscScalar e_W  = eta(user, j, i, 0, -1);
         // const PetscScalar e_N  = eta(user, j, i, 1, 0);
         // const PetscScalar e_S  = eta(user, j, i, -1, 0);
         const PetscScalar e_E =
-            2. / (1. / depthIntegratedTransmissivity(x[j][i], my_fdepth[j][i], my_ksat[j][i]) +
-                  1. / depthIntegratedTransmissivity(x[j][i + 1], my_fdepth[j][i + 1], my_ksat[j][i + 1]));
+            2. / (1. / depthIntegratedTransmissivity(x[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(x[i][j + 1], my_fdepth[i][j + 1], my_ksat[i][j + 1]));
         const PetscScalar e_W =
-            2. / (1. / depthIntegratedTransmissivity(x[j][i], my_fdepth[j][i], my_ksat[j][i]) +
-                  1. / depthIntegratedTransmissivity(x[j][i - 1], my_fdepth[j][i - 1], my_ksat[j][i - 1]));
+            2. / (1. / depthIntegratedTransmissivity(x[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(x[i][j - 1], my_fdepth[i][j - 1], my_ksat[i][j - 1]));
         const PetscScalar e_N =
-            2. / (1. / depthIntegratedTransmissivity(x[j][i], my_fdepth[j][i], my_ksat[j][i]) +
-                  1. / depthIntegratedTransmissivity(x[j + 1][i], my_fdepth[j + 1][i], my_ksat[j + 1][i]));
+            2. / (1. / depthIntegratedTransmissivity(x[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(x[i + 1][j], my_fdepth[i + 1][j], my_ksat[i + 1][j]));
         const PetscScalar e_S =
-            2. / (1. / depthIntegratedTransmissivity(x[j][i], my_fdepth[j][i], my_ksat[j][i]) +
-                  1. / depthIntegratedTransmissivity(x[j - 1][i], my_fdepth[j - 1][i], my_ksat[j - 1][i]));
+            2. / (1. / depthIntegratedTransmissivity(x[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(x[i - 1][j], my_fdepth[i - 1][j], my_ksat[i - 1][j]));
 
-        const PetscScalar uxx = -1. / (cellsize_ew[j][i] * cellsize_ew[j][i]) * (e_E * ux_E - e_W * ux_W);
+        const PetscScalar uxx = -1. / (cellsize_ew[i][j] * cellsize_ew[i][j]) * (e_E * ux_E - e_W * ux_W);
         const PetscScalar uyy = -1. / (user->cellsize_NS * user->cellsize_NS) * (e_N * uy_N - e_S * uy_S);
 
         /* For p=2, these terms decay to:
          uxx = (2.0*u - x[j][i-1] - x[j][i+1])*hydhx
          uyy = (2.0*u - x[j-1][i] - x[j+1][i])*hxdhy
         */
-        f[j][i] = (uxx + uyy) * (user->timestep / my_S[j][i]) + u;
+        f[i][j] = (uxx + uyy) * (user->timestep / my_S[j][i]) + u;
       }
     }
   }
