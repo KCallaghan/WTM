@@ -186,10 +186,6 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         arp.effective_storativity(x, y) = 1.;
       } else {
         arp.effective_storativity(x, y) = arp.porosity(x, y);
-        // Apply the first half of the recharge to the water-table depth grid (wtd)
-        // use regular porosity for adding recharge since this checks
-        // for underground space within add_recharge.
-        //   arp.wtd(x, y) += add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 1, arp);
       }
     }
   }
@@ -500,11 +496,9 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar my_S = updateEffectiveStorativity(
             my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
-        f[i][j] =
-            (uxx + uyy) * (user->timestep / my_S) + u + add_recharge(my_rech[i][j], my_h[i][j], my_porosity[i][j]);
-        if (isnan(f[i][j])) {
-          std::cout << "NAN at i" << i << " j " << j << std::endl;
-        }
+        const PetscScalar my_recharge = add_recharge(my_rech[i][j], my_h[i][j], my_porosity[i][j]);
+
+        f[i][j] = (uxx + uyy) * (user->timestep / my_S) + u + my_recharge;
       }
     }
   }
