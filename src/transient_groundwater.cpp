@@ -54,7 +54,6 @@ struct AppCtx {
   Vec h           = nullptr;
   Vec topo_vec    = nullptr;
   Vec rech_vec    = nullptr;
-  Vec area_vec    = nullptr;
 
   ~AppCtx() {
     SNESDestroy(&snes);
@@ -70,7 +69,6 @@ struct AppCtx {
     VecDestroy(&h);
     VecDestroy(&topo_vec);
     VecDestroy(&rech_vec);
-    VecDestroy(&area_vec);
   }
 
   // Extract global vectors from DM; then duplicate for remaining
@@ -87,7 +85,6 @@ struct AppCtx {
     VecDuplicate(x, &h);
     VecDuplicate(x, &topo_vec);
     VecDuplicate(x, &rech_vec);
-    VecDuplicate(x, &area_vec);
   }
 };
 
@@ -102,7 +99,6 @@ struct DMDA_Array_Pack {
   PetscScalar** h           = nullptr;
   PetscScalar** topo_vec    = nullptr;
   PetscScalar** rech_vec    = nullptr;
-  PetscScalar** area_vec    = nullptr;
   const AppCtx* context     = nullptr;
 
   DMDA_Array_Pack(const AppCtx& user) {
@@ -118,7 +114,6 @@ struct DMDA_Array_Pack {
     PETSC_CHECK(DMDAVecGetArray(user.da, user.h, &h));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.topo_vec, &topo_vec));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.rech_vec, &rech_vec));
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.area_vec, &area_vec));
   }
 
   void release() {
@@ -133,7 +128,6 @@ struct DMDA_Array_Pack {
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->h, &h));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->topo_vec, &topo_vec));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->rech_vec, &rech_vec));
-    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->area_vec, &area_vec));
     context = nullptr;
   }
 };
@@ -181,7 +175,6 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
         arp.wtd(x, y) = 0.;
       }
-      arp.original_wtd(x, y) = arp.wtd(x, y);
     }
   }
 
@@ -259,10 +252,9 @@ int update(Parameters& params, ArrayPack& arp) {
       dmdapack.ksat_vec[i][j]    = arp.ksat(i, j);
       dmdapack.S[i][j]           = arp.effective_storativity(i, j);
       dmdapack.porosity[i][j]    = arp.porosity(i, j);
-      dmdapack.h[i][j]           = arp.original_wtd(i, j);
+      dmdapack.h[i][j]           = arp.wtd(i, j);
       dmdapack.topo_vec[i][j]    = arp.topo(i, j);
       dmdapack.rech_vec[i][j]    = arp.rech(i, j);
-      dmdapack.area_vec[i][j]    = arp.cell_area[j];
     }
   }
 
@@ -478,7 +470,6 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecGetArray(da, user->h, &my_h));
   PetscCall(DMDAVecGetArray(da, user->topo_vec, &my_topo));
   PetscCall(DMDAVecGetArray(da, user->rech_vec, &my_rech));
-  PetscCall(DMDAVecGetArray(da, user->area_vec, &my_cell_area));
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
@@ -527,7 +518,6 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecRestoreArray(da, user->h, &my_h));
   PetscCall(DMDAVecRestoreArray(da, user->topo_vec, &my_topo));
   PetscCall(DMDAVecRestoreArray(da, user->rech_vec, &my_rech));
-  PetscCall(DMDAVecRestoreArray(da, user->area_vec, &my_cell_area));
 
   PetscLogFlops(info->xm * info->ym * (72.0));
   return 0;
