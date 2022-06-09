@@ -5,18 +5,16 @@
 // according to how much change in water table we are projecting to see during that time step.
 double updateEffectiveStorativity(
     const double my_original_wtd,
-    const double my_wtd_T,
+    const double my_new_wtd,
     const double my_porosity,
     const double starting_effective_storativity) {
-  const double projected_full_step_wtd = my_wtd_T;  // my_original_wtd + (my_wtd_T - my_original_wtd) * 2.;
-  if (my_original_wtd <= 0. &&
-      projected_full_step_wtd <= 0.) {  // both are below ground, so we can use the original porosity
+  if (my_original_wtd <= 0. && my_new_wtd <= 0.) {  // both are below ground, so we can use the original porosity
     return my_porosity;
-  } else if (my_original_wtd >= 0. && projected_full_step_wtd >= 0.) {  // both are above ground, so the porosity is 1
+  } else if (my_original_wtd >= 0. && my_new_wtd >= 0.) {  // both are above ground, so the porosity is 1
     return 1.;
   } else {
-    const double change_in_water_column_thickness = std::abs(projected_full_step_wtd - my_original_wtd);
-    if (my_original_wtd < 0. && projected_full_step_wtd > 0.) {  // started below ground and ended above ground
+    const double change_in_water_column_thickness = std::abs(my_new_wtd - my_original_wtd);
+    if (my_original_wtd < 0. && my_new_wtd > 0.) {  // started below ground and ended above ground
       // First, scale the change in wtd as if the whole column has the porosity of the belowground area
       const double scaled_change_in_water_column_thickness =
           change_in_water_column_thickness * starting_effective_storativity / my_porosity;
@@ -30,11 +28,11 @@ double updateEffectiveStorativity(
       return (aboveground_water_column_thickness + my_porosity * -my_original_wtd) /
              (aboveground_water_column_thickness - my_original_wtd);
     } else {
-      // This means that (my_original_wtd > 0. && projected_full_step_wtd < 0.). started above ground and ended below
+      // This means that (my_original_wtd > 0. && my_new_wtd < 0.). started above ground and ended below
       // ground.
       const double scaled_change_in_water_column_thickness =
           change_in_water_column_thickness * starting_effective_storativity;  // divided by 1 for above-ground porosity
-      if (scaled_change_in_water_column_thickness < projected_full_step_wtd) {
+      if (scaled_change_in_water_column_thickness < my_new_wtd) {
         // when rescaling the water according to the porosity values, there is no longer enough to reach below ground;
         // so the scaled new porosity will be = 1
         return 1;
