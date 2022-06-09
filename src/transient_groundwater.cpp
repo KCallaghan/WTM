@@ -273,18 +273,6 @@ int update(Parameters& params, ArrayPack& arp) {
   DMDASNESSetFunctionLocal(
       user.da, INSERT_VALUES, (PetscErrorCode(*)(DMDALocalInfo*, void*, void*, void*))FormFunctionLocal, &user);
 
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      if (arp.land_mask(x, y) != 0) {
-        double rech_to_add = arp.rech(x, y) * arp.cell_area[y];
-        if (arp.wtd(x, y) > 0 && (arp.wtd(x, y) + arp.rech(x, y)) < 0) {
-          rech_to_add = -arp.wtd(x, y) * arp.cell_area[y];
-        }
-        arp.total_added_recharge += rech_to_add;
-      }
-    }
-  }
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Customize nonlinear solver; set runtime options
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -420,7 +408,8 @@ static PetscErrorCode FormRHS(AppCtx* user, DM da, Vec B, ArrayPack& arp) {
       if (arp.land_mask(i, j) == 0) {
         b[i][j] = arp.topo(i, j) + 0.0;
       } else {
-        b[i][j] = arp.topo(i, j) + arp.wtd(i, j);
+        b[i][j] = arp.topo(i, j) + arp.wtd(i, j) +
+                  add_recharge(arp.rech(i, j), arp.wtd(i, j), arp.porosity(i, j), arp.cell_area[j], 1, arp);
       }
     }
   }
@@ -465,7 +454,6 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecGetArray(da, user->porosity, &my_porosity));
   PetscCall(DMDAVecGetArray(da, user->h, &my_h));
   PetscCall(DMDAVecGetArray(da, user->topo_vec, &my_topo));
-  PetscCall(DMDAVecGetArray(da, user->rech_vec, &my_rech));
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
@@ -496,9 +484,11 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar my_S = updateEffectiveStorativity(
             my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
-        const PetscScalar my_recharge = add_recharge(my_rech[i][j], my_h[i][j], my_porosity[i][j]);
+        f[i][j] = (uxx + uyy) * (user->timestep / my_S) + u;
 
-        f[i][j] = (uxx + uyy) * (user->timestep / my_S) + u + my_recharge;
+        if (my_S < 0) {
+          std::cout << "negative S " << my_S << std::endl;
+        }
       }
     }
   }
@@ -511,7 +501,6 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecRestoreArray(da, user->porosity, &my_porosity));
   PetscCall(DMDAVecRestoreArray(da, user->h, &my_h));
   PetscCall(DMDAVecRestoreArray(da, user->topo_vec, &my_topo));
-  PetscCall(DMDAVecRestoreArray(da, user->rech_vec, &my_rech));
 
   PetscLogFlops(info->xm * info->ym * (72.0));
   return 0;
