@@ -174,6 +174,8 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
       if (arp.land_mask(x, y) == 0.f) {
         arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
         arp.wtd(x, y) = 0.;
+      } else {
+        double rech_count = add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 1, arp);
       }
     }
   }
@@ -409,7 +411,7 @@ static PetscErrorCode FormRHS(AppCtx* user, DM da, Vec B, ArrayPack& arp) {
         b[i][j] = arp.topo(i, j) + 0.0;
       } else {
         b[i][j] = arp.topo(i, j) + arp.wtd(i, j) +
-                  add_recharge(arp.rech(i, j), arp.wtd(i, j), arp.porosity(i, j), arp.cell_area[j], 1, arp);
+                  add_recharge(arp.rech(i, j), arp.wtd(i, j), arp.porosity(i, j), arp.cell_area[j], 0, arp);
       }
     }
   }
@@ -478,17 +480,16 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
             2. / (1. / depthIntegratedTransmissivity(x[i][j], my_fdepth[i][j], my_ksat[i][j]) +
                   1. / depthIntegratedTransmissivity(x[i - 1][j], my_fdepth[i - 1][j], my_ksat[i - 1][j]));
 
-        const PetscScalar uxx = -1. / (cellsize_ew[i][j] * cellsize_ew[i][j]) * (e_E * ux_E - e_W * ux_W);
-        const PetscScalar uyy = -1. / (user->cellsize_NS * user->cellsize_NS) * (e_N * uy_N - e_S * uy_S);
+        const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) /
+                                (user->cellsize_NS * user->cellsize_NS);  //(cellsize_ew[i][j] * cellsize_ew[i][j]);
+        const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) /
+                                (cellsize_ew[i][j] * cellsize_ew[i][j]);  //(user->cellsize_NS * user->cellsize_NS);
+                                                                          // TODO double check which cellsize is which
 
         const PetscScalar my_S = updateEffectiveStorativity(
             my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
         f[i][j] = (uxx + uyy) * (user->timestep / my_S) + u;
-
-        if (my_S < 0) {
-          std::cout << "negative S " << my_S << std::endl;
-        }
       }
     }
   }
