@@ -28,7 +28,7 @@ std::string get_current_time_and_date_as_str() {
   return ss.str();
 }
 
-static constexpr auto help = "trying petsc method to solve the problem using Newton";
+static constexpr char help[] = "trying petsc method to solve the problem using Newton";
 
 void initialise(Parameters& params, ArrayPack& arp) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);
@@ -237,7 +237,6 @@ int main(int argc, char** argv) {
 
   PetscCall(PetscInitialize(&argc, &argv, (char*)0, help));
 
-  std::cout << "fdepth_fmin is " << params.fdepth_fmin << std::endl;
   initialise(params, arp);
   run(params, arp);
   finalise(params, arp);

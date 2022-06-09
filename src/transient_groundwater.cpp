@@ -53,6 +53,8 @@ struct AppCtx {
   Vec porosity    = nullptr;
   Vec h           = nullptr;
   Vec topo_vec    = nullptr;
+  Vec rech_vec    = nullptr;
+  Vec area_vec    = nullptr;
 
   ~AppCtx() {
     SNESDestroy(&snes);
@@ -67,6 +69,8 @@ struct AppCtx {
     VecDestroy(&porosity);
     VecDestroy(&h);
     VecDestroy(&topo_vec);
+    VecDestroy(&rech_vec);
+    VecDestroy(&area_vec);
   }
 
   // Extract global vectors from DM; then duplicate for remaining
@@ -82,6 +86,8 @@ struct AppCtx {
     VecDuplicate(x, &porosity);
     VecDuplicate(x, &h);
     VecDuplicate(x, &topo_vec);
+    VecDuplicate(x, &rech_vec);
+    VecDuplicate(x, &area_vec);
   }
 };
 
@@ -95,6 +101,8 @@ struct DMDA_Array_Pack {
   PetscScalar** porosity    = nullptr;
   PetscScalar** h           = nullptr;
   PetscScalar** topo_vec    = nullptr;
+  PetscScalar** rech_vec    = nullptr;
+  PetscScalar** area_vec    = nullptr;
   const AppCtx* context     = nullptr;
 
   DMDA_Array_Pack(const AppCtx& user) {
@@ -109,6 +117,8 @@ struct DMDA_Array_Pack {
     PETSC_CHECK(DMDAVecGetArray(user.da, user.porosity, &porosity));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.h, &h));
     PETSC_CHECK(DMDAVecGetArray(user.da, user.topo_vec, &topo_vec));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.rech_vec, &rech_vec));
+    PETSC_CHECK(DMDAVecGetArray(user.da, user.area_vec, &area_vec));
   }
 
   void release() {
@@ -122,6 +132,8 @@ struct DMDA_Array_Pack {
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->porosity, &porosity));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->h, &h));
     PETSC_CHECK(DMDAVecRestoreArray(context->da, context->topo_vec, &topo_vec));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->rech_vec, &rech_vec));
+    PETSC_CHECK(DMDAVecRestoreArray(context->da, context->area_vec, &area_vec));
     context = nullptr;
   }
 };
@@ -169,6 +181,7 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
         arp.wtd(x, y) = 0.;
       }
+      arp.original_wtd(x, y) = arp.wtd(x, y);
     }
   }
 
@@ -183,31 +196,33 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         // Apply the first half of the recharge to the water-table depth grid (wtd)
         // use regular porosity for adding recharge since this checks
         // for underground space within add_recharge.
-        arp.wtd(x, y) += add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 1, arp);
+        //   arp.wtd(x, y) += add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 1, arp);
       }
     }
   }
 }
 
-// main work is done here
 int update(Parameters& params, ArrayPack& arp) {
   AppCtx user;                /* user-defined work context */
   PetscInt its;               /* iterations for convergence */
   SNESConvergedReason reason; /* Check convergence */
 
-  // Initialize problem parameters
-
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Initialize problem parameters
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   user.cellsize_NS = params.cellsize_n_s_metres;
   user.timestep    = params.deltat;
 
-  // Create nonlinear solver context
-
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    Create nonlinear solver context
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   set_starting_values(params, arp);
 
   SNESCreate(PETSC_COMM_WORLD, &user.snes);
 
-  // Create distributed array (DMDA) to manage parallel grid and vectors
-
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Create distributed array (DMDA) to manage parallel grid and vectors
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   DMDACreate2d(
       PETSC_COMM_WORLD,
       DM_BOUNDARY_NONE,
@@ -225,8 +240,10 @@ int update(Parameters& params, ArrayPack& arp) {
   DMSetFromOptions(user.da);
   DMSetUp(user.da);
 
-  // Extract global vectors from DM; then duplicate for remaining vectors that are the same types
-
+  /*  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Extract global vectors from DM; then duplicate for remaining
+     vectors that are the same types
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   user.make_global_vectors();
 
   DMDA_Array_Pack dmdapack(user);
@@ -238,23 +255,47 @@ int update(Parameters& params, ArrayPack& arp) {
     for (auto i = xs; i < xs + xm; i++) {
       dmdapack.cellsize_EW[i][j] = arp.cellsize_e_w_metres[j];
       dmdapack.mask[i][j]        = arp.land_mask(i, j);
-      dmdapack.fdepth_vec[i][j]  = arp.fdepth(i, j);       // e-folding depth; based on slope and winter temperature
-      dmdapack.ksat_vec[i][j]    = arp.ksat(i, j);         // hydraulic conductivity
-      dmdapack.S[i][j] = arp.effective_storativity(i, j);  // based on porosity; 1 above ground and porosity below
-                                                           // ground. Changes if water table switches above/below ground
-      dmdapack.porosity[i][j] = arp.porosity(i, j);
-      dmdapack.h[i][j] = arp.wtd(i, j);  // water table depth prior to completing this solve. TODO should this be from
-                                         // before or after recharge is added?
-      dmdapack.topo_vec[i][j] = arp.topo(i, j);
+      dmdapack.fdepth_vec[i][j]  = arp.fdepth(i, j);
+      dmdapack.ksat_vec[i][j]    = arp.ksat(i, j);
+      dmdapack.S[i][j]           = arp.effective_storativity(i, j);
+      dmdapack.porosity[i][j]    = arp.porosity(i, j);
+      dmdapack.h[i][j]           = arp.original_wtd(i, j);
+      dmdapack.topo_vec[i][j]    = arp.topo(i, j);
+      dmdapack.rech_vec[i][j]    = arp.rech(i, j);
+      dmdapack.area_vec[i][j]    = arp.cell_area[j];
     }
   }
 
-  // Set local function evaluation routine
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     User can override with:
+     -snes_mf : matrix-free Newton-Krylov method with no preconditioning
+                (unless user explicitly sets preconditioner)
+     -snes_mf_operator : form preconditioning matrix as set by the user,
+                         but use matrix-free approx for Jacobian-vector
+                         products within Newton-Krylov method
+
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Set local function evaluation routine
+  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   DMSetApplicationContext(user.da, &user);
   SNESSetDM(user.snes, user.da);
 
   DMDASNESSetFunctionLocal(
       user.da, INSERT_VALUES, (PetscErrorCode(*)(DMDALocalInfo*, void*, void*, void*))FormFunctionLocal, &user);
+
+  for (int y = 0; y < params.ncells_y; y++) {
+    for (int x = 0; x < params.ncells_x; x++) {
+      if (arp.land_mask(x, y) != 0) {
+        double rech_to_add = arp.rech(x, y) * arp.cell_area[y];
+        if (arp.wtd(x, y) > 0 && (arp.wtd(x, y) + arp.rech(x, y)) < 0) {
+          rech_to_add = -arp.wtd(x, y) * arp.cell_area[y];
+        }
+        arp.total_added_recharge += rech_to_add;
+      }
+    }
+  }
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Customize nonlinear solver; set runtime options
@@ -291,8 +332,8 @@ int update(Parameters& params, ArrayPack& arp) {
       arp.wtd(i, j) = dmdapack.x[i][j] - arp.topo(i, j);
       if (arp.land_mask(i, j) == 0.f) {
         arp.total_loss_to_ocean +=
-            arp.wtd(i, j) * arp.cell_area[j];  // TODO could it be that because ocean cells are just set = x in the
-                                               // formula, that loss to/gain from ocean is not properly recorded?
+            arp.wtd(i, j) * arp.cell_area[j];  // could it be that because ocean cells are just set = x in the formula,
+                                               // that loss to/gain from ocean is not properly recorded?
         arp.wtd(i, j) = 0.;
       }
     }
@@ -315,7 +356,6 @@ int update(Parameters& params, ArrayPack& arp) {
    X - vector
  */
 static PetscErrorCode FormInitialGuess(AppCtx* user, DM da, Vec X, ArrayPack& arp) {
-  // set the initial guess equal to the starting head from before the solve. TODO should this use the wtd from
   PetscInt Mx, My;
   PetscScalar** x;
 
@@ -407,7 +447,7 @@ static PetscErrorCode FormRHS(AppCtx* user, DM da, Vec B, ArrayPack& arp) {
 static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user) {
   DM da = user->da;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo;
+      **my_topo, **my_rech, **my_cell_area;
   PetscInt Mx, My;
 
   DMDAGetInfo(
@@ -437,6 +477,8 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecGetArray(da, user->porosity, &my_porosity));
   PetscCall(DMDAVecGetArray(da, user->h, &my_h));
   PetscCall(DMDAVecGetArray(da, user->topo_vec, &my_topo));
+  PetscCall(DMDAVecGetArray(da, user->rech_vec, &my_rech));
+  PetscCall(DMDAVecGetArray(da, user->area_vec, &my_cell_area));
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
@@ -467,7 +509,11 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar my_S = updateEffectiveStorativity(
             my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
-        f[i][j] = (uxx + uyy) * (user->timestep / my_S) + u;
+        f[i][j] =
+            (uxx + uyy) * (user->timestep / my_S) + u + add_recharge(my_rech[i][j], my_h[i][j], my_porosity[i][j]);
+        if (isnan(f[i][j])) {
+          std::cout << "NAN at i" << i << " j " << j << std::endl;
+        }
       }
     }
   }
@@ -480,6 +526,8 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecRestoreArray(da, user->porosity, &my_porosity));
   PetscCall(DMDAVecRestoreArray(da, user->h, &my_h));
   PetscCall(DMDAVecRestoreArray(da, user->topo_vec, &my_topo));
+  PetscCall(DMDAVecRestoreArray(da, user->rech_vec, &my_rech));
+  PetscCall(DMDAVecRestoreArray(da, user->area_vec, &my_cell_area));
 
   PetscLogFlops(info->xm * info->ym * (72.0));
   return 0;

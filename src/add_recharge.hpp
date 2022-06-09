@@ -5,13 +5,7 @@
 // Determine how much recharge to add to each cell based on porosity,
 // water table depth, and available P-ET.
 // Note that we assume that porosity does not change with depth:
-inline double add_recharge(
-    const double my_rech,
-    double my_wtd,
-    const double my_porosity,
-    const double cell_area,
-    const bool count_recharge,
-    ArrayPack& arp) {
+inline double add_recharge(const double my_rech, double my_wtd, const double my_porosity) {
   double recharge_to_add = 0.;
 
   if (my_wtd >= 0) {  // all the recharge will occur above the land surface; don't worry about porosity.
@@ -35,9 +29,9 @@ inline double add_recharge(
     }
   }
 
-  if (count_recharge) {
-    arp.total_added_recharge += recharge_to_add * cell_area;
-  }
+  //  if (count_recharge) {
+  //    arp.total_added_recharge += recharge_to_add * cell_area;
+  //  }
 
   return recharge_to_add;
 }
