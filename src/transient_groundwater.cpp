@@ -486,10 +486,10 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
                                 (cellsize_ew[i][j] * cellsize_ew[i][j]);  //(user->cellsize_NS * user->cellsize_NS);
                                                                           // TODO double check which cellsize is which
 
-        const PetscScalar my_S = updateEffectiveStorativity(
+        starting_storativity[i][j] = updateEffectiveStorativity(
             my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
-        f[i][j] = (uxx + uyy) * (user->timestep / my_S) + u;
+        f[i][j] = (uxx + uyy) * (user->timestep / starting_storativity[i][j]) + u;
       }
     }
   }

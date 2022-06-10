@@ -1,4 +1,5 @@
 #include <cmath>
+#include <iostream>
 
 // Deal with the fact that porosity is 1 above ground but [value] below ground. It is included directly in the matrix
 // calculation, so we can't just scale water change before or after. Instead, we are scaling the effective storativity
@@ -11,8 +12,9 @@ double updateEffectiveStorativity(
   if (my_original_wtd <= 0. && my_new_wtd <= 0.) {  // both are below ground, so we can use the original porosity
     return my_porosity;
   } else if (my_original_wtd >= 0. && my_new_wtd >= 0.) {  // both are above ground, so the porosity is 1
-    return 1.;
+    return my_porosity;                                    // 1.;
   } else {
+    std::cout << "in the else " << std::endl;
     const double change_in_water_column_thickness = std::abs(my_new_wtd - my_original_wtd);
     if (my_original_wtd < 0. && my_new_wtd > 0.) {  // started below ground and ended above ground
       // First, scale the change in wtd as if the whole column has the porosity of the belowground area
