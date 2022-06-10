@@ -25,6 +25,7 @@ inline double add_recharge(
       recharge_to_add = -my_wtd;
       if (count_recharge) {
         arp.total_added_recharge -= my_rech * cell_area;
+        arp.total_added_recharge += recharge_to_add * cell_area;
       }
     }
   } else if (my_rech > 0) {  // at least some of the water will be added into the ground, so we need to think about
