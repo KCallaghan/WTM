@@ -168,10 +168,10 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.land_mask = rd::Array2D<uint8_t>(arp.topo, 1);
   arp.land_mask.setEdges(0);
 
-  arp.precip          = rd::Array2D<float>(arp.topo, 0.);  // Units: m/yr.
-  arp.runoff_ratio    = rd::Array2D<float>(arp.topo, 0.);  // Units: m/yr.
-  arp.evap            = rd::Array2D<float>(arp.topo, 0.);  // Units: m/yr.
-  arp.open_water_evap = rd::Array2D<float>(arp.topo, 0.);  // Units: m/yr.
+  arp.precip          = rd::Array2D<float>(arp.topo, 0.03f);  // Units: m/yr.
+  arp.runoff_ratio    = rd::Array2D<float>(arp.topo, 0.);     // Units: m/yr.
+  arp.evap            = rd::Array2D<float>(arp.topo, 0.);     // Units: m/yr.
+  arp.open_water_evap = rd::Array2D<float>(arp.topo, 0.5);    // Units: m/yr.
 
   arp.winter_temp     = rd::Array2D<float>(arp.topo, 0);  // Units: deg C
   arp.wtd             = rd::Array2D<double>(arp.topo, 0.0);

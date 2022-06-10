@@ -300,6 +300,20 @@ int update(Parameters& params, ArrayPack& arp) {
   PetscPrintf(
       PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
 
+  for (auto j = ys; j < ys + ym; j++) {
+    for (auto i = xs; i < xs + xm; i++) {
+      dmdapack.S[i][j] = updateEffectiveStorativity(
+          arp.wtd(i, j), dmdapack.x[i][j] - arp.topo(i, j), arp.porosity(i, j), arp.effective_storativity(i, j));
+    }
+  }
+
+  SNESSolve(user.snes, user.b, user.x);
+  SNESGetIterationNumber(user.snes, &its);
+  SNESGetConvergedReason(user.snes, &reason);
+
+  PetscPrintf(
+      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Free work space.  All PETSc objects should be destroyed when they
      are no longer needed.
@@ -486,8 +500,8 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
                                 (cellsize_ew[i][j] * cellsize_ew[i][j]);  //(user->cellsize_NS * user->cellsize_NS);
                                                                           // TODO double check which cellsize is which
 
-        starting_storativity[i][j] = updateEffectiveStorativity(
-            my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
+        // starting_storativity[i][j] = updateEffectiveStorativity(
+        //   my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
         f[i][j] = (uxx + uyy) * (user->timestep / starting_storativity[i][j]) + u;
       }
