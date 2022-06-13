@@ -25,4 +25,11 @@ void InitialiseSNES(AppCtx& user_context, Parameters& params) {
       &user_context.da);
   DMSetFromOptions(user_context.da);
   DMSetUp(user_context.da);
+
+  user_context.make_global_vectors();
+
+  DMSetApplicationContext(user_context.da, &user_context);
+  SNESSetDM(user_context.snes, user_context.da);
+
+  SNESSetFromOptions(user_context.snes);
 }
