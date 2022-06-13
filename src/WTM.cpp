@@ -1,7 +1,8 @@
-#include "CreateSNES.cpp"
 #include "fill_spill_merge.hpp"
 #include "irf.hpp"
 #include "transient_groundwater.hpp"
+
+#include "CreateSNES.cpp"
 
 #include <fmt/core.h>
 #include <petscdm.h>

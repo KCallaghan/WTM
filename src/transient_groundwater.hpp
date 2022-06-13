@@ -2,8 +2,7 @@
 
 #include "ArrayPack.hpp"
 #include "CreateSNES.hpp"
-#include "DMDA_array_pack.hpp"
-#include "parameters.hpp"
+//#include "DMDA_array_pack.hpp"
 
 #include <richdem/common/Array2D.hpp>
 

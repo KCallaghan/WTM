@@ -1,3 +1,5 @@
+#include "parameters.hpp"
+
 #include <petscdm.h>
 #include <petscdmda.h>
 #include <petscerror.h>
