@@ -38,55 +38,6 @@ std::tuple<PetscInt, PetscInt, PetscInt, PetscInt> get_corners(const DM da) {
    application-provided call-back routines, FormJacobianLocal() and
    FormFunctionLocal().
 */
-struct AppCtx {
-  PetscReal timestep;
-  PetscReal cellsize_NS;
-  SNES snes       = nullptr;
-  DM da           = nullptr;
-  Vec x           = nullptr;  // Solution vector
-  Vec b           = nullptr;  // RHS vector
-  Vec S           = nullptr;
-  Vec cellsize_EW = nullptr;
-  Vec fdepth_vec  = nullptr;
-  Vec ksat_vec    = nullptr;
-  Vec mask        = nullptr;
-  Vec porosity    = nullptr;
-  Vec h           = nullptr;
-  Vec topo_vec    = nullptr;
-  Vec rech_vec    = nullptr;
-
-  ~AppCtx() {
-    SNESDestroy(&snes);
-    DMDestroy(&da);
-    VecDestroy(&x);
-    VecDestroy(&b);
-    VecDestroy(&S);
-    VecDestroy(&cellsize_EW);
-    VecDestroy(&fdepth_vec);
-    VecDestroy(&ksat_vec);
-    VecDestroy(&mask);
-    VecDestroy(&porosity);
-    VecDestroy(&h);
-    VecDestroy(&topo_vec);
-    VecDestroy(&rech_vec);
-  }
-
-  // Extract global vectors from DM; then duplicate for remaining
-  // vectors that are the same types
-  void make_global_vectors() {
-    DMCreateGlobalVector(da, &x);
-    VecDuplicate(x, &b);
-    VecDuplicate(x, &S);
-    VecDuplicate(x, &cellsize_EW);
-    VecDuplicate(x, &fdepth_vec);
-    VecDuplicate(x, &ksat_vec);
-    VecDuplicate(x, &mask);
-    VecDuplicate(x, &porosity);
-    VecDuplicate(x, &h);
-    VecDuplicate(x, &topo_vec);
-    VecDuplicate(x, &rech_vec);
-  }
-};
 
 struct DMDA_Array_Pack {
   PetscScalar** x           = nullptr;
@@ -101,19 +52,19 @@ struct DMDA_Array_Pack {
   PetscScalar** rech_vec    = nullptr;
   const AppCtx* context     = nullptr;
 
-  DMDA_Array_Pack(const AppCtx& user) {
+  DMDA_Array_Pack(const AppCtx& user_context) {
     assert(!context);  // Make sure we're not already initialized
-    context = &user;
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.x, &x));
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.S, &S));
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.cellsize_EW, &cellsize_EW));
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.fdepth_vec, &fdepth_vec));
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.ksat_vec, &ksat_vec));
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.mask, &mask));
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.porosity, &porosity));
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.h, &h));
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.topo_vec, &topo_vec));
-    PETSC_CHECK(DMDAVecGetArray(user.da, user.rech_vec, &rech_vec));
+    context = &user_context;
+    PETSC_CHECK(DMDAVecGetArray(user_context.da, user_context.x, &x));
+    PETSC_CHECK(DMDAVecGetArray(user_context.da, user_context.S, &S));
+    PETSC_CHECK(DMDAVecGetArray(user_context.da, user_context.cellsize_EW, &cellsize_EW));
+    PETSC_CHECK(DMDAVecGetArray(user_context.da, user_context.fdepth_vec, &fdepth_vec));
+    PETSC_CHECK(DMDAVecGetArray(user_context.da, user_context.ksat_vec, &ksat_vec));
+    PETSC_CHECK(DMDAVecGetArray(user_context.da, user_context.mask, &mask));
+    PETSC_CHECK(DMDAVecGetArray(user_context.da, user_context.porosity, &porosity));
+    PETSC_CHECK(DMDAVecGetArray(user_context.da, user_context.h, &h));
+    PETSC_CHECK(DMDAVecGetArray(user_context.da, user_context.topo_vec, &topo_vec));
+    PETSC_CHECK(DMDAVecGetArray(user_context.da, user_context.rech_vec, &rech_vec));
   }
 
   void release() {
@@ -193,23 +144,11 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
   }
 }
 
-int update(Parameters& params, ArrayPack& arp) {
-  AppCtx user;                /* user-defined work context */
+int update(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
   PetscInt its;               /* iterations for convergence */
   SNESConvergedReason reason; /* Check convergence */
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Initialize problem parameters
-  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  user.cellsize_NS = params.cellsize_n_s_metres;
-  user.timestep    = params.deltat;
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    Create nonlinear solver context
-    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   set_starting_values(params, arp);
-
-  SNESCreate(PETSC_COMM_WORLD, &user.snes);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Create distributed array (DMDA) to manage parallel grid and vectors
@@ -227,20 +166,20 @@ int update(Parameters& params, ArrayPack& arp) {
       1,
       nullptr,
       nullptr,
-      &user.da);
-  DMSetFromOptions(user.da);
-  DMSetUp(user.da);
+      &user_context.da);
+  DMSetFromOptions(user_context.da);
+  DMSetUp(user_context.da);
 
   /*  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Extract global vectors from DM; then duplicate for remaining
      vectors that are the same types
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  user.make_global_vectors();
+  user_context.make_global_vectors();
 
-  DMDA_Array_Pack dmdapack(user);
+  DMDA_Array_Pack dmdapack(user_context);
 
   // Get local array bounds
-  const auto [xs, ys, xm, ym] = get_corners(user.da);
+  const auto [xs, ys, xm, ym] = get_corners(user_context.da);
 
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
@@ -269,16 +208,19 @@ int update(Parameters& params, ArrayPack& arp) {
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Set local function evaluation routine
   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  DMSetApplicationContext(user.da, &user);
-  SNESSetDM(user.snes, user.da);
+  DMSetApplicationContext(user_context.da, &user_context);
+  SNESSetDM(user_context.snes, user_context.da);
 
   DMDASNESSetFunctionLocal(
-      user.da, INSERT_VALUES, (PetscErrorCode(*)(DMDALocalInfo*, void*, void*, void*))FormFunctionLocal, &user);
+      user_context.da,
+      INSERT_VALUES,
+      (PetscErrorCode(*)(DMDALocalInfo*, void*, void*, void*))FormFunctionLocal,
+      &user_context);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Customize nonlinear solver; set runtime options
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  SNESSetFromOptions(user.snes);
+  SNESSetFromOptions(user_context.snes);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Evaluate initial guess
@@ -287,15 +229,15 @@ int update(Parameters& params, ArrayPack& arp) {
      to employ an initial guess of zero, the user should explicitly set
      this vector to zero by calling VecSet().
   */
-  FormInitialGuess(&user, user.da, user.x, arp);
-  FormRHS(&user, user.da, user.b, arp);
+  FormInitialGuess(&user_context, user_context.da, user_context.x, arp);
+  FormRHS(&user_context, user_context.da, user_context.b, arp);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Solve nonlinear system
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  SNESSolve(user.snes, user.b, user.x);
-  SNESGetIterationNumber(user.snes, &its);
-  SNESGetConvergedReason(user.snes, &reason);
+  SNESSolve(user_context.snes, user_context.b, user_context.x);
+  SNESGetIterationNumber(user_context.snes, &its);
+  SNESGetConvergedReason(user_context.snes, &reason);
 
   PetscPrintf(
       PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
@@ -307,9 +249,9 @@ int update(Parameters& params, ArrayPack& arp) {
     }
   }
 
-  SNESSolve(user.snes, user.b, user.x);
-  SNESGetIterationNumber(user.snes, &its);
-  SNESGetConvergedReason(user.snes, &reason);
+  SNESSolve(user_context.snes, user_context.b, user_context.x);
+  SNESGetIterationNumber(user_context.snes, &its);
+  SNESGetConvergedReason(user_context.snes, &reason);
 
   PetscPrintf(
       PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
@@ -347,7 +289,7 @@ int update(Parameters& params, ArrayPack& arp) {
    Output Parameter:
    X - vector
  */
-static PetscErrorCode FormInitialGuess(AppCtx* user, DM da, Vec X, ArrayPack& arp) {
+static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X, ArrayPack& arp) {
   PetscInt Mx, My;
   PetscScalar** x;
 
@@ -396,7 +338,7 @@ static PetscErrorCode FormInitialGuess(AppCtx* user, DM da, Vec X, ArrayPack& ar
    Output Parameter:
    B - vector
  */
-static PetscErrorCode FormRHS(AppCtx* user, DM da, Vec B, ArrayPack& arp) {
+static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B, ArrayPack& arp) {
   PetscInt Mx, My;
   PetscScalar** b;
 
@@ -437,8 +379,8 @@ static PetscErrorCode FormRHS(AppCtx* user, DM da, Vec B, ArrayPack& arp) {
 /*
    FormFunctionLocal - Evaluates nonlinear function, F(x).
  */
-static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user) {
-  DM da = user->da;
+static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user_context) {
+  DM da = user_context->da;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
       **my_topo, **my_rech, **my_cell_area;
   PetscInt Mx, My;
@@ -462,14 +404,14 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   /*
     Compute function over the locally owned part of the grid
  */
-  PetscCall(DMDAVecGetArray(da, user->mask, &my_mask));
-  PetscCall(DMDAVecGetArray(da, user->S, &starting_storativity));
-  PetscCall(DMDAVecGetArray(da, user->cellsize_EW, &cellsize_ew));
-  PetscCall(DMDAVecGetArray(da, user->fdepth_vec, &my_fdepth));
-  PetscCall(DMDAVecGetArray(da, user->ksat_vec, &my_ksat));
-  PetscCall(DMDAVecGetArray(da, user->porosity, &my_porosity));
-  PetscCall(DMDAVecGetArray(da, user->h, &my_h));
-  PetscCall(DMDAVecGetArray(da, user->topo_vec, &my_topo));
+  PetscCall(DMDAVecGetArray(da, user_context->mask, &my_mask));
+  PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
+  PetscCall(DMDAVecGetArray(da, user_context->cellsize_EW, &cellsize_ew));
+  PetscCall(DMDAVecGetArray(da, user_context->fdepth_vec, &my_fdepth));
+  PetscCall(DMDAVecGetArray(da, user_context->ksat_vec, &my_ksat));
+  PetscCall(DMDAVecGetArray(da, user_context->porosity, &my_porosity));
+  PetscCall(DMDAVecGetArray(da, user_context->h, &my_h));
+  PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
@@ -494,28 +436,30 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
             2. / (1. / depthIntegratedTransmissivity(x[i][j], my_fdepth[i][j], my_ksat[i][j]) +
                   1. / depthIntegratedTransmissivity(x[i - 1][j], my_fdepth[i - 1][j], my_ksat[i - 1][j]));
 
-        const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) /
-                                (user->cellsize_NS * user->cellsize_NS);  //(cellsize_ew[i][j] * cellsize_ew[i][j]);
-        const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) /
-                                (cellsize_ew[i][j] * cellsize_ew[i][j]);  //(user->cellsize_NS * user->cellsize_NS);
-                                                                          // TODO double check which cellsize is which
+        const PetscScalar uxx =
+            (e_W * ux_W - e_E * ux_E) /
+            (user_context->cellsize_NS * user_context->cellsize_NS);  //(cellsize_ew[i][j] * cellsize_ew[i][j]);
+        const PetscScalar uyy =
+            (e_S * uy_S - e_N * uy_N) /
+            (cellsize_ew[i][j] * cellsize_ew[i][j]);  //(user_context->cellsize_NS * user_context->cellsize_NS);
+                                                      // TODO double check which cellsize is which
 
         // starting_storativity[i][j] = updateEffectiveStorativity(
         //   my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
-        f[i][j] = (uxx + uyy) * (user->timestep / starting_storativity[i][j]) + u;
+        f[i][j] = (uxx + uyy) * (user_context->timestep / starting_storativity[i][j]) + u;
       }
     }
   }
 
-  PetscCall(DMDAVecRestoreArray(da, user->mask, &my_mask));
-  PetscCall(DMDAVecRestoreArray(da, user->S, &starting_storativity));
-  PetscCall(DMDAVecRestoreArray(da, user->cellsize_EW, &cellsize_ew));
-  PetscCall(DMDAVecRestoreArray(da, user->fdepth_vec, &my_fdepth));
-  PetscCall(DMDAVecRestoreArray(da, user->ksat_vec, &my_ksat));
-  PetscCall(DMDAVecRestoreArray(da, user->porosity, &my_porosity));
-  PetscCall(DMDAVecRestoreArray(da, user->h, &my_h));
-  PetscCall(DMDAVecRestoreArray(da, user->topo_vec, &my_topo));
+  PetscCall(DMDAVecRestoreArray(da, user_context->mask, &my_mask));
+  PetscCall(DMDAVecRestoreArray(da, user_context->S, &starting_storativity));
+  PetscCall(DMDAVecRestoreArray(da, user_context->cellsize_EW, &cellsize_ew));
+  PetscCall(DMDAVecRestoreArray(da, user_context->fdepth_vec, &my_fdepth));
+  PetscCall(DMDAVecRestoreArray(da, user_context->ksat_vec, &my_ksat));
+  PetscCall(DMDAVecRestoreArray(da, user_context->porosity, &my_porosity));
+  PetscCall(DMDAVecRestoreArray(da, user_context->h, &my_h));
+  PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
 
   PetscLogFlops(info->xm * info->ym * (72.0));
   return 0;

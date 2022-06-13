@@ -1,3 +1,4 @@
+#include "CreateSNES.cpp"
 #include "fill_spill_merge.hpp"
 #include "irf.hpp"
 #include "transient_groundwater.hpp"
@@ -30,7 +31,7 @@ std::string get_current_time_and_date_as_str() {
 
 static constexpr char help[] = "trying petsc method to solve the problem using Newton";
 
-void initialise(Parameters& params, ArrayPack& arp) {
+void initialise(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);
   // Text file to save outputs of how much is changing and
   // min and max wtd at various times
@@ -68,6 +69,8 @@ void initialise(Parameters& params, ArrayPack& arp) {
 
   arp.check();
 
+  InitialiseSNES(user_context, params);
+
   // Print column headings to textfile to match data that will be printed after each time step.
   textfile << "Cycles_done Total_wtd_change Change_in_GW_only Change_in_SW_only absolute_value_total_wtd_change "
               "abs_change_in_GW abs_change_in_SW change_in_infiltration total_recharge_added total_loss_to_ocean "
@@ -77,7 +80,11 @@ void initialise(Parameters& params, ArrayPack& arp) {
 }
 
 template <class elev_t>
-void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHierarchy<elev_t>& deps) {
+void update(
+    Parameters& params,
+    ArrayPack& arp,
+    AppCtx& user_context,
+    richdem::dephier::DepressionHierarchy<elev_t>& deps) {
   richdem::Timer timer_overall;
   timer_overall.start();
 
@@ -114,7 +121,7 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
   // 2x 6 months GW then FSM.
   int iter_count = 0;
   while (iter_count++ < params.maxiter) {
-    FanDarcyGroundwater::update(params, arp);
+    FanDarcyGroundwater::update(params, arp, user_context);
   }
 
   std::cerr << "t GW time = " << time_groundwater.lap() << std::endl;
@@ -202,14 +209,14 @@ void update(Parameters& params, ArrayPack& arp, richdem::dephier::DepressionHier
   std::cerr << "t WTM update time = " << timer_overall.lap() << std::endl;
 }
 
-void run(Parameters& params, ArrayPack& arp) {
+void run(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
   // Set the initial depression hierarchy.
   // For equilibrium runs, this is the only time this needs to be done.
   auto deps = dh::GetDepressionHierarchy<float, rd::Topology::D8>(
       arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
   while (params.cycles_done < params.total_cycles) {
-    update(params, arp, deps);
+    update(params, arp, user_context, deps);
   }
 }
 
@@ -235,10 +242,12 @@ int main(int argc, char** argv) {
 
   ArrayPack arp;
 
+  AppCtx user_context;
+
   PetscCall(PetscInitialize(&argc, &argv, (char*)0, help));
 
-  initialise(params, arp);
-  run(params, arp);
+  initialise(params, arp, user_context);
+  run(params, arp, user_context);
   finalise(params, arp);
 
   PetscCall(PetscFinalize());
