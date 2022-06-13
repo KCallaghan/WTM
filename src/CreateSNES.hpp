@@ -53,4 +53,4 @@ struct AppCtx {
   }
 };
 
-void InitialiseSNES(AppCtx& user_context);
+void InitialiseSNES(AppCtx& user_context, Parameters& params);

@@ -150,26 +150,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
 
   set_starting_values(params, arp);
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Create distributed array (DMDA) to manage parallel grid and vectors
-  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  DMDACreate2d(
-      PETSC_COMM_WORLD,
-      DM_BOUNDARY_NONE,
-      DM_BOUNDARY_NONE,
-      DMDA_STENCIL_STAR,
-      params.ncells_x,
-      params.ncells_y,
-      PETSC_DECIDE,
-      PETSC_DECIDE,
-      1,
-      1,
-      nullptr,
-      nullptr,
-      &user_context.da);
-  DMSetFromOptions(user_context.da);
-  DMSetUp(user_context.da);
-
   /*  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Extract global vectors from DM; then duplicate for remaining
      vectors that are the same types
@@ -194,16 +174,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
       dmdapack.rech_vec[i][j]    = arp.rech(i, j);
     }
   }
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     User can override with:
-     -snes_mf : matrix-free Newton-Krylov method with no preconditioning
-                (unless user explicitly sets preconditioner)
-     -snes_mf_operator : form preconditioning matrix as set by the user,
-                         but use matrix-free approx for Jacobian-vector
-                         products within Newton-Krylov method
-
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Set local function evaluation routine
