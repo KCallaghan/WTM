@@ -27,23 +27,21 @@ void PETSC_CHECK(
   }
 }
 
+// get corners of arrays for individual processors
 std::tuple<PetscInt, PetscInt, PetscInt, PetscInt> get_corners(const DM da) {
   PetscInt xs, ys, xm, ym;
   PETSC_CHECK(DMDAGetCorners(da, &xs, &ys, nullptr, &xm, &ym, nullptr));
   return {xs, ys, xm, ym};
 }
 
-/*
-   User-defined application context - contains data needed by the
-   application-provided call-back routines, FormJacobianLocal() and
-   FormFunctionLocal().
-*/
-
-// User-defined routines
-
+// declare functions
 static PetscErrorCode FormRHS(AppCtx*, DM, Vec, ArrayPack& arp);
 static PetscErrorCode FormInitialGuess(AppCtx*, DM, Vec, ArrayPack& arp);
 static PetscErrorCode FormFunctionLocal(DMDALocalInfo*, PetscScalar**, PetscScalar**, AppCtx*);
+
+//////////////////////
+// PUBLIC FUNCTIONS //
+//////////////////////
 
 double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, const double ksat) {
   constexpr double shallow = 1.5;
@@ -68,10 +66,6 @@ double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, co
   }
 }
 
-//////////////////////
-// PUBLIC FUNCTIONS //
-//////////////////////
-
 void set_starting_values(Parameters& params, ArrayPack& arp) {
   // no pragma because we're editing arp.total_loss_to_ocean
   // check to see if there is any non-zero water table in ocean
@@ -87,7 +81,7 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
     }
   }
 
-  //#pragma omp parallel for default(none) shared(arp, params) collapse(2)
+#pragma omp parallel for default(none) shared(arp, params) collapse(2)
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 0.f || arp.wtd(x, y) > 0) {
@@ -101,19 +95,17 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
 }
 
 int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_Pack& dmdapack) {
-  PetscInt its;               /* iterations for convergence */
-  SNESConvergedReason reason; /* Check convergence */
+  PetscInt its;                // iterations for convergence
+  SNESConvergedReason reason;  // Check convergence
 
+  // compute any starting values needed for arrays
   set_starting_values(params, arp);
-
-  /*  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Extract global vectors from DM; then duplicate for remaining
-     vectors that are the same types
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
   // Get local array bounds
   const auto [xs, ys, xm, ym] = get_corners(user_context.da);
 
+  // values for storativity are reset each time; and wtd and recharge change from one timestep to the next, so set these
+  // here
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
       dmdapack.S[i][j]        = arp.effective_storativity(i, j);
@@ -122,32 +114,20 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
     }
   }
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Set local function evaluation routine
-  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  // Set local function evaluation routine
   DMDASNESSetFunctionLocal(
       user_context.da,
       INSERT_VALUES,
       (PetscErrorCode(*)(DMDALocalInfo*, void*, void*, void*))FormFunctionLocal,
       &user_context);
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Customize nonlinear solver; set runtime options
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Evaluate initial guess
-     Note: The user should initialize the vector, x, with the initial guess
-     for the nonlinear solver prior to calling SNESSolve().  In particular,
-     to employ an initial guess of zero, the user should explicitly set
-     this vector to zero by calling VecSet().
-  */
+  // Evaluate initial guess
   FormInitialGuess(&user_context, user_context.da, user_context.x, arp);
+
+  // set the RHS
   FormRHS(&user_context, user_context.da, user_context.b, arp);
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Solve nonlinear system
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  // Solve nonlinear system
   SNESSolve(user_context.snes, user_context.b, user_context.x);
   SNESGetIterationNumber(user_context.snes, &its);
   SNESGetConvergedReason(user_context.snes, &reason);
@@ -155,6 +135,7 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   PetscPrintf(
       PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
 
+  // recalculate the new storativity using the initial solve as an estimator for the final answer
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
       dmdapack.S[i][j] = updateEffectiveStorativity(
@@ -162,6 +143,7 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
     }
   }
 
+  // repeat the solve
   SNESSolve(user_context.snes, user_context.b, user_context.x);
   SNESGetIterationNumber(user_context.snes, &its);
   SNESGetConvergedReason(user_context.snes, &reason);
@@ -169,10 +151,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   PetscPrintf(
       PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Free work space.  All PETSc objects should be destroyed when they
-     are no longer needed.
-   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   // copy the result back into the wtd array
   for (int j = ys; j < ys + ym; j++) {
     for (int i = xs; i < xs + xm; i++) {
@@ -354,9 +332,7 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) / (cellsize_ew[i][j] * cellsize_ew[i][j]);
         const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (user_context->cellsize_NS * user_context->cellsize_NS);
         // TODO double check which cellsize is which
-        // std::cout<<"j "<<j<<" i "<<i<<" wtd "<<x[i][j]- my_topo[i][j]<<" fdepth "<<my_fdepth[i][j]<<" ksat
-        // "<<my_ksat[i][j]<<" T "<<depthIntegratedTransmissivity(x[i][j]-
-        // my_topo[i][j],my_fdepth[i][j],my_ksat[i][j])<<" e_E "<<e_E<<std::endl;
+
         //  starting_storativity[i][j] = updateEffectiveStorativity(
         //    my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
