@@ -335,28 +335,30 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar uy_N = (x[i + 1][j] - x[i][j]);
         const PetscScalar uy_S = (x[i][j] - x[i - 1][j]);
         const PetscScalar e_E =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-                  1. / depthIntegratedTransmissivity(x[i][j + 1], my_fdepth[i][j + 1], my_ksat[i][j + 1]));
+            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(
+                           x[i][j + 1] - my_topo[i][j + 1], my_fdepth[i][j + 1], my_ksat[i][j + 1]));
         const PetscScalar e_W =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-                  1. / depthIntegratedTransmissivity(x[i][j - 1], my_fdepth[i][j - 1], my_ksat[i][j - 1]));
+            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(
+                           x[i][j - 1] - my_topo[i][j - 1], my_fdepth[i][j - 1], my_ksat[i][j - 1]));
         const PetscScalar e_N =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-                  1. / depthIntegratedTransmissivity(x[i + 1][j], my_fdepth[i + 1][j], my_ksat[i + 1][j]));
+            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(
+                           x[i + 1][j] - my_topo[i + 1][j], my_fdepth[i + 1][j], my_ksat[i + 1][j]));
         const PetscScalar e_S =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-                  1. / depthIntegratedTransmissivity(x[i - 1][j], my_fdepth[i - 1][j], my_ksat[i - 1][j]));
+            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(
+                           x[i - 1][j] - my_topo[i - 1][j], my_fdepth[i - 1][j], my_ksat[i - 1][j]));
 
-        const PetscScalar uxx =
-            (e_W * ux_W - e_E * ux_E) /
-            (user_context->cellsize_NS * user_context->cellsize_NS);  //(cellsize_ew[i][j] * cellsize_ew[i][j]);
-        const PetscScalar uyy =
-            (e_S * uy_S - e_N * uy_N) /
-            (cellsize_ew[i][j] * cellsize_ew[i][j]);  //(user_context->cellsize_NS * user_context->cellsize_NS);
-                                                      // TODO double check which cellsize is which
-
-        // starting_storativity[i][j] = updateEffectiveStorativity(
-        //   my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
+        const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) / (cellsize_ew[i][j] * cellsize_ew[i][j]);
+        const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (user_context->cellsize_NS * user_context->cellsize_NS);
+        // TODO double check which cellsize is which
+        // std::cout<<"j "<<j<<" i "<<i<<" wtd "<<x[i][j]- my_topo[i][j]<<" fdepth "<<my_fdepth[i][j]<<" ksat
+        // "<<my_ksat[i][j]<<" T "<<depthIntegratedTransmissivity(x[i][j]-
+        // my_topo[i][j],my_fdepth[i][j],my_ksat[i][j])<<" e_E "<<e_E<<std::endl;
+        //  starting_storativity[i][j] = updateEffectiveStorativity(
+        //    my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
         f[i][j] = (uxx + uyy) * (user_context->timestep / starting_storativity[i][j]) + u;
       }
