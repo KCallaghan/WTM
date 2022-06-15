@@ -10,12 +10,63 @@
 #include <petscdmda.h>
 #include <petscerror.h>
 #include <petscsnes.h>
+#include <petscts.h>
 
 ///////////////////////
 // PRIVATE FUNCTIONS //
 ///////////////////////
 
 namespace FanDarcyGroundwater {
+
+typedef enum { VAR_CONSERVATIVE, VAR_NONCONSERVATIVE, VAR_TRANSIENTVAR } VarMode;
+static const char* const VarModes[] = {"CONSERVATIVE", "NONCONSERVATIVE", "TRANSIENTVAR", "VarMode", "VAR_", NULL};
+static PetscErrorCode IFunction_Conservative(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, void* ctx) {
+  const PetscScalar *u, *udot;
+  PetscScalar* f;
+  VecGetArrayRead(U, &u);
+  VecGetArrayRead(Udot, &udot);
+  VecGetArray(F, &f);
+  f[0] = udot[0] + u[0];
+  f[1] = udot[1] - u[0];
+  VecRestoreArrayRead(U, &u);
+  VecRestoreArrayRead(Udot, &udot);
+  VecRestoreArray(F, &f);
+  return 0;
+}
+
+static PetscErrorCode IFunction_Nonconservative(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, void* ctx) {
+  const PetscScalar *u, *udot;
+  PetscScalar* f;
+  VecGetArrayRead(U, &u);
+  VecGetArrayRead(Udot, &udot);
+  VecGetArray(F, &f);
+  f[0] = PetscExpScalar(u[0]) * udot[0] + PetscExpScalar(u[0]);
+  f[1] = PetscExpScalar(u[1]) * udot[1] - PetscExpScalar(u[0]);
+  VecRestoreArrayRead(U, &u);
+  VecRestoreArrayRead(Udot, &udot);
+  VecRestoreArray(F, &f);
+  return 0;
+}
+
+static PetscErrorCode IFunction_TransientVar(TS ts, PetscReal t, Vec U, Vec Cdot, Vec F, void* ctx) {
+  const PetscScalar *u, *cdot;
+  PetscScalar* f;
+  VecGetArrayRead(U, &u);
+  VecGetArrayRead(Cdot, &cdot);
+  VecGetArray(F, &f);
+  f[0] = cdot[0] + PetscExpScalar(u[0]);
+  f[1] = cdot[1] - PetscExpScalar(u[0]);
+  VecRestoreArrayRead(U, &u);
+  VecRestoreArrayRead(Cdot, &cdot);
+  VecRestoreArray(F, &f);
+  return 0;
+}
+
+static PetscErrorCode TransientVar(TS ts, Vec U, Vec C, void* ctx) {
+  VecCopy(U, C);
+  VecExp(C);
+  return 0;
+}
 
 void PETSC_CHECK(
     const PetscErrorCode err,
@@ -97,74 +148,107 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
 int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_Pack& dmdapack) {
   PetscInt its;                // iterations for convergence
   SNESConvergedReason reason;  // Check convergence
+  TS ts;
+  Vec U;
+  PetscScalar sum;
 
   // compute any starting values needed for arrays
   set_starting_values(params, arp);
 
-  // Get local array bounds
-  const auto [xs, ys, xm, ym] = get_corners(user_context.da);
+  std::cout << "line 180" << std::endl;
+  TSCreate(PETSC_COMM_WORLD, &ts);
+  TSSetType(ts, TSBDF);
+  TSSetDM(ts, user_context.da);
+  VecCreateSeq(PETSC_COMM_SELF, 2, &U);
+  VecSetValue(U, 0, 2., INSERT_VALUES);
+  VecSetValue(U, 1, 1., INSERT_VALUES);
+  std::cout << "line 187" << std::endl;
+  VecLog(U);
+  DMTSSetIFunction(user_context.da, IFunction_TransientVar, NULL);
+  DMTSSetTransientVariable(user_context.da, TransientVar, NULL);
+  std::cout << "line 191" << std::endl;
+  TSSetMaxTime(ts, 1.);
+  TSSetFromOptions(ts);
+  TSSolve(ts, U);
+  std::cout << "line 195" << std::endl;
+  VecExp(U);
 
-  // values for storativity are reset each time; and wtd and recharge change from one timestep to the next, so set these
-  // here
-  for (auto j = ys; j < ys + ym; j++) {
-    for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.S[i][j]        = arp.effective_storativity(i, j);
-      dmdapack.h[i][j]        = arp.wtd(i, j);
-      dmdapack.rech_vec[i][j] = arp.rech(i, j);
-    }
-  }
-
-  // Set local function evaluation routine
-  DMDASNESSetFunctionLocal(
-      user_context.da,
-      INSERT_VALUES,
-      (PetscErrorCode(*)(DMDALocalInfo*, void*, void*, void*))FormFunctionLocal,
-      &user_context);
-
-  // Evaluate initial guess
-  FormInitialGuess(&user_context, user_context.da, user_context.x, arp);
-
-  // set the RHS
-  FormRHS(&user_context, user_context.da, user_context.b, arp);
-
-  // Solve nonlinear system
-  SNESSolve(user_context.snes, user_context.b, user_context.x);
-  SNESGetIterationNumber(user_context.snes, &its);
-  SNESGetConvergedReason(user_context.snes, &reason);
-
-  PetscPrintf(
-      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
-
-  // recalculate the new storativity using the initial solve as an estimator for the final answer
-  for (auto j = ys; j < ys + ym; j++) {
-    for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.S[i][j] = updateEffectiveStorativity(
-          arp.wtd(i, j), dmdapack.x[i][j] - arp.topo(i, j), arp.porosity(i, j), arp.effective_storativity(i, j));
-    }
-  }
-
-  // repeat the solve
-  SNESSolve(user_context.snes, user_context.b, user_context.x);
-  SNESGetIterationNumber(user_context.snes, &its);
-  SNESGetConvergedReason(user_context.snes, &reason);
-
-  PetscPrintf(
-      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
-
-  // copy the result back into the wtd array
-  for (int j = ys; j < ys + ym; j++) {
-    for (int i = xs; i < xs + xm; i++) {
-      arp.wtd(i, j) = dmdapack.x[i][j] - arp.topo(i, j);
-      if (arp.land_mask(i, j) == 0.f) {
-        arp.total_loss_to_ocean +=
-            arp.wtd(i, j) * arp.cell_area[j];  // could it be that because ocean cells are just set = x in the formula,
-                                               // that loss to/gain from ocean is not properly recorded?
-        arp.wtd(i, j) = 0.;
-      }
-    }
-  }
+  VecView(U, PETSC_VIEWER_STDOUT_WORLD);
+  VecSum(U, &sum);
+  PetscPrintf(PETSC_COMM_WORLD, "Conservation error %g\n", (double)PetscRealPart(sum - 3.));
+  VecDestroy(&U);
+  TSDestroy(&ts);
+  std::cout << "line 203" << std::endl;
 
   return 0;
+
+  //
+  //  // Get local array bounds
+  //  const auto [xs, ys, xm, ym] = get_corners(user_context.da);
+  //
+  //  // values for storativity are reset each time; and wtd and recharge change from one timestep to the next, so set
+  //  these
+  //  // here
+  //  for (auto j = ys; j < ys + ym; j++) {
+  //    for (auto i = xs; i < xs + xm; i++) {
+  //      dmdapack.S[i][j]        = arp.effective_storativity(i, j);
+  //      dmdapack.h[i][j]        = arp.wtd(i, j);
+  //      dmdapack.rech_vec[i][j] = arp.rech(i, j);
+  //    }
+  //  }
+  //
+  //  // Set local function evaluation routine
+  //  DMDASNESSetFunctionLocal(
+  //      user_context.da,
+  //      INSERT_VALUES,
+  //      (PetscErrorCode(*)(DMDALocalInfo*, void*, void*, void*))FormFunctionLocal,
+  //      &user_context);
+  //
+  //  // Evaluate initial guess
+  //  FormInitialGuess(&user_context, user_context.da, user_context.x, arp);
+  //
+  //  // set the RHS
+  //  FormRHS(&user_context, user_context.da, user_context.b, arp);
+  //
+  //  // Solve nonlinear system
+  //  SNESSolve(user_context.snes, user_context.b, user_context.x);
+  //  SNESGetIterationNumber(user_context.snes, &its);
+  //  SNESGetConvergedReason(user_context.snes, &reason);
+  //
+  //  PetscPrintf(
+  //      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason],
+  //      its);
+  //
+  //  // recalculate the new storativity using the initial solve as an estimator for the final answer
+  //  for (auto j = ys; j < ys + ym; j++) {
+  //    for (auto i = xs; i < xs + xm; i++) {
+  //      dmdapack.S[i][j] = updateEffectiveStorativity(
+  //          arp.wtd(i, j), dmdapack.x[i][j] - arp.topo(i, j), arp.porosity(i, j), arp.effective_storativity(i, j));
+  //    }
+  //  }
+  //
+  //  // repeat the solve
+  //  SNESSolve(user_context.snes, user_context.b, user_context.x);
+  //  SNESGetIterationNumber(user_context.snes, &its);
+  //  SNESGetConvergedReason(user_context.snes, &reason);
+  //
+  //  PetscPrintf(
+  //      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason],
+  //      its);
+  //
+  //  // copy the result back into the wtd array
+  //  for (int j = ys; j < ys + ym; j++) {
+  //    for (int i = xs; i < xs + xm; i++) {
+  //      arp.wtd(i, j) = dmdapack.x[i][j] - arp.topo(i, j);
+  //      if (arp.land_mask(i, j) == 0.f) {
+  //        arp.total_loss_to_ocean +=
+  //            arp.wtd(i, j) * arp.cell_area[j];  // could it be that because ocean cells are just set = x in the
+  //            formula,
+  //                                               // that loss to/gain from ocean is not properly recorded?
+  //        arp.wtd(i, j) = 0.;
+  //      }
+  //    }
+  //  }
 }
 
 /* ------------------------------------------------------------------- */

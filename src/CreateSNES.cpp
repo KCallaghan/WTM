@@ -1,7 +1,7 @@
 //#include "CreateSNES.hpp"
 
 void InitialiseSNES(AppCtx& user_context, Parameters& params) {
-  SNESCreate(PETSC_COMM_WORLD, &user_context.snes);
+  // SNESCreate(PETSC_COMM_WORLD, &user_context.snes);
 
   user_context.cellsize_NS = params.cellsize_n_s_metres;
   user_context.timestep    = params.deltat;
@@ -29,7 +29,11 @@ void InitialiseSNES(AppCtx& user_context, Parameters& params) {
   user_context.make_global_vectors();
 
   DMSetApplicationContext(user_context.da, &user_context);
-  SNESSetDM(user_context.snes, user_context.da);
+  //  SNESSetDM(user_context.snes, user_context.da);
 
-  SNESSetFromOptions(user_context.snes);
+  //  SNESSetFromOptions(user_context.snes);
+
+  //    PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"TS conservation example","");
+  // PetscOptionsEnum("-var","Variable formulation",NULL,VarModes,(PetscEnum)var,(PetscEnum*)&var,NULL);
+  // PetscOptionsEnd();
 }

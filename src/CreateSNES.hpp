@@ -8,7 +8,7 @@
 struct AppCtx {
   PetscReal timestep;
   PetscReal cellsize_NS;
-  SNES snes       = nullptr;
+  // SNES snes       = nullptr;
   DM da           = nullptr;
   Vec x           = nullptr;  // Solution vector
   Vec b           = nullptr;  // RHS vector
@@ -23,7 +23,7 @@ struct AppCtx {
   Vec rech_vec    = nullptr;
 
   ~AppCtx() {
-    SNESDestroy(&snes);
+    //  SNESDestroy(&snes);
     DMDestroy(&da);
     VecDestroy(&x);
     VecDestroy(&b);
