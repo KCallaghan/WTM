@@ -20,33 +20,6 @@ namespace FanDarcyGroundwater {
 
 typedef enum { VAR_CONSERVATIVE, VAR_NONCONSERVATIVE, VAR_TRANSIENTVAR } VarMode;
 static const char* const VarModes[] = {"CONSERVATIVE", "NONCONSERVATIVE", "TRANSIENTVAR", "VarMode", "VAR_", NULL};
-static PetscErrorCode IFunction_Conservative(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, void* ctx) {
-  const PetscScalar *u, *udot;
-  PetscScalar* f;
-  VecGetArrayRead(U, &u);
-  VecGetArrayRead(Udot, &udot);
-  VecGetArray(F, &f);
-  f[0] = udot[0] + u[0];
-  f[1] = udot[1] - u[0];
-  VecRestoreArrayRead(U, &u);
-  VecRestoreArrayRead(Udot, &udot);
-  VecRestoreArray(F, &f);
-  return 0;
-}
-
-static PetscErrorCode IFunction_Nonconservative(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, void* ctx) {
-  const PetscScalar *u, *udot;
-  PetscScalar* f;
-  VecGetArrayRead(U, &u);
-  VecGetArrayRead(Udot, &udot);
-  VecGetArray(F, &f);
-  f[0] = PetscExpScalar(u[0]) * udot[0] + PetscExpScalar(u[0]);
-  f[1] = PetscExpScalar(u[1]) * udot[1] - PetscExpScalar(u[0]);
-  VecRestoreArrayRead(U, &u);
-  VecRestoreArrayRead(Udot, &udot);
-  VecRestoreArray(F, &f);
-  return 0;
-}
 
 static PetscErrorCode IFunction_TransientVar(TS ts, PetscReal t, Vec U, Vec Cdot, Vec F, void* ctx) {
   const PetscScalar *u, *cdot;
@@ -88,7 +61,11 @@ std::tuple<PetscInt, PetscInt, PetscInt, PetscInt> get_corners(const DM da) {
 // declare functions
 static PetscErrorCode FormRHS(AppCtx*, DM, Vec, ArrayPack& arp);
 static PetscErrorCode FormInitialGuess(AppCtx*, DM, Vec, ArrayPack& arp);
-static PetscErrorCode FormFunctionLocal(DMDALocalInfo*, PetscScalar**, PetscScalar**, AppCtx*);
+// static PetscErrorCode FormFunctionLocal(DMDALocalInfo*, PetscScalar**, PetscScalar**, AppCtx*);
+static PetscErrorCode FormFunction(TS, PetscReal, Vec, Vec, AppCtx*);
+static PetscErrorCode FormInitialSolution(DM, Vec, ArrayPack& arp);
+extern PetscErrorCode MyTSMonitor(TS, PetscInt, PetscReal, Vec, void*);
+extern PetscErrorCode MySNESMonitor(SNES, PetscInt, PetscReal, PetscViewerAndFormat*);
 
 //////////////////////
 // PUBLIC FUNCTIONS //
@@ -146,56 +123,105 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
 }
 
 int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_Pack& dmdapack) {
-  PetscInt its;                // iterations for convergence
-  SNESConvergedReason reason;  // Check convergence
   TS ts;
-  Vec U;
-  PetscScalar sum;
+  PetscInt xs, ys, xm, ym;
+  PetscBool usemonitor = PETSC_TRUE;
+  SNES ts_snes;
+  PetscReal ftime;
+  PetscInt steps; /* iterations for convergence */
+  PetscViewerAndFormat* vf;
 
   // compute any starting values needed for arrays
   set_starting_values(params, arp);
 
   std::cout << "line 180" << std::endl;
   TSCreate(PETSC_COMM_WORLD, &ts);
-  TSSetType(ts, TSBDF);
+  TSSetProblemType(ts, TS_NONLINEAR);
   TSSetDM(ts, user_context.da);
-  VecCreateSeq(PETSC_COMM_SELF, 2, &U);
-  VecSetValue(U, 0, 2., INSERT_VALUES);
-  VecSetValue(U, 1, 1., INSERT_VALUES);
-  std::cout << "line 187" << std::endl;
-  VecLog(U);
-  DMTSSetIFunction(user_context.da, IFunction_TransientVar, NULL);
-  DMTSSetTransientVariable(user_context.da, TransientVar, NULL);
-  std::cout << "line 191" << std::endl;
-  TSSetMaxTime(ts, 1.);
-  TSSetFromOptions(ts);
-  TSSolve(ts, U);
-  std::cout << "line 195" << std::endl;
-  VecExp(U);
+  DMDAGetCorners(user_context.da, &xs, &ys, NULL, &xm, &ym, NULL);
 
-  VecView(U, PETSC_VIEWER_STDOUT_WORLD);
-  VecSum(U, &sum);
-  PetscPrintf(PETSC_COMM_WORLD, "Conservation error %g\n", (double)PetscRealPart(sum - 3.));
-  VecDestroy(&U);
+  // values for storativity are reset each time; and wtd and recharge change from one timestep to the next, so set
+  // these here
+  for (auto j = ys; j < ys + ym; j++) {
+    for (auto i = xs; i < xs + xm; i++) {
+      dmdapack.S[i][j]        = arp.effective_storativity(i, j);
+      dmdapack.h[i][j]        = arp.wtd(i, j);
+      dmdapack.rech_vec[i][j] = arp.rech(i, j);
+    }
+  }
+
+  TSSetRHSFunction(ts, NULL, FormFunction, user_context.da);
+  TSSetMaxTime(ts, 1.0);
+  if (usemonitor) {
+    TSMonitorSet(ts, MyTSMonitor, 0, 0);
+  }
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Customize nonlinear solver
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  TSSetType(ts, TSBEULER);
+  TSGetSNES(ts, &ts_snes);
+  if (usemonitor) {
+    PetscViewerAndFormatCreate(PETSC_VIEWER_STDOUT_WORLD, PETSC_VIEWER_DEFAULT, &vf);
+    SNESMonitorSet(
+        ts_snes,
+        (PetscErrorCode(*)(SNES, PetscInt, PetscReal, void*))MySNESMonitor,
+        vf,
+        (PetscErrorCode(*)(void**))PetscViewerAndFormatDestroy);
+  }
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Set initial conditions
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  FormInitialSolution(user_context.da, user_context.x, arp);
+  TSSetTimeStep(ts, .0001);
+  TSSetExactFinalTime(ts, TS_EXACTFINALTIME_STEPOVER);
+  TSSetSolution(ts, user_context.x);
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Set runtime options
+   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  TSSetFromOptions(ts);
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Solve nonlinear system
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+  TSSolve(ts, user_context.x);
+  TSGetSolveTime(ts, &ftime);
+  TSGetStepNumber(ts, &steps);
+  VecViewFromOptions(user_context.x, NULL, "-final_sol");
+
+  // // VecCreateSeq(PETSC_COMM_SELF, 2, &U);
+  // // VecSetValue(U, 0, 2., INSERT_VALUES);
+  // // VecSetValue(U, 1, 1., INSERT_VALUES);
+  // // std::cout << "line 187" << std::endl;
+  // // VecLog(U);
+  // // DMTSSetIFunction(user_context.da, IFunction_TransientVar, NULL);
+  // // DMTSSetTransientVariable(user_context.da, TransientVar, NULL);
+  // // std::cout << "line 191" << std::endl;
+  // // TSSetMaxTime(ts, 1.);
+  // // TSSetFromOptions(ts);
+  // // TSSolve(ts, U);
+  // // std::cout << "line 195" << std::endl;
+  // // VecExp(U);
+  //
+  // // VecView(U, PETSC_VIEWER_STDOUT_WORLD);
+  // // VecSum(U, &sum);
+  // // PetscPrintf(PETSC_COMM_WORLD, "Conservation error %g\n", (double)PetscRealPart(sum - 3.));
+  // VecDestroy(&U);
   TSDestroy(&ts);
   std::cout << "line 203" << std::endl;
 
-  return 0;
+  // copy the result back into the wtd array
+  for (int j = ys; j < ys + ym; j++) {
+    for (int i = xs; i < xs + xm; i++) {
+      arp.wtd(i, j) = dmdapack.x[i][j] - arp.topo(i, j);
+      if (arp.land_mask(i, j) == 0.f) {
+        arp.total_loss_to_ocean +=
+            arp.wtd(i, j) * arp.cell_area[j];  // could it be that because ocean cells are just set = x in the formula,
+                                               // that loss to/gain from ocean is not properly recorded?
+        arp.wtd(i, j) = 0.;
+      }
+    }
+  }
 
-  //
-  //  // Get local array bounds
-  //  const auto [xs, ys, xm, ym] = get_corners(user_context.da);
-  //
-  //  // values for storativity are reset each time; and wtd and recharge change from one timestep to the next, so set
-  //  these
-  //  // here
-  //  for (auto j = ys; j < ys + ym; j++) {
-  //    for (auto i = xs; i < xs + xm; i++) {
-  //      dmdapack.S[i][j]        = arp.effective_storativity(i, j);
-  //      dmdapack.h[i][j]        = arp.wtd(i, j);
-  //      dmdapack.rech_vec[i][j] = arp.rech(i, j);
-  //    }
-  //  }
+  return 0;
   //
   //  // Set local function evaluation routine
   //  DMDASNESSetFunctionLocal(
@@ -236,19 +262,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   //      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason],
   //      its);
   //
-  //  // copy the result back into the wtd array
-  //  for (int j = ys; j < ys + ym; j++) {
-  //    for (int i = xs; i < xs + xm; i++) {
-  //      arp.wtd(i, j) = dmdapack.x[i][j] - arp.topo(i, j);
-  //      if (arp.land_mask(i, j) == 0.f) {
-  //        arp.total_loss_to_ocean +=
-  //            arp.wtd(i, j) * arp.cell_area[j];  // could it be that because ocean cells are just set = x in the
-  //            formula,
-  //                                               // that loss to/gain from ocean is not properly recorded?
-  //        arp.wtd(i, j) = 0.;
-  //      }
-  //    }
-  //  }
 }
 
 /* ------------------------------------------------------------------- */
@@ -352,10 +365,13 @@ static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B, ArrayPack& arp
 /*
    FormFunctionLocal - Evaluates nonlinear function, F(x).
  */
-static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user_context) {
+// static PetscErrorCode FormFunction(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user_context) {
+static PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec x, Vec f, AppCtx* user_context) {
+  PetscInt xs, ys, xm, ym;
+
   DM da = user_context->da;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **my_rech, **my_cell_area;
+      **my_topo;
   PetscInt Mx, My;
 
   DMDAGetInfo(
@@ -386,8 +402,10 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecGetArray(da, user_context->h, &my_h));
   PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
 
-  for (auto j = info->ys; j < info->ys + info->ym; j++) {
-    for (auto i = info->xs; i < info->xs + info->xm; i++) {
+  DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
+
+  for (auto j = ys; j < ys + ym; j++) {
+    for (auto i = xs; i < xs + xm; i++) {
       const PetscScalar u = x[i][j];
       if (my_mask[i][j] == 0) {
         f[i][j] = u;
@@ -437,5 +455,92 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscLogFlops(info->xm * info->ym * (72.0));
   return 0;
 }
+
+/* ------------------------------------------------------------------- */
+static PetscErrorCode FormInitialSolution(DM da, Vec X, ArrayPack& arp) {
+  PetscInt i, j, xs, ys, xm, ym, Mx, My;
+  PetscScalar*** u;
+  PetscReal hx, hy, x, y, r;
+  DMDAGetInfo(
+      da,
+      PETSC_IGNORE,
+      &Mx,
+      &My,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE);
+  /*
+     Get pointers to vector data
+  */
+  DMDAVecGetArray(da, X, &x);
+  //  DMDAVecGetArray(da,mask,&my_mask);
+  //  DMDAVecGetArray(da,topo_vec,&my_topo);
+
+  /*
+     Get local grid boundaries
+  */
+  DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
+  /*
+     Compute function over the locally owned part of the grid
+  */
+
+  for (j = ys; j < ys + ym; j++) {
+    for (i = xs; i < xs + xm; i++) {
+      if (arp.land_mask(i, j) == 0) {
+        x[i][j] = arp.topo(i, j) + 0.0;
+      } else {
+        x[i][j] = arp.topo(i, j) + arp.wtd(i, j) +
+                  add_recharge(arp.rech(i, j), arp.wtd(i, j), arp.porosity(i, j), arp.cell_area[j], 0, arp);
+      }
+    }
+  }
+  /*
+     Restore vectors
+  */
+  DMDAVecRestoreArray(da, X, &x);
+  //  DMDAVecRestoreArray(da,mask,&my_mask);
+  //  DMDAVecRestoreArray(da,topo_vec, &my_topo);
+
+  return 0;
+}
+
+PetscErrorCode MyTSMonitor(TS ts, PetscInt step, PetscReal ptime, Vec v, void* ctx) {
+  PetscReal norm;
+  MPI_Comm comm;
+  VecNorm(v, NORM_2, &norm);
+  PetscObjectGetComm((PetscObject)ts, &comm);
+  if (step > -1) { /* -1 is used to indicate an interpolated value */
+    PetscPrintf(comm, "timestep %" PetscInt_FMT " time %g norm %g\n", step, (double)ptime, (double)norm);
+  }
+  return 0;
+}
+/*
+   MySNESMonitor - illustrate how to set user-defined monitoring routine for SNES.
+   Input Parameters:
+     snes - the SNES context
+     its - iteration number
+     fnorm - 2-norm function value (may be estimated)
+     ctx - optional user-defined context for private data for the
+         monitor routine, as set by SNESMonitorSet()
+ */
+PetscErrorCode MySNESMonitor(SNES snes, PetscInt its, PetscReal fnorm, PetscViewerAndFormat* vf) {
+  SNESMonitorDefaultShort(snes, its, fnorm, vf);
+  return 0;
+}
+/*TEST
+    test:
+      args: -da_grid_x 20 -ts_max_time 3 -ts_dt 1e-1 -ts_theta_initial_guess_extrapolate 0 -ts_monitor
+-ksp_monitor_short requires: !single test: suffix: 2 args: -da_grid_x 20 -ts_max_time 0.11 -ts_dt 1e-1 -ts_type glle
+-ts_monitor -ksp_monitor_short requires: !single test: suffix: glvis_da_2d_vect args: -usemonitor 0 -da_grid_x 20
+-ts_max_time 0.3 -ts_dt 1e-1 -ts_type glle -final_sol glvis: -viewer_glvis_dm_da_bs 2,0 requires: !single test: suffix:
+glvis_da_2d_vect_ll args: -usemonitor 0 -da_grid_x 20 -ts_max_time 0.3 -ts_dt 1e-1 -ts_type glle -final_sol glvis:
+-viewer_glvis_dm_da_bs 2,0 -viewer_glvis_dm_da_ll requires: !single TEST*/
 
 }  // namespace FanDarcyGroundwater
