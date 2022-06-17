@@ -62,7 +62,7 @@ std::tuple<PetscInt, PetscInt, PetscInt, PetscInt> get_corners(const DM da) {
 static PetscErrorCode FormRHS(AppCtx*, DM, Vec, ArrayPack& arp);
 static PetscErrorCode FormInitialGuess(AppCtx*, DM, Vec, ArrayPack& arp);
 // static PetscErrorCode FormFunctionLocal(DMDALocalInfo*, PetscScalar**, PetscScalar**, AppCtx*);
-static PetscErrorCode FormFunction(TS, PetscReal, Vec, Vec, AppCtx*);
+static PetscErrorCode FormFunction(TS, PetscReal, Vec, Vec, void*);
 static PetscErrorCode FormInitialSolution(DM, Vec, ArrayPack& arp);
 extern PetscErrorCode MyTSMonitor(TS, PetscInt, PetscReal, Vec, void*);
 extern PetscErrorCode MySNESMonitor(SNES, PetscInt, PetscReal, PetscViewerAndFormat*);
@@ -134,7 +134,7 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   // compute any starting values needed for arrays
   set_starting_values(params, arp);
 
-  std::cout << "line 180" << std::endl;
+  std::cout << "line 137" << std::endl;
   TSCreate(PETSC_COMM_WORLD, &ts);
   TSSetProblemType(ts, TS_NONLINEAR);
   TSSetDM(ts, user_context.da);
@@ -149,12 +149,16 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
       dmdapack.rech_vec[i][j] = arp.rech(i, j);
     }
   }
+  std::cout << "line 152" << std::endl;
 
+  auto* my_void_ptr = reinterpret_cast<void*>(&user_context);
   TSSetRHSFunction(ts, NULL, FormFunction, user_context.da);
   TSSetMaxTime(ts, 1.0);
   if (usemonitor) {
     TSMonitorSet(ts, MyTSMonitor, 0, 0);
   }
+  std::cout << "line 158" << std::endl;
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Customize nonlinear solver
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -168,6 +172,8 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
         vf,
         (PetscErrorCode(*)(void**))PetscViewerAndFormatDestroy);
   }
+  std::cout << "line 173" << std::endl;
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Set initial conditions
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -175,17 +181,28 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   TSSetTimeStep(ts, .0001);
   TSSetExactFinalTime(ts, TS_EXACTFINALTIME_STEPOVER);
   TSSetSolution(ts, user_context.x);
+  std::cout << "line 182" << std::endl;
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Set runtime options
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   TSSetFromOptions(ts);
+  std::cout << "line 190" << std::endl;
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Solve nonlinear system
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   TSSolve(ts, user_context.x);
+  std::cout << "line 196" << std::endl;
+
   TSGetSolveTime(ts, &ftime);
+  std::cout << "line 199" << std::endl;
+
   TSGetStepNumber(ts, &steps);
+  std::cout << "line 202" << std::endl;
+
   VecViewFromOptions(user_context.x, NULL, "-final_sol");
+  std::cout << "line 205" << std::endl;
 
   // // VecCreateSeq(PETSC_COMM_SELF, 2, &U);
   // // VecSetValue(U, 0, 2., INSERT_VALUES);
@@ -206,7 +223,7 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   // // PetscPrintf(PETSC_COMM_WORLD, "Conservation error %g\n", (double)PetscRealPart(sum - 3.));
   // VecDestroy(&U);
   TSDestroy(&ts);
-  std::cout << "line 203" << std::endl;
+  std::cout << "line 209" << std::endl;
 
   // copy the result back into the wtd array
   for (int j = ys; j < ys + ym; j++) {
@@ -366,12 +383,13 @@ static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B, ArrayPack& arp
    FormFunctionLocal - Evaluates nonlinear function, F(x).
  */
 // static PetscErrorCode FormFunction(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user_context) {
-static PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec x, Vec f, AppCtx* user_context) {
+static PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec B, void* my_void_ptr) {
   PetscInt xs, ys, xm, ym;
+  auto* user_context = reinterpret_cast<AppCtx*>(my_void_ptr);
 
   DM da = user_context->da;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo;
+      **my_topo, **f, **x;
   PetscInt Mx, My;
 
   DMDAGetInfo(
@@ -401,6 +419,8 @@ static PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec x, Vec f, AppCtx*
   PetscCall(DMDAVecGetArray(da, user_context->porosity, &my_porosity));
   PetscCall(DMDAVecGetArray(da, user_context->h, &my_h));
   PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
+  PetscCall(DMDAVecGetArray(da, X, &x));
+  PetscCall(DMDAVecGetArray(da, B, &f));
 
   DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
 
@@ -451,16 +471,17 @@ static PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec x, Vec f, AppCtx*
   PetscCall(DMDAVecRestoreArray(da, user_context->porosity, &my_porosity));
   PetscCall(DMDAVecRestoreArray(da, user_context->h, &my_h));
   PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
+  PetscCall(DMDAVecRestoreArray(da, X, &x));
+  PetscCall(DMDAVecRestoreArray(da, B, &f));
 
-  PetscLogFlops(info->xm * info->ym * (72.0));
+  // PetscLogFlops(info->xm * info->ym * (72.0));
   return 0;
 }
 
 /* ------------------------------------------------------------------- */
 static PetscErrorCode FormInitialSolution(DM da, Vec X, ArrayPack& arp) {
   PetscInt i, j, xs, ys, xm, ym, Mx, My;
-  PetscScalar*** u;
-  PetscReal hx, hy, x, y, r;
+  PetscScalar** x;
   DMDAGetInfo(
       da,
       PETSC_IGNORE,
