@@ -58,19 +58,6 @@ std::tuple<PetscInt, PetscInt, PetscInt, PetscInt> get_corners(const DM da) {
   return {xs, ys, xm, ym};
 }
 
-// declare functions
-static PetscErrorCode FormRHS(AppCtx*, DM, Vec, ArrayPack& arp);
-static PetscErrorCode FormInitialGuess(AppCtx*, DM, Vec, ArrayPack& arp);
-// static PetscErrorCode FormFunctionLocal(DMDALocalInfo*, PetscScalar**, PetscScalar**, AppCtx*);
-static PetscErrorCode FormFunction(TS, PetscReal, Vec, Vec, void*);
-static PetscErrorCode FormInitialSolution(DM, Vec, ArrayPack& arp);
-extern PetscErrorCode MyTSMonitor(TS, PetscInt, PetscReal, Vec, void*);
-extern PetscErrorCode MySNESMonitor(SNES, PetscInt, PetscReal, PetscViewerAndFormat*);
-
-//////////////////////
-// PUBLIC FUNCTIONS //
-//////////////////////
-
 double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, const double ksat) {
   constexpr double shallow = 1.5;
   // Global soil datasets include information for shallow soils.
@@ -93,6 +80,180 @@ double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, co
     return std::max(0.0, ksat * (wtd_T + shallow + fdepth));  // max because you can't have a negative transmissivity.
   }
 }
+
+/* ------------------------------------------------------------------- */
+/*
+   FormFunctionLocal - Evaluates nonlinear function, F(x).
+ */
+// static PetscErrorCode FormFunction(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user_context) {
+static PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void* ptr) {
+  auto* user_context = static_cast<AppCtx*>(ptr);
+  // AppCtx user_context = *(AppCtx *)ptr;
+  // AppCtx test;
+  // test = *(AppCtx *)ptr;
+  DM da = user_context->da;
+
+  // DM             da = (DM)ptr;
+  //  PetscInt       i,j;
+  //  PetscReal      hx,hy,sx,sy;
+  //  PetscScalar    u,uxx,uyy,v;
+  Vec localX;
+  PetscInt xs, ys, xm, ym;
+  //  PetscInt Mx, My;
+  // //
+  // DMDAGetInfo(da,PETSC_IGNORE,&Mx,&My,PETSC_IGNORE,PETSC_IGNORE,PETSC_IGNORE,PETSC_IGNORE,PETSC_IGNORE,PETSC_IGNORE,PETSC_IGNORE,PETSC_IGNORE,PETSC_IGNORE,PETSC_IGNORE);
+  // // hx = 1.0/(PetscReal)(Mx-1); sx = 1.0/(hx*hx);
+  // // hy = 1.0/(PetscReal)(My-1); sy = 1.0/(hy*hy);
+  //
+  //
+  //
+  PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
+      **my_topo, **f, **x;
+  // DMDAGetInfo(
+  //     da,
+  //     PETSC_IGNORE,
+  //     &Mx,
+  //     &My,
+  //     PETSC_IGNORE,
+  //     PETSC_IGNORE,
+  //     PETSC_IGNORE,
+  //     PETSC_IGNORE,
+  //     PETSC_IGNORE,
+  //     PETSC_IGNORE,
+  //     PETSC_IGNORE,
+  //     PETSC_IGNORE,
+  //     PETSC_IGNORE,
+  //     PETSC_IGNORE);
+
+  DMGetLocalVector(da, &localX);
+  /*
+    Compute function over the locally owned part of the grid
+ */
+  PetscCall(DMDAVecGetArray(da, user_context->mask, &my_mask));
+  PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
+  PetscCall(DMDAVecGetArray(da, user_context->cellsize_EW, &cellsize_ew));
+  PetscCall(DMDAVecGetArray(da, user_context->fdepth_vec, &my_fdepth));
+  PetscCall(DMDAVecGetArray(da, user_context->ksat_vec, &my_ksat));
+  PetscCall(DMDAVecGetArray(da, user_context->porosity, &my_porosity));
+  PetscCall(DMDAVecGetArray(da, user_context->h, &my_h));
+  PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
+  // PetscCall(DMDAVecGetArray(da, X, &x));
+  PetscCall(DMDAVecGetArray(da, F, &f));
+  DMDAVecGetArrayDOF(da, localX, &x);
+
+  DMGlobalToLocalBegin(da, X, INSERT_VALUES, localX);
+  DMGlobalToLocalEnd(da, X, INSERT_VALUES, localX);
+
+  DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
+
+  for (auto j = ys; j < ys + ym; j++) {
+    for (auto i = xs; i < xs + xm; i++) {
+      const PetscScalar u = x[i][j];
+      if (my_mask[i][j] == 0) {
+        f[i][j] = u;
+      } else {
+        const PetscScalar ux_E = (x[i][j + 1] - x[i][j]);
+        const PetscScalar ux_W = (x[i][j] - x[i][j - 1]);
+        const PetscScalar uy_N = (x[i + 1][j] - x[i][j]);
+        const PetscScalar uy_S = (x[i][j] - x[i - 1][j]);
+        const PetscScalar e_E =
+            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(
+                           x[i][j + 1] - my_topo[i][j + 1], my_fdepth[i][j + 1], my_ksat[i][j + 1]));
+        const PetscScalar e_W =
+            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(
+                           x[i][j - 1] - my_topo[i][j - 1], my_fdepth[i][j - 1], my_ksat[i][j - 1]));
+        const PetscScalar e_N =
+            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(
+                           x[i + 1][j] - my_topo[i + 1][j], my_fdepth[i + 1][j], my_ksat[i + 1][j]));
+        const PetscScalar e_S =
+            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+                  1. / depthIntegratedTransmissivity(
+                           x[i - 1][j] - my_topo[i - 1][j], my_fdepth[i - 1][j], my_ksat[i - 1][j]));
+
+        const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) / (cellsize_ew[i][j] * cellsize_ew[i][j]);
+        const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (user_context->cellsize_NS * user_context->cellsize_NS);
+        // TODO double check which cellsize is which
+
+        //  starting_storativity[i][j] = updateEffectiveStorativity(
+        //    my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
+
+        f[i][j] = (uxx + uyy) * (user_context->timestep / starting_storativity[i][j]) + u;
+      }
+    }
+  }
+
+  PetscCall(DMDAVecRestoreArray(da, user_context->mask, &my_mask));
+  PetscCall(DMDAVecRestoreArray(da, user_context->S, &starting_storativity));
+  PetscCall(DMDAVecRestoreArray(da, user_context->cellsize_EW, &cellsize_ew));
+  PetscCall(DMDAVecRestoreArray(da, user_context->fdepth_vec, &my_fdepth));
+  PetscCall(DMDAVecRestoreArray(da, user_context->ksat_vec, &my_ksat));
+  PetscCall(DMDAVecRestoreArray(da, user_context->porosity, &my_porosity));
+  PetscCall(DMDAVecRestoreArray(da, user_context->h, &my_h));
+  PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
+  //  PetscCall(DMDAVecRestoreArray(da, X, &x));
+  PetscCall(DMDAVecRestoreArray(da, F, &f));
+  DMDAVecRestoreArrayDOF(da, localX, &x);
+  DMRestoreLocalVector(da, &localX);
+
+  // PetscLogFlops(info->xm * info->ym * (72.0));
+
+  /*hxdhy  = hx/hy;*/
+  /*hydhx  = hy/hx;*/
+  /*
+     Scatter ghost points to local vector,using the 2-step process
+        DMGlobalToLocalBegin(),DMGlobalToLocalEnd().
+     By placing code between these two statements, computations can be
+     done while messages are in transition.
+  */
+  //  /*
+  //     Get pointers to vector data
+  //  */
+  //  DMDAVecGetArrayDOF(da,F,&f);
+  //  /*
+  //     Get local grid boundaries
+  //  */
+  //  DMDAGetCorners(da,&xs,&ys,NULL,&xm,&ym,NULL);
+  //  /*
+  //     Compute function over the locally owned part of the grid
+  //  */
+  //  for (j=ys; j<ys+ym; j++) {
+  //    for (i=xs; i<xs+xm; i++) {
+  //      if (i == 0 || j == 0 || i == Mx-1 || j == My-1) {
+  //        f[j][i] = x[j][i];
+  //        f[j][i] = x[j][i];
+  //        continue;
+  //      }
+  //      u          = x[j][i];
+  //      v          = x[j][i];
+  //      uxx        = (-2.0*u + x[j][i-1] + x[j][i+1])*sx;
+  //      uyy        = (-2.0*u + x[j-1][i] + x[j+1][i])*sy;
+  //      f[j][i] = v;
+  //      f[j][i] = uxx + uyy;
+  //    }
+  //  }
+  //  /*
+  //     Restore vectors
+  //  */
+  //  DMDAVecRestoreArrayDOF(da,F,&f);
+  //  PetscLogFlops(11.0*ym*xm);
+  return 0;
+}
+
+// declare functions
+static PetscErrorCode FormRHS(AppCtx*, DM, Vec, ArrayPack& arp);
+static PetscErrorCode FormInitialGuess(AppCtx*, DM, Vec, ArrayPack& arp);
+// static PetscErrorCode FormFunctionLocal(DMDALocalInfo*, PetscScalar**, PetscScalar**, AppCtx*);
+// static PetscErrorCode FormFunction(TS, PetscReal, Vec, Vec, &void*);
+static PetscErrorCode FormInitialSolution(DM, Vec, ArrayPack& arp);
+extern PetscErrorCode MyTSMonitor(TS, PetscInt, PetscReal, Vec, void*);
+extern PetscErrorCode MySNESMonitor(SNES, PetscInt, PetscReal, PetscViewerAndFormat*);
+
+//////////////////////
+// PUBLIC FUNCTIONS //
+//////////////////////
 
 void set_starting_values(Parameters& params, ArrayPack& arp) {
   // no pragma because we're editing arp.total_loss_to_ocean
@@ -136,8 +297,8 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
 
   std::cout << "line 137" << std::endl;
   TSCreate(PETSC_COMM_WORLD, &ts);
-  TSSetProblemType(ts, TS_NONLINEAR);
   TSSetDM(ts, user_context.da);
+  TSSetProblemType(ts, TS_NONLINEAR);
   DMDAGetCorners(user_context.da, &xs, &ys, NULL, &xm, &ym, NULL);
 
   // values for storativity are reset each time; and wtd and recharge change from one timestep to the next, so set
@@ -151,8 +312,10 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   }
   std::cout << "line 152" << std::endl;
 
-  auto* my_void_ptr = reinterpret_cast<void*>(&user_context);
-  TSSetRHSFunction(ts, NULL, FormFunction, user_context.da);
+  void* ptr;
+  ptr = &user_context;
+  //  auto *ptr = static_cast<void*>(&user_context);
+  TSSetRHSFunction(ts, NULL, FormFunction, (void*)&user_context);
   TSSetMaxTime(ts, 1.0);
   if (usemonitor) {
     TSMonitorSet(ts, MyTSMonitor, 0, 0);
@@ -375,106 +538,6 @@ static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B, ArrayPack& arp
     }
   }
   DMDAVecRestoreArray(da, B, &b);
-  return 0;
-}
-
-/* ------------------------------------------------------------------- */
-/*
-   FormFunctionLocal - Evaluates nonlinear function, F(x).
- */
-// static PetscErrorCode FormFunction(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user_context) {
-static PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec B, void* my_void_ptr) {
-  PetscInt xs, ys, xm, ym;
-  auto* user_context = reinterpret_cast<AppCtx*>(my_void_ptr);
-
-  DM da = user_context->da;
-  PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **f, **x;
-  PetscInt Mx, My;
-
-  DMDAGetInfo(
-      da,
-      PETSC_IGNORE,
-      &Mx,
-      &My,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE);
-
-  /*
-    Compute function over the locally owned part of the grid
- */
-  PetscCall(DMDAVecGetArray(da, user_context->mask, &my_mask));
-  PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
-  PetscCall(DMDAVecGetArray(da, user_context->cellsize_EW, &cellsize_ew));
-  PetscCall(DMDAVecGetArray(da, user_context->fdepth_vec, &my_fdepth));
-  PetscCall(DMDAVecGetArray(da, user_context->ksat_vec, &my_ksat));
-  PetscCall(DMDAVecGetArray(da, user_context->porosity, &my_porosity));
-  PetscCall(DMDAVecGetArray(da, user_context->h, &my_h));
-  PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
-  PetscCall(DMDAVecGetArray(da, X, &x));
-  PetscCall(DMDAVecGetArray(da, B, &f));
-
-  DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
-
-  for (auto j = ys; j < ys + ym; j++) {
-    for (auto i = xs; i < xs + xm; i++) {
-      const PetscScalar u = x[i][j];
-      if (my_mask[i][j] == 0) {
-        f[i][j] = u;
-      } else {
-        const PetscScalar ux_E = (x[i][j + 1] - x[i][j]);
-        const PetscScalar ux_W = (x[i][j] - x[i][j - 1]);
-        const PetscScalar uy_N = (x[i + 1][j] - x[i][j]);
-        const PetscScalar uy_S = (x[i][j] - x[i - 1][j]);
-        const PetscScalar e_E =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-                  1. / depthIntegratedTransmissivity(
-                           x[i][j + 1] - my_topo[i][j + 1], my_fdepth[i][j + 1], my_ksat[i][j + 1]));
-        const PetscScalar e_W =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-                  1. / depthIntegratedTransmissivity(
-                           x[i][j - 1] - my_topo[i][j - 1], my_fdepth[i][j - 1], my_ksat[i][j - 1]));
-        const PetscScalar e_N =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-                  1. / depthIntegratedTransmissivity(
-                           x[i + 1][j] - my_topo[i + 1][j], my_fdepth[i + 1][j], my_ksat[i + 1][j]));
-        const PetscScalar e_S =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-                  1. / depthIntegratedTransmissivity(
-                           x[i - 1][j] - my_topo[i - 1][j], my_fdepth[i - 1][j], my_ksat[i - 1][j]));
-
-        const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) / (cellsize_ew[i][j] * cellsize_ew[i][j]);
-        const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (user_context->cellsize_NS * user_context->cellsize_NS);
-        // TODO double check which cellsize is which
-
-        //  starting_storativity[i][j] = updateEffectiveStorativity(
-        //    my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
-
-        f[i][j] = (uxx + uyy) * (user_context->timestep / starting_storativity[i][j]) + u;
-      }
-    }
-  }
-
-  PetscCall(DMDAVecRestoreArray(da, user_context->mask, &my_mask));
-  PetscCall(DMDAVecRestoreArray(da, user_context->S, &starting_storativity));
-  PetscCall(DMDAVecRestoreArray(da, user_context->cellsize_EW, &cellsize_ew));
-  PetscCall(DMDAVecRestoreArray(da, user_context->fdepth_vec, &my_fdepth));
-  PetscCall(DMDAVecRestoreArray(da, user_context->ksat_vec, &my_ksat));
-  PetscCall(DMDAVecRestoreArray(da, user_context->porosity, &my_porosity));
-  PetscCall(DMDAVecRestoreArray(da, user_context->h, &my_h));
-  PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
-  PetscCall(DMDAVecRestoreArray(da, X, &x));
-  PetscCall(DMDAVecRestoreArray(da, B, &f));
-
-  // PetscLogFlops(info->xm * info->ym * (72.0));
   return 0;
 }
 
