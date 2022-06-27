@@ -10,8 +10,8 @@ inline double add_recharge(
     double my_wtd,
     const double my_porosity,
     const double cell_area,
-    const bool count_recharge,
-    ArrayPack& arp) {
+    const bool count_recharge) {
+  // ArrayPack& arp) {
   double recharge_to_add = 0.;
 
   // if (count_recharge) {
@@ -28,16 +28,16 @@ inline double add_recharge(
       //     arp.total_added_recharge += recharge_to_add * cell_area;
       //   }
     }
-    if (count_recharge) {
-      arp.total_added_recharge += recharge_to_add * cell_area;
-    }
+    //  if (count_recharge) {
+    //    arp.total_added_recharge += recharge_to_add * cell_area;
+    //  }
   } else if (my_rech > 0) {  // at least some of the water will be added into the ground, so we need to think about
                              // porosity. If my_rech was < 0 we don't add it here since there is no surface
                              // water available to evaporate.
 
-    if (count_recharge) {
-      arp.total_added_recharge += recharge_to_add * cell_area;
-    }
+    //  if (count_recharge) {
+    //    arp.total_added_recharge += recharge_to_add * cell_area;
+    //  }
 
     const double GW_space = -my_wtd * my_porosity;  // if wtd is negative, this is the amount of above-ground equivalent
                                                     // recharge that can be accommodated below ground.

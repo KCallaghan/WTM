@@ -44,16 +44,16 @@ double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, co
   }
 }
 
-static PetscErrorCode IFunction_TransientVar(TS ts, PetscReal t, Vec X, Vec Cdot, Vec F, void* ctx) {
+static PetscErrorCode IFunction_TransientVar(DM da, PetscReal t, Vec X, Vec Cdot, Vec F, void* ctx) {
   auto* user_context = static_cast<AppCtx*>(ctx);
-  DM da              = user_context->da;
+  da                 = user_context->da;
   const PetscScalar* cdot;
   PetscInt xs, ys, xm, ym;
   Vec localX;
 
   // PetscScalar* f;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **x, **f;
+      **my_topo, **x, **f, **my_rech, **my_area;
   // const PetscScalar *x;
   std::cout << "doing the ifunction" << std::endl;
 
@@ -65,6 +65,8 @@ static PetscErrorCode IFunction_TransientVar(TS ts, PetscReal t, Vec X, Vec Cdot
   PetscCall(DMDAVecGetArray(da, user_context->porosity, &my_porosity));
   PetscCall(DMDAVecGetArray(da, user_context->h, &my_h));
   PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
+  PetscCall(DMDAVecGetArray(da, user_context->rech_vec, &my_rech));
+  PetscCall(DMDAVecGetArray(da, user_context->cell_area, &my_area));
 
   DMGetLocalVector(da, &localX);
   DMGlobalToLocalBegin(da, X, INSERT_VALUES, localX);
@@ -111,7 +113,9 @@ static PetscErrorCode IFunction_TransientVar(TS ts, PetscReal t, Vec X, Vec Cdot
         starting_storativity[i][j] = updateEffectiveStorativity(
             my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
-        f[i][j] = (uxx + uyy) * (user_context->timestep / starting_storativity[i][j]) + u;
+        double recharge = add_recharge(my_rech[i][j], my_h[i][j], my_porosity[i][j], my_area[i][j], 0);
+
+        f[i][j] = (uxx + uyy) * (user_context->timestep / starting_storativity[i][j]) + u - recharge;
         //  std::cout<<"i "<<i<<" j "<<j<<" f "<<f[i][j]<<" x "<<x[i][j]<<std::endl;
       }
     }
@@ -128,6 +132,9 @@ static PetscErrorCode IFunction_TransientVar(TS ts, PetscReal t, Vec X, Vec Cdot
   PetscCall(DMDAVecRestoreArray(da, user_context->porosity, &my_porosity));
   PetscCall(DMDAVecRestoreArray(da, user_context->h, &my_h));
   PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
+  PetscCall(DMDAVecRestoreArray(da, user_context->rech_vec, &my_rech));
+  PetscCall(DMDAVecRestoreArray(da, user_context->cell_area, &my_area));
+
   DMDAVecRestoreArrayRead(da, localX, &x);
   DMRestoreLocalVector(da, &localX);
 
@@ -288,7 +295,12 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
         arp.wtd(x, y) = 0.;
       } else {
-        double rech_count = add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 1, arp);
+        double rech_count = add_recharge(
+            arp.rech(x, y),
+            arp.wtd(x, y),
+            arp.porosity(x, y),
+            arp.cell_area[y],
+            1);  // TODO: update how total_added_recharge gets counted
       }
     }
   }
@@ -329,17 +341,24 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   // these here
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.S[i][j]        = arp.effective_storativity(i, j);
-      dmdapack.h[i][j]        = arp.wtd(i, j);
-      dmdapack.rech_vec[i][j] = arp.rech(i, j);
-      int n                   = arp.topo.xyToI(i, j);
-      double xval             = arp.topo(i, j) + arp.wtd(i, j);
-      dmdapack.x[i][j]        = xval;
+      dmdapack.mask[i][j]        = arp.land_mask(i, j);
+      dmdapack.S[i][j]           = arp.effective_storativity(i, j);
+      dmdapack.cellsize_EW[i][j] = arp.cellsize_e_w_metres[j];
+      dmdapack.fdepth_vec[i][j]  = arp.fdepth(i, j);
+      dmdapack.ksat_vec[i][j]    = arp.ksat(i, j);
+      dmdapack.porosity[i][j]    = arp.porosity(i, j);
+      dmdapack.h[i][j]           = arp.wtd(i, j);
+      dmdapack.topo_vec[i][j]    = arp.topo(i, j);
+      dmdapack.rech_vec[i][j]    = arp.rech(i, j);
+      dmdapack.cell_area[i][j]   = arp.cell_area[j];
+      int n                      = arp.topo.xyToI(i, j);
+      double xval                = arp.topo(i, j) + arp.wtd(i, j);
+      dmdapack.x[i][j]           = xval;
     }
   }
   std::cout << "line 152" << std::endl;
 
-  DMTSSetIFunction(user_context.da, IFunction_TransientVar, (void*)&user_context);
+  DMTSSetIFunctionLocal(user_context.da, IFunction_TransientVar, (void*)&user_context);
   DMTSSetTransientVariable(user_context.da, TransientVar, (void*)&user_context);
 
   TSSetMaxTime(ts, 1.0);

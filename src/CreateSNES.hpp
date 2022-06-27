@@ -21,6 +21,7 @@ struct AppCtx {
   Vec h           = nullptr;
   Vec topo_vec    = nullptr;
   Vec rech_vec    = nullptr;
+  Vec cell_area   = nullptr;
 
   ~AppCtx() {
     //  SNESDestroy(&snes);
@@ -36,6 +37,7 @@ struct AppCtx {
     VecDestroy(&h);
     VecDestroy(&topo_vec);
     VecDestroy(&rech_vec);
+    VecDestroy(&cell_area);
   }
 
   // Extract global vectors from DM; then duplicate for remaining
@@ -52,6 +54,7 @@ struct AppCtx {
     VecDuplicate(x, &h);
     VecDuplicate(x, &topo_vec);
     VecDuplicate(x, &rech_vec);
+    VecDuplicate(x, &cell_area);
   }
 };
 
