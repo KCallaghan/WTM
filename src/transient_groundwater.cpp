@@ -44,16 +44,63 @@ double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, co
   }
 }
 
+static PetscErrorCode FormInitialSolution(DM da, Vec X, ArrayPack& arp) {
+  PetscInt i, j, xs, ys, xm, ym, Mx, My;
+  PetscScalar** x;
+  DMDAGetInfo(
+      da,
+      PETSC_IGNORE,
+      &Mx,
+      &My,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE,
+      PETSC_IGNORE);
+  /*
+     Get pointers to vector data
+  */
+  DMDAVecGetArray(da, X, &x);
+  /*
+     Get local grid boundaries
+  */
+  DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
+  /*
+     Compute function over the locally owned part of the grid
+  */
+  for (j = ys; j < ys + ym; j++) {
+    for (i = xs; i < xs + xm; i++) {
+      if (arp.land_mask(i, j) == 0) {
+        x[i][j] = arp.topo(i, j) + 0.0;
+      } else {
+        x[i][j] = arp.topo(i, j) + arp.wtd(i, j);
+      }
+    }
+  }
+  /*
+     Restore vectors
+  */
+  DMDAVecRestoreArray(da, X, &x);
+  return 0;
+}
+
 static PetscErrorCode IFunction_TransientVar(DM da, PetscReal t, Vec X, Vec Cdot, Vec F, void* ctx) {
   auto* user_context = static_cast<AppCtx*>(ctx);
   da                 = user_context->da;
-  const PetscScalar* cdot;
+  // const PetscScalar* cdot;
   PetscInt xs, ys, xm, ym;
   Vec localX;
+  Vec localC;
+  Vec localF;
 
   // PetscScalar* f;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **x, **f, **my_rech, **my_area;
+      **my_topo, **x, **f, **my_rech, **my_area, **cdot;
   // const PetscScalar *x;
   std::cout << "doing the ifunction" << std::endl;
 
@@ -73,14 +120,24 @@ static PetscErrorCode IFunction_TransientVar(DM da, PetscReal t, Vec X, Vec Cdot
   DMGlobalToLocalEnd(da, X, INSERT_VALUES, localX);
   DMDAVecGetArrayRead(da, localX, &x);
 
+  DMGetLocalVector(da, &localF);
+  DMGlobalToLocalBegin(da, F, INSERT_VALUES, localF);
+  DMGlobalToLocalEnd(da, F, INSERT_VALUES, localF);
+  DMDAVecGetArrayRead(da, localF, &f);
+
+  DMGetLocalVector(da, &localC);
+  DMGlobalToLocalBegin(da, Cdot, INSERT_VALUES, localC);
+  DMGlobalToLocalEnd(da, Cdot, INSERT_VALUES, localC);
+  DMDAVecGetArrayRead(da, localC, &cdot);
+
   // VecGetArrayRead(X, &x);
-  VecGetArrayRead(Cdot, &cdot);
-  PetscCall(DMDAVecGetArray(da, F, &f));
+  //  VecGetArrayRead(Cdot, &cdot);
+  // PetscCall(DMDAVecGetArray(da, F, &f));
 
   DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
-
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
+      //    std::cout<<"i "<<i<<" j "<<j<<" x "<<x[i][j]<<" cdot "<<cdot[i][j]<<" f "<<f[i][j]<<std::endl;
       const PetscScalar u = x[i][j];
       if (my_mask[i][j] == 0) {
         f[i][j] = u;
@@ -114,13 +171,14 @@ static PetscErrorCode IFunction_TransientVar(DM da, PetscReal t, Vec X, Vec Cdot
             my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
 
         double recharge = add_recharge(my_rech[i][j], my_h[i][j], my_porosity[i][j], my_area[i][j], 0);
-
-        f[i][j] = (uxx + uyy) * (user_context->timestep / starting_storativity[i][j]) + u - recharge;
+        f[i][j] = x[i][j] + 10;  //(uxx + uyy) * (user_context->timestep / starting_storativity[i][j]) + u - recharge;
         //  std::cout<<"i "<<i<<" j "<<j<<" f "<<f[i][j]<<" x "<<x[i][j]<<std::endl;
       }
+      //    std::cout<<"i "<<i<<" j "<<j<<" x "<<x[i][j]<<" cdot "<<cdot[i][j]<<" f "<<f[i][j]<<std::endl;
     }
   }
-
+  std::cout << "done" << std::endl;
+  std::cout << "x in the func " << x[10][10] << " f " << f[10][10] << std::endl;
   // f[0] = cdot[0] + PetscExpScalar(x[0]);
   // f[1] = cdot[1] - PetscExpScalar(x[0]);
 
@@ -137,17 +195,19 @@ static PetscErrorCode IFunction_TransientVar(DM da, PetscReal t, Vec X, Vec Cdot
 
   DMDAVecRestoreArrayRead(da, localX, &x);
   DMRestoreLocalVector(da, &localX);
+  DMDAVecRestoreArrayRead(da, localF, &f);
+  DMRestoreLocalVector(da, &localF);
+  DMDAVecRestoreArrayRead(da, localC, &cdot);
+  DMRestoreLocalVector(da, &localC);
 
-  // VecRestoreArrayRead(X, &x);
-  VecRestoreArrayRead(Cdot, &cdot);
-  PetscCall(DMDAVecRestoreArray(da, F, &f));
-
+  // VecRestoreArrayRead(Cdot, &cdot);
+  std::cout << "return" << std::endl;
   return 0;
 }
 
-static PetscErrorCode TransientVar(TS ts, Vec U, Vec C, void* ctx) {
+static PetscErrorCode TransientVar(TS ts, Vec X, Vec C, void* ctx) {
   std::cout << "doing the transient var" << std::endl;
-  VecCopy(U, C);
+  VecCopy(X, C);
   VecExp(C);
   return 0;
 }
@@ -169,115 +229,6 @@ std::tuple<PetscInt, PetscInt, PetscInt, PetscInt> get_corners(const DM da) {
   return {xs, ys, xm, ym};
 }
 
-/* ------------------------------------------------------------------- */
-/*
-   FormFunctionLocal - Evaluates nonlinear function, F(x).
- */
-// static PetscErrorCode FormFunction(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user_context) {
-// static PetscErrorCode FormFunction(TS ts, PetscReal ftime, Vec X, Vec F, void* ptr) {
-//  auto* user_context = static_cast<AppCtx*>(ptr);
-// std::cout<<"forming the function"<<std::endl;
-//  DM da = user_context->da;
-//
-//  Vec localX;
-//  PetscInt xs, ys, xm, ym;
-//
-//  PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-//      **my_topo, **f, **x;
-//
-//  /*
-//    Compute function over the locally owned part of the grid
-// */
-//  PetscCall(DMDAVecGetArray(da, user_context->mask, &my_mask));
-//  PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
-//  PetscCall(DMDAVecGetArray(da, user_context->cellsize_EW, &cellsize_ew));
-//  PetscCall(DMDAVecGetArray(da, user_context->fdepth_vec, &my_fdepth));
-//  PetscCall(DMDAVecGetArray(da, user_context->ksat_vec, &my_ksat));
-//  PetscCall(DMDAVecGetArray(da, user_context->porosity, &my_porosity));
-//  PetscCall(DMDAVecGetArray(da, user_context->h, &my_h));
-//  PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
-//  PetscCall(DMDAVecGetArray(da, F, &f));
-//
-//  DMGetLocalVector(da, &localX);
-//  DMGlobalToLocalBegin(da, X, INSERT_VALUES, localX);
-//  DMGlobalToLocalEnd(da, X, INSERT_VALUES, localX);
-//  DMDAVecGetArrayRead(da, localX, &x);
-//
-//  DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
-//
-//  for (auto j = ys; j < ys + ym; j++) {
-//    for (auto i = xs; i < xs + xm; i++) {
-//      const PetscScalar u = x[i][j];
-//      if (my_mask[i][j] == 0) {
-//        f[i][j] = u;
-//      } else {
-//        const PetscScalar ux_E = (x[i][j + 1] - x[i][j]);
-//        const PetscScalar ux_W = (x[i][j] - x[i][j - 1]);
-//        const PetscScalar uy_N = (x[i + 1][j] - x[i][j]);
-//        const PetscScalar uy_S = (x[i][j] - x[i - 1][j]);
-//        const PetscScalar e_E =
-//            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-//                  1. / depthIntegratedTransmissivity(
-//                           x[i][j + 1] - my_topo[i][j + 1], my_fdepth[i][j + 1], my_ksat[i][j + 1]));
-//        const PetscScalar e_W =
-//            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-//                  1. / depthIntegratedTransmissivity(
-//                           x[i][j - 1] - my_topo[i][j - 1], my_fdepth[i][j - 1], my_ksat[i][j - 1]));
-//        const PetscScalar e_N =
-//            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-//                  1. / depthIntegratedTransmissivity(
-//                           x[i + 1][j] - my_topo[i + 1][j], my_fdepth[i + 1][j], my_ksat[i + 1][j]));
-//        const PetscScalar e_S =
-//            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
-//                  1. / depthIntegratedTransmissivity(
-//                           x[i - 1][j] - my_topo[i - 1][j], my_fdepth[i - 1][j], my_ksat[i - 1][j]));
-//
-//        const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) / (cellsize_ew[i][j] * cellsize_ew[i][j]);
-//        const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (user_context->cellsize_NS * user_context->cellsize_NS);
-//        // TODO double check which cellsize is which
-//
-//        starting_storativity[i][j] = updateEffectiveStorativity(
-//            my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
-//
-//        f[i][j] = (uxx + uyy) * (user_context->timestep / starting_storativity[i][j]) + u;
-//        //     std::cout<<"i "<<i<<" j "<<j<<" f is "<<f[i][j]<<std::endl;
-//        //     std::cout<<"x "<<x[i][j]<<" xE "<<x[i][j+1]<<std::endl;
-//        //     std::cout<<"e_W "<<e_W<<" ux_W "<<ux_W<<" e_E "<<e_E<<" ux_E "<<ux_E<<" cellsize_ew
-//        //     "<<cellsize_ew[i][j]<<std::endl; std::cout<<"uxx "<<uxx<<" uyy "<<uyy<<std::endl;
-//      }
-//    }
-//  }
-//
-//  PetscCall(DMDAVecRestoreArray(da, user_context->mask, &my_mask));
-//  PetscCall(DMDAVecRestoreArray(da, user_context->S, &starting_storativity));
-//  PetscCall(DMDAVecRestoreArray(da, user_context->cellsize_EW, &cellsize_ew));
-//  PetscCall(DMDAVecRestoreArray(da, user_context->fdepth_vec, &my_fdepth));
-//  PetscCall(DMDAVecRestoreArray(da, user_context->ksat_vec, &my_ksat));
-//  PetscCall(DMDAVecRestoreArray(da, user_context->porosity, &my_porosity));
-//  PetscCall(DMDAVecRestoreArray(da, user_context->h, &my_h));
-//  PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
-//  //  PetscCall(DMDAVecRestoreArray(da, X, &x));
-//  PetscCall(DMDAVecRestoreArray(da, F, &f));
-//  DMDAVecRestoreArrayRead(da, localX, &x);
-//  DMRestoreLocalVector(da, &localX);
-//
-//  PetscLogFlops(xm * ym * (72.0));
-//
-//  //  /*
-//  //     Get pointers to vector data
-//  //  */
-//  //  DMDAVecGetArrayDOF(da,F,&f);
-//  //  /*
-//  //  */
-//  //  DMDAVecRestoreArrayDOF(da,F,&f);
-//  return 0;
-//}
-
-// declare functions
-// static PetscErrorCode FormRHS(AppCtx*, DM, Vec, ArrayPack& arp);
-// static PetscErrorCode FormFunctionLocal(DMDALocalInfo*, PetscScalar**, PetscScalar**, AppCtx*);
-// static PetscErrorCode FormFunction(TS, PetscReal, Vec, Vec, &void*);
-// static PetscErrorCode FormInitialSolution(DM, Vec, ArrayPack& arp);
 extern PetscErrorCode MyTSMonitor(TS, PetscInt, PetscReal, Vec, void*);
 extern PetscErrorCode MySNESMonitor(SNES, PetscInt, PetscReal, PetscViewerAndFormat*);
 
@@ -351,15 +302,15 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
       dmdapack.topo_vec[i][j]    = arp.topo(i, j);
       dmdapack.rech_vec[i][j]    = arp.rech(i, j);
       dmdapack.cell_area[i][j]   = arp.cell_area[j];
-      int n                      = arp.topo.xyToI(i, j);
-      double xval                = arp.topo(i, j) + arp.wtd(i, j);
-      dmdapack.x[i][j]           = xval;
     }
   }
-  std::cout << "line 152" << std::endl;
+  std::cout << "line 152 " << dmdapack.x[10][10] << std::endl;
 
+  // DMDASNESSetFunctionLocal(user_context.da, INSERT_VALUES, (PetscErrorCode(*)(DMDALocalInfo*, void*, void*,
+  // void*))FormFunctionLocal, &user_context);
+  FormInitialSolution(user_context.da, user_context.x, arp);
   DMTSSetIFunctionLocal(user_context.da, IFunction_TransientVar, (void*)&user_context);
-  DMTSSetTransientVariable(user_context.da, TransientVar, (void*)&user_context);
+  // DMTSSetTransientVariable(user_context.da, TransientVar, (void*)&user_context);
 
   TSSetMaxTime(ts, 1.0);
   if (usemonitor) {
@@ -370,25 +321,24 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Customize nonlinear solver
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  TSSetType(ts, TSBEULER);
-  TSGetSNES(ts, &ts_snes);
-  if (usemonitor) {
-    PetscViewerAndFormatCreate(PETSC_VIEWER_STDOUT_WORLD, PETSC_VIEWER_DEFAULT, &vf);
-    SNESMonitorSet(
-        ts_snes,
-        (PetscErrorCode(*)(SNES, PetscInt, PetscReal, void*))MySNESMonitor,
-        vf,
-        (PetscErrorCode(*)(void**))PetscViewerAndFormatDestroy);
-  }
+  //  TSSetType(ts, TSBEULER);
+  //  TSGetSNES(ts, &ts_snes);
+  //  if (usemonitor) {
+  //    PetscViewerAndFormatCreate(PETSC_VIEWER_STDOUT_WORLD, PETSC_VIEWER_DEFAULT, &vf);
+  //    SNESMonitorSet(
+  //        ts_snes,
+  //        (PetscErrorCode(*)(SNES, PetscInt, PetscReal, void*))MySNESMonitor,
+  //        vf,
+  //        (PetscErrorCode(*)(void**))PetscViewerAndFormatDestroy);
+  //  }
   std::cout << "line 173" << std::endl;
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Set initial conditions
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  // FormInitialSolution(user_context.da, user_context.x, arp);
   TSSetTimeStep(ts, .1);
   TSSetExactFinalTime(ts, TS_EXACTFINALTIME_STEPOVER);
-  TSSetSolution(ts, user_context.x);
+  //  TSSetSolution(ts, user_context.x);
   std::cout << "line 182" << std::endl;
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -401,7 +351,7 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
      Solve nonlinear system
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   TSSolve(ts, user_context.x);
-  std::cout << "line 196" << std::endl;
+  std::cout << "line 196 " << dmdapack.x[10][10] << std::endl;
 
   TSGetSolveTime(ts, &ftime);
   std::cout << "line 199" << std::endl;
@@ -430,7 +380,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   // // VecSum(U, &sum);
   // // PetscPrintf(PETSC_COMM_WORLD, "Conservation error %g\n", (double)PetscRealPart(sum - 3.));
   // VecDestroy(&U);
-  TSDestroy(&ts);
   std::cout << "line 209" << std::endl;
 
   // copy the result back into the wtd array
@@ -446,47 +395,8 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
     }
   }
 
+  TSDestroy(&ts);
   return 0;
-  //
-  //  // Set local function evaluation routine
-  //  DMDASNESSetFunctionLocal(
-  //      user_context.da,
-  //      INSERT_VALUES,
-  //      (PetscErrorCode(*)(DMDALocalInfo*, void*, void*, void*))FormFunctionLocal,
-  //      &user_context);
-  //
-  //  // Evaluate initial guess
-  //  FormInitialGuess(&user_context, user_context.da, user_context.x, arp);
-  //
-  //  // set the RHS
-  //  FormRHS(&user_context, user_context.da, user_context.b, arp);
-  //
-  //  // Solve nonlinear system
-  //  SNESSolve(user_context.snes, user_context.b, user_context.x);
-  //  SNESGetIterationNumber(user_context.snes, &its);
-  //  SNESGetConvergedReason(user_context.snes, &reason);
-  //
-  //  PetscPrintf(
-  //      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason],
-  //      its);
-  //
-  //  // recalculate the new storativity using the initial solve as an estimator for the final answer
-  //  for (auto j = ys; j < ys + ym; j++) {
-  //    for (auto i = xs; i < xs + xm; i++) {
-  //      dmdapack.S[i][j] = updateEffectiveStorativity(
-  //          arp.wtd(i, j), dmdapack.x[i][j] - arp.topo(i, j), arp.porosity(i, j), arp.effective_storativity(i, j));
-  //    }
-  //  }
-  //
-  //  // repeat the solve
-  //  SNESSolve(user_context.snes, user_context.b, user_context.x);
-  //  SNESGetIterationNumber(user_context.snes, &its);
-  //  SNESGetConvergedReason(user_context.snes, &reason);
-  //
-  //  PetscPrintf(
-  //      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason],
-  //      its);
-  //
 }
 
 /*
@@ -537,53 +447,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
 // }
 //
 ///* ------------------------------------------------------------------- */
-// static PetscErrorCode FormInitialSolution(DM da, Vec X, ArrayPack& arp) {
-//   PetscInt i, j, xs, ys, xm, ym, Mx, My;
-//   PetscScalar** x;
-//   DMDAGetInfo(
-//       da,
-//       PETSC_IGNORE,
-//       &Mx,
-//       &My,
-//       PETSC_IGNORE,
-//       PETSC_IGNORE,
-//       PETSC_IGNORE,
-//       PETSC_IGNORE,
-//       PETSC_IGNORE,
-//       PETSC_IGNORE,
-//       PETSC_IGNORE,
-//       PETSC_IGNORE,
-//       PETSC_IGNORE,
-//       PETSC_IGNORE);
-//   /*
-//      Get pointers to vector data
-//   */
-//   DMDAVecGetArray(da, X, &x);
-//
-//   /*
-//      Get local grid boundaries
-//   */
-//   DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
-//   /*
-//      Compute function over the locally owned part of the grid
-//   */
-//
-//   for (j = ys; j < ys + ym; j++) {
-//     for (i = xs; i < xs + xm; i++) {
-//       if (arp.land_mask(i, j) == 0) {
-//         x[i][j] = 0.0;//arp.topo(i, j) + 0.0;
-//       } else {
-//         x[i][j] = 0.0;//arp.topo(i, j) + arp.wtd(i, j);
-//       }
-//     }
-//   }
-//   /*
-//      Restore vectors
-//   */
-//   DMDAVecRestoreArray(da, X, &x);
-//
-//   return 0;
-// }
 
 PetscErrorCode MyTSMonitor(TS ts, PetscInt step, PetscReal ptime, Vec v, void* ctx) {
   PetscReal norm;
