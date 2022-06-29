@@ -22,6 +22,9 @@ struct AppCtx {
   Vec topo_vec    = nullptr;
   Vec rech_vec    = nullptr;
   Vec cell_area   = nullptr;
+  PetscReal lidvelocity, prandtl, grashof; /* physical parameters */
+  PetscBool parabolic;   /* allow a transient term corresponding roughly to artificial compressibility */
+  PetscReal cfl_initial; /* CFL for first time step */
 
   ~AppCtx() {
     //  SNESDestroy(&snes);
