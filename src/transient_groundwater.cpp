@@ -89,9 +89,15 @@ static PetscErrorCode FormInitialSolution(DM da, Vec X, ArrayPack& arp) {
   return 0;
 }
 
-static PetscErrorCode IFunction_TransientVar(DM da, PetscReal t, Vec X, Vec Cdot, Vec F, void* ctx) {
-  auto* user_context = static_cast<AppCtx*>(ctx);
-  da                 = user_context->da;
+static PetscErrorCode IFunction_TransientVar(
+    DMDALocalInfo* info,
+    PetscReal t,
+    PetscScalar** x,
+    PetscScalar** Cdot,
+    PetscScalar** f,
+    void* ctx) {
+  AppCtx* user_context = (AppCtx*)ctx;
+  DM da                = user_context->da;
   // const PetscScalar* cdot;
   PetscInt xs, ys, xm, ym;
   Vec localX;
@@ -100,7 +106,7 @@ static PetscErrorCode IFunction_TransientVar(DM da, PetscReal t, Vec X, Vec Cdot
 
   // PetscScalar* f;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **x, **f, **my_rech, **my_area, **cdot;
+      **my_topo, **my_rech, **my_area, **cdot;
   // const PetscScalar *x;
   std::cout << "doing the ifunction" << std::endl;
 
@@ -114,25 +120,6 @@ static PetscErrorCode IFunction_TransientVar(DM da, PetscReal t, Vec X, Vec Cdot
   PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecGetArray(da, user_context->rech_vec, &my_rech));
   PetscCall(DMDAVecGetArray(da, user_context->cell_area, &my_area));
-
-  DMGetLocalVector(da, &localX);
-  DMGlobalToLocalBegin(da, X, INSERT_VALUES, localX);
-  DMGlobalToLocalEnd(da, X, INSERT_VALUES, localX);
-  DMDAVecGetArrayRead(da, localX, &x);
-
-  DMGetLocalVector(da, &localF);
-  DMGlobalToLocalBegin(da, F, INSERT_VALUES, localF);
-  DMGlobalToLocalEnd(da, F, INSERT_VALUES, localF);
-  DMDAVecGetArrayRead(da, localF, &f);
-
-  DMGetLocalVector(da, &localC);
-  DMGlobalToLocalBegin(da, Cdot, INSERT_VALUES, localC);
-  DMGlobalToLocalEnd(da, Cdot, INSERT_VALUES, localC);
-  DMDAVecGetArrayRead(da, localC, &cdot);
-
-  // VecGetArrayRead(X, &x);
-  //  VecGetArrayRead(Cdot, &cdot);
-  // PetscCall(DMDAVecGetArray(da, F, &f));
 
   DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
   for (auto j = ys; j < ys + ym; j++) {
@@ -179,8 +166,6 @@ static PetscErrorCode IFunction_TransientVar(DM da, PetscReal t, Vec X, Vec Cdot
   }
   std::cout << "done" << std::endl;
   std::cout << "x in the func " << x[10][10] << " f " << f[10][10] << std::endl;
-  // f[0] = cdot[0] + PetscExpScalar(x[0]);
-  // f[1] = cdot[1] - PetscExpScalar(x[0]);
 
   PetscCall(DMDAVecRestoreArray(da, user_context->mask, &my_mask));
   PetscCall(DMDAVecRestoreArray(da, user_context->S, &starting_storativity));
@@ -193,14 +178,6 @@ static PetscErrorCode IFunction_TransientVar(DM da, PetscReal t, Vec X, Vec Cdot
   PetscCall(DMDAVecRestoreArray(da, user_context->rech_vec, &my_rech));
   PetscCall(DMDAVecRestoreArray(da, user_context->cell_area, &my_area));
 
-  DMDAVecRestoreArrayRead(da, localX, &x);
-  DMRestoreLocalVector(da, &localX);
-  DMDAVecRestoreArrayRead(da, localF, &f);
-  DMRestoreLocalVector(da, &localF);
-  DMDAVecRestoreArrayRead(da, localC, &cdot);
-  DMRestoreLocalVector(da, &localC);
-
-  // VecRestoreArrayRead(Cdot, &cdot);
   std::cout << "return" << std::endl;
   return 0;
 }
@@ -309,7 +286,8 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   // DMDASNESSetFunctionLocal(user_context.da, INSERT_VALUES, (PetscErrorCode(*)(DMDALocalInfo*, void*, void*,
   // void*))FormFunctionLocal, &user_context);
   FormInitialSolution(user_context.da, user_context.x, arp);
-  DMTSSetIFunctionLocal(user_context.da, IFunction_TransientVar, (void*)&user_context);
+  DMDATSSetIFunctionLocal(
+      user_context.da, INSERT_VALUES, (DMDATSIFunctionLocal)IFunction_TransientVar, (void*)&user_context);
   // DMTSSetTransientVariable(user_context.da, TransientVar, (void*)&user_context);
 
   TSSetMaxTime(ts, 1.0);
