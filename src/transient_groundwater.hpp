@@ -8,6 +8,6 @@
 
 namespace FanDarcyGroundwater {
 
-int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_Pack& dmdapack);
+int update(Parameters& params, ArrayPack& arp, AppCtx& user_context);
 
 }

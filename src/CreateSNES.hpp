@@ -11,6 +11,7 @@ struct AppCtx {
   // SNES snes       = nullptr;
   DM da           = nullptr;
   Vec x           = nullptr;  // Solution vector
+  Vec xdot        = nullptr;  // Solution vector
   Vec b           = nullptr;  // RHS vector
   Vec S           = nullptr;
   Vec cellsize_EW = nullptr;
@@ -30,6 +31,7 @@ struct AppCtx {
     //  SNESDestroy(&snes);
     DMDestroy(&da);
     VecDestroy(&x);
+    VecDestroy(&xdot);
     VecDestroy(&b);
     VecDestroy(&S);
     VecDestroy(&cellsize_EW);
@@ -48,6 +50,7 @@ struct AppCtx {
   void make_global_vectors() {
     DMCreateGlobalVector(da, &x);
     VecDuplicate(x, &b);
+    VecDuplicate(x, &xdot);
     VecDuplicate(x, &S);
     VecDuplicate(x, &cellsize_EW);
     VecDuplicate(x, &fdepth_vec);

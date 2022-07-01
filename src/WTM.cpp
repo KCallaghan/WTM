@@ -71,7 +71,7 @@ void initialise(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
 
   arp.check();
 
-  InitialiseSNES(user_context, params);
+  //  InitialiseSNES(user_context, params);
 
   // Print column headings to textfile to match data that will be printed after each time step.
   textfile << "Cycles_done Total_wtd_change Change_in_GW_only Change_in_SW_only absolute_value_total_wtd_change "
@@ -86,7 +86,6 @@ void update(
     Parameters& params,
     ArrayPack& arp,
     AppCtx& user_context,
-    DMDA_Array_Pack& dmdapack,
     richdem::dephier::DepressionHierarchy<elev_t>& deps) {
   richdem::Timer timer_overall;
   timer_overall.start();
@@ -124,7 +123,7 @@ void update(
   // 2x 6 months GW then FSM.
   int iter_count = 0;
   while (iter_count++ < params.maxiter) {
-    FanDarcyGroundwater::update(params, arp, user_context, dmdapack);
+    FanDarcyGroundwater::update(params, arp, user_context);
   }
 
   std::cerr << "t GW time = " << time_groundwater.lap() << std::endl;
@@ -212,14 +211,14 @@ void update(
   std::cerr << "t WTM update time = " << timer_overall.lap() << std::endl;
 }
 
-void run(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_Pack& dmdapack) {
+void run(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
   // Set the initial depression hierarchy.
   // For equilibrium runs, this is the only time this needs to be done.
   auto deps = dh::GetDepressionHierarchy<float, rd::Topology::D8>(
       arp.topo, arp.cell_area, arp.label, arp.final_label, arp.flowdirs);
 
   while (params.cycles_done < params.total_cycles) {
-    update(params, arp, user_context, dmdapack, deps);
+    update(params, arp, user_context, deps);
   }
 }
 
@@ -251,13 +250,13 @@ int main(int argc, char** argv) {
 
   initialise(params, arp, user_context);
 
-  DMDA_Array_Pack dmdapack(user_context);  // this needs to come after initialise
-  populate_DMDA_array_pack(user_context, arp, dmdapack);
+  // DMDA_Array_Pack dmdapack(user_context);  // this needs to come after initialise
+  // populate_DMDA_array_pack(user_context, arp, dmdapack);
 
-  run(params, arp, user_context, dmdapack);
+  run(params, arp, user_context);
   finalise(params, arp);
 
-  dmdapack.release();
+  // dmdapack.release();
 
   PetscCall(PetscFinalize());
 
