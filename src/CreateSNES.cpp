@@ -2,6 +2,7 @@
 
 void InitialiseSNES(AppCtx& user_context, Parameters& params) {
   // SNESCreate(PETSC_COMM_WORLD, &user_context.snes);
+  TSCreate(PETSC_COMM_WORLD, &user_context.ts);
 
   user_context.cellsize_NS = params.cellsize_n_s_metres;
   user_context.timestep    = params.deltat;
@@ -30,6 +31,7 @@ void InitialiseSNES(AppCtx& user_context, Parameters& params) {
 
   DMSetApplicationContext(user_context.da, &user_context);
   //  SNESSetDM(user_context.snes, user_context.da);
+  TSSetDM(user_context.ts, user_context.da);
 
   //  SNESSetFromOptions(user_context.snes);
 

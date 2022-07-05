@@ -16,6 +16,7 @@ void populate_DMDA_array_pack(AppCtx& user_context, ArrayPack& arp, DMDA_Array_P
       dmdapack.ksat_vec[i][j]    = arp.ksat(i, j);
       dmdapack.porosity[i][j]    = arp.porosity(i, j);
       dmdapack.topo_vec[i][j]    = arp.topo(i, j);
+      dmdapack.cell_area[i][j]   = arp.cell_area[j];
     }
   }
 }

@@ -4,11 +4,12 @@
 #include <petscdmda.h>
 #include <petscerror.h>
 #include <petscsnes.h>
+#include <petscts.h>
 
 struct AppCtx {
   PetscReal timestep;
   PetscReal cellsize_NS;
-  // SNES snes       = nullptr;
+  TS ts           = nullptr;
   DM da           = nullptr;
   Vec x           = nullptr;  // Solution vector
   Vec xdot        = nullptr;  // Solution vector
@@ -23,12 +24,14 @@ struct AppCtx {
   Vec topo_vec    = nullptr;
   Vec rech_vec    = nullptr;
   Vec cell_area   = nullptr;
+  Vec f           = nullptr;
   PetscReal lidvelocity, prandtl, grashof; /* physical parameters */
   PetscBool parabolic;   /* allow a transient term corresponding roughly to artificial compressibility */
   PetscReal cfl_initial; /* CFL for first time step */
 
   ~AppCtx() {
     //  SNESDestroy(&snes);
+    TSDestroy(&ts);
     DMDestroy(&da);
     VecDestroy(&x);
     VecDestroy(&xdot);
@@ -43,6 +46,7 @@ struct AppCtx {
     VecDestroy(&topo_vec);
     VecDestroy(&rech_vec);
     VecDestroy(&cell_area);
+    VecDestroy(&f);
   }
 
   // Extract global vectors from DM; then duplicate for remaining
@@ -61,6 +65,7 @@ struct AppCtx {
     VecDuplicate(x, &topo_vec);
     VecDuplicate(x, &rech_vec);
     VecDuplicate(x, &cell_area);
+    VecDuplicate(x, &f);
   }
 };
 

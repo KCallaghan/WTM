@@ -85,27 +85,8 @@ static PetscErrorCode FormIFunctionLocal(
   AppCtx* user_context = (AppCtx*)ctx;
   DM da                = user_context->da;
   PetscInt xs, ys, xm, ym;
-
-  DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
-  for (auto j = ys; j < ys + ym; j++) {
-    for (auto i = xs; i < xs + xm; i++) {
-      const PetscScalar u = x[i][j];
-      f[i][j]             = xdot[i][j] + u;
-    }
-  }
-  std::cout << "done" << std::endl;
-  std::cout << "x in the func " << x[10][10] << " f " << f[10][10] << std::endl;
-
-  return 0;
-}
-
-static PetscErrorCode TransientVar(TS ts, Vec X, Vec Xdot, void* ctx) {
-  AppCtx* user_context = (AppCtx*)ctx;
-  DM da                = user_context->da;
-  // const PetscScalar* cdot;
-  PetscInt xs, ys, xm, ym;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **my_rech, **my_area, **x, **xdot;
+      **my_topo, **my_rech, **my_area;
 
   PetscCall(DMDAVecGetArray(da, user_context->mask, &my_mask));
   PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
@@ -117,16 +98,17 @@ static PetscErrorCode TransientVar(TS ts, Vec X, Vec Xdot, void* ctx) {
   PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecGetArray(da, user_context->rech_vec, &my_rech));
   PetscCall(DMDAVecGetArray(da, user_context->cell_area, &my_area));
-
-  DMDAVecGetArray(da, X, &x);
-  DMDAVecGetArray(da, Xdot, &xdot);
+  // PetscScalar **my_x,**my_xdot,**my_f;
+  // PetscCall(DMDAVecGetArray(da, x, &my_x));
+  // PetscCall(DMDAVecGetArray(da, xdot, &my_xdot));
+  // PetscCall(DMDAVecGetArray(da, f, &my_f));
 
   DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
       const PetscScalar u = x[i][j];
       if (my_mask[i][j] == 0) {
-        xdot[i][j] = u;
+        f[i][j] = u;
       } else {
         const PetscScalar ux_E = (x[i][j + 1] - x[i][j]);
         const PetscScalar ux_W = (x[i][j] - x[i][j - 1]);
@@ -149,8 +131,8 @@ static PetscErrorCode TransientVar(TS ts, Vec X, Vec Xdot, void* ctx) {
                   1. / depthIntegratedTransmissivity(
                            x[i - 1][j] - my_topo[i - 1][j], my_fdepth[i - 1][j], my_ksat[i - 1][j]));
 
-        const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) / (cellsize_ew[i][j] * cellsize_ew[i][j]);
-        const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (user_context->cellsize_NS * user_context->cellsize_NS);
+        const PetscScalar uxx = (e_E * ux_E - e_W * ux_W) / (cellsize_ew[i][j] * cellsize_ew[i][j]);
+        const PetscScalar uyy = (e_N * uy_N - e_S * uy_S) / (user_context->cellsize_NS * user_context->cellsize_NS);
         // TODO double check which cellsize is which
 
         starting_storativity[i][j] = updateEffectiveStorativity(
@@ -158,14 +140,15 @@ static PetscErrorCode TransientVar(TS ts, Vec X, Vec Xdot, void* ctx) {
 
         double recharge = add_recharge(my_rech[i][j], my_h[i][j], my_porosity[i][j], my_area[i][j], 0);
 
-        xdot[i][j] = ((uxx + uyy) + recharge) / starting_storativity[i][j];
+        f[i][j] = xdot[i][j] - (uxx + uyy + recharge) / starting_storativity[i][j];
       }
     }
   }
-
-  PetscCall(DMDAVecRestoreArray(da, X, &x));
-  PetscCall(DMDAVecRestoreArray(da, Xdot, &xdot));
-
+  std::cout << "done" << std::endl;
+  std::cout << "x in the func " << x[10][10] << " f " << f[10][10] << " xdot " << xdot[10][10] << std::endl;
+  // PetscCall(DMDAVecRestoreArray(da, x, &my_x));
+  // PetscCall(DMDAVecRestoreArray(da, xdot, &my_xdot));
+  // PetscCall(DMDAVecRestoreArray(da, f, &my_f));
   PetscCall(DMDAVecRestoreArray(da, user_context->mask, &my_mask));
   PetscCall(DMDAVecRestoreArray(da, user_context->S, &starting_storativity));
   PetscCall(DMDAVecRestoreArray(da, user_context->cellsize_EW, &cellsize_ew));
@@ -176,6 +159,19 @@ static PetscErrorCode TransientVar(TS ts, Vec X, Vec Xdot, void* ctx) {
   PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecRestoreArray(da, user_context->rech_vec, &my_rech));
   PetscCall(DMDAVecRestoreArray(da, user_context->cell_area, &my_area));
+
+  return 0;
+}
+
+static PetscErrorCode TransientVar(TS ts, Vec X, Vec Xdot, void* ctx) {
+  AppCtx* user_context = (AppCtx*)ctx;
+  DM da                = user_context->da;
+  // const PetscScalar* cdot;
+  PetscInt xs, ys, xm, ym;
+  PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
+      **my_topo, **my_rech, **my_area, **x, **xdot;
+
+  PetscCall(VecCopy(X, Xdot));
 
   return 0;
 }
@@ -213,41 +209,18 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
   }
 }
 
-int update(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
+int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_Pack& dmdapack) {
   PetscInt steps;
-  TS ts;
   PetscReal ftime;
+  DMDALocalInfo* info;
   PetscInt xs, ys, xm, ym;
   TSConvergedReason reason;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **my_rech, **my_area, **my_x;
-
-  user_context.cellsize_NS = params.cellsize_n_s_metres;
-  user_context.timestep    = params.deltat;
+      **my_topo, **my_rech, **my_area, **my_x, **my_xdot, **my_f;
 
   set_starting_values(params, arp);
 
-  TSCreate(PETSC_COMM_WORLD, &ts);
-  DMDACreate2d(
-      PETSC_COMM_WORLD,
-      DM_BOUNDARY_NONE,
-      DM_BOUNDARY_NONE,
-      DMDA_STENCIL_STAR,
-      params.ncells_x,
-      params.ncells_y,
-      PETSC_DECIDE,
-      PETSC_DECIDE,
-      1,
-      1,
-      nullptr,
-      nullptr,
-      &user_context.da);
-  DMSetFromOptions(user_context.da);
-  DMSetUp(user_context.da);
-  user_context.make_global_vectors();
-
-  TSSetDM(ts, user_context.da);
-  TSSetProblemType(ts, TS_NONLINEAR);
+  TSSetProblemType(user_context.ts, TS_NONLINEAR);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Create user context, set problem data, create vector data structures.
@@ -258,66 +231,41 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
   // values for storativity are reset each time; and wtd and recharge change from one timestep to the next, so set
   // these here
 
-  PetscCall(DMDAVecGetArray(user_context.da, user_context.mask, &my_mask));
-  PetscCall(DMDAVecGetArray(user_context.da, user_context.S, &starting_storativity));
-  PetscCall(DMDAVecGetArray(user_context.da, user_context.cellsize_EW, &cellsize_ew));
-  PetscCall(DMDAVecGetArray(user_context.da, user_context.fdepth_vec, &my_fdepth));
-  PetscCall(DMDAVecGetArray(user_context.da, user_context.ksat_vec, &my_ksat));
-  PetscCall(DMDAVecGetArray(user_context.da, user_context.porosity, &my_porosity));
-  PetscCall(DMDAVecGetArray(user_context.da, user_context.h, &my_h));
-  PetscCall(DMDAVecGetArray(user_context.da, user_context.topo_vec, &my_topo));
-  PetscCall(DMDAVecGetArray(user_context.da, user_context.rech_vec, &my_rech));
-  PetscCall(DMDAVecGetArray(user_context.da, user_context.cell_area, &my_area));
-
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      my_mask[i][j]              = arp.land_mask(i, j);
-      starting_storativity[i][j] = arp.effective_storativity(i, j);
-      cellsize_ew[i][j]          = arp.cellsize_e_w_metres[j];
-      my_fdepth[i][j]            = arp.fdepth(i, j);
-      my_ksat[i][j]              = arp.ksat(i, j);
-      my_porosity[i][j]          = arp.porosity(i, j);
-      my_h[i][j]                 = arp.wtd(i, j);
-      my_topo[i][j]              = arp.topo(i, j);
-      my_rech[i][j]              = arp.rech(i, j);
-      my_area[i][j]              = arp.cell_area[j];
+      dmdapack.S[i][j]        = arp.effective_storativity(i, j);
+      dmdapack.h[i][j]        = arp.wtd(i, j);
+      dmdapack.rech_vec[i][j] = arp.rech(i, j);
+      //   dmdapack.my_x[i][j]                 = arp.wtd(i, j) + arp.topo(i,j);
     }
   }
 
-  PetscCall(DMDAVecRestoreArray(user_context.da, user_context.mask, &my_mask));
-  PetscCall(DMDAVecRestoreArray(user_context.da, user_context.S, &starting_storativity));
-  PetscCall(DMDAVecRestoreArray(user_context.da, user_context.cellsize_EW, &cellsize_ew));
-  PetscCall(DMDAVecRestoreArray(user_context.da, user_context.fdepth_vec, &my_fdepth));
-  PetscCall(DMDAVecRestoreArray(user_context.da, user_context.ksat_vec, &my_ksat));
-  PetscCall(DMDAVecRestoreArray(user_context.da, user_context.porosity, &my_porosity));
-  PetscCall(DMDAVecRestoreArray(user_context.da, user_context.h, &my_h));
-  PetscCall(DMDAVecRestoreArray(user_context.da, user_context.topo_vec, &my_topo));
-  PetscCall(DMDAVecRestoreArray(user_context.da, user_context.rech_vec, &my_rech));
-  PetscCall(DMDAVecRestoreArray(user_context.da, user_context.cell_area, &my_area));
-
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Create time integration context
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    Create time integration context
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   DMSetApplicationContext(user_context.da, &user_context);
   DMDATSSetIFunctionLocal(
-      user_context.da, INSERT_VALUES, (DMDATSIFunctionLocal)FormIFunctionLocal, (void*)&user_context);
+      user_context.da,
+      INSERT_VALUES,
+      (DMDATSIFunctionLocal)FormIFunctionLocal /*(info,ftime,dmdapack.x,dmdapack.xdot,dmdapack.f,&user_context)*/,
+      (void*)&user_context);
   DMTSSetTransientVariable(user_context.da, TransientVar, (void*)&user_context);
-  TSSetMaxSteps(ts, 10000);
-  TSSetMaxTime(ts, 1.0);
-  TSSetExactFinalTime(ts, TS_EXACTFINALTIME_STEPOVER);
-  TSSetTimeStep(ts, 0.1);
-  TSSetFromOptions(ts);
+  TSSetMaxSteps(user_context.ts, 10000);
+  TSSetMaxTime(user_context.ts, 1.0);
+  TSSetExactFinalTime(user_context.ts, TS_EXACTFINALTIME_STEPOVER);
+  TSSetTimeStep(user_context.ts, 0.1);
+  TSSetFromOptions(user_context.ts);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Solve the nonlinear system
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
   FormInitialSolution(user_context.da, user_context.x, arp);
-  TSSetSolution(ts, user_context.x);
-  TSSolve(ts, user_context.x);
-  TSGetSolveTime(ts, &ftime);
-  TSGetStepNumber(ts, &steps);
-  TSGetConvergedReason(ts, &reason);
+  TSSetSolution(user_context.ts, user_context.x);
+  TSSolve(user_context.ts, user_context.x);
+  TSGetSolveTime(user_context.ts, &ftime);
+  TSGetStepNumber(user_context.ts, &steps);
+  TSGetConvergedReason(user_context.ts, &reason);
 
   PetscPrintf(
       PETSC_COMM_WORLD,
@@ -330,12 +278,11 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
      Free work space.  All PETSc objects should be destroyed when they
      are no longer needed.
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  PetscCall(DMDAVecGetArray(user_context.da, user_context.x, &my_x));
 
   // copy the result back into the wtd array
   for (int j = ys; j < ys + ym; j++) {
     for (int i = xs; i < xs + xm; i++) {
-      arp.wtd(i, j) = my_x[i][j] - arp.topo(i, j);
+      arp.wtd(i, j) = dmdapack.x[i][j] - arp.topo(i, j);
       if (arp.land_mask(i, j) == 0.f) {
         arp.total_loss_to_ocean +=
             arp.wtd(i, j) * arp.cell_area[j];  // could it be that because ocean cells are just set = x in the formula,
@@ -344,9 +291,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
       }
     }
   }
-  PetscCall(DMDAVecRestoreArray(user_context.da, user_context.x, &my_x));
-
-  TSDestroy(&ts);
 
   return 0;
 }

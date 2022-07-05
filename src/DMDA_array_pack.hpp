@@ -12,6 +12,8 @@
 
 struct DMDA_Array_Pack {
   PetscScalar** x           = nullptr;
+  PetscScalar** xdot        = nullptr;
+  PetscScalar** f           = nullptr;
   PetscScalar** S           = nullptr;
   PetscScalar** cellsize_EW = nullptr;
   PetscScalar** fdepth_vec  = nullptr;
@@ -28,6 +30,8 @@ struct DMDA_Array_Pack {
     assert(!context);  // Make sure we're not already initialized
     context = &user;
     DMDAVecGetArray(user.da, user.x, &x);
+    DMDAVecGetArray(user.da, user.xdot, &xdot);
+    DMDAVecGetArray(user.da, user.f, &f);
     DMDAVecGetArray(user.da, user.S, &S);
     DMDAVecGetArray(user.da, user.cellsize_EW, &cellsize_EW);
     DMDAVecGetArray(user.da, user.fdepth_vec, &fdepth_vec);
@@ -43,6 +47,8 @@ struct DMDA_Array_Pack {
   void release() {
     assert(context);  // Make sure we are already initialized
     DMDAVecRestoreArray(context->da, context->x, &x);
+    DMDAVecRestoreArray(context->da, context->xdot, &xdot);
+    DMDAVecRestoreArray(context->da, context->f, &f);
     DMDAVecRestoreArray(context->da, context->S, &S);
     DMDAVecRestoreArray(context->da, context->cellsize_EW, &cellsize_EW);
     DMDAVecRestoreArray(context->da, context->fdepth_vec, &fdepth_vec);
