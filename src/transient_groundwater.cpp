@@ -68,6 +68,7 @@ static PetscErrorCode FormInitialSolution(DM da, Vec X, ArrayPack& arp) {
       }
     }
   }
+  std::cout << "x in the initial solution " << x[10][10] << std::endl;
   /*
      Restore vectors
   */
@@ -87,6 +88,7 @@ static PetscErrorCode FormIFunctionLocal(
   PetscInt xs, ys, xm, ym;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
       **my_topo, **my_rech, **my_area;
+  std::cout << "x in the func before " << x[10][10] << " f " << f[10][10] << " xdot " << xdot[10][10] << std::endl;
 
   PetscCall(DMDAVecGetArray(da, user_context->mask, &my_mask));
   PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
@@ -170,8 +172,18 @@ static PetscErrorCode TransientVar(TS ts, Vec X, Vec Xdot, void* ctx) {
   PetscInt xs, ys, xm, ym;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
       **my_topo, **my_rech, **my_area, **x, **xdot;
+  PetscCall(DMDAVecGetArray(da, Xdot, &xdot));
 
-  PetscCall(VecCopy(X, Xdot));
+  DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
+  for (auto j = ys; j < ys + ym; j++) {
+    for (auto i = xs; i < xs + xm; i++) {
+      xdot[i][j] = 100;
+    }
+  }
+
+  PetscCall(DMDAVecRestoreArray(da, Xdot, &xdot));
+
+  // PetscCall(VecCopy(X, Xdot));
 
   return 0;
 }
