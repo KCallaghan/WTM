@@ -79,7 +79,7 @@ static PetscErrorCode FormIFunctionLocal(
     DMDALocalInfo* info,
     PetscReal ptime,
     PetscScalar** x,
-    PetscScalar** xdot,
+    PetscScalar** Thickness,
     PetscScalar** f,
     void* ctx) {
   AppCtx* user_context = (AppCtx*)ctx;
@@ -98,10 +98,6 @@ static PetscErrorCode FormIFunctionLocal(
   PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecGetArray(da, user_context->rech_vec, &my_rech));
   PetscCall(DMDAVecGetArray(da, user_context->cell_area, &my_area));
-  // PetscScalar **my_x,**my_xdot,**my_f;
-  // PetscCall(DMDAVecGetArray(da, x, &my_x));
-  // PetscCall(DMDAVecGetArray(da, xdot, &my_xdot));
-  // PetscCall(DMDAVecGetArray(da, f, &my_f));
 
   DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
   for (auto j = ys; j < ys + ym; j++) {
@@ -140,15 +136,11 @@ static PetscErrorCode FormIFunctionLocal(
 
         double recharge = add_recharge(my_rech[j][i], my_h[j][i], my_porosity[j][i], my_area[j][i], 0);
 
-        f[j][i] = xdot[j][i] - (uxx + uyy + recharge) / starting_storativity[j][i];
+        f[j][i] = Thickness[j][i] - (uxx + uyy + recharge);  //(uxx + uyy + recharge);
       }
     }
   }
-  std::cout << "done" << std::endl;
-  std::cout << "x in the func " << x[10][10] << " f " << f[10][10] << " xdot " << xdot[10][10] << std::endl;
-  // PetscCall(DMDAVecRestoreArray(da, x, &my_x));
-  // PetscCall(DMDAVecRestoreArray(da, xdot, &my_xdot));
-  // PetscCall(DMDAVecRestoreArray(da, f, &my_f));
+
   PetscCall(DMDAVecRestoreArray(da, user_context->mask, &my_mask));
   PetscCall(DMDAVecRestoreArray(da, user_context->S, &starting_storativity));
   PetscCall(DMDAVecRestoreArray(da, user_context->cellsize_EW, &cellsize_ew));
@@ -173,16 +165,20 @@ static PetscErrorCode TransientVar(TS ts, Vec Head, Vec Thickness, void* ctx) {
   const PetscScalar** h;
   PetscCall(DMDAVecGetArrayRead(da, Head, &h));
   PetscCall(DMDAVecGetArrayWrite(da, Thickness, &H));
+  PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
+  PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
 
   DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      H[j][i] = h[j][i];
+      H[j][i] = (h[j][i] - my_topo[j][i]) * starting_storativity[j][i];
     }
   }
 
   PetscCall(DMDAVecRestoreArrayRead(da, Head, &h));
   PetscCall(DMDAVecRestoreArrayWrite(da, Thickness, &H));
+  PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
+  PetscCall(DMDAVecRestoreArray(da, user_context->S, &starting_storativity));
 
   return 0;
 }
@@ -227,12 +223,12 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   PetscInt xs, ys, xm, ym;
   TSConvergedReason reason;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **my_rech, **my_area, **my_x, **my_xdot, **my_f;
+      **my_topo, **my_rech, **my_area, **my_x, **my_f;
 
   set_starting_values(params, arp);
 
   TSSetProblemType(user_context.ts, TS_NONLINEAR);
-
+  TSSetTime(user_context.ts, 0.0);
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Create user context, set problem data, create vector data structures.
    Also, compute the initial guess.
@@ -247,7 +243,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
       dmdapack.S[j][i]        = arp.effective_storativity(i, j);
       dmdapack.h[j][i]        = arp.wtd(i, j);
       dmdapack.rech_vec[j][i] = arp.rech(i, j);
-      //   dmdapack.my_x[j][i]                 = arp.wtd(i, j) + arp.topo(i,j);
     }
   }
 
@@ -262,9 +257,9 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
       (void*)&user_context);
   DMTSSetTransientVariable(user_context.da, TransientVar, (void*)&user_context);
   TSSetMaxSteps(user_context.ts, 10000);
-  TSSetMaxTime(user_context.ts, 1.0);
+  TSSetMaxTime(user_context.ts, user_context.maxtime);
   TSSetExactFinalTime(user_context.ts, TS_EXACTFINALTIME_STEPOVER);
-  TSSetTimeStep(user_context.ts, 0.1);
+  TSSetTimeStep(user_context.ts, user_context.timestep);
   TSSetFromOptions(user_context.ts);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
