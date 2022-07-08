@@ -10,13 +10,13 @@ void populate_DMDA_array_pack(AppCtx& user_context, ArrayPack& arp, DMDA_Array_P
 
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.cellsize_EW[i][j] = arp.cellsize_e_w_metres[j];
-      dmdapack.mask[i][j]        = arp.land_mask(i, j);
-      dmdapack.fdepth_vec[i][j]  = arp.fdepth(i, j);
-      dmdapack.ksat_vec[i][j]    = arp.ksat(i, j);
-      dmdapack.porosity[i][j]    = arp.porosity(i, j);
-      dmdapack.topo_vec[i][j]    = arp.topo(i, j);
-      dmdapack.cell_area[i][j]   = arp.cell_area[j];
+      dmdapack.cellsize_EW[j][i] = arp.cellsize_e_w_metres[j];
+      dmdapack.mask[j][i]        = arp.land_mask(i, j);
+      dmdapack.fdepth_vec[j][i]  = arp.fdepth(i, j);
+      dmdapack.ksat_vec[j][i]    = arp.ksat(i, j);
+      dmdapack.porosity[j][i]    = arp.porosity(i, j);
+      dmdapack.topo_vec[j][i]    = arp.topo(i, j);
+      dmdapack.cell_area[j][i]   = arp.cell_area[j];
     }
   }
 }

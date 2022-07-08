@@ -62,9 +62,9 @@ static PetscErrorCode FormInitialSolution(DM da, Vec X, ArrayPack& arp) {
   for (j = ys; j < ys + ym; j++) {
     for (i = xs; i < xs + xm; i++) {
       if (arp.land_mask(i, j) == 0) {
-        x[i][j] = arp.topo(i, j) + 0.0;
+        x[j][i] = arp.topo(i, j) + 0.0;
       } else {
-        x[i][j] = arp.topo(i, j) + arp.wtd(i, j);
+        x[j][i] = arp.topo(i, j) + arp.wtd(i, j);
       }
     }
   }
@@ -106,41 +106,41 @@ static PetscErrorCode FormIFunctionLocal(
   DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      const PetscScalar u = x[i][j];
-      if (my_mask[i][j] == 0) {
-        f[i][j] = u;
+      const PetscScalar u = x[j][i];
+      if (my_mask[j][i] == 0) {
+        f[j][i] = u;
       } else {
-        const PetscScalar ux_E = (x[i][j + 1] - x[i][j]);
-        const PetscScalar ux_W = (x[i][j] - x[i][j - 1]);
-        const PetscScalar uy_N = (x[i + 1][j] - x[i][j]);
-        const PetscScalar uy_S = (x[i][j] - x[i - 1][j]);
+        const PetscScalar ux_E = (x[j][i + 1] - x[j][i]);
+        const PetscScalar ux_W = (x[j][i] - x[j][i - 1]);
+        const PetscScalar uy_N = (x[j + 1][i] - x[j][i]);
+        const PetscScalar uy_S = (x[j][i] - x[j - 1][i]);
         const PetscScalar e_E =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+            2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
                   1. / depthIntegratedTransmissivity(
-                           x[i][j + 1] - my_topo[i][j + 1], my_fdepth[i][j + 1], my_ksat[i][j + 1]));
+                           x[j][i + 1] - my_topo[j][i + 1], my_fdepth[j][i + 1], my_ksat[j][i + 1]));
         const PetscScalar e_W =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+            2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
                   1. / depthIntegratedTransmissivity(
-                           x[i][j - 1] - my_topo[i][j - 1], my_fdepth[i][j - 1], my_ksat[i][j - 1]));
+                           x[j][i - 1] - my_topo[j][i - 1], my_fdepth[j][i - 1], my_ksat[j][i - 1]));
         const PetscScalar e_N =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+            2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
                   1. / depthIntegratedTransmissivity(
-                           x[i + 1][j] - my_topo[i + 1][j], my_fdepth[i + 1][j], my_ksat[i + 1][j]));
+                           x[j + 1][i] - my_topo[j + 1][i], my_fdepth[j + 1][i], my_ksat[j + 1][i]));
         const PetscScalar e_S =
-            2. / (1. / depthIntegratedTransmissivity(x[i][j] - my_topo[i][j], my_fdepth[i][j], my_ksat[i][j]) +
+            2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
                   1. / depthIntegratedTransmissivity(
-                           x[i - 1][j] - my_topo[i - 1][j], my_fdepth[i - 1][j], my_ksat[i - 1][j]));
+                           x[j - 1][i] - my_topo[j - 1][i], my_fdepth[j - 1][i], my_ksat[j - 1][i]));
 
-        const PetscScalar uxx = (e_E * ux_E - e_W * ux_W) / (cellsize_ew[i][j] * cellsize_ew[i][j]);
+        const PetscScalar uxx = (e_E * ux_E - e_W * ux_W) / (cellsize_ew[j][i] * cellsize_ew[j][i]);
         const PetscScalar uyy = (e_N * uy_N - e_S * uy_S) / (user_context->cellsize_NS * user_context->cellsize_NS);
         // TODO double check which cellsize is which
 
-        starting_storativity[i][j] = updateEffectiveStorativity(
-            my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
+        starting_storativity[j][i] = updateEffectiveStorativity(
+            my_h[j][i], x[j][i] - my_topo[j][i], my_porosity[j][i], starting_storativity[j][i]);
 
-        double recharge = add_recharge(my_rech[i][j], my_h[i][j], my_porosity[i][j], my_area[i][j], 0);
+        double recharge = add_recharge(my_rech[j][i], my_h[j][i], my_porosity[j][i], my_area[j][i], 0);
 
-        f[i][j] = xdot[i][j] - (uxx + uyy + recharge) / starting_storativity[i][j];
+        f[j][i] = xdot[j][i] - (uxx + uyy + recharge) / starting_storativity[j][i];
       }
     }
   }
@@ -163,15 +163,26 @@ static PetscErrorCode FormIFunctionLocal(
   return 0;
 }
 
-static PetscErrorCode TransientVar(TS ts, Vec X, Vec Xdot, void* ctx) {
+static PetscErrorCode TransientVar(TS ts, Vec Head, Vec Thickness, void* ctx) {
   AppCtx* user_context = (AppCtx*)ctx;
   DM da                = user_context->da;
   // const PetscScalar* cdot;
   PetscInt xs, ys, xm, ym;
-  PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **my_rech, **my_area, **x, **xdot;
+  PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **H, **my_porosity, **my_topo,
+      **my_rech, **my_area;
+  const PetscScalar** h;
+  PetscCall(DMDAVecGetArrayRead(da, Head, &h));
+  PetscCall(DMDAVecGetArrayWrite(da, Thickness, &H));
 
-  PetscCall(VecCopy(X, Xdot));
+  DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
+  for (auto j = ys; j < ys + ym; j++) {
+    for (auto i = xs; i < xs + xm; i++) {
+      H[j][i] = h[j][i];
+    }
+  }
+
+  PetscCall(DMDAVecRestoreArrayRead(da, Head, &h));
+  PetscCall(DMDAVecRestoreArrayWrite(da, Thickness, &H));
 
   return 0;
 }
@@ -233,10 +244,10 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
 
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.S[i][j]        = arp.effective_storativity(i, j);
-      dmdapack.h[i][j]        = arp.wtd(i, j);
-      dmdapack.rech_vec[i][j] = arp.rech(i, j);
-      //   dmdapack.my_x[i][j]                 = arp.wtd(i, j) + arp.topo(i,j);
+      dmdapack.S[j][i]        = arp.effective_storativity(i, j);
+      dmdapack.h[j][i]        = arp.wtd(i, j);
+      dmdapack.rech_vec[j][i] = arp.rech(i, j);
+      //   dmdapack.my_x[j][i]                 = arp.wtd(i, j) + arp.topo(i,j);
     }
   }
 
@@ -282,7 +293,7 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   // copy the result back into the wtd array
   for (int j = ys; j < ys + ym; j++) {
     for (int i = xs; i < xs + xm; i++) {
-      arp.wtd(i, j) = dmdapack.x[i][j] - arp.topo(i, j);
+      arp.wtd(i, j) = dmdapack.x[j][i] - arp.topo(i, j);
       if (arp.land_mask(i, j) == 0.f) {
         arp.total_loss_to_ocean +=
             arp.wtd(i, j) * arp.cell_area[j];  // could it be that because ocean cells are just set = x in the formula,
