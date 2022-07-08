@@ -3,6 +3,8 @@
 void InitialiseSNES(AppCtx& user_context, Parameters& params) {
   // SNESCreate(PETSC_COMM_WORLD, &user_context.snes);
   TSCreate(PETSC_COMM_WORLD, &user_context.ts);
+  TSSetType(user_context.ts, TSBDF);
+  TSBDFSetOrder(user_context.ts, 1);  // BDF1 = Backward Euler
 
   user_context.cellsize_NS = params.cellsize_n_s_metres;
   user_context.maxtime     = params.deltat;

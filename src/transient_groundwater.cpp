@@ -68,6 +68,7 @@ static PetscErrorCode FormInitialSolution(DM da, Vec X, ArrayPack& arp) {
       }
     }
   }
+  std::cout << "x in the initial solution " << x[10][10] << std::endl;
   /*
      Restore vectors
   */
@@ -87,6 +88,7 @@ static PetscErrorCode FormIFunctionLocal(
   PetscInt xs, ys, xm, ym;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
       **my_topo, **my_rech, **my_area;
+  std::cout << "x in the func before " << x[10][10] << " f " << f[10][10] << " xdot " << xdot[10][10] << std::endl;
 
   PetscCall(DMDAVecGetArray(da, user_context->mask, &my_mask));
   PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
