@@ -40,6 +40,7 @@ struct Parameters {
   double fdepth_a               = -1.;
   double fdepth_b               = -1.;
   double fdepth_fmin            = -1.;
+  double petsc_timestep         = -1.;
   double southern_edge          = std::numeric_limits<double>::signaling_NaN();
   double solver_tolerance_value = -1;
   int32_t picard_iterations     = -1;  // Default only one iteration

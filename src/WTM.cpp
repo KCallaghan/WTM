@@ -161,11 +161,11 @@ void update(
 #pragma omp parallel for default(none) shared(arp, params)
     for (unsigned int i = 0; i < arp.topo.size(); i++) {
       if (arp.wtd(i) > 0) {  // if there is surface water present
-        arp.rech(i) = (arp.precip(i) - arp.open_water_evap(i)) / seconds_in_a_year * params.deltat;
+        arp.rech(i) = (arp.precip(i) - arp.open_water_evap(i)) / seconds_in_a_year * params.petsc_timestep;
       } else {  // water table is below the surface
         // Recharge is always positive.
-        arp.rech(i) =
-            (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
+        arp.rech(i) = (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year *
+                      params.petsc_timestep;
       }
 
       if (arp.rech(i) > 0) {
@@ -186,10 +186,10 @@ void update(
         arp.wtd(i) = 0;      // use this option when testing GW component alone
         // still set recharge because it could be positive in this cell, and some may run off or move to neighbouring
         // cells
-        arp.rech(i) = (arp.precip(i) - arp.open_water_evap(i)) / seconds_in_a_year * params.deltat;
+        arp.rech(i) = (arp.precip(i) - arp.open_water_evap(i)) / seconds_in_a_year * params.petsc_timestep;
       } else {  // water table is below the surface
-        arp.rech(i) =
-            (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
+        arp.rech(i) = (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year *
+                      params.petsc_timestep;
       }
       if (arp.rech(i) > 0) {
         // if there is positive recharge, some of it may run off.

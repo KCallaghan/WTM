@@ -52,6 +52,8 @@ Parameters::Parameters(const std::string& config_file) {
       ss >> outfile_prefix;
     } else if (key == "parallel_threads") {
       ss >> parallel_threads;
+    } else if (key == "petsc_timestep") {
+      ss >> petsc_timestep;
     } else if (key == "picard_iterations") {
       ss >> picard_iterations;
     } else if (key == "region") {
@@ -143,6 +145,7 @@ void Parameters::check() const {
   check_string_init("time_start", time_start);
   check_string_init("time_end", time_end);
   check_positive("parallel_threads", parallel_threads);
+  check_positive("petsc_timestep", petsc_timestep);
   check_positive("total_cycles", total_cycles);
 }
 
@@ -169,6 +172,7 @@ void Parameters::print() const {
   std::cout << "c maxiter                = " << maxiter << std::endl;
   std::cout << "c outfile_prefix         = " << outfile_prefix << std::endl;
   std::cout << "c parallel_threads       = " << parallel_threads << std::endl;
+  std::cout << "c petsc_timestep         = " << petsc_timestep << std::endl;
   std::cout << "c picard_iterations      = " << picard_iterations << std::endl;
   std::cout << "c region                 = " << region << std::endl;
   std::cout << "c run_type               = " << run_type << std::endl;

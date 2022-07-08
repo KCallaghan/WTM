@@ -9,6 +9,7 @@
 struct AppCtx {
   PetscReal timestep;
   PetscReal cellsize_NS;
+  PetscReal maxtime;
   TS ts           = nullptr;
   DM da           = nullptr;
   Vec x           = nullptr;  // Solution vector
