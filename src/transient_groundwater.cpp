@@ -228,6 +228,8 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
 
   set_starting_values(params, arp);
   TSSetProblemType(user_context.ts, TS_NONLINEAR);
+  TSSetTime(user_context.ts, 0);
+  TSSetStepNumber(user_context.ts, 0);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Create user context, set problem data, create vector data structures.
@@ -256,7 +258,7 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
       (void*)&user_context);
   DMTSSetTransientVariable(user_context.da, TransientVar, (void*)&user_context);
   TSSetMaxSteps(user_context.ts, 10000);
-  TSSetMaxTime(user_context.ts, user_context.maxtime * (params.cycles_done + 1 + arp.iter_count + 1));
+  TSSetMaxTime(user_context.ts, user_context.maxtime /* * (params.cycles_done + arp.iter_count + 1) */);
   TSSetExactFinalTime(user_context.ts, TS_EXACTFINALTIME_STEPOVER);
   TSSetTimeStep(user_context.ts, user_context.timestep);
   TSSetFromOptions(user_context.ts);
