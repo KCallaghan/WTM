@@ -122,8 +122,8 @@ void update(
   // These iterations refer to how many times to repeat the time step within the groundwater
   // portion of code before running FSM. For example, 1 year GW then FSM could also be run as
   // 2x 6 months GW then FSM.
-  int iter_count = 0;
-  while (iter_count++ < params.maxiter) {
+  arp.iter_count = 0;
+  while (arp.iter_count++ < params.maxiter) {
     FanDarcyGroundwater::update(params, arp, user_context, dmdapack);
   }
 

@@ -81,6 +81,7 @@ struct ArrayPack {
   // Cumulative state variables
   double total_added_recharge = 0;
   double total_loss_to_ocean  = 0;
+  int iter_count              = 0;
 
   void check() const;
 };
