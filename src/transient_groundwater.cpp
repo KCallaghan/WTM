@@ -37,28 +37,15 @@ double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, co
 /*
   FormInitialSolution - Forms initial approximation.
 
-  Input Parameters:
-  user - user-defined application context
-  X - vector
-
-  Output Parameter:
-  X - vector
+  For us, this is the head, equal to topography plus water table depth.
 */
 static PetscErrorCode FormInitialSolution(DM da, Vec X, ArrayPack& arp) {
   PetscInt i, j, xs, ys, xm, ym;
   PetscScalar** x;
 
-  /*
-     Get pointers to vector data
-  */
   DMDAVecGetArray(da, X, &x);
-  /*
-     Get local grid boundaries
-  */
   DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
-  /*
-     Compute function over the locally owned part of the grid
-  */
+
   for (j = ys; j < ys + ym; j++) {
     for (i = xs; i < xs + xm; i++) {
       if (arp.land_mask(i, j) == 0) {
@@ -68,10 +55,7 @@ static PetscErrorCode FormInitialSolution(DM da, Vec X, ArrayPack& arp) {
       }
     }
   }
-  std::cout << "x in the initial solution " << x[10][10] << std::endl;
-  /*
-     Restore vectors
-  */
+
   DMDAVecRestoreArray(da, X, &x);
   return 0;
 }
@@ -88,7 +72,6 @@ static PetscErrorCode FormIFunctionLocal(
   PetscInt xs, ys, xm, ym;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
       **my_topo, **my_rech, **my_area;
-  std::cout << "x in the func before " << x[10][10] << " f " << f[10][10] << " xdot " << xdot[10][10] << std::endl;
 
   PetscCall(DMDAVecGetArray(da, user_context->mask, &my_mask));
   PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
@@ -133,12 +116,17 @@ static PetscErrorCode FormIFunctionLocal(
         const PetscScalar uyy = (e_N * uy_N - e_S * uy_S) / (user_context->cellsize_NS * user_context->cellsize_NS);
         // TODO double check which cellsize is which
 
-        starting_storativity[j][i] = updateEffectiveStorativity(
-            my_h[j][i], x[j][i] - my_topo[j][i], my_porosity[j][i], starting_storativity[j][i]);
-
         double recharge = add_recharge(my_rech[j][i], my_h[j][i], my_porosity[j][i], my_area[j][i], 0);
+        // considered using x-topo for the water table for recharge, but I think it makes more sense to use my_h.
+        // The recharge *this* timestep isn't dependent on what happened to x *last* timestep, after all.
 
         f[j][i] = Thickness[j][i] - (uxx + uyy + recharge);  //(uxx + uyy + recharge);
+        if (i == 25 && j == 25) {
+          std::cout << "Ifunction i " << i << " j " << j << std::endl;
+          //    std::cout<<"x "<<x[j][i]<<" f "<<f[j][i]<<std::endl;
+          std::cout << "recharge " << recharge << " H " << Thickness[j][i] << std::endl;
+          //    std::cout<<"uxx "<<uxx<<" uyy "<<uyy<<std::endl;
+        }
       }
     }
   }
@@ -163,17 +151,26 @@ static PetscErrorCode TransientVar(TS ts, Vec Head, Vec Thickness, void* ctx) {
   // const PetscScalar* cdot;
   PetscInt xs, ys, xm, ym;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **H, **my_porosity, **my_topo,
-      **my_rech, **my_area;
+      **my_rech, **my_h;
   const PetscScalar** h;
   PetscCall(DMDAVecGetArrayRead(da, Head, &h));
   PetscCall(DMDAVecGetArrayWrite(da, Thickness, &H));
   PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
+  PetscCall(DMDAVecGetArray(da, user_context->h, &my_h));
+  PetscCall(DMDAVecGetArray(da, user_context->porosity, &my_porosity));
 
   DMDAGetCorners(da, &xs, &ys, NULL, &xm, &ym, NULL);
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      H[j][i] = (h[j][i] - my_topo[j][i]) * starting_storativity[j][i];
+      double my_S = updateEffectiveStorativity(
+          my_h[j][i], h[j][i] - my_topo[j][i], my_porosity[j][i], starting_storativity[j][i]);
+      H[j][i] = (h[j][i] - my_topo[j][i]) * my_S;
+      if (i == 25 && j == 25) {
+        std::cout << "TransientVar i " << i << " j " << j << std::endl;
+        std::cout << "H " << H[j][i] << " h-t " << h[j][i] - my_topo[j][i] << " my_h " << my_h[j][i] << " S " << my_S
+                  << std::endl;
+      }
     }
   }
 
@@ -181,6 +178,8 @@ static PetscErrorCode TransientVar(TS ts, Vec Head, Vec Thickness, void* ctx) {
   PetscCall(DMDAVecRestoreArrayWrite(da, Thickness, &H));
   PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecRestoreArray(da, user_context->S, &starting_storativity));
+  PetscCall(DMDAVecRestoreArray(da, user_context->h, &my_h));
+  PetscCall(DMDAVecRestoreArray(da, user_context->porosity, &my_porosity));
 
   return 0;
 }
@@ -228,9 +227,8 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
       **my_topo, **my_rech, **my_area, **my_x, **my_f;
 
   set_starting_values(params, arp);
-
   TSSetProblemType(user_context.ts, TS_NONLINEAR);
-  TSSetTime(user_context.ts, 0.0);
+
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Create user context, set problem data, create vector data structures.
    Also, compute the initial guess.
@@ -239,7 +237,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
 
   // values for storativity are reset each time; and wtd and recharge change from one timestep to the next, so set
   // these here
-
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
       dmdapack.S[j][i]        = arp.effective_storativity(i, j);
@@ -259,7 +256,7 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
       (void*)&user_context);
   DMTSSetTransientVariable(user_context.da, TransientVar, (void*)&user_context);
   TSSetMaxSteps(user_context.ts, 10000);
-  TSSetMaxTime(user_context.ts, user_context.maxtime);
+  TSSetMaxTime(user_context.ts, user_context.maxtime * (params.cycles_done + 1 + arp.iter_count + 1));
   TSSetExactFinalTime(user_context.ts, TS_EXACTFINALTIME_STEPOVER);
   TSSetTimeStep(user_context.ts, user_context.timestep);
   TSSetFromOptions(user_context.ts);
@@ -281,11 +278,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
       TSConvergedReasons[reason],
       (double)ftime,
       steps);
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-     Free work space.  All PETSc objects should be destroyed when they
-     are no longer needed.
-     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
   // copy the result back into the wtd array
   for (int j = ys; j < ys + ym; j++) {
