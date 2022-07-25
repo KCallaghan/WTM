@@ -70,11 +70,9 @@ static PetscErrorCode FormIFunctionLocal(
   AppCtx* user_context = (AppCtx*)ctx;
   DM da                = user_context->da;
   PetscInt xs, ys, xm, ym;
-  PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **my_rech, **my_area;
+  PetscScalar **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity, **my_topo, **my_rech, **my_area;
 
   PetscCall(DMDAVecGetArray(da, user_context->mask, &my_mask));
-  PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
   PetscCall(DMDAVecGetArray(da, user_context->cellsize_EW, &cellsize_ew));
   PetscCall(DMDAVecGetArray(da, user_context->fdepth_vec, &my_fdepth));
   PetscCall(DMDAVecGetArray(da, user_context->ksat_vec, &my_ksat));
@@ -120,19 +118,12 @@ static PetscErrorCode FormIFunctionLocal(
         // considered using x-topo for the water table for recharge, but I think it makes more sense to use my_h.
         // The recharge *this* timestep isn't dependent on what happened to x *last* timestep, after all.
 
-        f[j][i] = Thickness[j][i] - (uxx + uyy + recharge);  //(uxx + uyy + recharge);
-        if (i == 25 && j == 25) {
-          std::cout << "Ifunction i " << i << " j " << j << std::endl;
-          //    std::cout<<"x "<<x[j][i]<<" f "<<f[j][i]<<std::endl;
-          std::cout << "recharge " << recharge << " H " << Thickness[j][i] << std::endl;
-          //    std::cout<<"uxx "<<uxx<<" uyy "<<uyy<<std::endl;
-        }
+        f[j][i] = Thickness[j][i] - (uxx + uyy + recharge);
       }
     }
   }
 
   PetscCall(DMDAVecRestoreArray(da, user_context->mask, &my_mask));
-  PetscCall(DMDAVecRestoreArray(da, user_context->S, &starting_storativity));
   PetscCall(DMDAVecRestoreArray(da, user_context->cellsize_EW, &cellsize_ew));
   PetscCall(DMDAVecRestoreArray(da, user_context->fdepth_vec, &my_fdepth));
   PetscCall(DMDAVecRestoreArray(da, user_context->ksat_vec, &my_ksat));
@@ -165,12 +156,7 @@ static PetscErrorCode TransientVar(TS ts, Vec Head, Vec Thickness, void* ctx) {
     for (auto i = xs; i < xs + xm; i++) {
       double my_S = updateEffectiveStorativity(
           my_h[j][i], h[j][i] - my_topo[j][i], my_porosity[j][i], starting_storativity[j][i]);
-      H[j][i] = (h[j][i] - my_topo[j][i]) * my_S;
-      if (i == 25 && j == 25) {
-        std::cout << "TransientVar i " << i << " j " << j << std::endl;
-        std::cout << "H " << H[j][i] << " h-t " << h[j][i] - my_topo[j][i] << " my_h " << my_h[j][i] << " S " << my_S
-                  << std::endl;
-      }
+      H[j][i] = (h[j][i] - my_topo[j][i]);  // * my_S;
     }
   }
 
