@@ -136,21 +136,22 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
       PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
 
   // recalculate the new storativity using the initial solve as an estimator for the final answer
-  for (auto j = ys; j < ys + ym; j++) {
-    for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.S[j][i] = updateEffectiveStorativity(
-          arp.wtd(i, j), dmdapack.x[j][i] - arp.topo(i, j), arp.porosity(i, j), arp.effective_storativity(i, j));
-    }
-  }
-  // std::cout<<"before solve x "<<dmdapack.x[1000][999]<<" wtd "<<arp.wtd(999,1000)<<std::endl;
-
-  // repeat the solve
-  SNESSolve(user_context.snes, user_context.b, user_context.x);
-  SNESGetIterationNumber(user_context.snes, &its);
-  SNESGetConvergedReason(user_context.snes, &reason);
-
-  PetscPrintf(
-      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
+  //  for (auto j = ys; j < ys + ym; j++) {
+  //    for (auto i = xs; i < xs + xm; i++) {
+  //      dmdapack.S[j][i] = updateEffectiveStorativity(
+  //          arp.wtd(i, j), dmdapack.x[j][i] - arp.topo(i, j), arp.porosity(i, j), arp.effective_storativity(i, j));
+  //    }
+  //  }
+  //  // std::cout<<"before solve x "<<dmdapack.x[1000][999]<<" wtd "<<arp.wtd(999,1000)<<std::endl;
+  //
+  //  // repeat the solve
+  //  SNESSolve(user_context.snes, user_context.b, user_context.x);
+  //  SNESGetIterationNumber(user_context.snes, &its);
+  //  SNESGetConvergedReason(user_context.snes, &reason);
+  //
+  //  PetscPrintf(
+  //      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason],
+  //      its);
 
   // copy the result back into the wtd array
   for (int j = ys; j < ys + ym; j++) {
@@ -342,10 +343,11 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (user_context->cellsize_NS * user_context->cellsize_NS);
         // TODO double check which cellsize is which
 
-        //  starting_storativity[i][j] = updateEffectiveStorativity(
-        //    my_h[i][j], x[i][j] - my_topo[i][j], my_porosity[i][j], starting_storativity[i][j]);
+        float my_storativity = updateEffectiveStorativity(
+            my_h[j][i], x[j][i] - my_topo[j][i], my_porosity[j][i], starting_storativity[j][i]);
+
         double rech = add_recharge(my_rech[j][i], my_h[j][i], my_porosity[j][i]);
-        f[j][i]     = (uxx + uyy) * (user_context->timestep / starting_storativity[j][i]) + u - rech;
+        f[j][i]     = (uxx + uyy) * (user_context->timestep / my_storativity) + u - rech;
         if (j == 10 && i == 10) {
           std::cout << "x " << x[j][i] << " f " << f[j][i] << std::endl;
           std::cout << "uxx " << uxx << " uyy " << uyy << " S " << starting_storativity[j][i] << " u " << u << " t "
