@@ -76,7 +76,13 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         arp.total_loss_to_ocean += arp.wtd(x, y) * arp.cell_area[y];
         arp.wtd(x, y) = 0.;
       } else {
-        double rech_count = add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y));
+        double rech_count = arp.rech(x, y);
+        if (arp.wtd(x, y) >= 0 && arp.wtd(x, y) + arp.rech(x, y) < 0)
+          rech_count = -arp.wtd(x, y);
+
+        // double rech_count = add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y));
+        //  std::cout<<"rech_count "<<rech_count<<" wtd "<<arp.wtd(x,y)<<" rech "<<arp.rech(x,y)<<std::endl;
+        arp.total_added_recharge += rech_count * arp.cell_area[y];
       }
     }
   }
@@ -136,22 +142,21 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
       PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
 
   // recalculate the new storativity using the initial solve as an estimator for the final answer
-  //  for (auto j = ys; j < ys + ym; j++) {
-  //    for (auto i = xs; i < xs + xm; i++) {
-  //      dmdapack.S[j][i] = updateEffectiveStorativity(
-  //          arp.wtd(i, j), dmdapack.x[j][i] - arp.topo(i, j), arp.porosity(i, j), arp.effective_storativity(i, j));
-  //    }
-  //  }
-  //  // std::cout<<"before solve x "<<dmdapack.x[1000][999]<<" wtd "<<arp.wtd(999,1000)<<std::endl;
-  //
-  //  // repeat the solve
-  //  SNESSolve(user_context.snes, user_context.b, user_context.x);
-  //  SNESGetIterationNumber(user_context.snes, &its);
-  //  SNESGetConvergedReason(user_context.snes, &reason);
-  //
-  //  PetscPrintf(
-  //      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason],
-  //      its);
+  for (auto j = ys; j < ys + ym; j++) {
+    for (auto i = xs; i < xs + xm; i++) {
+      dmdapack.S[j][i] = updateEffectiveStorativity(
+          arp.wtd(i, j), dmdapack.x[j][i] - arp.topo(i, j), arp.porosity(i, j), arp.effective_storativity(i, j));
+    }
+  }
+  // std::cout<<"before solve x "<<dmdapack.x[1000][999]<<" wtd "<<arp.wtd(999,1000)<<std::endl;
+
+  // repeat the solve
+  SNESSolve(user_context.snes, user_context.b, user_context.x);
+  SNESGetIterationNumber(user_context.snes, &its);
+  SNESGetConvergedReason(user_context.snes, &reason);
+
+  PetscPrintf(
+      PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
 
   // copy the result back into the wtd array
   for (int j = ys; j < ys + ym; j++) {
@@ -208,12 +213,12 @@ static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X, Array
 
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      if (arp.land_mask(i, j) == 0) {
-        /* boundary conditions are all zero Dirichlet */
-        x[j][i] = arp.topo(i, j) + 0.0;
-      } else {
-        x[j][i] = arp.topo(i, j) + arp.wtd(i, j);
-      }
+      //   if (arp.land_mask(i, j) == 0) {
+      //     /* boundary conditions are all zero Dirichlet */
+      //     x[j][i] = arp.topo(i, j) + 0.0;
+      //   } else {
+      x[j][i] = arp.topo(i, j) + arp.wtd(i, j);
+      //  }
     }
   }
   // std::cout<<"initial guess x "<<x[1000][999]<<std::endl;
@@ -257,15 +262,12 @@ static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B, ArrayPack& arp
   const auto [xs, ys, xm, ym] = get_corners(da);
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      if (arp.land_mask(i, j) == 0) {
-        b[j][i] = arp.topo(i, j) + 0.0;
-      } else {
-        b[j][i] =
-            arp.topo(i, j) +
-            arp.wtd(
-                i, j);  // +
-                        // add_recharge(arp.rech(i, j), arp.wtd(i, j), arp.porosity(i, j), arp.cell_area[j], 0, arp);
-      }
+      //    if (arp.land_mask(i, j) == 0) {
+      //      b[j][i] = arp.topo(i, j) + 0.0;
+      //    } else {
+      b[j][i] = arp.topo(i, j) + arp.wtd(i, j);
+      // +add_recharge(arp.rech(i, j), arp.wtd(i, j), arp.porosity(i, j), arp.cell_area[j], 0, arp);
+      //    }
     }
   }
   // std::cout<<"rhs guess x "<<b[1000][999]<<std::endl;
@@ -339,15 +341,19 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
                   1. / depthIntegratedTransmissivity(
                            x[j - 1][i] - my_topo[j - 1][i], my_fdepth[j - 1][i], my_ksat[j - 1][i]));
 
-        const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) / (cellsize_ew[j][i] * cellsize_ew[j][i]);
-        const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (user_context->cellsize_NS * user_context->cellsize_NS);
+        const PetscScalar uxx =
+            (e_W * ux_W - e_E * ux_E) /
+            (user_context->cellsize_NS * user_context->cellsize_NS);  //(cellsize_ew[j][i] * cellsize_ew[j][i]);
+        const PetscScalar uyy =
+            (e_S * uy_S - e_N * uy_N) /
+            (cellsize_ew[j][i] * cellsize_ew[j][i]);  //(user_context->cellsize_NS * user_context->cellsize_NS);
         // TODO double check which cellsize is which
 
-        float my_storativity = updateEffectiveStorativity(
-            my_h[j][i], x[j][i] - my_topo[j][i], my_porosity[j][i], starting_storativity[j][i]);
+        //  float my_storativity = updateEffectiveStorativity(
+        //    my_h[j][i], x[j][i] - my_topo[j][i], my_porosity[j][i], starting_storativity[j][i]);
 
         double rech = add_recharge(my_rech[j][i], my_h[j][i], my_porosity[j][i]);
-        f[j][i]     = (uxx + uyy) * (user_context->timestep / my_storativity) + u - rech;
+        f[j][i]     = (uxx + uyy) * (user_context->timestep / starting_storativity[j][i]) + u - rech;
         //   if (j == 10 && i == 10) {
         //     std::cout << "x " << x[j][i] << " f " << f[j][i] << std::endl;
         //     std::cout << "uxx " << uxx << " uyy " << uyy << " S " << starting_storativity[j][i] << " u " << u << " t
