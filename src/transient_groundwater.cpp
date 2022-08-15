@@ -348,14 +348,16 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
 
         double rech = add_recharge(my_rech[j][i], my_h[j][i], my_porosity[j][i]);
         f[j][i]     = (uxx + uyy) * (user_context->timestep / my_storativity) + u - rech;
-        if (j == 10 && i == 10) {
-          std::cout << "x " << x[j][i] << " f " << f[j][i] << std::endl;
-          std::cout << "uxx " << uxx << " uyy " << uyy << " S " << starting_storativity[j][i] << " u " << u << " t "
-                    << user_context->timestep << " rech " << rech << std::endl;
-          std::cout << "T " << depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i])
-                    << std::endl;
-          std::cout << "f " << my_fdepth[j][i] << " topo " << my_topo[j][i] << " k " << my_ksat[j][i] << std::endl;
-        }
+        //   if (j == 10 && i == 10) {
+        //     std::cout << "x " << x[j][i] << " f " << f[j][i] << std::endl;
+        //     std::cout << "uxx " << uxx << " uyy " << uyy << " S " << starting_storativity[j][i] << " u " << u << " t
+        //     "
+        //               << user_context->timestep << " rech " << rech << std::endl;
+        //     std::cout << "T " << depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i],
+        //     my_ksat[j][i])
+        //               << std::endl;
+        //     std::cout << "f " << my_fdepth[j][i] << " topo " << my_topo[j][i] << " k " << my_ksat[j][i] << std::endl;
+        //   }
       }
     }
   }
