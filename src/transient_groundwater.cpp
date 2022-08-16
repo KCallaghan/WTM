@@ -80,8 +80,6 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         if (arp.wtd(x, y) >= 0 && arp.wtd(x, y) + arp.rech(x, y) < 0)
           rech_count = -arp.wtd(x, y);
 
-        // double rech_count = add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y));
-        //  std::cout<<"rech_count "<<rech_count<<" wtd "<<arp.wtd(x,y)<<" rech "<<arp.rech(x,y)<<std::endl;
         arp.total_added_recharge += rech_count * arp.cell_area[y];
       }
     }
@@ -148,7 +146,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
           arp.wtd(i, j), dmdapack.x[j][i] - arp.topo(i, j), arp.porosity(i, j), arp.effective_storativity(i, j));
     }
   }
-  // std::cout<<"before solve x "<<dmdapack.x[1000][999]<<" wtd "<<arp.wtd(999,1000)<<std::endl;
 
   // repeat the solve
   SNESSolve(user_context.snes, user_context.b, user_context.x);
@@ -162,8 +159,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   for (int j = ys; j < ys + ym; j++) {
     for (int i = xs; i < xs + xm; i++) {
       arp.wtd(i, j) = dmdapack.x[j][i] - arp.topo(i, j);
-      //     if(j==1000&&i==999)
-      // std::cout<<"x "<<dmdapack.x[j][i]<<" wtd "<<arp.wtd(i,j)<<std::endl;
       if (arp.land_mask(i, j) == 0.f) {
         arp.total_loss_to_ocean +=
             arp.wtd(i, j) * arp.cell_area[j];  // could it be that because ocean cells are just set = x in the formula,
@@ -213,15 +208,9 @@ static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X, Array
 
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      //   if (arp.land_mask(i, j) == 0) {
-      //     /* boundary conditions are all zero Dirichlet */
-      //     x[j][i] = arp.topo(i, j) + 0.0;
-      //   } else {
       x[j][i] = arp.topo(i, j) + arp.wtd(i, j);
-      //  }
     }
   }
-  // std::cout<<"initial guess x "<<x[1000][999]<<std::endl;
 
   DMDAVecRestoreArray(da, X, &x);
   return 0;
@@ -262,15 +251,9 @@ static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B, ArrayPack& arp
   const auto [xs, ys, xm, ym] = get_corners(da);
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      //    if (arp.land_mask(i, j) == 0) {
-      //      b[j][i] = arp.topo(i, j) + 0.0;
-      //    } else {
       b[j][i] = arp.topo(i, j) + arp.wtd(i, j);
-      // +add_recharge(arp.rech(i, j), arp.wtd(i, j), arp.porosity(i, j), arp.cell_area[j], 0, arp);
-      //    }
     }
   }
-  // std::cout<<"rhs guess x "<<b[1000][999]<<std::endl;
   DMDAVecRestoreArray(da, B, &b);
   return 0;
 }
@@ -341,29 +324,12 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
                   1. / depthIntegratedTransmissivity(
                            x[j - 1][i] - my_topo[j - 1][i], my_fdepth[j - 1][i], my_ksat[j - 1][i]));
 
-        const PetscScalar uxx =
-            (e_W * ux_W - e_E * ux_E) /
-            (user_context->cellsize_NS * user_context->cellsize_NS);  //(cellsize_ew[j][i] * cellsize_ew[j][i]);
-        const PetscScalar uyy =
-            (e_S * uy_S - e_N * uy_N) /
-            (cellsize_ew[j][i] * cellsize_ew[j][i]);  //(user_context->cellsize_NS * user_context->cellsize_NS);
-        // TODO double check which cellsize is which
-
-        //  float my_storativity = updateEffectiveStorativity(
-        //    my_h[j][i], x[j][i] - my_topo[j][i], my_porosity[j][i], starting_storativity[j][i]);
+        const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) / (user_context->cellsize_NS * user_context->cellsize_NS);
+        const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (cellsize_ew[j][i] * cellsize_ew[j][i]);
 
         double rech = add_recharge(my_rech[j][i], my_h[j][i], my_porosity[j][i]);
-        f[j][i]     = (uxx + uyy) * (user_context->timestep / starting_storativity[j][i]) + u - rech;
-        //   if (j == 10 && i == 10) {
-        //     std::cout << "x " << x[j][i] << " f " << f[j][i] << std::endl;
-        //     std::cout << "uxx " << uxx << " uyy " << uyy << " S " << starting_storativity[j][i] << " u " << u << " t
-        //     "
-        //               << user_context->timestep << " rech " << rech << std::endl;
-        //     std::cout << "T " << depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i],
-        //     my_ksat[j][i])
-        //               << std::endl;
-        //     std::cout << "f " << my_fdepth[j][i] << " topo " << my_topo[j][i] << " k " << my_ksat[j][i] << std::endl;
-        //   }
+
+        f[j][i] = (uxx + uyy) * (user_context->timestep / starting_storativity[j][i]) + u - rech;
       }
     }
   }
