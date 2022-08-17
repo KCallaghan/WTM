@@ -367,7 +367,7 @@ void InitialiseBoth(const Parameters& params, ArrayPack& arp) {
   }
 
   // get the starting runoff using precip and evap inputs:
-#pragma omp parallel for default(none) shared(arp)
+#pragma omp parallel for default(none) shared(arp, params)
   for (unsigned int i = 0; i < arp.topo.size(); i++) {
     arp.rech(i) = (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
     if (arp.porosity(i) <= 0) {
