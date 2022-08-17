@@ -369,10 +369,7 @@ void InitialiseBoth(const Parameters& params, ArrayPack& arp) {
   // get the starting runoff using precip and evap inputs:
 #pragma omp parallel for default(none) shared(arp)
   for (unsigned int i = 0; i < arp.topo.size(); i++) {
-    arp.rech(i) = arp.precip(i) - arp.evap(i);
-    if (arp.rech(i) < 0) {  // Recharge is always positive.
-      arp.rech(i) = 0.0f;
-    }
+    arp.rech(i) = (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
     if (arp.porosity(i) <= 0) {
       arp.porosity(i) = 0.0000001f;  // not sure why it is sometimes processing cells with 0 porosity?
     }
