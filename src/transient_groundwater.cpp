@@ -6,20 +6,11 @@
 #include <array>
 #include <experimental/source_location>
 
-#include <chrono>
-
 #include <petscdm.h>
 #include <petscdmda.h>
 #include <petscerror.h>
 #include <petscsnes.h>
-std::string get_time() {
-  const auto now       = std::chrono::system_clock::now();
-  const auto in_time_t = std::chrono::system_clock::to_time_t(now);
 
-  std::stringstream ss;
-  ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S");
-  return ss.str();
-}
 ///////////////////////
 // PRIVATE FUNCTIONS //
 ///////////////////////
@@ -44,8 +35,8 @@ std::tuple<PetscInt, PetscInt, PetscInt, PetscInt> get_corners(const DM da) {
 }
 
 // declare functions
-static PetscErrorCode FormRHS(AppCtx*, DM, Vec, ArrayPack& arp);
-static PetscErrorCode FormInitialGuess(AppCtx*, DM, Vec, ArrayPack& arp);
+static PetscErrorCode FormRHS(AppCtx*, DM, Vec);
+static PetscErrorCode FormInitialGuess(AppCtx*, DM, Vec);
 static PetscErrorCode FormFunctionLocal(DMDALocalInfo*, PetscScalar**, PetscScalar**, AppCtx*);
 
 //////////////////////
@@ -116,12 +107,13 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   // Get local array bounds
   const auto [xs, ys, xm, ym] = get_corners(user_context.da);
 
-// values for storativity are reset each time; and recharge changes from one timestep to the next, so set these here
+  // values for storativity are reset each time; and recharge changes from one timestep to the next, so set these here
 #pragma omp parallel for default(none) shared(arp, ys, ym, xs, xm, dmdapack, params) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
       dmdapack.time_per_S[j][i] = params.deltat / arp.effective_storativity(i, j);
       dmdapack.rech_vec[j][i]   = add_recharge(arp.rech(i, j), arp.wtd(i, j), arp.porosity(i, j));
+      dmdapack.head[j][i]       = arp.wtd(i, j) + arp.topo(i, j);
     }
   }
 
@@ -133,14 +125,12 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
       &user_context);
 
   // Evaluate initial guess
-  FormInitialGuess(&user_context, user_context.da, user_context.x, arp);
+  FormInitialGuess(&user_context, user_context.da, user_context.x);
 
   // set the RHS
-  FormRHS(&user_context, user_context.da, user_context.b, arp);
-  std::cout << "before solve 1 " << get_time() << std::endl;
+  FormRHS(&user_context, user_context.da, user_context.b);
   // Solve nonlinear system
   SNESSolve(user_context.snes, user_context.b, user_context.x);
-  std::cout << "after solve 1 " << get_time() << std::endl;
 
   SNESGetIterationNumber(user_context.snes, &its);
   SNESGetConvergedReason(user_context.snes, &reason);
@@ -157,16 +147,21 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
           updateEffectiveStorativity(arp.wtd(i, j), dmdapack.x[j][i] - dmdapack.topo_vec[j][i], arp.porosity(i, j));
     }
   }
-  std::cout << "before solve 2 " << get_time() << std::endl;
 
-  // repeat the solve
+// repeat the solve
+#pragma omp parallel for default(none) shared(ys, ym, xs, xm, dmdapack) collapse(2)
+  for (auto j = ys; j < ys + ym; j++) {
+    for (auto i = xs; i < xs + xm; i++) {
+      dmdapack.head[j][i] = dmdapack.x[j][i];
+    }
+  }
+  FormInitialGuess(&user_context, user_context.da, user_context.x);
   SNESSolve(user_context.snes, user_context.b, user_context.x);
   SNESGetIterationNumber(user_context.snes, &its);
   SNESGetConvergedReason(user_context.snes, &reason);
 
   PetscPrintf(
       PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
-  std::cout << "after both solves " << get_time() << std::endl;
 
   // copy the result back into the wtd array
   for (int j = ys; j < ys + ym; j++) {
@@ -195,22 +190,24 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
    Output Parameter:
    X - vector
  */
-static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X, ArrayPack& arp) {
-  PetscScalar** x;
+static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X) {
+  PetscScalar **x, **my_head;
 
   DMDAVecGetArray(da, X, &x);
+  DMDAVecGetArray(da, user_context->head, &my_head);
 
   const auto [xs, ys, xm, ym] = get_corners(da);
 
-#pragma omp parallel for default(none) shared(arp, ys, ym, xs, xm, x) collapse(2)
+#pragma omp parallel for default(none) shared(my_head, ys, ym, xs, xm, x) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      x[j][i] = arp.topo(i, j) + arp.wtd(i, j);  // when land mask == 0, both topo and wtd have already been set to 0
-                                                 // elsewhere, so no need for another if statement here
+      x[j][i] = my_head[j][i];  // when land mask == 0, both topo and wtd have already been set to 0
+                                // elsewhere, so no need for another if statement here
     }
   }
 
   DMDAVecRestoreArray(da, X, &x);
+  DMDAVecRestoreArray(da, user_context->head, &my_head);
   return 0;
 }
 
@@ -224,21 +221,24 @@ static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X, Array
    Output Parameter:
    B - vector
  */
-static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B, ArrayPack& arp) {
-  PetscScalar** b;
+static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B) {
+  PetscScalar **b, **my_head;
 
   DMDAVecGetArray(da, B, &b);
+  DMDAVecGetArray(da, user_context->head, &my_head);
 
   const auto [xs, ys, xm, ym] = get_corners(da);
 
-#pragma omp parallel for default(none) shared(arp, ys, ym, xs, xm, b) collapse(2)
+#pragma omp parallel for default(none) shared(ys, ym, xs, xm, b, my_head) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      b[j][i] = arp.topo(i, j) + arp.wtd(i, j);  // when land mask == 0, both topo and wtd have already been set to 0
-                                                 // elsewhere, so no need for another if statement here
+      b[j][i] = my_head[j][i];  // when land mask == 0, both topo and wtd have already been set to 0
+                                // elsewhere, so no need for another if statement here
     }
   }
   DMDAVecRestoreArray(da, B, &b);
+  DMDAVecRestoreArray(da, user_context->head, &my_head);
+
   return 0;
 }
 
