@@ -6,11 +6,20 @@
 #include <array>
 #include <experimental/source_location>
 
+#include <chrono>
+
 #include <petscdm.h>
 #include <petscdmda.h>
 #include <petscerror.h>
 #include <petscsnes.h>
+std::string get_time() {
+  const auto now       = std::chrono::system_clock::now();
+  const auto in_time_t = std::chrono::system_clock::to_time_t(now);
 
+  std::stringstream ss;
+  ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S");
+  return ss.str();
+}
 ///////////////////////
 // PRIVATE FUNCTIONS //
 ///////////////////////
@@ -130,9 +139,11 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
 
   // set the RHS
   FormRHS(&user_context, user_context.da, user_context.b, arp);
-
+  std::cout << "before solve 1 " << get_time() << std::endl;
   // Solve nonlinear system
   SNESSolve(user_context.snes, user_context.b, user_context.x);
+  std::cout << "after solve 1 " << get_time() << std::endl;
+
   SNESGetIterationNumber(user_context.snes, &its);
   SNESGetConvergedReason(user_context.snes, &reason);
 
@@ -146,6 +157,7 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
           dmdapack.h[j][i], dmdapack.x[j][i] - dmdapack.topo_vec[j][i], dmdapack.porosity[j][i]);
     }
   }
+  std::cout << "before solve 2 " << get_time() << std::endl;
 
   // repeat the solve
   SNESSolve(user_context.snes, user_context.b, user_context.x);
@@ -154,6 +166,7 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
 
   PetscPrintf(
       PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
+  std::cout << "after both solves " << get_time() << std::endl;
 
   // copy the result back into the wtd array
   for (int j = ys; j < ys + ym; j++) {
@@ -271,7 +284,7 @@ static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B, ArrayPack& arp
 static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user_context) {
   DM da = user_context->da;
   PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **my_rech, **my_cell_area;
+      **my_topo, **my_rech, **my_T;
   PetscInt Mx, My;
 
   DMDAGetInfo(
@@ -302,41 +315,48 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecGetArray(da, user_context->h, &my_h));
   PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecGetArray(da, user_context->rech_vec, &my_rech));
+  PetscCall(DMDAVecGetArray(da, user_context->T_vec, &my_T));
+
+  for (auto j = info->ys; j < info->ys + info->ym; j++) {
+    for (auto i = info->xs; i < info->xs + info->xm; i++) {
+      my_T[j][i] = 1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]);
+    }
+  }
 
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
       const PetscScalar u = x[j][i];
       if (my_mask[j][i] == 0) {
-        // if(i==0||j==0||i==info->xs+info->xm-1||j==info->ys+info->ym-1){
         f[j][i] = 0;
       } else {
         const PetscScalar ux_E = (x[j][i + 1] - x[j][i]);
         const PetscScalar ux_W = (x[j][i] - x[j][i - 1]);
         const PetscScalar uy_N = (x[j + 1][i] - x[j][i]);
         const PetscScalar uy_S = (x[j][i] - x[j - 1][i]);
-        const PetscScalar e_E =
-            2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
-                  1. / depthIntegratedTransmissivity(
-                           x[j][i + 1] - my_topo[j][i + 1], my_fdepth[j][i + 1], my_ksat[j][i + 1]));
-        const PetscScalar e_W =
-            2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
-                  1. / depthIntegratedTransmissivity(
-                           x[j][i - 1] - my_topo[j][i - 1], my_fdepth[j][i - 1], my_ksat[j][i - 1]));
-        const PetscScalar e_N =
-            2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
-                  1. / depthIntegratedTransmissivity(
-                           x[j + 1][i] - my_topo[j + 1][i], my_fdepth[j + 1][i], my_ksat[j + 1][i]));
-        const PetscScalar e_S =
-            2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
-                  1. / depthIntegratedTransmissivity(
-                           x[j - 1][i] - my_topo[j - 1][i], my_fdepth[j - 1][i], my_ksat[j - 1][i]));
+        const PetscScalar e_E  = 2. / (my_T[j][i] + my_T[j][i + 1]);
+        //        2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
+        //            1. / depthIntegratedTransmissivity(
+        //                   x[j][i + 1] - my_topo[j][i + 1], my_fdepth[j][i + 1], my_ksat[j][i + 1]));
+        const PetscScalar e_W = 2. / (my_T[j][i] + my_T[j][i - 1]);
+        //  2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
+        //      1. / depthIntegratedTransmissivity(
+        //             x[j][i - 1] - my_topo[j][i - 1], my_fdepth[j][i - 1], my_ksat[j][i - 1]));
+        const PetscScalar e_N = 2. / (my_T[j][i] + my_T[j + 1][i]);
+        //            2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i])
+        //            +
+        //                1. / depthIntegratedTransmissivity(
+        //                       x[j + 1][i] - my_topo[j + 1][i], my_fdepth[j + 1][i], my_ksat[j + 1][i]));
+        const PetscScalar e_S = 2. / (my_T[j][i] + my_T[j - 1][i]);
+        //      2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
+        //          1. / depthIntegratedTransmissivity(
+        //                 x[j - 1][i] - my_topo[j - 1][i], my_fdepth[j - 1][i], my_ksat[j - 1][i]));
 
         const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) / (user_context->cellsize_NS * user_context->cellsize_NS);
         const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (cellsize_ew[j][i] * cellsize_ew[j][i]);
 
         double rech = add_recharge(my_rech[j][i], my_h[j][i], my_porosity[j][i]);
 
-        float my_S = updateEffectiveStorativity(my_h[j][i], x[j][i] - my_topo[j][i], my_porosity[j][i]);
+        // float my_S = updateEffectiveStorativity(my_h[j][i], x[j][i] - my_topo[j][i], my_porosity[j][i]);
 
         f[j][i] = (uxx + uyy) * (user_context->timestep / starting_storativity[j][i]) + u - rech;
       }
@@ -351,6 +371,7 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecRestoreArray(da, user_context->h, &my_h));
   PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecRestoreArray(da, user_context->rech_vec, &my_rech));
+  PetscCall(DMDAVecRestoreArray(da, user_context->T_vec, &my_T));
 
   PetscLogFlops(info->xm * info->ym * (72.0));
   return 0;
