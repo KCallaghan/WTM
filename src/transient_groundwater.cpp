@@ -98,7 +98,6 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
       if (arp.land_mask(x, y) == 0.f || arp.wtd(x, y) >= 0) {
-        // in the ocean, we set several arrays to default values
         arp.effective_storativity(x, y) = 1.;
       } else {
         arp.effective_storativity(x, y) = arp.porosity(x, y);
@@ -117,13 +116,12 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   // Get local array bounds
   const auto [xs, ys, xm, ym] = get_corners(user_context.da);
 
-  // values for storativity are reset each time; and wtd and recharge change from one timestep to the next, so set these
-  // here
+// values for storativity are reset each time; and recharge changes from one timestep to the next, so set these here
+#pragma omp parallel for default(none) shared(arp, ys, ym, xs, xm, dmdapack, params) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.S[j][i]        = arp.effective_storativity(i, j);
-      dmdapack.h[j][i]        = arp.wtd(i, j);
-      dmdapack.rech_vec[j][i] = arp.rech(i, j);
+      dmdapack.time_per_S[j][i] = params.deltat / arp.effective_storativity(i, j);
+      dmdapack.rech_vec[j][i]   = add_recharge(arp.rech(i, j), arp.wtd(i, j), arp.porosity(i, j));
     }
   }
 
@@ -150,11 +148,13 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   PetscPrintf(
       PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
 
-  // recalculate the new storativity using the initial solve as an estimator for the final answer
+// recalculate the new storativity using the initial solve as an estimator for the final answer
+#pragma omp parallel for default(none) shared(arp, ys, ym, xs, xm, dmdapack, params) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.S[j][i] = updateEffectiveStorativity(
-          dmdapack.h[j][i], dmdapack.x[j][i] - dmdapack.topo_vec[j][i], dmdapack.porosity[j][i]);
+      dmdapack.time_per_S[j][i] =
+          params.deltat /
+          updateEffectiveStorativity(arp.wtd(i, j), dmdapack.x[j][i] - dmdapack.topo_vec[j][i], arp.porosity(i, j));
     }
   }
   std::cout << "before solve 2 " << get_time() << std::endl;
@@ -196,35 +196,17 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
    X - vector
  */
 static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X, ArrayPack& arp) {
-  PetscInt Mx, My;
   PetscScalar** x;
-
-  DMDAGetInfo(
-      da,
-      PETSC_IGNORE,
-      &Mx,
-      &My,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE);
 
   DMDAVecGetArray(da, X, &x);
 
   const auto [xs, ys, xm, ym] = get_corners(da);
 
+#pragma omp parallel for default(none) shared(arp, ys, ym, xs, xm, x) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      if (arp.land_mask(i, j) == 0)
-        x[j][i] = arp.wtd(i, j);
-      else
-        x[j][i] = arp.topo(i, j) + arp.wtd(i, j);
+      x[j][i] = arp.topo(i, j) + arp.wtd(i, j);  // when land mask == 0, both topo and wtd have already been set to 0
+                                                 // elsewhere, so no need for another if statement here
     }
   }
 
@@ -243,34 +225,17 @@ static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X, Array
    B - vector
  */
 static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B, ArrayPack& arp) {
-  PetscInt Mx, My;
   PetscScalar** b;
-
-  DMDAGetInfo(
-      da,
-      PETSC_IGNORE,
-      &Mx,
-      &My,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE);
 
   DMDAVecGetArray(da, B, &b);
 
   const auto [xs, ys, xm, ym] = get_corners(da);
+
+#pragma omp parallel for default(none) shared(arp, ys, ym, xs, xm, b) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      if (arp.land_mask(i, j) == 0)
-        b[j][i] = arp.wtd(i, j);
-      else
-        b[j][i] = arp.topo(i, j) + arp.wtd(i, j);
+      b[j][i] = arp.topo(i, j) + arp.wtd(i, j);  // when land mask == 0, both topo and wtd have already been set to 0
+                                                 // elsewhere, so no need for another if statement here
     }
   }
   DMDAVecRestoreArray(da, B, &b);
@@ -283,49 +248,34 @@ static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B, ArrayPack& arp
  */
 static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, PetscScalar** f, AppCtx* user_context) {
   DM da = user_context->da;
-  PetscScalar **starting_storativity, **cellsize_ew, **my_mask, **my_fdepth, **my_ksat, **my_h, **my_porosity,
-      **my_topo, **my_rech, **my_T;
-  PetscInt Mx, My;
-
-  DMDAGetInfo(
-      da,
-      PETSC_IGNORE,
-      &Mx,
-      &My,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE,
-      PETSC_IGNORE);
+  PetscScalar **time_over_storativity, **cellsize_ew_sq, **my_mask, **my_fdepth, **my_ksat, **my_topo, **my_rech,
+      **my_T;
 
   /*
     Compute function over the locally owned part of the grid
  */
   PetscCall(DMDAVecGetArray(da, user_context->mask, &my_mask));
-  PetscCall(DMDAVecGetArray(da, user_context->S, &starting_storativity));
-  PetscCall(DMDAVecGetArray(da, user_context->cellsize_EW, &cellsize_ew));
+  PetscCall(DMDAVecGetArray(da, user_context->time_per_S, &time_over_storativity));
+  PetscCall(DMDAVecGetArray(da, user_context->cellsize_EW_squared, &cellsize_ew_sq));
   PetscCall(DMDAVecGetArray(da, user_context->fdepth_vec, &my_fdepth));
   PetscCall(DMDAVecGetArray(da, user_context->ksat_vec, &my_ksat));
-  PetscCall(DMDAVecGetArray(da, user_context->porosity, &my_porosity));
-  PetscCall(DMDAVecGetArray(da, user_context->h, &my_h));
   PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecGetArray(da, user_context->rech_vec, &my_rech));
   PetscCall(DMDAVecGetArray(da, user_context->T_vec, &my_T));
 
+#pragma omp parallel for default(none) shared(info, my_T, x, my_topo, my_fdepth, my_ksat) collapse(2)
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
       my_T[j][i] = 1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]);
     }
   }
 
+#pragma omp parallel for default(none) \
+    shared(info, cellsize_ew_sq, x, my_T, my_mask, my_rech, user_context, time_over_storativity, f)
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
+#pragma omp parallel for default(none) \
+    shared(info, cellsize_ew_sq, my_mask, x, my_T, my_rech, user_context, j, time_over_storativity, f)
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
-      const PetscScalar u = x[j][i];
       if (my_mask[j][i] == 0) {
         f[j][i] = 0;
       } else {
@@ -334,41 +284,25 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar uy_N = (x[j + 1][i] - x[j][i]);
         const PetscScalar uy_S = (x[j][i] - x[j - 1][i]);
         const PetscScalar e_E  = 2. / (my_T[j][i] + my_T[j][i + 1]);
-        //        2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
-        //            1. / depthIntegratedTransmissivity(
-        //                   x[j][i + 1] - my_topo[j][i + 1], my_fdepth[j][i + 1], my_ksat[j][i + 1]));
-        const PetscScalar e_W = 2. / (my_T[j][i] + my_T[j][i - 1]);
-        //  2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
-        //      1. / depthIntegratedTransmissivity(
-        //             x[j][i - 1] - my_topo[j][i - 1], my_fdepth[j][i - 1], my_ksat[j][i - 1]));
-        const PetscScalar e_N = 2. / (my_T[j][i] + my_T[j + 1][i]);
-        //            2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i])
-        //            +
-        //                1. / depthIntegratedTransmissivity(
-        //                       x[j + 1][i] - my_topo[j + 1][i], my_fdepth[j + 1][i], my_ksat[j + 1][i]));
-        const PetscScalar e_S = 2. / (my_T[j][i] + my_T[j - 1][i]);
-        //      2. / (1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]) +
-        //          1. / depthIntegratedTransmissivity(
-        //                 x[j - 1][i] - my_topo[j - 1][i], my_fdepth[j - 1][i], my_ksat[j - 1][i]));
+        const PetscScalar e_W  = 2. / (my_T[j][i] + my_T[j][i - 1]);
+        const PetscScalar e_N  = 2. / (my_T[j][i] + my_T[j + 1][i]);
+        const PetscScalar e_S  = 2. / (my_T[j][i] + my_T[j - 1][i]);
 
-        const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) / (user_context->cellsize_NS * user_context->cellsize_NS);
-        const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (cellsize_ew[j][i] * cellsize_ew[j][i]);
+        const PetscScalar uxx = (e_W * ux_W - e_E * ux_E) / user_context->cellsize_NS_squared;
+        const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / cellsize_ew_sq[j][i];
 
-        double rech = add_recharge(my_rech[j][i], my_h[j][i], my_porosity[j][i]);
-
-        // float my_S = updateEffectiveStorativity(my_h[j][i], x[j][i] - my_topo[j][i], my_porosity[j][i]);
-
-        f[j][i] = (uxx + uyy) * (user_context->timestep / starting_storativity[j][i]) + u - rech;
+        f[j][i] = (uxx + uyy) * time_over_storativity[j][i] + x[j][i] -
+                  my_rech[j][i];  // my_rech is converted to appropriate recharge for this timestep and starting water
+                                  // table outside of the solve.
       }
     }
   }
+
   PetscCall(DMDAVecRestoreArray(da, user_context->mask, &my_mask));
-  PetscCall(DMDAVecRestoreArray(da, user_context->S, &starting_storativity));
-  PetscCall(DMDAVecRestoreArray(da, user_context->cellsize_EW, &cellsize_ew));
+  PetscCall(DMDAVecRestoreArray(da, user_context->time_per_S, &time_over_storativity));
+  PetscCall(DMDAVecRestoreArray(da, user_context->cellsize_EW_squared, &cellsize_ew_sq));
   PetscCall(DMDAVecRestoreArray(da, user_context->fdepth_vec, &my_fdepth));
   PetscCall(DMDAVecRestoreArray(da, user_context->ksat_vec, &my_ksat));
-  PetscCall(DMDAVecRestoreArray(da, user_context->porosity, &my_porosity));
-  PetscCall(DMDAVecRestoreArray(da, user_context->h, &my_h));
   PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecRestoreArray(da, user_context->rech_vec, &my_rech));
   PetscCall(DMDAVecRestoreArray(da, user_context->T_vec, &my_T));
