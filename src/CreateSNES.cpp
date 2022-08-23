@@ -3,8 +3,7 @@
 void InitialiseSNES(AppCtx& user_context, Parameters& params) {
   SNESCreate(PETSC_COMM_WORLD, &user_context.snes);
 
-  user_context.cellsize_NS = params.cellsize_n_s_metres;
-  user_context.timestep    = params.deltat;
+  user_context.cellsize_NS_squared = params.cellsize_n_s_metres * params.cellsize_n_s_metres;
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Create distributed array (DMDA) to manage parallel grid and vectors
