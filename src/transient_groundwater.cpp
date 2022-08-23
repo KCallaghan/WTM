@@ -88,7 +88,7 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
 #pragma omp parallel for default(none) shared(arp, params) collapse(2)
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
-      if (arp.land_mask(x, y) == 0.f || arp.wtd(x, y) > 0) {
+      if (arp.land_mask(x, y) == 0.f || arp.wtd(x, y) >= 0) {
         // in the ocean, we set several arrays to default values
         arp.effective_storativity(x, y) = 1.;
       } else {
@@ -143,7 +143,7 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
       dmdapack.S[j][i] = updateEffectiveStorativity(
-          arp.wtd(i, j), dmdapack.x[j][i] - arp.topo(i, j), arp.porosity(i, j), arp.effective_storativity(i, j));
+          dmdapack.h[j][i], dmdapack.x[j][i] - dmdapack.topo_vec[j][i], dmdapack.porosity[j][i]);
     }
   }
 
@@ -208,7 +208,10 @@ static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X, Array
 
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      x[j][i] = arp.topo(i, j) + arp.wtd(i, j);
+      if (arp.land_mask(i, j) == 0)
+        x[j][i] = arp.wtd(i, j);
+      else
+        x[j][i] = arp.topo(i, j) + arp.wtd(i, j);
     }
   }
 
@@ -251,7 +254,10 @@ static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B, ArrayPack& arp
   const auto [xs, ys, xm, ym] = get_corners(da);
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      b[j][i] = arp.topo(i, j) + arp.wtd(i, j);
+      if (arp.land_mask(i, j) == 0)
+        b[j][i] = arp.wtd(i, j);
+      else
+        b[j][i] = arp.topo(i, j) + arp.wtd(i, j);
     }
   }
   DMDAVecRestoreArray(da, B, &b);
@@ -301,7 +307,8 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
     for (auto i = info->xs; i < info->xs + info->xm; i++) {
       const PetscScalar u = x[j][i];
       if (my_mask[j][i] == 0) {
-        f[j][i] = u;
+        // if(i==0||j==0||i==info->xs+info->xm-1||j==info->ys+info->ym-1){
+        f[j][i] = 0;
       } else {
         const PetscScalar ux_E = (x[j][i + 1] - x[j][i]);
         const PetscScalar ux_W = (x[j][i] - x[j][i - 1]);
@@ -328,6 +335,8 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar uyy = (e_S * uy_S - e_N * uy_N) / (cellsize_ew[j][i] * cellsize_ew[j][i]);
 
         double rech = add_recharge(my_rech[j][i], my_h[j][i], my_porosity[j][i]);
+
+        float my_S = updateEffectiveStorativity(my_h[j][i], x[j][i] - my_topo[j][i], my_porosity[j][i]);
 
         f[j][i] = (uxx + uyy) * (user_context->timestep / starting_storativity[j][i]) + u - rech;
       }
