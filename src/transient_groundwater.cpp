@@ -4,8 +4,8 @@
 
 #include <omp.h>
 
-#include <eigen3/Eigen/Core>
-#include <eigen3/Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
+#include <Eigen/Core>
+#include <Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
 
 using SpMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;  // declares a row-major sparse matrix type of double
 
