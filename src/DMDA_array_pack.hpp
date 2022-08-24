@@ -21,6 +21,7 @@ struct DMDA_Array_Pack {
   PetscScalar** rech_vec            = nullptr;
   PetscScalar** T_vec               = nullptr;
   PetscScalar** head                = nullptr;
+  PetscScalar** guess               = nullptr;
   const AppCtx* context             = nullptr;
 
   DMDA_Array_Pack(const AppCtx& user) {
@@ -36,6 +37,7 @@ struct DMDA_Array_Pack {
     DMDAVecGetArray(user.da, user.rech_vec, &rech_vec);
     DMDAVecGetArray(user.da, user.T_vec, &T_vec);
     DMDAVecGetArray(user.da, user.head, &head);
+    DMDAVecGetArray(user.da, user.guess, &guess);
   }
 
   void release() {
@@ -50,6 +52,7 @@ struct DMDA_Array_Pack {
     DMDAVecRestoreArray(context->da, context->rech_vec, &rech_vec);
     DMDAVecRestoreArray(context->da, context->T_vec, &T_vec);
     DMDAVecRestoreArray(context->da, context->head, &head);
+    DMDAVecRestoreArray(context->da, context->guess, &guess);
     context = nullptr;
   }
 };
