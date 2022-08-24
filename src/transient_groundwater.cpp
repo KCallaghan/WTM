@@ -72,7 +72,7 @@ void first_half(const Parameters& params, ArrayPack& arp) {
   //  populate the A matrix.
 
   const auto construct_e_w_diagonal_one = [&](const int x, const int y, const int dy) {
-    return -arp.scalar_array_y(x, y) * ((arp.transmissivity(x, y + dy) + arp.transmissivity(x, y)) / 2);
+    return -arp.scalar_array_y(x, y) * (2. / (1. / arp.transmissivity(x, y + dy) + 1. / arp.transmissivity(x, y)));
     //-arp.scalar_array_y(x, y) * ((arp.transmissivity(x, y + dy) + arp.transmissivity(x, y)) / 2);
   };
 
@@ -83,11 +83,21 @@ void first_half(const Parameters& params, ArrayPack& arp) {
 
   const auto construct_major_diagonal_one =
       [&](const int x, const int y, const int dx1, const int dx2, const int dy1, const int dy2) {
-        const auto x_term = arp.scalar_array_x(x, y) * (arp.transmissivity(x + dx1, y) / 2 + arp.transmissivity(x, y) +
-                                                        arp.transmissivity(x + dx2, y) / 2);
-        const auto y_term = arp.scalar_array_y(x, y) * (arp.transmissivity(x, y + dy1) / 2 + arp.transmissivity(x, y) +
-                                                        arp.transmissivity(x, y + dy2) / 2);
+        const auto x_term =
+            arp.scalar_array_x(x, y) * (2. / (1. / arp.transmissivity(x + dx1, y) + 1. / arp.transmissivity(x, y)) +
+                                        2. / (1. / arp.transmissivity(x + dx2, y) + 1. / arp.transmissivity(x, y)));
+        const auto y_term =
+            arp.scalar_array_y(x, y) * (2. / (1. / arp.transmissivity(x, y + dy1) + 1. / arp.transmissivity(x, y)) +
+                                        2. / (1. / arp.transmissivity(x, y + dy2) + 1. / arp.transmissivity(x, y)));
         return x_term + y_term + 1;
+
+        // const auto x_term = arp.scalar_array_x(x, y) * (arp.transmissivity(x + dx1, y) / 2 + arp.transmissivity(x, y)
+        // +
+        //                                                 arp.transmissivity(x + dx2, y) / 2);
+        // const auto y_term = arp.scalar_array_y(x, y) * (arp.transmissivity(x, y + dy1) / 2 + arp.transmissivity(x, y)
+        // +
+        //                                                 arp.transmissivity(x, y + dy2) / 2);
+        // return x_term + y_term + 1;
       };
 
 #pragma omp parallel for collapse(2) default(none) \
