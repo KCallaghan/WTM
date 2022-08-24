@@ -4,8 +4,8 @@
 
 #include <omp.h>
 
-#include <eigen3/Eigen/Core>
-#include <eigen3/Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
+#include <Eigen/Core>
+#include <Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
 
 using SpMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;  // declares a row-major sparse matrix type of double
 
@@ -73,10 +73,12 @@ void first_half(const Parameters& params, ArrayPack& arp) {
 
   const auto construct_e_w_diagonal_one = [&](const int x, const int y, const int dy) {
     return -arp.scalar_array_y(x, y) * ((arp.transmissivity(x, y + dy) + arp.transmissivity(x, y)) / 2);
+    //-arp.scalar_array_y(x, y) * ((arp.transmissivity(x, y + dy) + arp.transmissivity(x, y)) / 2);
   };
 
   const auto construct_n_s_diagonal_one = [&](const int x, const int y, const int dx) {
-    return -arp.scalar_array_x(x, y) * ((arp.transmissivity(x + dx, y) + arp.transmissivity(x, y)) / 2);
+    return -arp.scalar_array_x(x, y) * (2. / (1. / arp.transmissivity(x + dx, y) + 1. / arp.transmissivity(x, y)));
+    //-arp.scalar_array_x(x, y) * ((arp.transmissivity(x + dx, y) + arp.transmissivity(x, y)) / 2);
   };
 
   const auto construct_major_diagonal_one =
@@ -162,161 +164,6 @@ void first_half(const Parameters& params, ArrayPack& arp) {
   }
 }
 
-// In the second step of the midpoint method, we use the transmissivity values
-// obtained after the calculation in the first step above.
-// We then compute the new water table depths after a full time-step has passed.
-void second_half(Parameters& params, ArrayPack& arp) {
-  SpMat A(params.ncells_x * params.ncells_y, params.ncells_x * params.ncells_y);
-  SpMat B(params.ncells_x * params.ncells_y, params.ncells_x * params.ncells_y);
-  A.reserve(Eigen::VectorXi::Constant(params.ncells_x * params.ncells_y, 5));
-  B.reserve(Eigen::VectorXi::Constant(params.ncells_x * params.ncells_y, 5));
-
-  Eigen::VectorXd b(params.ncells_x * params.ncells_y);
-  Eigen::VectorXd vec_x(params.ncells_x * params.ncells_y);
-  Eigen::VectorXd guess(params.ncells_x * params.ncells_y);
-
-// We need to solve the vector-matrix equation Ax=Bb.
-// b consists of the current head values (i.e. water table depth + topography)
-// We also populate a 'guess', which consists of a water table (wtd_T) that
-// has already been modified for changing transmissivity closer to the final answer.
-#pragma omp parallel for default(none) shared(arp, b, guess, params) collapse(2)
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      b(arp.wtd_T.xyToI(x, y)) =
-          arp.original_wtd(x, y) + arp.topo(x, y);  // original wtd is 0 in ocean cells and topo is 0 in ocean cells, so
-                                                    // no need to differentiate between ocean vs land.
-      guess(arp.wtd_T.xyToI(x, y)) = arp.wtd_T(x, y) + arp.topo(x, y);
-    }
-  }
-
-  // SECOND SOLVE
-  // Populate the matrices A and B.
-
-  const auto construct_e_w_diagonal_two = [&](const int x, const int y, const int dy) {
-    return arp.scalar_array_y(x, y) * (arp.transmissivity(x, y) + arp.transmissivity(x, y + dy)) / 4;
-  };
-
-  const auto construct_n_s_diagonal_two = [&](const int x, const int y, const int dx) {
-    return arp.scalar_array_x(x, y) * (arp.transmissivity(x, y) + arp.transmissivity(x + dx, y)) / 4;
-  };
-
-  const auto construct_major_diagonal_two =
-      [&](const int x, const int y, const int onemult, const int dx1, const int dx2, const int dy1, const int dy2) {
-        const auto x_term =
-            arp.scalar_array_x(x, y) *
-            (arp.transmissivity(x + dx1, y) / 4 + arp.transmissivity(x, y) / 2 + arp.transmissivity(x + dx2, y) / 4);
-        const auto y_term =
-            arp.scalar_array_y(x, y) *
-            (arp.transmissivity(x, y + dy1) / 4 + arp.transmissivity(x, y) / 2 + arp.transmissivity(x, y + dy2) / 4);
-        return 1 + onemult * (x_term + y_term);
-      };
-
-#pragma omp parallel for default(none)                                                                              \
-    shared(arp, params, construct_major_diagonal_two, construct_e_w_diagonal_two, construct_n_s_diagonal_two, A, B) \
-        collapse(2)
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      // The row and column that the current cell will be stored in in matrix A.
-      // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
-      // All of the N,E,S,W directions should be in the same row, but the column will differ.
-      const auto main_loc = arp.wtd_T.xyToI(x, y);
-
-      if (x != 0) {
-        // Do the North diagonal. Offset by -1.
-        const auto entry                 = construct_n_s_diagonal_two(x, y, -1);
-        B.insert(main_loc, main_loc - 1) = entry;
-        A.insert(main_loc, main_loc - 1) = -entry;
-      }
-
-      if (y != 0) {
-        // Next is the West diagonal. Opposite of the East. Located at (i,j-params.ncells_X).
-        const auto entry                               = construct_e_w_diagonal_two(x, y, -1);
-        B.insert(main_loc, main_loc - params.ncells_x) = entry;
-        A.insert(main_loc, main_loc - params.ncells_x) = -entry;
-      }
-
-      // major diagonal
-      B.insert(main_loc, main_loc) = construct_major_diagonal_two(
-          x,
-          y,
-          -1,
-          (x == 0) ? 0 : -1,
-          (x == params.ncells_x - 1) ? 0 : 1,
-          (y == 0) ? 0 : -1,
-          (y == params.ncells_y - 1) ? 0 : 1);
-      A.insert(main_loc, main_loc) = construct_major_diagonal_two(
-          x,
-          y,
-          1,
-          (x == 0) ? 0 : -1,
-          (x == params.ncells_x - 1) ? 0 : 1,
-          (y == 0) ? 0 : -1,
-          (y == params.ncells_y - 1) ? 0 : 1);
-
-      if (y != params.ncells_y - 1) {
-        // Now do the East diagonal. The East location is at (i,j+params.ncells_x).
-        const auto entry                               = construct_e_w_diagonal_two(x, y, 1);
-        B.insert(main_loc, main_loc + params.ncells_x) = entry;
-        A.insert(main_loc, main_loc + params.ncells_x) = -entry;
-      }
-
-      if (x != params.ncells_x - 1) {
-        // Do the South diagonal, offset by +1.
-        const auto entry                 = construct_n_s_diagonal_two(x, y, 1);
-        B.insert(main_loc, main_loc + 1) = entry;
-        A.insert(main_loc, main_loc + 1) = -entry;
-      }
-    }
-  }
-
-  b     = B * b;
-  guess = B * guess;
-
-  // Apply the recharge to the water-table depth grid. The full amount of recharge is added to b, which was created
-  // based on original_wtd. Recharge is added here because of the form that the equation takes - can't add it prior to
-  // doing the B*b multiplication.
-  // do not use pragma because recharge added is modified within the add_recharge function
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      if (arp.land_mask(x, y) == 1) {  // only add recharge to land cells
-        const auto index = arp.wtd_T.xyToI(x, y);
-        b(index) += add_recharge(arp.rech(x, y), arp.original_wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 1, arp);
-        guess(index) +=
-            add_recharge(arp.rech(x, y), arp.original_wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 0, arp);
-      }
-    }
-  }
-
-  // Biconjugate gradient solver with guess
-  Eigen::BiCGSTAB<SpMat> solver;
-  solver.setTolerance(params.solver_tolerance_value);
-  // NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means
-  // that BiCGSTAB will not run in parallel. It is faster without.
-
-  solver.compute(A);
-
-  if (solver.info() != Eigen::Success) {
-    throw std::runtime_error("Eigen sparse solver failed at the compute step!");
-  }
-
-  vec_x = solver.solveWithGuess(b, guess);
-
-  if (solver.info() != Eigen::Success) {
-    throw std::runtime_error("Eigen sparse solver failed at the solve step!");
-  }
-
-  std::cout << "#iterations:     " << solver.iterations() << std::endl;
-  std::cout << "estimated error: " << solver.error() << std::endl;
-
-#pragma omp parallel for default(none) shared(arp, params, vec_x) collapse(2)
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      // copy result into the wtd array:
-      arp.wtd(x, y) = vec_x(arp.wtd_T.xyToI(x, y)) - arp.topo(x, y);
-    }
-  }
-}
-
 //////////////////////
 // PUBLIC FUNCTIONS //
 //////////////////////
@@ -356,7 +203,7 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         // Its clone (wtd_T) is used and updated in the Picard iteration
         // use regular porosity for adding recharge since this checks
         // for underground space within add_recharge.
-        arp.wtd(x, y) += add_recharge(arp.rech(x, y) / 2., arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 0, arp);
+        arp.wtd(x, y) += add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 0, arp);
 
         arp.wtd_T(x, y)           = arp.wtd(x, y);
         arp.wtd_T_iteration(x, y) = arp.wtd_T(x, y);
@@ -436,11 +283,10 @@ void update(Parameters& params, ArrayPack& arp) {
 
   // Do the second half of the midpoint method:
   // Solve for water table after the full time step.
-  std::cout << "p second_half" << std::endl;
-  second_half(params, arp);
 
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
+      arp.wtd(x, y) = arp.wtd_T(x, y);
       if (arp.land_mask(x, y) != 0) {
         continue;
       }
