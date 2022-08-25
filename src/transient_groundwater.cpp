@@ -280,8 +280,8 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   // Get local array bounds
   const auto [xs, ys, xm, ym] = get_corners(user_context.da);
 
-  first_half(params, arp);
-  // values for storativity are reset each time; and recharge changes from one timestep to the next, so set these here
+  // first_half(params, arp);
+  //  values for storativity are reset each time; and recharge changes from one timestep to the next, so set these here
 #pragma omp parallel for default(none) shared(arp, ys, ym, xs, xm, dmdapack, params) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
