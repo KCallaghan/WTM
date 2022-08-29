@@ -261,7 +261,6 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecGetArray(da, user_context->ksat_vec, &my_ksat));
   PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecGetArray(da, user_context->rech_vec, &my_rech));
-  PetscCall(DMDAVecGetArray(da, user_context->T_vec, &my_T));
 
 #pragma omp parallel for default(none) shared(info, my_T, x, my_topo, my_fdepth, my_ksat) collapse(2)
   for (auto j = info->ys; j < info->ys + info->ym; j++) {
@@ -303,7 +302,6 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
   PetscCall(DMDAVecRestoreArray(da, user_context->ksat_vec, &my_ksat));
   PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
   PetscCall(DMDAVecRestoreArray(da, user_context->rech_vec, &my_rech));
-  PetscCall(DMDAVecRestoreArray(da, user_context->T_vec, &my_T));
 
   PetscLogFlops(info->xm * info->ym * (72.0));
   return 0;

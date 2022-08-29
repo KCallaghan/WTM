@@ -15,7 +15,6 @@ void populate_DMDA_array_pack(AppCtx& user_context, ArrayPack& arp, DMDA_Array_P
       dmdapack.fdepth_vec[j][i]          = arp.fdepth(i, j);
       dmdapack.ksat_vec[j][i]            = arp.ksat(i, j);
       dmdapack.topo_vec[j][i]            = arp.topo(i, j);
-      dmdapack.T_vec[j][i]               = arp.transmissivity(i, j);
     }
   }
 }

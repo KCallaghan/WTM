@@ -18,9 +18,7 @@ struct AppCtx {
   Vec mask                = nullptr;
   Vec topo_vec            = nullptr;
   Vec rech_vec            = nullptr;
-  Vec T_vec               = nullptr;
   Vec head                = nullptr;
-  Vec guess               = nullptr;
 
   ~AppCtx() {
     SNESDestroy(&snes);
@@ -34,9 +32,7 @@ struct AppCtx {
     VecDestroy(&mask);
     VecDestroy(&topo_vec);
     VecDestroy(&rech_vec);
-    VecDestroy(&T_vec);
     VecDestroy(&head);
-    VecDestroy(&guess);
   }
 
   // Extract global vectors from DM; then duplicate for remaining
@@ -51,9 +47,7 @@ struct AppCtx {
     VecDuplicate(x, &mask);
     VecDuplicate(x, &topo_vec);
     VecDuplicate(x, &rech_vec);
-    VecDuplicate(x, &T_vec);
     VecDuplicate(x, &head);
-    VecDuplicate(x, &guess);
   }
 };
 
