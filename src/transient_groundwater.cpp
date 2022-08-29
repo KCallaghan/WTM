@@ -6,6 +6,24 @@
 
 #include <Eigen/Core>
 #include <Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
+#include "ceres/ceres.h"
+#include "glog/logging.h"
+using ceres::AutoDiffCostFunction;
+using ceres::CostFunction;
+using ceres::Problem;
+using ceres::Solve;
+using ceres::Solver;
+// A templated cost functor that implements the residual r = 10 -
+// x. The method operator() is templated so that we can then use an
+// automatic differentiation wrapper around it to generate its
+// derivatives.
+struct CostFunctor {
+  template <typename T>
+  bool operator()(const T* const x, T* residual) const {
+    residual[0] = 10.0 - x[0];
+    return true;
+  }
+};
 
 using SpMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;  // declares a row-major sparse matrix type of double
 
@@ -73,12 +91,10 @@ void first_half(const Parameters& params, ArrayPack& arp) {
 
   const auto construct_e_w_diagonal_one = [&](const int x, const int y, const int dy) {
     return -arp.scalar_array_y(x, y) * (2. / (1. / arp.transmissivity(x, y + dy) + 1. / arp.transmissivity(x, y)));
-    //-arp.scalar_array_y(x, y) * ((arp.transmissivity(x, y + dy) + arp.transmissivity(x, y)) / 2);
   };
 
   const auto construct_n_s_diagonal_one = [&](const int x, const int y, const int dx) {
     return -arp.scalar_array_x(x, y) * (2. / (1. / arp.transmissivity(x + dx, y) + 1. / arp.transmissivity(x, y)));
-    //-arp.scalar_array_x(x, y) * ((arp.transmissivity(x + dx, y) + arp.transmissivity(x, y)) / 2);
   };
 
   const auto construct_major_diagonal_one =
@@ -90,14 +106,6 @@ void first_half(const Parameters& params, ArrayPack& arp) {
             arp.scalar_array_y(x, y) * (2. / (1. / arp.transmissivity(x, y + dy1) + 1. / arp.transmissivity(x, y)) +
                                         2. / (1. / arp.transmissivity(x, y + dy2) + 1. / arp.transmissivity(x, y)));
         return x_term + y_term + 1;
-
-        // const auto x_term = arp.scalar_array_x(x, y) * (arp.transmissivity(x + dx1, y) / 2 + arp.transmissivity(x, y)
-        // +
-        //                                                 arp.transmissivity(x + dx2, y) / 2);
-        // const auto y_term = arp.scalar_array_y(x, y) * (arp.transmissivity(x, y + dy1) / 2 + arp.transmissivity(x, y)
-        // +
-        //                                                 arp.transmissivity(x, y + dy2) / 2);
-        // return x_term + y_term + 1;
       };
 
 #pragma omp parallel for collapse(2) default(none) \
@@ -213,7 +221,7 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
         // Its clone (wtd_T) is used and updated in the Picard iteration
         // use regular porosity for adding recharge since this checks
         // for underground space within add_recharge.
-        arp.wtd(x, y) += add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 0, arp);
+        arp.wtd(x, y) += add_recharge(arp.rech(x, y), arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 1, arp);
 
         arp.wtd_T(x, y)           = arp.wtd(x, y);
         arp.wtd_T_iteration(x, y) = arp.wtd_T(x, y);
@@ -238,6 +246,24 @@ void update(Parameters& params, ArrayPack& arp) {
   Eigen::initParallel();
   omp_set_num_threads(params.parallel_threads);
   Eigen::setNbThreads(params.parallel_threads);
+
+  // The variable to solve for with its initial value. It will be
+  // mutated in place by the solver.
+  double x               = 0.5;
+  const double initial_x = x;
+  // Build the problem.
+  Problem problem;
+  // Set up the only cost function (also known as residual). This uses
+  // auto-differentiation to obtain the derivative (jacobian).
+  CostFunction* cost_function = new AutoDiffCostFunction<CostFunctor, 1, 1>(new CostFunctor);
+  problem.AddResidualBlock(cost_function, nullptr, &x);
+  // Run the solver!
+  Solver::Options options;
+  options.minimizer_progress_to_stdout = true;
+  Solver::Summary summary;
+  Solve(options, &problem, &summary);
+  std::cout << summary.BriefReport() << "\n";
+  std::cout << "x : " << initial_x << " -> " << x << "\n";
 
   // set starting values and arrays for the groundwater calculation
   set_starting_values(params, arp);
@@ -268,13 +294,13 @@ void update(Parameters& params, ArrayPack& arp) {
 // also update scalar_array_x and _y, which use effective_storativity.
 #pragma omp parallel for default(none) shared(arp, params) collapse(2)
     for (int y = 0; y < params.ncells_y; y++) {
-      for (int x = 0; x < params.ncells_x; x++) {
-        if (arp.land_mask(x, y) != 0.f) {
-          arp.effective_storativity(x, y) = updateEffectiveStorativity(
-              arp.original_wtd(x, y), arp.wtd_T(x, y), arp.porosity(x, y), arp.effective_storativity(x, y));
-          arp.scalar_array_y(x, y) = params.deltat / (arp.effective_storativity(x, y) * arp.cellsize_e_w_metres[y] *
+      for (int z = 0; z < params.ncells_x; z++) {
+        if (arp.land_mask(z, y) != 0.f) {
+          arp.effective_storativity(z, y) = updateEffectiveStorativity(
+              arp.original_wtd(z, y), arp.wtd_T(z, y), arp.porosity(z, y), arp.effective_storativity(z, y));
+          arp.scalar_array_y(z, y) = params.deltat / (arp.effective_storativity(z, y) * arp.cellsize_e_w_metres[y] *
                                                       arp.cellsize_e_w_metres[y]);
-          arp.scalar_array_x(x, y) = params.x_partial / arp.effective_storativity(x, y);
+          arp.scalar_array_x(z, y) = params.x_partial / arp.effective_storativity(z, y);
         }
       }
     }

@@ -1,4 +1,5 @@
 #include "fill_spill_merge.hpp"
+#include "glog/logging.h"
 #include "irf.hpp"
 #include "transient_groundwater.hpp"
 
@@ -229,6 +230,7 @@ int main(int argc, char** argv) {
 
   ArrayPack arp;
   initialise(params, arp);
+  google::InitGoogleLogging(argv[0]);
   run(params, arp);
   finalise(params, arp);
 
