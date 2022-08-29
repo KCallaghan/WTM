@@ -7,11 +7,12 @@
 
 struct AppCtx {
   PetscReal cellsize_NS_squared;
+  PetscReal deltat;
   SNES snes               = nullptr;
   DM da                   = nullptr;
   Vec x                   = nullptr;  // Solution vector
   Vec b                   = nullptr;  // RHS vector
-  Vec time_per_S          = nullptr;
+  Vec storativity_vec     = nullptr;
   Vec cellsize_EW_squared = nullptr;
   Vec fdepth_vec          = nullptr;
   Vec ksat_vec            = nullptr;
@@ -20,13 +21,14 @@ struct AppCtx {
   Vec rech_vec            = nullptr;
   Vec T_vec               = nullptr;
   Vec head                = nullptr;
+  Vec porosity_vec        = nullptr;
 
   ~AppCtx() {
     SNESDestroy(&snes);
     DMDestroy(&da);
     VecDestroy(&x);
     VecDestroy(&b);
-    VecDestroy(&time_per_S);
+    VecDestroy(&storativity_vec);
     VecDestroy(&cellsize_EW_squared);
     VecDestroy(&fdepth_vec);
     VecDestroy(&ksat_vec);
@@ -35,6 +37,7 @@ struct AppCtx {
     VecDestroy(&rech_vec);
     VecDestroy(&T_vec);
     VecDestroy(&head);
+    VecDestroy(&porosity_vec);
   }
 
   // Extract global vectors from DM; then duplicate for remaining
@@ -42,7 +45,7 @@ struct AppCtx {
   void make_global_vectors() {
     DMCreateGlobalVector(da, &x);
     VecDuplicate(x, &b);
-    VecDuplicate(x, &time_per_S);
+    VecDuplicate(x, &storativity_vec);
     VecDuplicate(x, &cellsize_EW_squared);
     VecDuplicate(x, &fdepth_vec);
     VecDuplicate(x, &ksat_vec);
@@ -51,6 +54,7 @@ struct AppCtx {
     VecDuplicate(x, &rech_vec);
     VecDuplicate(x, &T_vec);
     VecDuplicate(x, &head);
+    VecDuplicate(x, &porosity_vec);
   }
 };
 
