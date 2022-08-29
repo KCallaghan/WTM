@@ -27,11 +27,6 @@ void ArrayPack::check() const {
   compare_dimensions(topo, wtd);
   compare_dimensions(topo, wtd_mid);
   compare_dimensions(topo, wtd_old);
-  compare_dimensions(topo, wtd_T);
-  compare_dimensions(topo, wtd_T_iteration);
-  compare_dimensions(topo, original_wtd);
-  compare_dimensions(topo, scalar_array_x);
-  compare_dimensions(topo, scalar_array_y);
   compare_dimensions(topo, label);
   compare_dimensions(topo, final_label);
   compare_dimensions(topo, flowdirs);

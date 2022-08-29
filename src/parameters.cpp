@@ -50,18 +50,12 @@ Parameters::Parameters(const std::string& config_file) {
       ss >> maxiter;
     } else if (key == "outfile_prefix") {
       ss >> outfile_prefix;
-    } else if (key == "parallel_threads") {
-      ss >> parallel_threads;
-    } else if (key == "picard_iterations") {
-      ss >> picard_iterations;
     } else if (key == "region") {
       ss >> region;
     } else if (key == "run_type") {
       ss >> run_type;
     } else if (key == "runoff_ratio_on") {
       ss >> runoff_ratio_on;
-    } else if (key == "solver_tolerance_value") {
-      ss >> solver_tolerance_value;
     } else if (key == "southern_edge") {
       ss >> southern_edge;
     } else if (key == "supplied_wt") {
@@ -116,7 +110,6 @@ void Parameters::check() const {
   check_positive("fdepth_a", fdepth_a);
   check_positive("fdepth_b", fdepth_b);
   check_positive("fdepth_fmin", fdepth_fmin);
-  check_positive("picard_iterations", picard_iterations);
   check_binary(
       fsm_on, "set fsm_on to 1 to allow Fill-Spill-Merge to move surface water, or 0 to disable Fill-Spill-Merge.");
   check_binary(
@@ -127,7 +120,6 @@ void Parameters::check() const {
       runoff_ratio_on,
       "set runoff_ratio_on to 1 to supply a runoff ratio array, or 0 to assume all P-ET infiltrates in the cell "
       "where it falls.");
-  check_positive("solver_tolerance_value", solver_tolerance_value);
   check_binary(
       supplied_wt,
       "set supplied_wt to 1 to supply a starting water table, or 0 to set starting water table == 0 (only available "
@@ -142,7 +134,6 @@ void Parameters::check() const {
   check_string_init("textfilename", textfilename);
   check_string_init("time_start", time_start);
   check_string_init("time_end", time_end);
-  check_positive("parallel_threads", parallel_threads);
   check_positive("total_cycles", total_cycles);
 }
 
@@ -168,13 +159,10 @@ void Parameters::print() const {
   std::cout << "c infiltration_on        = " << infiltration_on << std::endl;
   std::cout << "c maxiter                = " << maxiter << std::endl;
   std::cout << "c outfile_prefix         = " << outfile_prefix << std::endl;
-  std::cout << "c parallel_threads       = " << parallel_threads << std::endl;
-  std::cout << "c picard_iterations      = " << picard_iterations << std::endl;
   std::cout << "c region                 = " << region << std::endl;
   std::cout << "c run_type               = " << run_type << std::endl;
   std::cout << "c runoff_ratio_on        = " << runoff_ratio_on << std::endl;
   std::cout << "c southern_edge          = " << southern_edge << std::endl;
-  std::cout << "c solver_tolerance_value = " << solver_tolerance_value << std::endl;
   std::cout << "c supplied_wt            = " << supplied_wt << std::endl;
   std::cout << "c surfdatadir            = " << surfdatadir << std::endl;
   std::cout << "c textfilename           = " << textfilename << std::endl;

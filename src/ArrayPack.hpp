@@ -60,14 +60,8 @@ struct ArrayPack {
   d2d wtd;
   d2d wtd_mid;
   d2d wtd_old;
-  d2d wtd_T;
-  d2d wtd_T_iteration;
-  d2d original_wtd;
 
   // arrays used for calculations in code:
-
-  d2d scalar_array_x;
-  d2d scalar_array_y;
 
   dvec cell_area;
   dvec cellsize_e_w_metres;

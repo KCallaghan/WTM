@@ -64,9 +64,6 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
     arp.vert_ksat = rd::Array2D<float>(params.get_path("vertical_ksat"));
   }
 
-  arp.scalar_array_x = rd::Array2D<double>(arp.topo, 0.0);
-  arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
-
   // load in the wtd result from the previous time:
   arp.wtd = rd::Array2D<double>(params.get_path(params.time_start, "wtd"));
 
@@ -89,11 +86,6 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
   arp.open_water_evap = arp.open_water_evap_start;
   arp.winter_temp     = arp.winter_temp_start;
   arp.fdepth          = arp.fdepth_start;
-  arp.wtd_T           = arp.wtd;
-  arp.wtd_T_iteration = arp.wtd;
-  arp.original_wtd    = arp.wtd;
-  arp.scalar_array_x  = rd::Array2D<double>(arp.topo, 0.0);
-  arp.scalar_array_y  = rd::Array2D<double>(arp.topo, 0.0);
 }
 
 /// This function initialises those arrays that are needed only for equilibrium
@@ -121,9 +113,6 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
   arp.winter_temp =
       rd::Array2D<float>(params.get_path(params.time_start, "winter_temperature"));  // Units: degrees Celsius
 
-  arp.scalar_array_x = rd::Array2D<double>(arp.topo, 0.0);
-  arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
-
   if (params.runoff_ratio_on) {
     arp.runoff_ratio = rd::Array2D<float>(params.get_path(params.time_start, "runoff_ratio"));  // Units: m/yr.
   } else {
@@ -135,15 +124,9 @@ void InitialiseEquilibrium(Parameters& params, ArrayPack& arp) {
   }
 
   if (params.supplied_wt == true) {
-    arp.wtd             = rd::Array2D<double>(params.get_path(params.time_start, "starting_wt"));
-    arp.wtd_T           = arp.wtd;
-    arp.wtd_T_iteration = arp.wtd;
-    arp.original_wtd    = arp.wtd;
+    arp.wtd = rd::Array2D<double>(params.get_path(params.time_start, "starting_wt"));
   } else {
-    arp.wtd             = rd::Array2D<double>(arp.topo, 0.);
-    arp.wtd_T           = rd::Array2D<double>(arp.topo, 0.);
-    arp.wtd_T_iteration = rd::Array2D<double>(arp.topo, 0.);
-    arp.original_wtd    = rd::Array2D<double>(arp.topo, 0.);
+    arp.wtd = rd::Array2D<double>(arp.topo, 0.);
   }
   // we start with a water table at the surface for equilibrium runs.
 
@@ -173,14 +156,8 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.evap            = rd::Array2D<float>(arp.topo, 0.);   // Units: m/yr.
   arp.open_water_evap = rd::Array2D<float>(arp.topo, 0.4);  // Units: m/yr.
 
-  arp.winter_temp     = rd::Array2D<float>(arp.topo, 0);  // Units: deg C
-  arp.wtd             = rd::Array2D<double>(arp.topo, 0.0);
-  arp.wtd_T           = rd::Array2D<double>(arp.topo, 0.0);
-  arp.wtd_T_iteration = rd::Array2D<double>(arp.topo, 0.0);
-  arp.original_wtd    = rd::Array2D<double>(arp.topo, 0.0);
-
-  arp.scalar_array_x = rd::Array2D<double>(arp.topo, 0.0);
-  arp.scalar_array_y = rd::Array2D<double>(arp.topo, 0.0);
+  arp.winter_temp = rd::Array2D<float>(arp.topo, 0);  // Units: deg C
+  arp.wtd         = rd::Array2D<double>(arp.topo, 0.0);
 
   arp.fdepth = rd::Array2D<double>(arp.topo, 60);
 
@@ -249,11 +226,8 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
 #pragma omp parallel for default(none) shared(arp)
   for (size_t i = 0; i < arp.topo.size(); i++) {
     if (arp.land_mask(i) == 0) {  // || arp.ice_mask(i) == 1){
-      arp.wtd(i)             = 0.;
-      arp.wtd_T(i)           = 0.;
-      arp.wtd_T_iteration(i) = 0.;
-      arp.original_wtd(i)    = 0.;
-      arp.topo(i)            = 0.;
+      arp.wtd(i)  = 0.;
+      arp.topo(i) = 0.;
     } else {
       arp.topo(i)  = arp.topo(i) / 10.;
       arp.slope(i) = arp.slope(i) / 10.;
@@ -386,11 +360,8 @@ void InitialiseBoth(const Parameters& params, ArrayPack& arp) {
 #pragma omp parallel for default(none) shared(arp)
   for (unsigned int i = 0; i < arp.topo.size(); i++) {
     if (arp.land_mask(i) == 0) {  //|| arp.ice_mask(i) ==1){
-      arp.wtd(i)             = 0.;
-      arp.wtd_T(i)           = 0.;
-      arp.wtd_T_iteration(i) = 0.;
-      arp.original_wtd(i)    = 0.;
-      arp.topo(i)            = 0.;
+      arp.wtd(i)  = 0.;
+      arp.topo(i) = 0.;
     }
   }
 
