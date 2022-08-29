@@ -18,6 +18,7 @@ struct AppCtx {
   Vec mask                = nullptr;
   Vec topo_vec            = nullptr;
   Vec rech_vec            = nullptr;
+  Vec T_vec               = nullptr;
   Vec head                = nullptr;
 
   ~AppCtx() {
@@ -32,6 +33,7 @@ struct AppCtx {
     VecDestroy(&mask);
     VecDestroy(&topo_vec);
     VecDestroy(&rech_vec);
+    VecDestroy(&T_vec);
     VecDestroy(&head);
   }
 
@@ -47,6 +49,7 @@ struct AppCtx {
     VecDuplicate(x, &mask);
     VecDuplicate(x, &topo_vec);
     VecDuplicate(x, &rech_vec);
+    VecDuplicate(x, &T_vec);
     VecDuplicate(x, &head);
   }
 };

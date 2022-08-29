@@ -9,6 +9,7 @@ struct DMDA_Array_Pack {
   PetscScalar** mask                = nullptr;
   PetscScalar** topo_vec            = nullptr;
   PetscScalar** rech_vec            = nullptr;
+  PetscScalar** T_vec               = nullptr;
   PetscScalar** head                = nullptr;
   const AppCtx* context             = nullptr;
 
@@ -23,6 +24,7 @@ struct DMDA_Array_Pack {
     DMDAVecGetArray(user.da, user.mask, &mask);
     DMDAVecGetArray(user.da, user.topo_vec, &topo_vec);
     DMDAVecGetArray(user.da, user.rech_vec, &rech_vec);
+    DMDAVecGetArray(user.da, user.T_vec, &T_vec);
     DMDAVecGetArray(user.da, user.head, &head);
   }
 
@@ -36,6 +38,7 @@ struct DMDA_Array_Pack {
     DMDAVecRestoreArray(context->da, context->mask, &mask);
     DMDAVecRestoreArray(context->da, context->topo_vec, &topo_vec);
     DMDAVecRestoreArray(context->da, context->rech_vec, &rech_vec);
+    DMDAVecRestoreArray(context->da, context->T_vec, &T_vec);
     DMDAVecRestoreArray(context->da, context->head, &head);
     context = nullptr;
   }
