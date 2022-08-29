@@ -12,13 +12,6 @@
 #include <petscerror.h>
 #include <petscsnes.h>
 
-#include <Eigen/Core>
-#include <Eigen/Sparse>  //obtained on Linux using apt install libeigen3-dev. Make sure this points to the right place to include.
-
-using SpMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;  // declares a row-major sparse matrix type of double
-
-constexpr double seconds_in_a_year = 31536000.;
-
 ///////////////////////
 // PRIVATE FUNCTIONS //
 ///////////////////////
@@ -74,127 +67,6 @@ double depthIntegratedTransmissivity(const double wtd_T, const double fdepth, co
   }
 }
 
-// The midpoint method consists of two main steps.
-// In the first step, we compute water tables at the time that is *half* of the full time-step.
-// To do so, we use an implicit backward-difference Euler method.
-// Using these half-time water tables, we compute the new transmissivity values
-// That will be used in the second step of the midpoint method below.
-void first_half(const Parameters& params, ArrayPack& arp) {
-  Eigen::VectorXd b(params.ncells_x * params.ncells_y);
-  Eigen::VectorXd vec_x(params.ncells_x * params.ncells_y);
-  Eigen::VectorXd guess(params.ncells_x * params.ncells_y);
-  SpMat A(params.ncells_x * params.ncells_y, params.ncells_x * params.ncells_y);
-  // reserve the needed space in the A matrix. We know there is a maximum of 5 items per matrix row or column.
-  A.reserve(Eigen::VectorXi::Constant(params.ncells_x * params.ncells_y, 5));
-
-// We need to solve the vector-matrix equation Ax=b.
-// b consists of the current head values (i.e. water table depth + topography)
-// We also populate a 'guess', which consists of a water table (wtd_T) that in later iterations
-// has already been modified for changing transmissivity closer to the final answer.
-#pragma omp parallel for default(none) shared(arp, b, guess, params) collapse(2)
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      b(arp.wtd_T.xyToI(x, y)) =
-          arp.wtd(x, y) + arp.topo(x, y);  // wtd is 0 in ocean cells and topo is 0 in ocean cells, so no need to
-                                           // differentiate between ocean vs land.
-      guess(arp.wtd_T.xyToI(x, y)) = arp.wtd_T(x, y) + arp.topo(x, y);
-    }
-  }
-
-  //  HALFWAY SOLVE
-  //  populate the A matrix.
-
-  const auto construct_e_w_diagonal_one = [&](const int x, const int y, const int dy) {
-    return -arp.scalar_array_y(x, y) * ((arp.transmissivity(x, y + dy) + arp.transmissivity(x, y)) / 2);
-  };
-
-  const auto construct_n_s_diagonal_one = [&](const int x, const int y, const int dx) {
-    return -arp.scalar_array_x(x, y) * ((arp.transmissivity(x + dx, y) + arp.transmissivity(x, y)) / 2);
-  };
-
-  const auto construct_major_diagonal_one =
-      [&](const int x, const int y, const int dx1, const int dx2, const int dy1, const int dy2) {
-        const auto x_term = arp.scalar_array_x(x, y) * (arp.transmissivity(x + dx1, y) / 2 + arp.transmissivity(x, y) +
-                                                        arp.transmissivity(x + dx2, y) / 2);
-        const auto y_term = arp.scalar_array_y(x, y) * (arp.transmissivity(x, y + dy1) / 2 + arp.transmissivity(x, y) +
-                                                        arp.transmissivity(x, y + dy2) / 2);
-        return x_term + y_term + 1;
-      };
-
-#pragma omp parallel for collapse(2) default(none) \
-    shared(arp, params, construct_major_diagonal_one, construct_e_w_diagonal_one, construct_n_s_diagonal_one, A)
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      // The row and column that the current cell will be stored in in matrix A.
-      // This should go up monotonically, i.e. [0,0]; [1,1]; [2,2]; etc.
-      // All of the N,E,S,W directions should be in the same row, but the column will differ.
-      const auto main_loc = arp.wtd_T.xyToI(x, y);
-
-      if (x != 0) {
-        // Do the North diagonal. Offset by -1. When x == 0, there is no north diagonal.
-        A.insert(main_loc, main_loc - 1) = construct_n_s_diagonal_one(x, y, -1);
-      }
-
-      if (y != 0) {
-        // Next is the West diagonal. Opposite of the East. Located at (i,j-params.ncells_x). When y == 0, there is no
-        // west diagonal.
-        A.insert(main_loc, main_loc - params.ncells_x) = construct_e_w_diagonal_one(x, y, -1);
-      }
-
-      // major diagonal:
-      A.insert(main_loc, main_loc) = construct_major_diagonal_one(
-          x,
-          y,
-          (x == 0) ? 0 : -1,
-          (x == params.ncells_x - 1) ? 0 : 1,
-          (y == 0) ? 0 : -1,
-          (y == params.ncells_y - 1) ? 0 : 1);
-
-      if (y != params.ncells_y - 1) {
-        // Now do the East diagonal. The East location is at (i,j+params.ncells_x). When y == params.ncells_y -1,
-        // there is no east diagonal.
-        A.insert(main_loc, main_loc + params.ncells_x) = construct_e_w_diagonal_one(x, y, 1);
-      }
-
-      if (x != params.ncells_x - 1) {
-        // Do the South diagonal, offset by +1. When x == params.ncells_x, there is no south diagonal.
-        A.insert(main_loc, main_loc + 1) = construct_n_s_diagonal_one(x, y, 1);
-      }
-    }
-  }
-
-  A.makeCompressed();
-
-  // Biconjugate gradient solver with guess
-  Eigen::BiCGSTAB<SpMat> solver;
-  solver.setTolerance(params.solver_tolerance_value);
-  // NOTE: we cannot use the Eigen:IncompleteLUT preconditioner, because its implementation is serial. Using it means
-  // that BiCGSTAB will not run in parallel. It is faster without.
-
-  solver.compute(A);
-
-  if (solver.info() != Eigen::Success) {
-    throw std::runtime_error("Eigen sparse solver failed at the compute step!");
-  }
-
-  vec_x = solver.solveWithGuess(b, guess);
-
-  if (solver.info() != Eigen::Success) {
-    throw std::runtime_error("Eigen sparse solver failed at the solve step!");
-  }
-
-  std::cout << "#iterations:     " << solver.iterations() << std::endl;
-  std::cout << "estimated error: " << solver.error() << std::endl;
-
-#pragma omp parallel for default(none) shared(arp, params, vec_x) collapse(2)
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      // copy result into the wtd_T array:
-      arp.wtd_T(x, y) = vec_x(arp.wtd_T.xyToI(x, y)) - arp.topo(x, y);
-    }
-  }
-}
-
 void set_starting_values(Parameters& params, ArrayPack& arp) {
   // no pragma because we're editing arp.total_loss_to_ocean
   // check to see if there is any non-zero water table in ocean
@@ -217,8 +89,6 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
     }
   }
 
-  constexpr double ocean_T = 0.00005 * (1.5 + 60.);
-
 #pragma omp parallel for default(none) shared(arp, params) collapse(2)
   for (int y = 0; y < params.ncells_y; y++) {
     for (int x = 0; x < params.ncells_x; x++) {
@@ -229,56 +99,14 @@ void set_starting_values(Parameters& params, ArrayPack& arp) {
       }
     }
   }
-
-#pragma omp parallel for default(none) shared(arp, params) collapse(2)
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      if (arp.land_mask(x, y) == 0.f) {
-        // in the ocean, we set several arrays to default values
-        arp.transmissivity(x, y) = ocean_T;
-        arp.wtd_T(x, y)          = 0.;
-        arp.original_wtd(x, y)   = 0.;
-      } else {
-        arp.original_wtd(x, y) = arp.wtd(x, y);
-        // Apply the first half of the recharge to the water-table depth grid (wtd)
-        // Its clone (wtd_T) is used and updated in the Picard iteration
-        // use regular porosity for adding recharge since this checks
-        // for underground space within add_recharge.
-        arp.wtd(x, y) += add_recharge(arp.rech(x, y) / 2., arp.wtd(x, y), arp.porosity(x, y), arp.cell_area[y], 0, arp);
-        arp.wtd_T(x, y) = arp.wtd(x, y);
-      }
-      // set the scalar arrays for x and y directions
-      arp.scalar_array_y(x, y) =
-          params.deltat / (arp.effective_storativity(x, y) * arp.cellsize_e_w_metres[y] * arp.cellsize_e_w_metres[y]);
-      params.x_partial         = params.deltat / (params.cellsize_n_s_metres * params.cellsize_n_s_metres);
-      arp.scalar_array_x(x, y) = params.x_partial / arp.effective_storativity(x, y);
-    }
-  }
 }
 
 int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_Pack& dmdapack) {
   PetscInt its;                // iterations for convergence
   SNESConvergedReason reason;  // Check convergence
 
-  Eigen::initParallel();
-  omp_set_num_threads(params.parallel_threads);
-  Eigen::setNbThreads(params.parallel_threads);
-
   // compute any starting values needed for arrays
   set_starting_values(params, arp);
-
-#pragma omp parallel for default(none) shared(arp, params) collapse(2)
-  for (int y = 0; y < params.ncells_y; y++) {
-    for (int x = 0; x < params.ncells_x; x++) {
-      if (arp.land_mask(x, y) != 0.f) {
-        arp.transmissivity(x, y) =
-            depthIntegratedTransmissivity(arp.original_wtd(x, y) / 2., arp.fdepth(x, y), arp.ksat(x, y));
-      }
-    }
-  }
-
-  // Run the first half solver: solve for water table at half of the total deltat.
-  first_half(params, arp);
 
   // Get local array bounds
   const auto [xs, ys, xm, ym] = get_corners(user_context.da);
@@ -287,11 +115,9 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
 #pragma omp parallel for default(none) shared(arp, ys, ym, xs, xm, dmdapack, params) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      dmdapack.time_per_S[j][i] =
-          params.deltat / updateEffectiveStorativity(arp.original_wtd(i, j), arp.wtd_T(i, j), arp.porosity(i, j));
-      dmdapack.rech_vec[j][i] = add_recharge(arp.rech(i, j), arp.original_wtd(i, j), arp.porosity(i, j));
-      dmdapack.head[j][i]     = arp.original_wtd(i, j) + arp.topo(i, j);
-      dmdapack.guess[j][i]    = arp.wtd_T(i, j) + arp.topo(i, j);
+      dmdapack.time_per_S[j][i] = params.deltat / arp.effective_storativity(i, j);
+      dmdapack.rech_vec[j][i]   = add_recharge(arp.rech(i, j), arp.wtd(i, j), arp.porosity(i, j));
+      dmdapack.head[j][i]       = arp.wtd(i, j) + arp.topo(i, j);
     }
   }
 
@@ -321,8 +147,8 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
       dmdapack.time_per_S[j][i] =
-          params.deltat / updateEffectiveStorativity(
-                              arp.original_wtd(i, j), dmdapack.x[j][i] - dmdapack.topo_vec[j][i], arp.porosity(i, j));
+          params.deltat /
+          updateEffectiveStorativity(arp.wtd(i, j), dmdapack.x[j][i] - dmdapack.topo_vec[j][i], arp.porosity(i, j));
     }
   }
 
@@ -365,23 +191,23 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
    X - vector
  */
 static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X) {
-  PetscScalar **x, **my_guess;
+  PetscScalar **x, **my_head;
 
   DMDAVecGetArray(da, X, &x);
-  DMDAVecGetArray(da, user_context->guess, &my_guess);
+  DMDAVecGetArray(da, user_context->head, &my_head);
 
   const auto [xs, ys, xm, ym] = get_corners(da);
 
-#pragma omp parallel for default(none) shared(my_guess, ys, ym, xs, xm, x) collapse(2)
+#pragma omp parallel for default(none) shared(my_head, ys, ym, xs, xm, x) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      x[j][i] = my_guess[j][i];  // when land mask == 0, both topo and wtd have already been set to 0
-                                 // elsewhere, so no need for another if statement here
+      x[j][i] = my_head[j][i];  // when land mask == 0, both topo and wtd have already been set to 0
+                                // elsewhere, so no need for another if statement here
     }
   }
 
   DMDAVecRestoreArray(da, X, &x);
-  DMDAVecRestoreArray(da, user_context->guess, &my_guess);
+  DMDAVecRestoreArray(da, user_context->head, &my_head);
   return 0;
 }
 
