@@ -19,26 +19,8 @@ struct AppCtx {
   Vec topo_vec            = nullptr;
   Vec rech_vec            = nullptr;
   Vec T_vec               = nullptr;
-  Vec head                = nullptr;
   Vec porosity_vec        = nullptr;
   Vec starting_wtd        = nullptr;
-
-  ~AppCtx() {
-    SNESDestroy(&snes);
-    DMDestroy(&da);
-    VecDestroy(&x);
-    VecDestroy(&b);
-    VecDestroy(&cellsize_EW_squared);
-    VecDestroy(&fdepth_vec);
-    VecDestroy(&ksat_vec);
-    VecDestroy(&mask);
-    VecDestroy(&topo_vec);
-    VecDestroy(&rech_vec);
-    VecDestroy(&T_vec);
-    VecDestroy(&head);
-    VecDestroy(&porosity_vec);
-    VecDestroy(&starting_wtd);
-  }
 
   // Extract global vectors from DM; then duplicate for remaining
   // vectors that are the same types
@@ -52,7 +34,6 @@ struct AppCtx {
     VecDuplicate(x, &topo_vec);
     VecDuplicate(x, &rech_vec);
     VecDuplicate(x, &T_vec);
-    VecDuplicate(x, &head);
     VecDuplicate(x, &porosity_vec);
     VecDuplicate(x, &starting_wtd);
   }

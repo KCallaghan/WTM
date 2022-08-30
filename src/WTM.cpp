@@ -223,7 +223,7 @@ void run(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_Pa
   }
 }
 
-void finalise(Parameters& params, ArrayPack& arp) {
+void finalise(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);
 
   textfile << "p done with processing" << std::endl;
@@ -231,6 +231,20 @@ void finalise(Parameters& params, ArrayPack& arp) {
   arp.wtd.saveGDAL(fmt::format("{}{:09}.tif", params.outfile_prefix, params.cycles_done));
 
   textfile.close();
+
+  SNESDestroy(&user_context.snes);
+  DMDestroy(&user_context.da);
+  VecDestroy(&user_context.x);
+  VecDestroy(&user_context.b);
+  VecDestroy(&user_context.cellsize_EW_squared);
+  VecDestroy(&user_context.fdepth_vec);
+  VecDestroy(&user_context.ksat_vec);
+  VecDestroy(&user_context.mask);
+  VecDestroy(&user_context.topo_vec);
+  VecDestroy(&user_context.rech_vec);
+  VecDestroy(&user_context.T_vec);
+  VecDestroy(&user_context.porosity_vec);
+  VecDestroy(&user_context.starting_wtd);
 }
 
 int main(int argc, char** argv) {
@@ -255,9 +269,10 @@ int main(int argc, char** argv) {
   populate_DMDA_array_pack(user_context, arp, dmdapack);
 
   run(params, arp, user_context, dmdapack);
-  finalise(params, arp);
 
   dmdapack.release();
+
+  finalise(params, arp, user_context);
 
   PetscCall(PetscFinalize());
 
