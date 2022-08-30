@@ -6,7 +6,6 @@
 typedef richdem::Array2D<float> f2d;
 typedef richdem::Array2D<double> d2d;
 
-typedef richdem::Array2D<uint8_t> ui82d;
 typedef std::vector<double> dvec;
 
 struct ArrayPack {

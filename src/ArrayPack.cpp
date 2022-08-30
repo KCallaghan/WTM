@@ -18,7 +18,6 @@ void ArrayPack::check() const {
   compare_dimensions(topo, land_mask);
   compare_dimensions(topo, porosity);
   compare_dimensions(topo, effective_storativity);
-  compare_dimensions(topo, evap);
   compare_dimensions(topo, fdepth);
   compare_dimensions(topo, infiltration_array);
   compare_dimensions(topo, rech);
