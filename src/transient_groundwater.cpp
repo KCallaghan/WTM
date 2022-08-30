@@ -105,7 +105,6 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
       dmdapack.rech_vec[j][i]     = add_recharge(arp.rech(i, j), arp.wtd(i, j), arp.porosity(i, j));
-      dmdapack.head[j][i]         = arp.wtd(i, j) + arp.topo(i, j);
       dmdapack.starting_wtd[j][i] = arp.wtd(i, j);
     }
   }
@@ -162,23 +161,25 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
    X - vector
  */
 static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X) {
-  PetscScalar **x, **my_head;
+  PetscScalar **x, **my_starting_wtd, **my_topo;
 
   DMDAVecGetArray(da, X, &x);
-  DMDAVecGetArray(da, user_context->head, &my_head);
+  PetscCall(DMDAVecGetArray(da, user_context->starting_wtd, &my_starting_wtd));
+  PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
 
   const auto [xs, ys, xm, ym] = get_corners(da);
 
-#pragma omp parallel for default(none) shared(my_head, ys, ym, xs, xm, x) collapse(2)
+#pragma omp parallel for default(none) shared(my_starting_wtd, my_topo, ys, ym, xs, xm, x) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      x[j][i] = my_head[j][i];  // when land mask == 0, both topo and wtd have already been set to 0
-                                // elsewhere, so no need for another if statement here
+      x[j][i] = my_starting_wtd[j][i] + my_topo[j][i];  // when land mask == 0, both topo and wtd have already been set
+                                                        // to 0 elsewhere, so no need for another if statement here
     }
   }
 
   DMDAVecRestoreArray(da, X, &x);
-  DMDAVecRestoreArray(da, user_context->head, &my_head);
+  PetscCall(DMDAVecRestoreArray(da, user_context->starting_wtd, &my_starting_wtd));
+  PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
   return 0;
 }
 
@@ -193,22 +194,24 @@ static PetscErrorCode FormInitialGuess(AppCtx* user_context, DM da, Vec X) {
    B - vector
  */
 static PetscErrorCode FormRHS(AppCtx* user_context, DM da, Vec B) {
-  PetscScalar **b, **my_head;
+  PetscScalar **b, **my_starting_wtd, **my_topo;
 
   DMDAVecGetArray(da, B, &b);
-  DMDAVecGetArray(da, user_context->head, &my_head);
+  PetscCall(DMDAVecGetArray(da, user_context->starting_wtd, &my_starting_wtd));
+  PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
 
   const auto [xs, ys, xm, ym] = get_corners(da);
 
-#pragma omp parallel for default(none) shared(ys, ym, xs, xm, b, my_head) collapse(2)
+#pragma omp parallel for default(none) shared(ys, ym, xs, xm, b, my_starting_wtd, my_topo) collapse(2)
   for (auto j = ys; j < ys + ym; j++) {
     for (auto i = xs; i < xs + xm; i++) {
-      b[j][i] = my_head[j][i];  // when land mask == 0, both topo and wtd have already been set to 0
-                                // elsewhere, so no need for another if statement here
+      b[j][i] = my_starting_wtd[j][i] + my_topo[j][i];  // when land mask == 0, both topo and wtd have already been set
+                                                        // to 0 elsewhere, so no need for another if statement here
     }
   }
   DMDAVecRestoreArray(da, B, &b);
-  DMDAVecRestoreArray(da, user_context->head, &my_head);
+  PetscCall(DMDAVecRestoreArray(da, user_context->starting_wtd, &my_starting_wtd));
+  PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
 
   return 0;
 }
