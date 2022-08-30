@@ -47,8 +47,6 @@ struct ArrayPack {
 
   d2d effective_storativity;
   d2d fdepth;
-  d2d fdepth_start;
-  d2d fdepth_end;
   d2d infiltration_array;
   d2d rech;
   d2d runoff;

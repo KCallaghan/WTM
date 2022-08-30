@@ -56,8 +56,8 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
     arp.runoff_ratio_start = rd::Array2D<float>(params.get_path(params.time_start, "runoff_ratio"));
     arp.runoff_ratio_end   = rd::Array2D<float>(params.get_path(params.time_end, "runoff_ratio"));
   } else {
-    arp.runoff_ratio_start = rd::Array2D<float>(arp.topo, 0.0);
-    arp.runoff_ratio_end   = rd::Array2D<float>(arp.topo, 0.0);
+    arp.runoff_ratio_start = rd::Array2D<float>(arp.topo_start, 0.0);
+    arp.runoff_ratio_end   = rd::Array2D<float>(arp.topo_start, 0.0);
   }
 
   if (params.infiltration_on) {
@@ -69,23 +69,24 @@ void InitialiseTransient(Parameters& params, ArrayPack& arp) {
 
   // calculate the fdepth (e-folding depth, representing rate of decay of the
   // hydraulic conductivity with depth) arrays:
-  arp.fdepth_start = rd::Array2D<double>(arp.topo_start, 0);
-  arp.fdepth_end   = rd::Array2D<double>(arp.topo_start, 0);
+  arp.fdepth = rd::Array2D<double>(arp.topo_start, 0);
 
   for (size_t i = 0; i < arp.topo_start.size(); i++) {
-    arp.fdepth_start(i) = setup_fdepth(params, arp.slope_start(i), arp.winter_temp_start(i));
-    arp.fdepth_end(i)   = setup_fdepth(params, arp.slope_end(i), arp.winter_temp_end(i));
+    arp.fdepth(i) = setup_fdepth(params, arp.slope_start(i), arp.winter_temp_start(i));
   }
 
   // initialise the arrays to be as at the starting time:
   arp.topo            = arp.topo_start;
   arp.slope           = arp.slope_start;
   arp.precip          = arp.precip_start;
-  arp.runoff_ratio    = arp.runoff_ratio_start;
   arp.evap            = arp.evap_start;
   arp.open_water_evap = arp.open_water_evap_start;
   arp.winter_temp     = arp.winter_temp_start;
-  arp.fdepth          = arp.fdepth_start;
+  if (params.runoff_ratio_on) {
+    arp.runoff_ratio = arp.runoff_ratio_start;
+  } else {
+    arp.runoff_ratio = rd::Array2D<float>(arp.topo_start, 0.0);
+  }
 }
 
 /// This function initialises those arrays that are needed only for equilibrium
@@ -392,7 +393,7 @@ void UpdateTransientArrays(const Parameters& params, ArrayPack& arp) {
     arp.evap(i)            = (1 - f) * arp.evap_start(i) + f * arp.evap_end(i);
     arp.open_water_evap(i) = (1 - f) * arp.open_water_evap_start(i) + f * arp.open_water_evap_end(i);
     arp.winter_temp(i)     = (1 - f) * arp.winter_temp_start(i) + f * arp.winter_temp_end(i);
-    arp.fdepth(i)          = (1 - f) * arp.fdepth_start(i) + f * arp.fdepth_end(i);
+    arp.fdepth(i)          = setup_fdepth(params, arp.slope(i), arp.winter_temp(i));
 
     arp.label(i)       = dh::NO_DEP;   // No cells are part of a depression
     arp.final_label(i) = dh::NO_DEP;   // No cells are part of a depression
