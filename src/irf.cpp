@@ -229,9 +229,6 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
     if (arp.land_mask(i) == 0) {  // || arp.ice_mask(i) == 1){
       arp.wtd(i)  = 0.;
       arp.topo(i) = 0.;
-    } else {
-      arp.topo(i)  = arp.topo(i) / 10.;
-      arp.slope(i) = arp.slope(i) / 10.;
     }
   }
 
