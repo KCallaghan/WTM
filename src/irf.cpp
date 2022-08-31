@@ -7,7 +7,8 @@
 namespace rd = richdem;
 namespace dh = richdem::dephier;
 
-constexpr double UNDEF = -1.0e7;
+constexpr double UNDEF             = -1.0e7;
+constexpr double seconds_in_a_year = 31536000.;
 
 /// We calculate the e-folding depth here, using temperature and slope.
 double setup_fdepth(const Parameters& params, const double slope, const double temperature) {
@@ -168,10 +169,10 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   arp.land_mask = rd::Array2D<uint8_t>(arp.topo, 1);
   arp.land_mask.setEdges(0);
 
-  arp.precip          = rd::Array2D<float>(arp.topo, 0.03f);  // Units: m/yr.
-  arp.runoff_ratio    = rd::Array2D<float>(arp.topo, 0.);     // Units: m/yr.
-  arp.evap            = rd::Array2D<float>(arp.topo, 0.);     // Units: m/yr.
-  arp.open_water_evap = rd::Array2D<float>(arp.topo, 0.5);    // Units: m/yr.
+  arp.precip          = rd::Array2D<float>(arp.topo, 0.3f);  // Units: m/yr.
+  arp.runoff_ratio    = rd::Array2D<float>(arp.topo, 0.);    // Units: m/yr.
+  arp.evap            = rd::Array2D<float>(arp.topo, 0.);    // Units: m/yr.
+  arp.open_water_evap = rd::Array2D<float>(arp.topo, 0.4);   // Units: m/yr.
 
   arp.winter_temp     = rd::Array2D<float>(arp.topo, 0);  // Units: deg C
   arp.wtd             = rd::Array2D<double>(arp.topo, 0.0);
@@ -200,7 +201,7 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
 
   arp.ksat                  = rd::Array2D<float>(arp.topo, 0.0001f);  // Units of ksat are m/s.
   arp.porosity              = rd::Array2D<float>(arp.topo, 0.25);     // Units: unitless
-  arp.effective_storativity = rd::Array2D<double>(arp.topo, 0.);
+  arp.effective_storativity = rd::Array2D<double>(arp.topo, 0.25);
 
   // Set arrays that start off with zero or other values,
   // that are not imported files. Just to initialise these -
@@ -236,12 +237,9 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
   }
 
 // get the starting runoff using precip and evap inputs:
-#pragma omp parallel for default(none) shared(arp)
+#pragma omp parallel for default(none) shared(arp, params, seconds_in_a_year)
   for (size_t i = 0; i < arp.topo.size(); i++) {
-    arp.rech(i) = arp.precip(i) - arp.evap(i);
-    if (arp.rech(i) < 0) {  // Recharge is always positive.
-      arp.rech(i) = 0.0f;
-    }
+    arp.rech(i) = (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
     if (arp.porosity(i) <= 0) {
       arp.porosity(i) = 0.0000001f;  // not sure why it is sometimes processing cells with 0 porosity?
     }
@@ -267,6 +265,10 @@ void InitialiseTest(Parameters& params, ArrayPack& arp) {
       arp.label(i)       = dh::OCEAN;
       arp.final_label(i) = dh::OCEAN;
     }
+  }
+
+  for (unsigned int i = 0; i < arp.topo.size(); i++) {
+    arp.fdepth(i) = setup_fdepth(params, arp.slope(i), arp.winter_temp(i));
   }
 }
 
