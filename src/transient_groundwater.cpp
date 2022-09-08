@@ -130,6 +130,10 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
   PetscPrintf(
       PETSC_COMM_WORLD, "%s Number of nonlinear iterations = %" PetscInt_FMT "\n", SNESConvergedReasons[reason], its);
 
+  if (reason != 2 && reason != 3 && reason != 4) {
+    throw std::runtime_error("The SNES solver has not converged.");
+  }
+
   // copy the result back into the wtd array
   for (int j = ys; j < ys + ym; j++) {
     for (int i = xs; i < xs + xm; i++) {
