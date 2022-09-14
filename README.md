@@ -8,7 +8,7 @@ The model is intended for determining the depth or elevation of the water table,
 
 The model works by coupling groundwater and surface water components. The groundwater component moves water by solving the 2D horizontal groundwater equation: 
 
-<img src="https://latex.codecogs.com/svg.image?\bg{white}S_0\frac{\partial&space;h}{\partial&space;t}&space;=&space;\frac{\partial}{\partial&space;x}&space;\left(T\frac{\partial&space;h}{\partial&space;x}\right)&space;&plus;&space;&space;\frac{\partial}{\partial&space;y}&space;\left(T\frac{\partial&space;h}{\partial&space;y}\right)&space;&plus;&space;R" title="https://latex.codecogs.com/svg.image?\bg{white}S_0\frac{\partial h}{\partial t} = \frac{\partial}{\partial x} \left(T\frac{\partial h}{\partial x}\right) + \frac{\partial}{\partial y} \left(T\frac{\partial h}{\partial y}\right) + R" />
+<img src="https://latex.codecogs.com/svg.image?\bg{black}S_0\frac{\partial&space;h}{\partial&space;t}&space;=&space;\frac{\partial}{\partial&space;x}&space;\left(T\frac{\partial&space;h}{\partial&space;x}\right)&space;&plus;&space;&space;\frac{\partial}{\partial&space;y}&space;\left(T\frac{\partial&space;h}{\partial&space;y}\right)&space;&plus;&space;R" title="https://latex.codecogs.com/svg.image?\bg{black}S_0\frac{\partial h}{\partial t} = \frac{\partial}{\partial x} \left(T\frac{\partial h}{\partial x}\right) + \frac{\partial}{\partial y} \left(T\frac{\partial h}{\partial y}\right) + R" />
 
 cell-to-cell using Darcy's Law with a finite-difference approach in a single layer of vertically integrated hydraulic conductivity.
 
