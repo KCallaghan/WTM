@@ -6,7 +6,17 @@
 
 The model is intended for determining the depth or elevation of the water table, given a certain topography and set of climate inputs. Water table can be below ground (groundwater) or above ground (lake surfaces).
 
-The model works by coupling groundwater and surface water components. The groundwater component moves water cell-to-cell using Darcy's Law with a finite-difference approach in a single layer of vertically integrated hydraulic conductivity.
+The model works by coupling groundwater and surface water components. The groundwater component moves water by solving the 2D horizontal groundwater equation: 
+
+
+<img src="https://render.githubusercontent.com/render/math?math=x_{1,2} = \frac{-b \pm \sqrt{b^2-4ac}}{2b}">
+
+\begin{align}
+    S_0\frac{\partial h}{\partial t} = \frac{\partial}{\partial x} \left(T\frac{\partial h}{\partial x}\right) +  \frac{\partial}{\partial y} \left(T\frac{\partial h}{\partial y}\right) + R
+\end{align}, 
+
+
+cell-to-cell using Darcy's Law with a finite-difference approach in a single layer of vertically integrated hydraulic conductivity.
 
 The surface-water component was collaboratively written by R Barnes and KL Callaghan. It works by creating a hierarchy of depressions for the topography, and then allowing water to move across the land surface, filling depressions and spilling from one depression into another. For more details on the depression hierarchy, see:
 
