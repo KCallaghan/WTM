@@ -345,12 +345,56 @@ void InitialiseBoth(const Parameters& params, ArrayPack& arp) {
     }
   }
 
-  // get the starting runoff using precip and evap inputs:
 #pragma omp parallel for default(none) shared(arp, params)
   for (unsigned int i = 0; i < arp.topo.size(); i++) {
-    arp.rech(i) = (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
     if (arp.porosity(i) <= 0) {
       arp.porosity(i) = 0.0000001f;  // not sure why it is sometimes processing cells with 0 porosity?
+    }
+  }
+
+  // get the starting runoff using precip and evap inputs:
+  // Evap mode 1: Use the computed open-water evaporation rate
+  if (params.evap_mode) {
+    std::cout << "p updating the recharge field" << std::endl;
+#pragma omp parallel for default(none) shared(arp, params)
+    for (unsigned int i = 0; i < arp.topo.size(); i++) {
+      if (arp.wtd(i) > 0) {  // if there is surface water present
+        arp.rech(i) = (arp.precip(i) - arp.open_water_evap(i)) / seconds_in_a_year * params.deltat;
+      } else {  // water table is below the surface
+        // Recharge is always positive.
+        arp.rech(i) =
+            (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
+      }
+
+      if (arp.rech(i) > 0) {
+        // if there is positive recharge, some of it may run off.
+        // set the amount of runoff based on runoff_ratio, and subtract this amount from the recharge.
+        arp.runoff(i) = arp.runoff_ratio(i) * arp.rech(i);
+        arp.rech(i) -= arp.runoff(i);
+      }
+    }
+  }
+
+  // Evap mode 0: remove all surface water (like Fan Reinfelder et al., 2013)
+  else {
+    std::cout << "p removing all surface water" << std::endl;
+#pragma omp parallel for default(none) shared(arp, params)
+    for (unsigned int i = 0; i < arp.topo.size(); i++) {
+      if (arp.wtd(i) > 0) {  // if there is surface water present
+        arp.wtd(i) = 0;      // use this option when testing GW component alone
+        // still set recharge because it could be positive in this cell, and some may run off or move to neighbouring
+        // cells
+        arp.rech(i) = (arp.precip(i) - arp.open_water_evap(i)) / seconds_in_a_year * params.deltat;
+      } else {  // water table is below the surface
+        arp.rech(i) =
+            (std::max(0., static_cast<double>(arp.precip(i)) - arp.evap(i))) / seconds_in_a_year * params.deltat;
+      }
+      if (arp.rech(i) > 0) {
+        // if there is positive recharge, some of it may run off.
+        // set the amount of runoff based on runoff_ratio, and subtract this amount from the recharge.
+        arp.runoff(i) = arp.runoff_ratio(i) * arp.rech(i);
+        arp.rech(i) -= arp.runoff(i);
+      }
     }
   }
 
