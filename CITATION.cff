@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Callaghan"
+  given-names: "Kerry Lee"
+  orcid: "https://orcid.org/0000-0002-2674-0838"
+- family-names: "Barnes"
+  given-names: "Richard"
+  orcid: "https://orcid.org/0000-0002-0204-6040"
+- family-names: "Wickert"
+  given-names: "Andrew D."
+  orcid: "https://orcid.org/0000-0002-9545-3365"
+title: "The Water Table Model"
+version: 2.0.0
+doi: 10.5281/zenodo.8092449
+date-released: 2023-06-28
+url: "https://github.com/KCallaghan/WTM"
