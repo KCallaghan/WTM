@@ -4029,7 +4029,7 @@ namespace {
         static bool             isSet;
         static struct sigaction oldSigActions[DOCTEST_COUNTOF(signalDefs)];
         static stack_t          oldSigStack;
-        static char             altStackMem[4 * SIGSTKSZ];
+        static char             altStackMem[4 * 10000];  //TODO this used to be a call to SIGSTKSZ (not 10000) which is deprecated, do something better than just a random value
 
         static void handleSignal(int sig) {
             const char* name = "<unknown signal>";
