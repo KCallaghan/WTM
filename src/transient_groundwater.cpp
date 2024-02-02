@@ -263,7 +263,7 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
         const PetscScalar ux_W = (this_x - x[j][i - 1]);
         const PetscScalar uy_N = (x[j + 1][i] - this_x);
         const PetscScalar uy_S = (this_x - x[j - 1][i]);
-        const PetscScalar e_E  = 2. / (this_T + my_T[j][i + 1]);
+        const PetscScalar e_E  = 2. / (this_T + my_T[j][i + 1]);  //harmonic means
         const PetscScalar e_W  = 2. / (this_T + my_T[j][i - 1]);
         const PetscScalar e_N  = 2. / (this_T + my_T[j + 1][i]);
         const PetscScalar e_S  = 2. / (this_T + my_T[j - 1][i]);
