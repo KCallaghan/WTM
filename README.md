@@ -2,13 +2,13 @@
 
 # The Water Table Model (WTM)
 
-***This model combines groundwater and surface water flow to output the elevation of the water table relative to the land surface at a given time.***
+***This model combines groundwater flow and dynamic lake simulation to output the elevation of the water table relative to the land surface at a given time.***
 
 The model is intended for determining the depth or elevation of the water table, given a certain topography and set of climate inputs. Water table can be below ground (groundwater) or above ground (lake surfaces).
 
-The model works by coupling groundwater and surface water components. The groundwater component moves water cell-to-cell using Darcy's Law with a finite-difference approach in a single layer of vertically integrated hydraulic conductivity.
+The model works by coupling groundwater and dynamic lake components. The groundwater component moves water cell-to-cell by solving the 2D groundwater flow equation for a heterogeneous, horizontally isotropic medium. It uses PETSc's SNES component to do so. The model is structured with a single layer of vertically integrated hydraulic conductivity.
 
-The surface-water component was collaboratively written by R Barnes and KL Callaghan. It works by creating a hierarchy of depressions for the topography, and then allowing water to move across the land surface, filling depressions and spilling from one depression into another. For more details on the depression hierarchy, see:
+The dynamic lake component was collaboratively written by R Barnes and KL Callaghan. It works by creating a hierarchy of depressions for the topography, and then allowing water to move across the land surface, filling depressions and spilling from one depression into another. For more details on the depression hierarchy, see:
 
 **Barnes, R, Callaghan, KL, and Wickert, AD, (2020), [Computing water flow through complex landscapes, Part 2: Finding hierarchies in depressions and morphological segmentations](https://esurf.copernicus.org/articles/8/431/2020/), *Earth Surf. Dynam.*, doi:10.5194/esurf-8-431-2020**
 
@@ -21,7 +21,7 @@ Please contact us if you have questions or suggestions!
 
 ## Required data inputs
 
-Data inputs are all in a .nc (NetCDF) format. The NetCDF files should have 3 variables: 'lat' for latitude, 'lon' for longitude, and 'value' for the value of interest (e.g. elevation, precipitation, etc).
+Data inputs are all in a Geotiff (.tif) format. 
 
 The following files are required:
 * Topography - elevation in metres
@@ -32,12 +32,12 @@ The following files are required:
 * Winter air temperature - in degrees Celsius
 * Hydraulic conductivity - in metres per second
 * Porosity - unitless
-* Open-water evaporation - in metres per second
+* Open-water evaporation - in metres per year
 
 ## Dependencies
 
 * The C++ compiler g++
-* NetCDF for C++
+* GDAL
 * RichDEM
 
 ## Downloading with dependencies
@@ -70,7 +70,15 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DUSE_GDAL=ON ..
 make
 ```
-Use `-DSANITIZE_ADDRESS=On` to enable addressing sanitizing
+Use `-DSANITIZE_ADDRESS=On` to enable addressing sanitizing.
+
+Alternatively, to build with `ninja`, use:
+```
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DRICHDEM_LOGGING=ON  -GNinja ..
+ninja
+```
 
 ## Running the code
 Ensure that all of the data files are located appropriately in a folder together. Edit the Config_file.cfg configuration file as appropriate. The configuration file contains the following variables:
@@ -107,11 +115,12 @@ Once the configuration file has been set up appropriately, simply open a termina
 # Optionally:
 # export OMP_NUM_THREADS=N
 # Required
-./twsm.x Config_file.cfg
+./build/wtm.x Config_file.cfg -snes_mf -snes_type anderson -snes_stol T
 ```
 Here, N is the number of CPU threads you want the parallel processing for the groundwater-flow step to use. In the above line, you are setting an environment variable that will define this until you exit the terminal window.
+T is the tolerance setting for the SNES solver (e.g. 0.000001).
 
-There will be some on-screen outputs to indicate the first steps through the code, after which values of interest will be output to the text file and an updated geoTiff output file will be saved every 100 iterations.
+There will be some on-screen outputs to indicate the first steps through the code, after which values of interest will be output to the text file and an updated geoTiff output file will be saved every X iterations (X is set in the configuration file).
 
 ## Example of a full config file:
 ```
