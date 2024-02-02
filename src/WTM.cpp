@@ -104,6 +104,7 @@ void update(
   if ((params.cycles_done % params.cycles_to_save) == 0) {
     // Save the output every "cycles_to_save" iterations, under a new filename
     // so we can compare how the water table has changed through time.
+    arp.wtd.setNoData(-9999);
     arp.wtd.saveGDAL(fmt::format("{}{:09}.tif", params.outfile_prefix, params.cycles_done));
   }
 
@@ -228,6 +229,7 @@ void finalise(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
 
   textfile << "p done with processing" << std::endl;
   // save the final answer for water table depth.
+  arp.wtd.setNoData(-9999);
   arp.wtd.saveGDAL(fmt::format("{}{:09}.tif", params.outfile_prefix, params.cycles_done));
 
   textfile.close();
