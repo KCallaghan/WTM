@@ -49,7 +49,7 @@ https://help.github.com/en/github/authenticating-to-github/generating-a-new-ssh-
 
 Clone with submodule dependencies (RichDEM) included:
 ```sh
-git clone --recurse-submodules https://github.com/KCallaghan/Coupled_SW_GW
+git clone --recurse-submodules https://github.com/KCallaghan/WTM
 ```
 
 If you forget to do this and just run a normal `git clone`, you can still pull the submodules:
