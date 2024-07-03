@@ -11,7 +11,7 @@ authors:
   given-names: "Andrew D."
   orcid: "https://orcid.org/0000-0002-9545-3365"
 title: "The Water Table Model"
-version: 2.0.0
-doi: 10.5281/zenodo.8092449
-date-released: 2023-06-28
+version: 2.0.1
+doi: 10.5281/zenodo.10611076
+date-released: 2024-02-02
 url: "https://github.com/KCallaghan/WTM"
