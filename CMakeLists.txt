@@ -48,7 +48,7 @@ add_library(wtm
   src/update_effective_storativity.cpp
 )
 target_compile_options(wtm PRIVATE -Wfloat-conversion -Wall -Wextra -pedantic -Wshadow)
-target_link_libraries(wtm PUBLIC richdem OpenMP::OpenMP_CXX fmt::fmt PkgConfig::PETSC )
+target_link_libraries(wtm PUBLIC richdem OpenMP::OpenMP_CXX fmt::fmt PkgConfig::PETSC)
 target_compile_features(wtm PUBLIC cxx_std_20)
 
 add_executable(wtm.x

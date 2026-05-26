@@ -27,9 +27,14 @@ void InitialiseSNES(AppCtx& user_context, Parameters& params) {
   DMSetUp(user_context.da);
 
   user_context.make_global_vectors();
+  user_context.make_local_vectors();
 
   DMSetApplicationContext(user_context.da, &user_context);
   SNESSetDM(user_context.snes, user_context.da);
 
+  // Anderson mixing converges reliably without a Jacobian for this nonlinear problem.
+  // m=1 (1 history vector) is sufficient and avoids the instability seen with m>1.
+  // Override with -snes_type or -snes_anderson_m at runtime if needed.
+  SNESSetType(user_context.snes, SNESANDERSON);
   SNESSetFromOptions(user_context.snes);
 }

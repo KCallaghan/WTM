@@ -104,8 +104,13 @@ void update(
   if ((params.cycles_done % params.cycles_to_save) == 0) {
     // Save the output every "cycles_to_save" iterations, under a new filename
     // so we can compare how the water table has changed through time.
-    arp.wtd.setNoData(-9999);
-    arp.wtd.saveGDAL(fmt::format("{}{:09}.tif", params.outfile_prefix, params.cycles_done));
+    // wtd is fully assembled on all ranks by FanDarcyGroundwater::update; rank 0 writes.
+    PetscMPIInt rank;
+    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+    if (rank == 0) {
+      arp.wtd.setNoData(-9999);
+      arp.wtd.saveGDAL(fmt::format("{}{:09}.tif", params.outfile_prefix, params.cycles_done));
+    }
   }
 
   arp.wtd_old = arp.wtd;  // These are used to see how much change occurs
@@ -228,9 +233,13 @@ void finalise(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
   std::ofstream textfile(params.textfilename, std::ios_base::app);
 
   textfile << "p done with processing" << std::endl;
-  // save the final answer for water table depth.
-  arp.wtd.setNoData(-9999);
-  arp.wtd.saveGDAL(fmt::format("{}{:09}.tif", params.outfile_prefix, params.cycles_done));
+  // Save the final answer. wtd is assembled on all ranks; only rank 0 writes to avoid conflicts.
+  PetscMPIInt rank;
+  MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+  if (rank == 0) {
+    arp.wtd.setNoData(-9999);
+    arp.wtd.saveGDAL(fmt::format("{}{:09}.tif", params.outfile_prefix, params.cycles_done));
+  }
 
   textfile.close();
 
@@ -244,9 +253,12 @@ void finalise(Parameters& params, ArrayPack& arp, AppCtx& user_context) {
   VecDestroy(&user_context.mask);
   VecDestroy(&user_context.topo_vec);
   VecDestroy(&user_context.rech_vec);
-  VecDestroy(&user_context.T_vec);
   VecDestroy(&user_context.porosity_vec);
   VecDestroy(&user_context.starting_wtd);
+  VecDestroy(&user_context.topo_local);
+  VecDestroy(&user_context.fdepth_local);
+  VecDestroy(&user_context.ksat_local);
+  VecDestroy(&user_context.T_local);
 }
 
 int main(int argc, char** argv) {
@@ -269,6 +281,9 @@ int main(int argc, char** argv) {
 
   DMDA_Array_Pack dmdapack(user_context);  // this needs to come after initialise
   populate_DMDA_array_pack(user_context, arp, dmdapack);
+  // Scatter topo/fdepth/ksat to local ghost vectors. These global vecs are not held by
+  // dmdapack so there is no GetArray lock conflict.
+  scatter_static_fields(user_context, arp);
 
   run(params, arp, user_context, dmdapack);
 

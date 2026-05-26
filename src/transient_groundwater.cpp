@@ -150,6 +150,22 @@ int update(Parameters& params, ArrayPack& arp, AppCtx& user_context, DMDA_Array_
     }
   }
 
+  // Assemble the full wtd field across all MPI ranks.  Each rank has updated
+  // only its owned cells; non-owned entries are left at their previous values.
+  // Build a buffer with owned cells non-zero and everything else zeroed, then
+  // sum across ranks so that every rank ends up with the complete correct field.
+  {
+    const int total = params.ncells_x * params.ncells_y;
+    std::vector<double> owned_only(total, 0.0);
+    for (int j = ys; j < ys + ym; j++)
+      for (int i = xs; i < xs + xm; i++)
+        owned_only[j * params.ncells_x + i] = arp.wtd(i, j);
+    MPI_Allreduce(MPI_IN_PLACE, owned_only.data(), total, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD);
+    for (int j = 0; j < params.ncells_y; j++)
+      for (int i = 0; i < params.ncells_x; i++)
+        arp.wtd(i, j) = owned_only[j * params.ncells_x + i];
+  }
+
   return 0;
 }
 
@@ -230,21 +246,23 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
       **my_porosity;
 
   /*
-    Compute function over the locally owned part of the grid
- */
+    Compute function over the locally owned part of the grid.
+    topo/fdepth/ksat/T use local ghost vectors so neighbor accesses [j][i±1] are valid under MPI.
+  */
   PetscCall(DMDAVecGetArray(da, user_context->mask, &my_mask));
   PetscCall(DMDAVecGetArray(da, user_context->cellsize_EW_squared, &cellsize_ew_sq));
-  PetscCall(DMDAVecGetArray(da, user_context->fdepth_vec, &my_fdepth));
-  PetscCall(DMDAVecGetArray(da, user_context->ksat_vec, &my_ksat));
-  PetscCall(DMDAVecGetArray(da, user_context->topo_vec, &my_topo));
+  PetscCall(DMDAVecGetArray(da, user_context->fdepth_local, &my_fdepth));
+  PetscCall(DMDAVecGetArray(da, user_context->ksat_local, &my_ksat));
+  PetscCall(DMDAVecGetArray(da, user_context->topo_local, &my_topo));
   PetscCall(DMDAVecGetArray(da, user_context->rech_vec, &my_rech));
-  PetscCall(DMDAVecGetArray(da, user_context->T_vec, &my_T));
+  PetscCall(DMDAVecGetArray(da, user_context->T_local, &my_T));
   PetscCall(DMDAVecGetArray(da, user_context->porosity_vec, &my_porosity));
   PetscCall(DMDAVecGetArray(da, user_context->starting_wtd, &my_starting_wtd));
 
+  // Compute 1/T over the full ghost range so neighbor lookups in the owned-range loop below are valid.
 #pragma omp parallel for default(none) shared(info, my_T, x, my_topo, my_fdepth, my_ksat) collapse(2)
-  for (auto j = info->ys; j < info->ys + info->ym; j++) {
-    for (auto i = info->xs; i < info->xs + info->xm; i++) {
+  for (auto j = info->gys; j < info->gys + info->gym; j++) {
+    for (auto i = info->gxs; i < info->gxs + info->gxm; i++) {
       my_T[j][i] = 1. / depthIntegratedTransmissivity(x[j][i] - my_topo[j][i], my_fdepth[j][i], my_ksat[j][i]);
     }
   }
@@ -283,11 +301,11 @@ static PetscErrorCode FormFunctionLocal(DMDALocalInfo* info, PetscScalar** x, Pe
 
   PetscCall(DMDAVecRestoreArray(da, user_context->mask, &my_mask));
   PetscCall(DMDAVecRestoreArray(da, user_context->cellsize_EW_squared, &cellsize_ew_sq));
-  PetscCall(DMDAVecRestoreArray(da, user_context->fdepth_vec, &my_fdepth));
-  PetscCall(DMDAVecRestoreArray(da, user_context->ksat_vec, &my_ksat));
-  PetscCall(DMDAVecRestoreArray(da, user_context->topo_vec, &my_topo));
+  PetscCall(DMDAVecRestoreArray(da, user_context->fdepth_local, &my_fdepth));
+  PetscCall(DMDAVecRestoreArray(da, user_context->ksat_local, &my_ksat));
+  PetscCall(DMDAVecRestoreArray(da, user_context->topo_local, &my_topo));
   PetscCall(DMDAVecRestoreArray(da, user_context->rech_vec, &my_rech));
-  PetscCall(DMDAVecRestoreArray(da, user_context->T_vec, &my_T));
+  PetscCall(DMDAVecRestoreArray(da, user_context->T_local, &my_T));
   PetscCall(DMDAVecRestoreArray(da, user_context->porosity_vec, &my_porosity));
   PetscCall(DMDAVecRestoreArray(da, user_context->starting_wtd, &my_starting_wtd));
 
