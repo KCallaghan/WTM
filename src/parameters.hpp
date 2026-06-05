@@ -26,6 +26,7 @@ struct Parameters {
   std::string time_end       = UNINIT_STR;
 
   double cells_per_degree = -1;
+  double res_meters = -1;
 
   double UNDEF = -1.0e7;
 
@@ -34,6 +35,7 @@ struct Parameters {
   int32_t evap_mode       = -1;
   int32_t fsm_on          = -1;
   int32_t runoff_ratio_on = -1;
+  int32_t grid_type = -1;
 
   double deltat          = std::numeric_limits<double>::signaling_NaN();
   double fdepth_a        = -1.;

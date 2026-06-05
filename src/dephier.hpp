@@ -312,7 +312,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   // begin looking for depressions. We add all of these ocean cells to the
   // priority queue now.
   uint64_t ocean_cells = 0;
-#pragma omp parallel for default(none) shared(dem,dx,dy,label,neighbours) collapse(2) reduction(+:ocean_cells) reduction(merge:ocean_seeds)
+#pragma omp parallel for shared(dem,dx,dy,label,neighbours) collapse(2) reduction(+:ocean_cells) reduction(merge:ocean_seeds)
   for (int y = 0; y < dem.height(); y++)
     for (int x = 0; x < dem.width(); x++) {
       // Ensure the input only has OCEAN and NO_DEP labels.
@@ -366,7 +366,7 @@ DepressionHierarchy<elev_t> GetDepressionHierarchy(
   // finds and this shouldn't slow things down too much!
   int pit_cell_count = 0;
   progress.start(dem.size());
-#pragma omp parallel for default(none) shared(dem,dx,dy,label,neighbours,progress) private(ocean_seeds) collapse(2) reduction(+:pit_cell_count) reduction(merge:land_seeds)
+#pragma omp parallel for shared(dem,dx,dy,label,neighbours,progress) private(ocean_seeds) collapse(2) reduction(+:pit_cell_count) reduction(merge:land_seeds)
   for (int y = 0; y < dem.height(); y++)     // Look at all the cells
     for (int x = 0; x < dem.width(); x++) {  // Yes, all of them
       ++progress;

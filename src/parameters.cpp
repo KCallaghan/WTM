@@ -22,6 +22,10 @@ Parameters::Parameters(const std::string& config_file) {
       continue;
     }
 
+    if (line.find("#")==0) {
+      continue;
+    }
+
     std::stringstream ss(line);
     std::string key;
     ss >> key;
@@ -44,6 +48,8 @@ Parameters::Parameters(const std::string& config_file) {
       ss >> fdepth_fmin;
     } else if (key == "fsm_on") {
       ss >> fsm_on;
+    } else if (key == "grid_type") {
+      ss >> grid_type;
     } else if (key == "infiltration_on") {
       ss >> infiltration_on;
     } else if (key == "maxiter") {
@@ -52,6 +58,8 @@ Parameters::Parameters(const std::string& config_file) {
       ss >> outfile_prefix;
     } else if (key == "region") {
       ss >> region;
+    } else if (key == "res_meters") {
+      ss >> res_meters;
     } else if (key == "run_type") {
       ss >> run_type;
     } else if (key == "runoff_ratio_on") {
@@ -98,12 +106,21 @@ void Parameters::check() const {
     }
   };
 
-  check_positive("cells_per_degree", cells_per_degree);
+  check_binary(
+	       grid_type, "set grid_type to 0 for a latlon grid, or 1 for an xy (meters) grid.");
+
+  if (grid_type == 0) {
+    check_positive("cells_per_degree", cells_per_degree);
+    if (std::isnan(southern_edge) || southern_edge < -90 || southern_edge > 90) {
+      throw std::runtime_error("please enter a value between -90 and 90 degrees for the southern_edge!");
+    }
+  } else {
+    check_positive("res_meters", res_meters);
+  }
+
   check_positive("cycles_to_save", cycles_to_save);
   check_positive("deltat", deltat);
-  if (std::isnan(southern_edge) || southern_edge < -90 || southern_edge > 90) {
-    throw std::runtime_error("please enter a value between -90 and 90 degrees for the southern_edge!");
-  }
+
   check_binary(
       evap_mode,
       "set evap_mode to 0 to remove all surface water, or 1 to use a grid of potential evaporation for lakes.");
@@ -148,7 +165,9 @@ std::string Parameters::get_path(const std::string& layer_name) const {
 }
 
 void Parameters::print() const {
-  std::cout << "c cells_per_degree       = " << cells_per_degree << std::endl;
+  if (grid_type == 0) {
+    std::cout << "c cells_per_degree       = " << cells_per_degree << std::endl;
+  } 
   std::cout << "c cycles_to_save         = " << cycles_to_save << std::endl;
   std::cout << "c deltat                 = " << deltat << std::endl;
   std::cout << "c evap_mode              = " << evap_mode << std::endl;
@@ -160,9 +179,14 @@ void Parameters::print() const {
   std::cout << "c maxiter                = " << maxiter << std::endl;
   std::cout << "c outfile_prefix         = " << outfile_prefix << std::endl;
   std::cout << "c region                 = " << region << std::endl;
+  if (grid_type == 1) {
+    std::cout << "c res_meters             = " << res_meters << std::endl;
+  }
   std::cout << "c run_type               = " << run_type << std::endl;
   std::cout << "c runoff_ratio_on        = " << runoff_ratio_on << std::endl;
-  std::cout << "c southern_edge          = " << southern_edge << std::endl;
+  if (grid_type == 0) {
+    std::cout << "c southern_edge          = " << southern_edge << std::endl;
+  }
   std::cout << "c supplied_wt            = " << supplied_wt << std::endl;
   std::cout << "c surfdatadir            = " << surfdatadir << std::endl;
   std::cout << "c textfilename           = " << textfilename << std::endl;
